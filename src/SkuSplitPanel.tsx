@@ -53,7 +53,7 @@ export function SkuSplitPanel({
       <div className="sku-split-list">
         {results.map((product) => (
           <div className="sku-split-list-row" key={product.id}>
-            <span>{product.code} / {product.name} <small>옵션 {product.variants.length}개</small></span>
+            <span>{product.name} <small>옵션 {product.variants.length}개</small></span>
             <button type="button" disabled={busy} onClick={() => review(product.id)}>분리 검토</button>
           </div>
         ))}
