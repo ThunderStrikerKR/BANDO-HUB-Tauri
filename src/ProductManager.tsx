@@ -71,7 +71,7 @@ export function ProductManager({
     };
   }, [edit?.id]);
   // Staff-created products do not need a Cafe24 listing or official option ID.
-  const manualOptionEditor = !!edit && !edit.siteId && !edit.sourceProductId &&
+  const manualOptionEditor = !!edit && !edit.sourceProductId &&
     edit.variants.every((variant) => variant.source === "MANUAL");
   const detailImage = edit && (
     edit.imageOverride === "HIDDEN" ? undefined :
