@@ -22,6 +22,7 @@ const api: Api = {
   isTestWorkspace: true,
   saveProductWorkbook: (bytes) => invoke<string | null>("save_product_workbook", { bytes }),
   saveProductSyncWorkbook: (bytes) => invoke<string | null>("save_product_sync_workbook", { bytes }),
+  saveFactoryWorkbook: (bytes) => invoke<string | null>("save_factory_workbook", { bytes }),
   saveClientWorkbook: (bytes) => invoke<string | null>("save_client_workbook", { bytes }),
   saveRegistrationWorkbook: (kind, bytes) => invoke<string | null>("save_registration_workbook", { kind, bytes }),
   load: () => invoke<State>("state_load"),
