@@ -184,7 +184,7 @@ export function dailySettlement(state: State, date: string, historyRows: History
       paidAllocated, paymentApproved, outstanding,
       freightCost: freight.complete ? freight.value : null,
       freightComplete: freight.complete,
-      cashEvidenceMissing: !!order.paid && !paidAllocated && !paymentApproved,
+      cashEvidenceMissing: !!order.paid && !paidAllocated,
       legacyDate: !order.confirmedAt,
       shipmentIds: [...row.shipmentIds],
     };
