@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { confirmAction, promptText } from "./dialogs";
 import { clientCandidates, suggestClient, won } from "./domain";
 import { applyCatalogPriceSync, previewCatalogPriceSync, type CatalogPricePreview } from "./catalog-price-sync";
-import { colorLabel, productKey, registeredProducts } from "./product-models";
 import type { NoticeSink } from "./shared/notices";
 import { useAsyncTask } from "./shared/useAsyncTask";
 import type { BulkPreview, CatalogReport, Client, State } from "./types";
