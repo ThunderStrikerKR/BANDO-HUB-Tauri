@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { confirmAction } from "./dialogs";
 import {
   applyClientWorkbook, exportClientWorkbook, previewClientWorkbook,
   type ClientWorkbookPreview,
@@ -48,6 +49,10 @@ export function ClientWorkbookTools({
   const approve = () => void run(async () => {
     if (!preview || !accepted || tally.held || tally.error ||
       (!tally.created && !tally.updated)) return;
+    if (!(await confirmAction(
+      "거래처 신규 " + tally.created + "건과 수정 " + tally.updated +
+      "건을 저장할까요? 기존 거래처, 주문과 특수 단가는 보존합니다."
+    ))) return;
     const current = await window.bando!.load();
     const { next, created, updated } = applyClientWorkbook(current, preview);
     await window.bando!.backup();
