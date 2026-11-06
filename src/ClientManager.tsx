@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { confirmAction } from "./dialogs";
 import { clientCandidates, uid } from "./domain";
-import { BulkTools, TierBadge } from "./ManagementUI";
+import { TierBadge } from "./ManagementUI";
+import { ClientWorkbookTools } from "./ClientWorkbookTools";
 import { colorLabel, registeredProducts } from "./product-models";
 import type { NoticeSink } from "./shared/notices";
 import { useAsyncTask } from "./shared/useAsyncTask";
