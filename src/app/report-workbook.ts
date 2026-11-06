@@ -1,6 +1,6 @@
-import { orderHistory } from "./order-history";
+import { seoulDate } from "./settlement-report";
 import type { State } from "../types";
-import { dailySettlement, type DailySettlementReport, type HistoryRow } from "./settlement-report";
+import type { DailySettlementReport, HistoryRow } from "./settlement-report";
 
 export interface ReportWorkbookData {
   date: string;
@@ -93,7 +93,7 @@ export async function exportOrderHistoryWorkbook(
   for (const row of historyRows) {
     sheet.addRow([
       row.order.id,
-      new Date(row.order.confirmedAt ?? row.order.createdAt).toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" }),
+      seoulDate(row.order.confirmedAt ?? row.order.createdAt),
       safeCell(row.client?.name ?? row.order.clientSnapshot?.name ?? "미확인"),
       row.status, safeCell(row.recipients.map((r) => r.name).join(", ")),
       currency(row.billing.subtotal), currency(row.billing.shipping),
