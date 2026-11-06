@@ -76,8 +76,11 @@ export function parseOfficialProductPage(urlText: string, html: string, state: S
   const retail = parsePrice(field("판매가")) ??
     parsePrice(meta('meta[property="product:price:amount"]')) ??
     parsePrice(clean(doc.querySelector("#span_product_price_text")?.textContent));
+  const description = clean(doc.querySelector("#prdDetail, .prdDetail")?.textContent).slice(0, 6000);
   const explicitColor = field("색상") ||
-    name.match(/\b(Black|White|Gray|Grey|Silver|Brown|Blue|Red|Gold|Clear)\b/i)?.[1] || "";
+    name.match(/\b(Black|White|Gray|Grey|Silver|Brown|Blue|Red|Gold|Clear)\b/i)?.[1] ||
+    name.match(/(블랙|검정|화이트|그레이|회색|실버|브라운|블루|레드|골드|클리어)/)?.[1] ||
+    description.match(/\bColor\s*:\s*(Black|White|Gray|Grey|Silver|Brown|Blue|Red|Gold|Clear)\b/i)?.[1] || "";
   const color = normalizeColor(explicitColor || "단일");
   const catalog: Catalog = url.hostname.endsWith("bandomall.co.kr") ? "BANDOMALL" : "BANDOSTAND";
   const now = new Date().toISOString();
