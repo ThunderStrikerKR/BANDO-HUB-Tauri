@@ -243,3 +243,17 @@
 @media (max-width: 680px) {
   .product-manual-variant-fields { grid-template-columns: minmax(0, 1fr); }
 }
+
+
+/* Client Excel reconciliation: review large lists without growing the dialog. */
+.client-workbook-tools .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.client-workbook-preview {
+  max-height: min(430px, 50dvh);
+  overflow: auto;
+  margin: 12px 0;
+  border: 1px solid #454545;
+  border-radius: 6px;
+}
+.client-workbook-preview table { min-width: 680px; }
+.client-workbook-preview thead { position: sticky; top: 0; z-index: 1; background: #252525; }
+.client-workbook-preview td:last-child { max-width: 460px; overflow-wrap: anywhere; }
