@@ -65,6 +65,8 @@ export function App() {
         {notifications && (
           <FactoryNotifications
             state={state}
+            onSave={model.commit}
+            onRefresh={model.refresh}
             onClose={() => setNotifications(false)}
             onOpen={(id) => {
               const order = state.orders.find((o) => o.id === id);
