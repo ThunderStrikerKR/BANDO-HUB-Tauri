@@ -418,6 +418,7 @@ export interface Settings {
   specialPolicy?: "WHOLESALE_EXCEPTIONS" | "UNCONFIRMED";
 }
 export interface ExportRecord {
+  savedPath?: string;
   snapshots?: import("./workflow-types.js").ExcelQueueEntry[];
   id: string;
   at: string;
