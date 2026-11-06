@@ -525,8 +525,8 @@ export interface StartupMetrics {
   readyMs: number;
 }
 export interface Api {
-  saveProductWorkbook?: (bytes: number[]) => Promise<string>;
-  saveRegistrationWorkbook?: (kind: "양식" | "결과", bytes: number[]) => Promise<string>;
+  saveProductWorkbook?: (bytes: number[]) => Promise<string | null>;
+  saveRegistrationWorkbook?: (kind: "양식" | "결과", bytes: number[]) => Promise<string | null>;
   openFactoryFile?: (id: string) => Promise<void>;
   productImage?: (id: string) => Promise<{ data: string; source: string } | null>;
   approveFactoryConflict?: (id: string, row: number) => Promise<void>;
