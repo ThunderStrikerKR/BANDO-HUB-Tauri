@@ -108,12 +108,12 @@ export async function parseFactoryReplyWorkbook(state: State, file: File):
     });
   }
   if (!rows.length) throw Error("회신 파일에 처리할 배송 행이 없습니다.");
-  const trackingSet = new Set<string>();
-  for (const row of rows) {
-    if (!row.issue && trackingSet.has(row.tracking)) {
-      row.issue = "같은 회신 파일에 운송장번호가 중복됩니다.";
-    }
-    if (row.tracking) trackingSet.add(row.tracking);
+  const trackingCounts = new Map<string, number>();
+  for (const row of rows) if (row.tracking) {
+    trackingCounts.set(row.tracking, (trackingCounts.get(row.tracking) ?? 0) + 1);
+  }
+  for (const row of rows) if (row.tracking && (trackingCounts.get(row.tracking) ?? 0) > 1) {
+    row.issue = "같은 회신 파일에 운송장번호가 중복됩니다.";
   }
   const reply: FactoryReply = {
     id, filename: file.name, businessDate: formatDate(),
