@@ -19,8 +19,8 @@ const safeImage = (siteId?: string) => {
 
 const api: Api = {
   isTestWorkspace: true,
-  saveProductWorkbook: (bytes) => invoke<string>("save_product_workbook", { bytes }),
-  saveRegistrationWorkbook: (kind, bytes) => invoke<string>("save_registration_workbook", { kind, bytes }),
+  saveProductWorkbook: (bytes) => invoke<string | null>("save_product_workbook", { bytes }),
+  saveRegistrationWorkbook: (kind, bytes) => invoke<string | null>("save_registration_workbook", { kind, bytes }),
   load: () => invoke<State>("state_load"),
   save: (state) => invoke<void>("state_save", { state }),
   patchSettings: (changes, expected) => invoke<State>("settings_patch", { changes, expected }),
