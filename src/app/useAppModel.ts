@@ -10,12 +10,11 @@ import { clone } from "../ui";
 import type { WorkflowSelection } from "../WorkflowBoard";
 import { onlyDeletedGroups } from "../workspace-selection";
 import type { PageId } from "./navigation";
+import { seoulDate } from "./settlement-report";
 export function useAppModel() {
   const { notice, notify: setNotice, dismiss: dismissNotice } = useNotice();
-  const [historyDate, setHistoryDate] = useState(() =>
-      new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" }),
-    ),
-    [settlementDate, setSettlementDate] = useState(() => new Date().toLocaleDateString("en-CA"));
+  const [historyDate, setHistoryDate] = useState(() => seoulDate(new Date().toISOString())),
+    [settlementDate, setSettlementDate] = useState(() => seoulDate(new Date().toISOString()));
   const hasPendingChanges = useHasPendingChanges();
   const [rawEditDirty, setRawEditDirty] = useState(false);
   const [state, setState] = useState<State>(),
