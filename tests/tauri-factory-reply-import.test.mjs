@@ -135,7 +135,7 @@ test("real Logen XLSX: changed tracking and actual freight require individual co
   const corrected = approveFactoryReplyRow(held, second.reply.id, 2);
   assert.equal(corrected.workflow.shipments[0].tracking.FACTORY, "009988776655");
   assert.equal(corrected.workflow.shipments[0].actualFreight.FACTORY, 5000);
-  assert.equal(corrected.factoryReplies[1].rows[0].applied, false);
+  assert.ok(!corrected.factoryReplies[1].rows[0].applied);
   assert.equal(corrected.factoryReplies[2].resolves.id, second.reply.id);
   assert.ok(corrected.workflow.events.some((e) => e.before?.tracking === "001234567891"));
   assert.throws(() => approveFactoryReplyRow(corrected, second.reply.id, 2), /이미 정정된/);
