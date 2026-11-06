@@ -483,7 +483,7 @@ export function ProductManager({
                         </div>
                         <div className="product-manual-variant-fields">
                           <Field label="색상">
-                            <input value={variant.color === "단일" && edit.variants.length > 1 ? "" : variant.color}
+                            <input value={variant.color}
                               placeholder="예: 블랙 / 색상 구분이 없으면 단일"
                               onChange={(event) => setEdit((prev) => {
                                 if (!prev) return prev;
