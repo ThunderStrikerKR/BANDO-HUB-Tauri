@@ -37,7 +37,7 @@ test('Tauri uses a controlled native XLSX write instead of opening arbitrary pat
   const rust = read('src-tauri/src/lib.rs');
   assert.match(rust, /fn save_product_workbook/);
   assert.match(rust, /\.create_new\(true\)/);
-  assert.match(rust, /save_product_workbook\s*\n\s*\]/);
+  assert.match(rust, /save_product_workbook,\s*save_registration_workbook/);
   assert.doesNotMatch(rust, /fn save_product_workbook\([^)]*filename:/);
 });
 test('Category map is a full-width interactive tree with on-demand editor', () => {
