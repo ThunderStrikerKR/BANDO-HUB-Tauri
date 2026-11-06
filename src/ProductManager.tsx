@@ -249,6 +249,9 @@ export function ProductManager({
                 <ProductImports state={state} onSave={onSave} onRefresh={onRefresh} onNotice={onNotice} />
               </section>
             )}
+            <details className="card"><summary>기존 신규 상품 등록 양식 (보조 기능)</summary>
+              <RegistrationManager state={state} onSave={onSave} onRefresh={onRefresh} onNotice={onNotice} />
+            </details>
             <section className="card product-prices">
               <div className="manager-filters">
                 <ClassificationFilters
