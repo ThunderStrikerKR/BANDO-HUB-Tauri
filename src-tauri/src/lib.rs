@@ -455,6 +455,60 @@ async fn save_product_workbook(
     save_xlsx_with_dialog(app, "상품가격표", bytes).await
 }
 
+// The renderer supplies only a SHA-256 ID. No path from JavaScript is trusted.
+fn reply_digest(id: &str) -> Result<&str, String> {
+    let digest = id.strip_prefix("factory-reply-")
+        .ok_or("공장 회신 식별자가 올바르지 않습니다.")?;
+    if digest.len() != 64 || !digest.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase()) {
+        return Err("공장 회신 식별자가 올바르지 않습니다.".into());
+    }
+    Ok(digest)
+}
+
+#[tauri::command]
+fn archive_factory_reply(db: State<'_, Database>, id: String, bytes: Vec<u8>) -> Result<String, String> {
+    use sha2::{Digest, Sha256};
+    use std::io::Write;
+    let digest = reply_digest(&id)?;
+    if bytes.len() < 4 || bytes.len() > 10 * 1024 * 1024 || !bytes.starts_with(b"PK") {
+        return Err("10MB 이하의 정상적인 XLSX 파일만 보관할 수 있습니다.".into());
+    }
+    if format!("{:x}", Sha256::digest(&bytes)) != digest {
+        return Err("선택한 공장 회신 파일과 검토한 파일이 일치하지 않습니다.".into());
+    }
+    let directory = db.base.join("factory-replies");
+    fs::create_dir_all(&directory).map_err(err)?;
+    let destination = directory.join(format!("{digest}.xlsx"));
+    if destination.exists() {
+        if fs::read(&destination).map_err(err)? != bytes {
+            return Err("보관 파일과 같은 식별자의 파일 내용이 일치하지 않습니다.".into());
+        }
+    } else {
+        let mut file = fs::OpenOptions::new().write(true).create_new(true)
+            .open(&destination).map_err(err)?;
+        if let Err(e) = file.write_all(&bytes).and_then(|_| file.sync_all()) {
+            drop(file);
+            let _ = fs::remove_file(&destination);
+            return Err(err(e));
+        }
+    }
+    Ok(destination.to_string_lossy().into_owned())
+}
+
+#[tauri::command]
+fn open_factory_reply_file(db: State<'_, Database>, id: String) -> Result<(), String> {
+    let digest = reply_digest(&id)?;
+    let data = get_snapshot(&*db.connection.lock().map_err(|_| "DB 잠금 오류")?)?;
+    if !data["factoryReplies"].as_array().is_some_and(|rows|
+        rows.iter().any(|row| row["id"].as_str() == Some(&id) &&
+            row["archivedPath"].as_str().is_some())) {
+        return Err("보관된 공장 회신 파일을 찾지 못했습니다.".into());
+    }
+    let path = db.base.join("factory-replies").join(format!("{digest}.xlsx"));
+    if !path.is_file() { return Err("보관된 회신 파일이 존재하지 않습니다.".into()); }
+    open::that(path).map_err(err)
+}
+
 #[tauri::command]
 async fn save_factory_workbook(
     app: tauri::AppHandle, bytes: Vec<u8>,
@@ -597,7 +651,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             state_load, state_save, settings_patch, price_set, clipboard_write, clipboard_read,
-            product_open, catalog_report, catalog_approve, receipt_archive, backup_create, backup_list, backup_restore, save_product_workbook, save_registration_workbook, save_client_workbook, save_product_sync_workbook, save_factory_workbook,
+            product_open, catalog_report, catalog_approve, receipt_archive, backup_create, backup_list, backup_restore, save_product_workbook, save_registration_workbook, save_client_workbook, save_product_sync_workbook, save_factory_workbook, archive_factory_reply, open_factory_reply_file,
             fetch_official_product_html
         ])
         .run(tauri::generate_context!())
