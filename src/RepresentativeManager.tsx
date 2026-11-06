@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   assignFamilyProduct,
   combineFamilies,
@@ -7,19 +7,20 @@ import {
   setFamilyRepresentative,
 } from "./model-family-editor";
 import { registeredProducts } from "./product-models";
-import { modelGroup } from "./model-families";
+import { modelGroup, validateModelSettings } from "./model-families";
 import type { Product, State } from "./types";
 
 export function RepresentativeManager({
   state,
-  onSave,
+  onRefresh,
   query = "",
 }: {
   state: State;
-  onSave: (s: State) => Promise<void>;
+  onRefresh: () => Promise<void>;
   query?: string;
 }) {
   const [draft, setDraft] = useState<State>(() => structuredClone(state));
+  const [baseline, setBaseline] = useState<State>(() => structuredClone(state));
   const [selected, setSelected] = useState("");
   const [code, setCode] = useState("");
   const [productQuery, setProductQuery] = useState("");
@@ -31,8 +32,18 @@ export function RepresentativeManager({
   const groups = useMemo(() => familySummaries(draft), [draft]);
   const activeId = groups.some((g) => g.id === selected) ? selected : (groups[0]?.id ?? "");
   const active = groups.find((g) => g.id === activeId);
-  const unsaved = JSON.stringify(draft.settings.modelFamilies ?? {}) !== JSON.stringify(state.settings.modelFamilies ?? {}) ||
-    JSON.stringify(draft.settings.modelRepresentatives ?? {}) !== JSON.stringify(state.settings.modelRepresentatives ?? {});
+  const unsaved = JSON.stringify(draft.settings.modelFamilies ?? {}) !== JSON.stringify(baseline.settings.modelFamilies ?? {}) ||
+    JSON.stringify(draft.settings.modelRepresentatives ?? {}) !== JSON.stringify(baseline.settings.modelRepresentatives ?? {});
+  // Refresh untouched drafts when orders or products change elsewhere. Keep unsaved edits
+  // intact; the server checks their original per-key values at save time.
+  useEffect(() => {
+    if (!unsaved) {
+      setDraft(structuredClone(state));
+      setBaseline(structuredClone(state));
+    }
+    // Only an incoming state change should reset a clean draft.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state]);
   const shownCode = code === "" ? active?.code || "" : code;
   const selectFamily = (id: string) => {
     setSelected(id);
@@ -49,11 +60,31 @@ export function RepresentativeManager({
     }
   };
   const commit = async () => {
+    if (busy || !unsaved) return;
     setBusy(true);
     setMessage("");
     try {
-      await onSave(draft);
-      setMessage("변경사항을 저장했습니다.");
+      if (!window.bando?.patchSettings) throw Error("모델군 개별 저장 기능을 사용할 수 없습니다.");
+      const fields = ["modelFamilies", "modelRepresentatives"] as const;
+      const changes: Record<string, unknown> = {};
+      const expected: Record<string, unknown> = {};
+      for (const field of fields) {
+        if (JSON.stringify(draft.settings[field] ?? {}) === JSON.stringify(baseline.settings[field] ?? {})) continue;
+        changes[field] = draft.settings[field] ?? null;
+        expected[field] = baseline.settings[field] ?? null;
+      }
+      if (!Object.keys(changes).length) return;
+      const latest = await window.bando.load();
+      const candidate = structuredClone(latest);
+      if (Object.hasOwn(changes, "modelFamilies")) candidate.settings.modelFamilies = structuredClone(draft.settings.modelFamilies);
+      if (Object.hasOwn(changes, "modelRepresentatives")) candidate.settings.modelRepresentatives = structuredClone(draft.settings.modelRepresentatives);
+      validateModelSettings(candidate, latest);
+      await window.bando.backup();
+      const updated = await window.bando.patchSettings(changes, expected);
+      setDraft(structuredClone(updated));
+      setBaseline(structuredClone(updated));
+      await onRefresh();
+      setMessage("모델군 설정을 저장했습니다. 주문과 상품 데이터는 유지했습니다.");
     } catch (error) {
       setMessage(String(error));
     } finally {
@@ -220,7 +251,7 @@ export function RepresentativeManager({
                 {message || (unsaved ? "저장하지 않은 변경사항 있음" : "변경사항 없음")}
               </span>
               <div className="family-footer-actions">
-                <button disabled={!unsaved || busy} onClick={() => {setDraft(structuredClone(state));setCode("");setMessage("");}}>변경 취소</button>
+                <button disabled={!unsaved || busy} onClick={() => {setDraft(structuredClone(state));setBaseline(structuredClone(state));setCode("");setMessage("");}}>변경 취소</button>
                 <button className="primary" disabled={!unsaved || busy} onClick={() => void commit()}>
                   {busy ? "저장 중" : "변경사항 저장"}
                 </button>
