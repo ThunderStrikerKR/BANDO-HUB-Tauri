@@ -43,7 +43,7 @@ const archive = [
   },
 ];
 
-const server = spawn("npm", ["run", "dev", "--", "--host", "127.0.0.1"], {
+const server = spawn(process.execPath, ["node_modules/vite/bin/vite.js", "--host", "127.0.0.1"], {
   cwd: root,
   stdio: ["ignore", "pipe", "pipe"],
   shell: false,
@@ -66,6 +66,7 @@ try {
   assert.ok(ready, "Vite did not start: " + serverOutput);
   browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({ viewport: { width: 1520, height: 1000 } });
+  page.setDefaultTimeout(12000);
   const pageErrors = [];
   page.on("pageerror", (err) => pageErrors.push(err.message));
   await page.addInitScript(
