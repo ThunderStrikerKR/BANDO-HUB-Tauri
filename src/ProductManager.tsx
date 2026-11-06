@@ -274,7 +274,9 @@ export function ProductManager({
                   가격 미등록만
                 </label>
               </div>
-              <ProductPriceWorkbookTools state={state} onSave={onSave} onRefresh={onRefresh} onNotice={onNotice} locked={!priceMode} />
+              <details className="product-price-legacy-tools"><summary>기존 가격표 Excel (보조 기능)</summary>
+                <ProductPriceWorkbookTools state={state} onSave={onSave} onRefresh={onRefresh} onNotice={onNotice} locked={!priceMode} />
+              </details>
               <div className="price-table-scroll">
                 <table>
                   <thead>
