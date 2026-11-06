@@ -1,0 +1,26 @@
+name: Verify Tauri migration (draft)
+on:
+  push:
+    branches:
+      - feature/tauri-product-bulk-registration
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  node-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install JavaScript dependencies
+        run: npm install --no-audit --no-fund --ignore-scripts
+      - name: TypeScript type check
+        run: npm run check:types
+      - name: Node tests
+        run: npm test
