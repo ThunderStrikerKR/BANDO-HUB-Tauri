@@ -97,6 +97,11 @@ export function connectFactoryReply(input: State, reply: FactoryReply, approveCo
     }
     const tracking = ship.tracking?.FACTORY,
       actual = actualFreightOf(ship, q.snapshot!.recipient, "FACTORY");
+    if (tracking && tracking === row.tracking && actual !== null && actual === row.actual) {
+      // A second response with identical information is archived, not applied again.
+      row.applied = true;
+      continue;
+    }
     if (
       !approveConflicts &&
       ((tracking && tracking !== row.tracking) || (actual !== null && actual !== row.actual))
