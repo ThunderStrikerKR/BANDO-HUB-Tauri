@@ -339,45 +339,12 @@ fn catalog_report() -> Result<Value, String> {
     Ok(data)
 }
 
+// The old catalog approval matched on product IDs and could create or overwrite
+// variants without human review. Keep this compatibility command intentionally
+// disabled. The reviewed UI uses revision-checked state_save after a backup.
 #[tauri::command]
-fn catalog_approve(db: State<'_, Database>) -> Result<Value, String> {
-    let report: Value = catalog_report()?;
-    let incoming = report["products"].as_array().ok_or("카탈로그 형식 오류")?;
-    let mut conn = lock_db(&db)?;
-    let mut state = get_snapshot(&conn)?;
-    let revision = state["revision"].as_u64().unwrap_or(0);
-    let products = state["products"].as_array_mut().ok_or("등록 상품 형식 오류")?;
-    let mut created = 0;
-    let mut updated = 0;
-    for candidate in incoming {
-        let id = candidate["id"].as_str().ok_or("상품 ID 오류")?;
-        if let Some(old) = products.iter_mut().find(|p| p["id"].as_str() == Some(id)) {
-            // Preserve staff-entered wholesale/semi price and any product/variant amendments.
-            let mut changed = false;
-            if let Some(next_variants) = candidate["variants"].as_array() {
-                for next in next_variants {
-                    let next_id = next["id"].as_str().unwrap_or("");
-                    if let Some(previous) = old["variants"].as_array_mut().and_then(|items|
-                        items.iter_mut().find(|v| v["id"].as_str() == Some(next_id))) {
-                        if previous["officialRetail"] != next["officialRetail"] {
-                            previous["retail"] = next["retail"].clone();
-                            previous["officialRetail"] = next["officialRetail"].clone();
-                            changed = true;
-                        }
-                    } else if let Some(variants) = old["variants"].as_array_mut() {
-                        variants.push(next.clone());
-                        changed = true;
-                    }
-                }
-            }
-            if changed { updated += 1; }
-        } else {
-            products.push(candidate.clone());
-            created += 1;
-        }
-    }
-    if created + updated > 0 { write_snapshot(&mut conn, state, revision, true)?; }
-    Ok(json!({"created": created, "updated": updated}))
+fn catalog_approve(_db: State<'_, Database>) -> Result<Value, String> {
+    Err("이전 방식의 일괄 승인은 안전하지 않아 중지되었습니다. 상품 동기화에서 옵션별 미리보기를 사용하세요.".into())
 }
 
 #[tauri::command]
