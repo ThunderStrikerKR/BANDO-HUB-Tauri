@@ -5,6 +5,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { Api, State, CatalogReport } from "./types";
 import productImages from "./tauri-product-images.json";
+import { parseOfficialProductPage } from "./official-product-import";
 
 const notReady = (feature: string): never => {
   throw new Error(`${feature}: Tauri v0.0.4에서 아직 이전하지 않은 기능입니다.`);
@@ -68,7 +69,11 @@ const api: Api = {
   openExcelDirectory: async () => notReady("엑셀 폴더 열기"),
   openExportFile: async () => notReady("엑셀 출력 파일 열기"),
   exportExcel: async () => notReady("공장 엑셀 내보내기"),
-  previewImport: async () => notReady("외부 상품 가져오기"),
+  previewImport: async (url) => {
+    const html = await invoke<string>("fetch_official_product_html", { target: url });
+    const state = await invoke<State>("state_load");
+    return parseOfficialProductPage(url, html, state);
+  },
   officialList: async () => notReady("공식 홈페이지 목록 조회"),
   downloadSheet: async () => notReady("시트 다운로드"),
   previewSheet: async () => notReady("시트 업로드 검증"),
