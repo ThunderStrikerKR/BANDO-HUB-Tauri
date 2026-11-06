@@ -33,7 +33,7 @@ const normalize = (value: string) => value.replace(/\s+/g, "").toLocaleLowerCase
 const phoneKey = (value: string) => value.replace(/\D/g, "");
 
 function workbookText(cell: ExcelJS.Cell): string {
-  if (cell.isMerged || cell.type === 4 /* Formula */ ||
+  if (cell.isMerged || cell.type === 6 /* Formula */ ||
     (typeof cell.value === "object" && cell.value !== null && "formula" in cell.value)) {
     throw Error("수식이나 병합된 셀은 사용할 수 없습니다.");
   }
@@ -81,7 +81,7 @@ const rowValues = (client: Client): string[] => [
   client.phone ?? "", client.mobile ?? "", client.person ?? "", client.contact,
   tierText[client.tier], paymentText[client.payment],
   client.shippingFeeExcluded ? "예" : "아니오",
-  client.defaultApplyVat ? "예" : "아니오",
+  client.defaultApplyVat === undefined ? "" : client.defaultApplyVat ? "예" : "아니오",
   client.active ? "거래중" : "거래중지",
   client.shortNames ?? "", client.identifiers, client.preferredAccountId ?? "",
   client.deletedAt ? "보관" : "사용",
@@ -149,6 +149,7 @@ function createCandidate(original: Client | undefined, cells: string[]): Client 
   const put = (key: "name" | "displayName" | "address" | "postcode" | "phone" |
     "mobile" | "person" | "contact" | "shortNames" | "identifiers" | "preferredAccountId", index: number) => {
     const raw = cells[index] ?? "";
+    if (!raw && !isNew) return;
     const value = optionalString(raw, next[key], isNew);
     if (value.length > (key === "address" ? 350 : 250)) throw Error(CLIENT_HEADERS[index] + ": 입력값이 너무 깁니다.");
     next[key] = value;
@@ -164,7 +165,9 @@ function createCandidate(original: Client | undefined, cells: string[]): Client 
   next.tier = tier(cells[9] ?? "", next.tier, isNew);
   next.payment = payment(cells[10] ?? "", next.payment);
   next.shippingFeeExcluded = flag(cells[11] ?? "", next.shippingFeeExcluded);
-  next.defaultApplyVat = flag(cells[12] ?? "", next.defaultApplyVat ?? false);
+  if ((cells[12] ?? "") || isNew) {
+    next.defaultApplyVat = flag(cells[12] ?? "", next.defaultApplyVat ?? false);
+  }
   if ((cells[13] ?? "") === "보관") throw Error("Excel에서 거래처를 삭제하거나 보관 상태로 전환할 수 없습니다.");
   next.active = flag(cells[13] ?? "", next.active);
   put("shortNames", 14);
