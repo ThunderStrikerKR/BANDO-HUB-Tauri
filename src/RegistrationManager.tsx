@@ -30,7 +30,7 @@ export function RegistrationManager({
     window.bando!.saveRegistrationWorkbook!(kind, bytes);
   const createTemplate = () => void run(async () => {
     const path = await download("양식", await exportRegistrationTemplate(state));
-    onNotice("상품 등록 양식을 저장했습니다: " + path, "success");
+    if (path) onNotice("상품 등록 양식을 저장했습니다: " + path, "success");
   });
   const chooseFile = (file?: File) => {
     if (!file) return;
@@ -57,7 +57,7 @@ export function RegistrationManager({
   const saveResults = () => void run(async () => {
     if (!lastBatch) return;
     const path = await download("결과", await exportRegistrationResults(lastBatch));
-    onNotice("상품 등록 결과를 저장했습니다: " + path, "success");
+    if (path) onNotice("상품 등록 결과를 저장했습니다: " + path, "success");
   });
   return <>
     <button type="button" onClick={() => setOpen(true)}>엑셀 대량 등록</button>
