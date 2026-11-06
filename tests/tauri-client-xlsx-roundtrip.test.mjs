@@ -15,9 +15,13 @@ const cjs = ts.transpileModule(code, { compilerOptions: {
   esModuleInterop: true,
 }}).outputText;
 const exports = {};
-vm.runInNewContext(cjs, { exports, require, structuredClone, crypto: webcrypto }, {
-  filename: "src/client-workbook.ts",
-});
+// ExcelJS performs realm-sensitive Array checks when assigning cell values.
+// Evaluate compiled source in the same JS realm as the ExcelJS library.
+const execute = vm.runInThisContext(
+  "(function(exports, require, structuredClone, crypto) {\n" + cjs + "\n})",
+  { filename: "src/client-workbook.ts" },
+);
+execute(exports, require, structuredClone, webcrypto);
 
 function fixture() {
   return {
@@ -42,12 +46,6 @@ async function makeWorkbook(state) {
   const buffer = await exports.exportClientWorkbook(state);
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(Buffer.from(buffer));
-  // Diagnostic output from the generated workbook; no personal data.
-  console.log("XLSX WORKSHEETS", JSON.stringify(workbook.worksheets.map((sheet) => ({
-    name: sheet.name, rows: sheet.rowCount,
-    A1: String(sheet.getCell("A1").value),
-    B1: String(sheet.getCell("B1").value),
-  }))));
   return workbook;
 }
 async function previewWorkbook(state, workbook) {
