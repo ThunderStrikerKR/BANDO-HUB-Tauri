@@ -38,11 +38,27 @@ export function orderHistory(state: State, query: string, date: string) {
       const recipients = shipments.length
         ? shipments.map((ship) => shipmentContext(state, ship).recipient)
         : order.recipients;
+      // All four components share the same workflow snapshot source.
+      // Never recompute a shipment's VAT or charge from current catalogue prices.
+      const parts = shipments.length
+        ? shipments.map((ship) => shipmentTotals(state, ship))
+        : client ? [totals(order, client)] : [];
+      const component = (key: "subtotal" | "shipping" | "vat" | "total"): number | null =>
+        parts.length && parts.every((part) => part[key] !== null)
+          ? parts.reduce((acc, part) => acc + part[key]!, 0)
+          : null;
       return {
         order,
         client,
         recipients,
         total,
+        billing: {
+          subtotal: component("subtotal"),
+          shipping: component("shipping"),
+          vat: component("vat"),
+          total: component("total"),
+        },
+        shipmentIds: shipments.map((ship) => ship.id),
         deleted,
         status: deleted
           ? "삭제됨"
