@@ -1,0 +1,133 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import vm from "node:vm";
+import ts from "typescript";
+import ExcelJS from "exceljs";
+import { webcrypto } from "node:crypto";
+import { createRequire } from "node:module";
+
+const read = (p) => readFileSync(new URL("../" + p, import.meta.url), "utf8");
+const require = createRequire(import.meta.url);
+const compiled = ts.transpileModule(read("src/factory-export.ts"), {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
+}).outputText;
+const exported = {};
+const load = vm.runInThisContext("(function(exports, require, crypto, structuredClone) {\n" + compiled + "\n})");
+load(exported, require, webcrypto, structuredClone);
+const { previewFactoryExport, createFactoryWorkbook, recordFactoryExport, LOGEN_HEADERS } = exported;
+
+function stateFixture() {
+  const sender = { id:"client1", name:"예시대리점", displayName:"예시악기", address:"인천 중구 100",
+    postcode:"22300", phone:"032-111-1111", mobile:"", tier:"wholesale", payment:"PREPAID",
+    active:true, identifiers:"", contact:"", shippingFeeExcluded:false, overrides:{} };
+  const recipient = { id:"r1", name:"김수취", address:"서울 서초구 123", phone:"02-2222-3333",
+    mobile:"010-1234-0000", note:"문 앞 배송 요청", items:[
+      { id:"item1", name:"BD 709", color:"블랙", quantity:3, origin:"FACTORY" },
+      { id:"item2", name:"BD 900", color:"화이트", quantity:1, origin:"FACTORY" },
+    ] };
+  const snap = { recipient, sender, freightCode:"010", total:120000, shipping:4000, vat:0, subtotal:116000 };
+  const q = { id:"excel:s1:FACTORY", shipmentId:"s1", origin:"FACTORY", at:"2026-11-07T01:33:00+09:00",
+    actor:"직원", status:"QUEUED", snapshot:snap };
+  return {
+    revision:13, clients:[sender], products:[], aliases:[], orders:[
+      { id:"order1", clientId:"client1", orderType:"AGENCY", recipients:[recipient] },
+    ],
+    exports:[], queue:[], settings:{operatorName:"매장 직원"},
+    workflow: {
+      queue:[q], shipments:[{ id:"s1", orderId:"order1", recipientId:"r1",
+        transferred:true, step:4 }],
+      events:[], sources:[], groups:[], deliveries:[], payments:[], changeRequests:[],
+    },
+  };
+}
+
+test("factory Logen workbook exports exactly 15 expected columns with preserved freight code 010", async () => {
+  const state = stateFixture();
+  const report = previewFactoryExport(state, ["excel:s1:FACTORY"]);
+  const bytes = await createFactoryWorkbook(report);
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(Buffer.from(bytes));
+  assert.equal(workbook.worksheets.length,1);
+  const sheet = workbook.worksheets[0];
+  assert.equal(sheet.rowCount,2);
+  assert.deepEqual(Array.from({length:15}, (_,i)=>sheet.getRow(1).getCell(i+1).value),
+    [...LOGEN_HEADERS]);
+  assert.equal(sheet.getCell("A2").value,"김수취");
+  assert.equal(sheet.getCell("H2").value,"010");
+  assert.equal(sheet.getCell("K2").value,"예시악기");
+  assert.equal(sheet.getCell("L2").value,"22300");
+  assert.equal(sheet.getCell("I2").value,"BD 709 블랙 3개 / BD 900 화이트 1개");
+  assert.equal(sheet.getCell("J2").value,"문 앞 배송 요청");
+  assert.equal(sheet.getCell("F2").value,null,"factory fills package count");
+  assert.equal(sheet.getCell("G2").value,null,"factory fills postage");
+  assert.equal(sheet.getCell("B2").value,null,"no guessed recipient postcode");
+});
+
+test("after Save As succeeds, mark queue EXPORTED and freeze audit without marking delivered", () => {
+  const state = stateFixture();
+  const original = JSON.stringify(state);
+  const preview = previewFactoryExport(state, ["excel:s1:FACTORY"]);
+  const {next,filename,exportId} = recordFactoryExport(state,preview,"C:\\Temp\\BANDO-export-1.xlsx");
+  assert.equal(filename,"BANDO-export-1.xlsx");
+  assert.equal(next.workflow.queue[0].status,"EXPORTED");
+  assert.equal(next.workflow.queue[0].fileOnly,true);
+  assert.equal(next.workflow.queue[0].factoryDeliveredAt,undefined);
+  assert.equal(next.workflow.queue[0].exportId,exportId);
+  assert.equal(next.exports.length,1);
+  assert.equal(next.exports[0].snapshots[0].snapshot.recipient.name,"김수취");
+  assert.equal(next.exports[0].savedPath,"C:\\Temp\\BANDO-export-1.xlsx");
+  assert.equal(next.workflow.events[0].action,"공장 발송 Excel 작성");
+  assert.equal(JSON.stringify(state),original);
+  assert.throws(()=>previewFactoryExport(next, ["excel:s1:FACTORY"]),/공장 출력 대기 상태/);
+});
+
+test("duplicate IDs, legacy IDs, store rows and stale revision are blocked", () => {
+  const state=stateFixture();
+  const id=state.workflow.queue[0].id;
+  assert.throws(()=>previewFactoryExport(state,[id,id]),/중복 선택/);
+  assert.throws(()=>previewFactoryExport(state,["order1"]),/이전 방식의 주문/);
+  const preview=previewFactoryExport(state,[id]);
+  assert.throws(()=>recordFactoryExport({...state,revision:14},preview,"C:\\Temp\\out.xlsx"),/변경되었습니다/);
+  state.workflow.queue[0].origin="STORE";
+  assert.throws(()=>previewFactoryExport(state,[id]),/공장 출력 대기/);
+});
+
+test("recipient, agency sender, tracking prerequisites, and ineligible item quantities are enforced", () => {
+  const state=stateFixture();
+  const id=state.workflow.queue[0].id;
+  state.workflow.queue[0].snapshot.recipient.address="";
+  assert.throws(()=>previewFactoryExport(state,[id]),/수취인/);
+  state.workflow.queue[0].snapshot.recipient.address="서울 서초구 123";
+  state.workflow.queue[0].snapshot.sender.address="";
+  assert.throws(()=>previewFactoryExport(state,[id]),/송하인/);
+  state.workflow.queue[0].snapshot.sender.address="인천 중구 100";
+  state.workflow.queue[0].snapshot.recipient.items[0].quantity=null;
+  assert.throws(()=>previewFactoryExport(state,[id]),/품목명과 수량/);
+});
+
+test("020 is preserved as a text freight code while factory postal data remains optional", async () => {
+  const state=stateFixture();
+  state.workflow.queue[0].snapshot.freightCode="020";
+  state.workflow.queue[0].snapshot.sender.postcode="";
+  const bytes=await createFactoryWorkbook(previewFactoryExport(state,[state.workflow.queue[0].id]));
+  const wb=new ExcelJS.Workbook();
+  await wb.xlsx.load(Buffer.from(bytes));
+  assert.equal(wb.worksheets[0].getCell("H2").value,"020");
+  assert.equal(wb.worksheets[0].getCell("L2").value,null);
+});
+
+test("Tauri native Save As wired; canceled dialog does not mark export in UI", () => {
+  const rust=read("src-tauri/src/lib.rs");
+  const bridge=read("src/tauri-bridge.ts");
+  const queue=read("src/WorkflowQueue.tsx");
+  assert.match(rust,/async fn save_factory_workbook/);
+  assert.match(rust,/save_factory_workbook,/);
+  assert.match(bridge,/saveFactoryWorkbook: \(bytes\)/);
+  assert.match(queue,/const savedPath = await window\.bando!\.saveFactoryWorkbook\(bytes\)/);
+  assert.match(queue,/if \(!savedPath\) return;/);
+  assert.match(queue,/recordFactoryExport\(latest, preview, savedPath\)/);
+  assert.match(queue,/await onSave\(result\.next\)/);
+  assert.match(queue,/await window\.bando!\.backup\(\)/);
+  assert.match(queue,/실제 공장 전달은 별도로 확인/);
+});
