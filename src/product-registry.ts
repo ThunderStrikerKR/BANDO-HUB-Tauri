@@ -39,22 +39,32 @@ export interface RegistrationBatch {
 }
 export const registryKey = (s: string) =>
   s.normalize("NFKC").trim().toLocaleLowerCase().replace(/\s+/g, " ");
+/** Validate changed brands while leaving untouched historical records intact. */
 export function validateBrands(state: State, before: State) {
-  for (const brand of state.brands ?? []) {
-    if (JSON.stringify(before.brands?.find((b) => b.id === brand.id)) === JSON.stringify(brand))
-      continue;
-    const terms = [brand.name, brand.korean, ...brand.aliases].filter(Boolean).map(registryKey);
-    if (
-      !brand.name.trim() ||
-      (state.brands ?? []).some(
-        (other) =>
-          other.id !== brand.id &&
-          [other.name, other.korean, ...other.aliases]
-            .filter(Boolean)
-            .some((term) => terms.includes(registryKey(term))),
-      )
-    )
-      throw Error("동일 브랜드명/한글명/검색 별칭이 이미 있습니다. 기존 브랜드를 정정하세요.");
+  const brands = state.brands ?? [];
+  for (const brand of brands) {
+    const previous = before.brands?.find((item) => item.id === brand.id);
+    if (JSON.stringify(previous) === JSON.stringify(brand)) continue;
+    if (!brand.id || !brand.name.trim()) {
+      throw Error("브랜드 공식명을 입력하세요.");
+    }
+    let evidence: URL;
+    try { evidence = new URL(brand.evidenceUrl.trim()); }
+    catch { throw Error("브랜드 확인 근거는 HTTPS URL이어야 합니다."); }
+    if (evidence.protocol !== "https:" || !evidence.hostname ||
+        evidence.username || evidence.password) {
+      throw Error("브랜드 확인 근거는 HTTPS URL이어야 합니다.");
+    }
+    const terms = [brand.name, brand.korean, ...brand.aliases]
+      .filter(Boolean).map(registryKey);
+    if (brands.some((other) => other.id !== brand.id &&
+      [other.name, other.korean, ...other.aliases]
+        .filter(Boolean).some((term) => terms.includes(registryKey(term))))) {
+      throw Error("브랜드 공식명, 한글명 또는 검색 별칭이 다른 브랜드와 중복됩니다.");
+    }
+    if (brands.some((other) => other !== brand && other.id === brand.id)) {
+      throw Error("브랜드 식별자가 중복되었습니다.");
+    }
   }
 }
 export function initialClassification(existing: Category[] = []) {
