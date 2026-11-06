@@ -34,6 +34,7 @@ fn write_snapshot(conn: &mut Connection, mut state: Value, expected_revision: u6
         return Err("다른 작업에서 데이터가 수정되었습니다. 새로고침 후 다시 저장하세요.".into());
     }
     validate_clients(&current, &state)?;
+    validate_brands(&current, &state)?;
     if validate_orders { reception::validate_reception(&current, &state)?; }
     let archive_entries = reception::new_archive_entries(&current, &state)?;
     state["revision"] = json!(current_revision + 1);
@@ -72,6 +73,48 @@ fn write_snapshot(conn: &mut Connection, mut state: Value, expected_revision: u6
     tx.commit().map_err(err)?;
     Ok(state)
 }
+// Only modified/new brands are validated so legacy unchanged rows cannot prevent
+// routine product, price and order saves. Brand IDs remain stable across renames.
+fn brand_terms(brand: &Value) -> Vec<String> {
+    let fixed = ["name", "korean"].iter()
+        .filter_map(|key| brand[*key].as_str());
+    let aliases = brand["aliases"].as_array().into_iter().flatten().filter_map(Value::as_str);
+    fixed.chain(aliases)
+        .map(|term| term.split_whitespace().collect::<Vec<_>>().join(" ").to_lowercase())
+        .filter(|term| !term.is_empty()).collect()
+}
+fn validate_brands(before: &Value, next: &Value) -> Result<(), String> {
+    let Some(brands) = next["brands"].as_array() else { return Ok(()); };
+    for (position, brand) in brands.iter().enumerate() {
+        let id = brand["id"].as_str().unwrap_or("");
+        if before["brands"].as_array().is_some_and(|previous| {
+            previous.iter().any(|old| old["id"].as_str() == Some(id) && old == brand)
+        }) { continue; }
+        if id.trim().is_empty() || brand["name"].as_str().unwrap_or("").trim().is_empty() {
+            return Err("브랜드 공식명과 식별자를 확인하세요.".into());
+        }
+        let evidence = brand["evidenceUrl"].as_str().unwrap_or("");
+        let valid_evidence = url::Url::parse(evidence).is_ok_and(|link|
+            link.scheme() == "https" && link.host_str().is_some() &&
+            link.username().is_empty() && link.password().is_none());
+        if !valid_evidence {
+            return Err("브랜드 확인 근거는 HTTPS URL이어야 합니다.".into());
+        }
+        let terms = brand_terms(brand);
+        for (other_position, other) in brands.iter().enumerate() {
+            if position == other_position { continue; }
+            if other["id"].as_str() == Some(id) {
+                return Err("브랜드 식별자가 중복되었습니다.".into());
+            }
+            let other_terms = brand_terms(other);
+            if terms.iter().any(|term| other_terms.contains(term)) {
+                return Err("다른 브랜드의 공식명, 한글명 또는 검색 별칭과 중복됩니다.".into());
+            }
+        }
+    }
+    Ok(())
+}
+
 // Validate only newly created or edited clients. Existing historical test rows are
 // not silently rewritten, but cannot be re-saved with missing sender information.
 fn validate_clients(before: &Value, next: &Value) -> Result<(), String> {
