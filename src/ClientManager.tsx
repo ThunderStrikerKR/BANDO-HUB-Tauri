@@ -82,7 +82,7 @@ export function ClientManager({
           </button>
         </div>
         <section className="card">
-          <BulkTools kind="clients" onRefresh={onRefresh} onError={onNotice} />
+          <ClientWorkbookTools onSave={onSave} onRefresh={onRefresh} onNotice={onNotice} />
           <table className="client-table">
             <thead>
               <tr>
