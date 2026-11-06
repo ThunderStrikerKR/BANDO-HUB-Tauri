@@ -206,3 +206,40 @@
 }
 
 .catalog-price-sync-review { max-height: 420px; overflow: auto; border: 1px solid #464646; border-radius: 6px; }
+
+
+/* In-house products have manually assigned sale options with no external listing. */
+.product-manual-variants {
+  display: grid;
+  gap: 12px;
+  margin: 14px 0;
+  padding: 14px;
+  background: #262626;
+  border: 1px solid #454545;
+  border-radius: 7px;
+}
+.product-manual-variants-heading,
+.product-manual-variant-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.product-manual-variant-row {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #454545;
+  background: #222;
+  border-radius: 6px;
+}
+.product-manual-variant-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 14px;
+}
+.product-manual-variant-fields input { width: 100%; min-width: 0; }
+@media (max-width: 680px) {
+  .product-manual-variant-fields { grid-template-columns: minmax(0, 1fr); }
+}
