@@ -78,7 +78,6 @@ test("real XLSX: modify one official-product retail price but keep option ID, ot
   const wb = await exportAndReload(state);
   const options = wb.getWorksheet("판매 옵션 및 가격");
   const original = state.products.find((p) => p.siteId === "351");
-  const rowNumber = options.findRow ? undefined : null;
   const row = options.getRows(2, options.rowCount - 1).find((item) =>
     item.getCell(1).value === original.id && item.getCell(3).value === original.variants[0].id);
   assert.ok(row);
@@ -185,4 +184,56 @@ test("safe approvals are backed up, revision-checked and wired to Tauri native S
   assert.match(ui,/await window\.bando!\.backup\(\)/);
   assert.match(ui,/applyProductSyncWorkbook\(state, review\)/);
   assert.match(ui,/await onSave\(result\.next\)/);
+});
+
+
+test("real XLSX: a new row with a duplicate business model is held, not registered", async () => {
+  const state=example();
+  const wb=await exportAndReload(state);
+  const products=wb.getWorksheet("상품 목록");
+  const options=wb.getWorksheet("판매 옵션 및 가격");
+  const original=state.products.find((p)=>p.siteId==="351");
+  const row=new Array(exports.PRODUCT_SYNC_HEADERS.length).fill("");
+  row[1]="DUPLICATE_MODEL"; row[2]="복사된 상품";
+  row[4]=original.code; row[5]="반도스탠드";
+  row[6]="공장"; row[11]="클리어"; row[12]="사용";
+  products.addRow(row);
+  const option=new Array(exports.OPTION_SYNC_HEADERS.length).fill("");
+  option[1]="DUPLICATE_MODEL"; option[3]="클리어"; option[7]="135000";
+  options.addRow(option);
+  const preview=await previewWorkbook(state,wb);
+  assert.ok(preview.rows.some((r)=>r.status==="HOLD"));
+  assert.throws(()=>exports.applyProductSyncWorkbook(state,preview),/오류나 중복 의심/);
+});
+
+test("real XLSX: an option without a matching parent key cannot be imported", async () => {
+  const state=example();
+  const wb=await exportAndReload(state);
+  const variants=wb.getWorksheet("판매 옵션 및 가격");
+  const option=new Array(exports.OPTION_SYNC_HEADERS.length).fill("");
+  option[1]="UNKNOWN_NEW_PRODUCT"; option[3]="블랙"; option[7]="110000";
+  variants.addRow(option);
+  const preview=await previewWorkbook(state,wb);
+  assert.ok(preview.rows.some((r)=>r.status==="ERROR" && /상품 행을 찾지 못했습니다/.test(r.errors.join(" "))));
+  assert.throws(()=>exports.applyProductSyncWorkbook(state,preview),/오류나 중복 의심/);
+});
+
+test("real XLSX: changing an existing product name preserves all original technical IDs", async () => {
+  const state=example();
+  const wb=await exportAndReload(state);
+  const products=wb.getWorksheet("상품 목록");
+  const original=state.products.find((p)=>p.siteId==="358");
+  const row=products.getRows(2,products.rowCount-1).find((r)=>r.getCell(1).value===original.id);
+  assert.ok(row);
+  row.getCell(3).value="보면대 바퀴";
+  row.getCell(4).value="4개 1세트";
+  const preview=await previewWorkbook(state,wb);
+  assert.equal(preview.updatedProducts,1);
+  const newProduct=exports.applyProductSyncWorkbook(state,preview).next.products.find((p)=>p.id===original.id);
+  assert.equal(newProduct.name,"보면대 바퀴");
+  assert.equal(newProduct.subtitle,"4개 1세트");
+  assert.equal(newProduct.code,original.code);
+  assert.equal(newProduct.siteCode,original.siteCode);
+  assert.equal(newProduct.siteId,original.siteId);
+  assert.deepEqual(newProduct.variants,original.variants);
 });
