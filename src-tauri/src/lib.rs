@@ -421,6 +421,42 @@ fn save_product_workbook(db: State<'_, Database>, bytes: Vec<u8>) -> Result<Stri
     Err("가격표 파일명 충돌이 반복되었습니다. 다시 시도하세요.".into())
 }
 
+// Store only two application-generated registration workbooks in Downloads.
+// The renderer cannot pass filesystem paths or arbitrary filenames.
+#[tauri::command]
+fn save_registration_workbook(db: State<'_, Database>, kind: String, bytes: Vec<u8>) -> Result<String, String> {
+    let label = match kind.as_str() {
+        "양식" => "상품등록양식",
+        "결과" => "상품등록결과",
+        _ => return Err("허용되지 않은 상품 등록 파일 유형입니다.".into()),
+    };
+    if bytes.len() < 4 || bytes.len() > 25 * 1024 * 1024 || !bytes.starts_with(b"PK") {
+        return Err("올바른 XLSX 데이터가 아니거나 파일 크기가 너무 큽니다.".into());
+    }
+    let folder = std::env::var_os("USERPROFILE")
+        .map(PathBuf::from)
+        .map(|p| p.join("Downloads"))
+        .filter(|p| p.is_dir())
+        .unwrap_or_else(|| db.base.join("exports"));
+    fs::create_dir_all(&folder).map_err(err)?;
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH).map_err(err)?.as_millis();
+    for n in 0..100 {
+        let destination = folder.join(format!("BANDO-HUB-{label}-{stamp}-{n}.xlsx"));
+        match fs::OpenOptions::new().write(true).create_new(true).open(&destination) {
+            Ok(mut file) => {
+                use std::io::Write;
+                file.write_all(&bytes).map_err(err)?;
+                file.sync_all().map_err(err)?;
+                return Ok(destination.to_string_lossy().into_owned());
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(e) => return Err(err(e)),
+        }
+    }
+    Err("파일명이 충돌하여 저장하지 못했습니다. 다시 시도하세요.".into())
+}
+
 pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
@@ -433,7 +469,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             state_load, state_save, settings_patch, price_set, clipboard_write, clipboard_read,
-            product_open, catalog_report, catalog_approve, receipt_archive, backup_create, backup_list, backup_restore, save_product_workbook
+            product_open, catalog_report, catalog_approve, receipt_archive, backup_create, backup_list, backup_restore, save_product_workbook, save_registration_workbook
         ])
         .run(tauri::generate_context!())
         .expect("BANDO HUB Tauri runtime error");
