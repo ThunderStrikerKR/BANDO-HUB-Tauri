@@ -152,7 +152,10 @@ export function WorkflowQueue({
                               <button
                                 disabled={busy}
                                 onClick={() =>
-                                  void run(() => onSave(markFactoryDelivered(state, q!.shipmentId)))
+                                  void run(async () => {
+                                    if (!(await confirmAction("이 발송 파일을 실제 공장에 전달했나요? 직원 확인 후에만 전달 완료로 표시합니다."))) return;
+                                    await onSave(markFactoryDelivered(state, q!.shipmentId));
+                                  })
                                 }
                               >
                                 실제 공장 전달 확인
@@ -160,7 +163,10 @@ export function WorkflowQueue({
                               <button
                                 disabled={busy}
                                 onClick={() =>
-                                  void run(() => onSave(reopenUnsentExport(state, q!.shipmentId)))
+                                  void run(async () => {
+                                    if (!(await confirmAction("아직 공장에 전달하지 않은 출력본을 폐기하고 다시 작성할까요? 기존 출력 이력은 보존됩니다."))) return;
+                                    await onSave(reopenUnsentExport(state, q!.shipmentId));
+                                  })
                                 }
                               >
                                 전달 전 정정 / 재출력
