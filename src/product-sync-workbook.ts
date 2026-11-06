@@ -169,6 +169,7 @@ function categoryEdit(state: State, p: Product, raw: string): void {
   p.category = categories.map((c) => c!.name).join(" > ");
 }
 function brandEdit(state: State, p: Product, raw: string): void {
+  if (!raw) return;
   const value = optional(raw, p.brandId ?? "");
   if (value && !state.brands?.some((b) => b.id === value)) {
     throw Error("등록되지 않은 브랜드 ID입니다.");
@@ -193,12 +194,21 @@ function updateExistingProduct(state: State, current: Product, cells: string[]):
   }
   if (cells[13] && cells[13] !== "정상") throw Error("보관 상태는 변경할 수 없습니다.");
   p.name = optional(cells[2], p.name);
-  p.subtitle = optional(cells[3], p.subtitle ?? "");
+  if (cells[3]) {
+    if (cells[3] === EMPTY) delete p.subtitle;
+    else p.subtitle = cells[3];
+  }
   if (!p.name) throw Error("상품명은 비울 수 없습니다.");
   categoryEdit(state, p, cells[7]);
   brandEdit(state, p, cells[8]);
-  p.specification = optional(cells[9], p.specification ?? "");
-  p.sellingUnit = optional(cells[10], p.sellingUnit ?? "");
+  if (cells[9]) {
+    if (cells[9] === EMPTY) delete p.specification;
+    else p.specification = cells[9];
+  }
+  if (cells[10]) {
+    if (cells[10] === EMPTY) delete p.sellingUnit;
+    else p.sellingUnit = cells[10];
+  }
   p.defaultColor = optional(cells[11], p.defaultColor);
   p.active = yesNo(cells[12], p.active);
   return p;
@@ -247,7 +257,10 @@ function editVariant(original: Variant, cells: string[], p: Product): Variant {
   if (cells[9] && cells[9] !== (original.siteOptionId ?? "")) throw Error("홈페이지 옵션 ID는 변경할 수 없습니다.");
   const v = structuredClone(original);
   v.color = optional(cells[3], v.color);
-  v.option = optional(cells[4], v.option ?? "");
+  if (cells[4]) {
+    if (cells[4] === EMPTY) delete v.option;
+    else v.option = cells[4];
+  }
   const at = new Date().toISOString();
   for (const [index, field] of [[5, "wholesale"], [6, "semi"], [7, "retail"]] as const) {
     const next = parsePrice(cells[index], v[field]);
@@ -316,7 +329,19 @@ export function previewProductSyncRows(state: State, source: WorkbookSource): Pr
       const productId = id || keys.get(key);
       if (!productId) throw Error("옵션이 연결될 상품 행을 찾지 못했습니다.");
       const product = next.find((p) => p.id === productId)!;
-      if (!product || isArchived(product)) throw Error("보관된 상품에는 옵션을 추가하거나 수정할 수 없습니다.");
+      if (!product) throw Error("상품 ID가 존재하지 않습니다.");
+      if (isArchived(product)) {
+        const archivedOption = optionId && state.products.find((p) => p.id === productId)
+          ?.variants.find((v) => v.id === optionId);
+        if (!archivedOption || JSON.stringify(rowOption(product, archivedOption).map(String)) !==
+          JSON.stringify(cells.map(String))) {
+          throw Error("보관된 상품과 옵션은 Excel에서 수정할 수 없습니다.");
+        }
+        addRow("판매 옵션 및 가격", row, productId + "|" + optionId,
+          product.name + " / " + archivedOption.color, "UNCHANGED");
+        seenOptions.add(productId + "|" + optionId);
+        continue;
+      }
       const keyId = productId + "|" + (optionId || "new:" + normalizeColor(cells[3]) + "|" + cells[4]);
       if (seenOptions.has(keyId)) throw Error("옵션 행이 중복되었습니다.");
       seenOptions.add(keyId);
@@ -355,8 +380,8 @@ export function previewProductSyncRows(state: State, source: WorkbookSource): Pr
           n === null || Number.isSafeInteger(n) && n >= 0)) throw Error("옵션 색상 또는 가격을 확인하세요.");
       }
       if (!original) {
-        const duplicates = state.products.filter((p) =>
-          !isArchived(p) && identity(p) === identity(product));
+        const duplicates = next.filter((p) =>
+          p.id !== product.id && !isArchived(p) && identity(p) === identity(product));
         if (duplicates.length) throw Error("동일 모델코드의 기존 상품이 있습니다. 기존 상품 ID로 수정하세요.");
         validateProduct(product, registeredProducts(state.products));
       }
