@@ -173,8 +173,10 @@ function createCandidate(original: Client | undefined, cells: string[]): Client 
   put("shortNames", 14);
   put("identifiers", 15);
   put("preferredAccountId", 16);
-  if ((cells[17] ?? "") === "보관" && !original?.deletedAt) {
-    throw Error("보관 상태 값은 변경할 수 없습니다.");
+  const archiveStatus = (cells[17] ?? "").trim();
+  const expectedStatus = original?.deletedAt ? "보관" : "사용";
+  if (archiveStatus && archiveStatus !== expectedStatus) {
+    throw Error("보관 상태는 Excel에서 변경할 수 없습니다.");
   }
   if (original?.deletedAt && JSON.stringify(next) !== JSON.stringify(original)) {
     throw Error("보관된 거래처는 Excel에서 수정할 수 없습니다.");
