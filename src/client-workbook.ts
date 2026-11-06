@@ -302,7 +302,13 @@ export async function previewClientWorkbook(state: State, file: File): Promise<C
   for (let i = 2; i <= data.rowCount; i++) {
     const values: string[] = [];
     try {
-      for (let col = 1; col <= CLIENT_HEADERS.length; col++) values.push(workbookText(data.getRow(i).getCell(col)));
+      for (let col = 1; col <= CLIENT_HEADERS.length; col++) {
+        const cell = data.getRow(i).getCell(col);
+        if ([1, 5, 6, 7, 17].includes(col) && typeof cell.value === "number") {
+          throw Error(CLIENT_HEADERS[col - 1] + "은 숫자가 아닌 텍스트 형식으로 입력하세요. 앞자리 0이 사라질 수 있습니다.");
+        }
+        values.push(workbookText(cell));
+      }
       cells.push({ row: i, cells: values });
     } catch (error) {
       // An unsafe row must block the entire import, never get silently skipped.
