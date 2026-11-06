@@ -457,37 +457,72 @@ async fn save_registration_workbook(
     save_xlsx_with_dialog(app, label, bytes).await
 }
 
-// Read-only official product fetch. URL validation and redirect blocking prevent
-// arbitrary network requests from the renderer (including local-network targets).
-#[tauri::command]
-async fn fetch_official_product_html(target: String) -> Result<String, String> {
-    const MAX_BODY: usize = 4 * 1024 * 1024;
+fn validate_official_product_url(target: &str) -> Result<url::Url, String> {
     if target.len() > 2048 {
         return Err("상품 URL이 너무 깁니다.".into());
     }
-    let url = url::Url::parse(&target).map_err(|_| "상품 상세 URL을 확인하세요.".to_string())?;
+    let url = url::Url::parse(target).map_err(|_| "상품 상세 URL을 확인하세요.".to_string())?;
     if url.scheme() != "https" ||
         url.port().is_some() ||
         !url.username().is_empty() ||
         url.password().is_some() ||
         !matches!(url.host_str(), Some("bandostand.com" | "www.bandostand.com" |
-            "bandomall.co.kr" | "www.bandomall.co.kr")) ||
-        !url.path().starts_with("/product/") {
+            "bandomall.co.kr" | "www.bandomall.co.kr")) {
         return Err("반도스탠드 또는 반도몰의 HTTPS 상품 상세 주소만 허용됩니다.".into());
     }
-    // Accept Cafe24's detail.html?product_no=... and SEO detail paths.
-    let has_product_number = if url.path() == "/product/detail.html" {
+    let segments: Vec<&str> = url.path_segments()
+        .map(|parts| parts.filter(|part| !part.is_empty()).collect())
+        .unwrap_or_default();
+    let is_cafe24 = url.path() == "/product/detail.html" &&
         url.query_pairs().any(|(key, value)| key == "product_no" &&
-            !value.is_empty() && value.chars().all(|c| c.is_ascii_digit()))
-    } else {
-        url.path_segments().is_some_and(|parts| {
-            parts.filter(|s| !s.is_empty()).any(|s| !s.is_empty() &&
-                s.chars().all(|c| c.is_ascii_digit()))
-        })
-    };
-    if !has_product_number {
+            !value.is_empty() && value.chars().all(|c| c.is_ascii_digit()));
+    let is_seo = segments.len() >= 3 && segments[0] == "product" &&
+        segments[1] != "detail.html" && segments[2].chars().all(|c| c.is_ascii_digit());
+    if !is_cafe24 && !is_seo {
         return Err("상품번호가 포함된 공식 상세페이지 URL을 사용하세요.".into());
     }
+    Ok(url)
+}
+
+#[cfg(test)]
+mod official_url_tests {
+    use super::validate_official_product_url;
+
+    #[test]
+    fn accepts_cafe24_and_seo_product_urls() {
+        assert!(validate_official_product_url(
+            "https://bandostand.com/product/detail.html?product_no=42"
+        ).is_ok());
+        assert!(validate_official_product_url(
+            "https://www.bandostand.com/product/stand-bd-701/54/"
+        ).is_ok());
+        assert!(validate_official_product_url(
+            "https://bandomall.co.kr/product/guitar-string/3449/category/1/display/1/"
+        ).is_ok());
+    }
+    #[test]
+    fn rejects_non_official_and_unsafe_urls() {
+        for item in [
+            "http://bandostand.com/product/x/42/",
+            "https://bandostand.com.evil.example/product/x/42/",
+            "https://127.0.0.1/product/x/42/",
+            "https://user:pass@bandostand.com/product/x/42/",
+            "https://bandostand.com:8443/product/x/42/",
+            "https://bandostand.com/product/detail.html?product_no=foo",
+            "https://bandostand.com/shopinfo/guide.html",
+            "https://bandostand.com/product/no-number/",
+        ] {
+            assert!(validate_official_product_url(item).is_err(), "{item}");
+        }
+    }
+}
+
+// Read-only official product fetch. URL validation and redirect blocking prevent
+// arbitrary network requests from the renderer (including local-network targets).
+#[tauri::command]
+async fn fetch_official_product_html(target: String) -> Result<String, String> {
+    const MAX_BODY: usize = 4 * 1024 * 1024;
+    let url = validate_official_product_url(&target)?;
 
     let client = reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::none())
