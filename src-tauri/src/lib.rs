@@ -76,8 +76,8 @@ fn write_snapshot(conn: &mut Connection, mut state: Value, expected_revision: u6
 // Only modified/new brands are validated so legacy unchanged rows cannot prevent
 // routine product, price and order saves. Brand IDs remain stable across renames.
 fn brand_terms(brand: &Value) -> Vec<String> {
-    let fixed = ["name", "korean"].iter()
-        .filter_map(|key| brand[*key].as_str());
+    let fields = ["name", "korean"];
+    let fixed = fields.iter().filter_map(|key| brand[*key].as_str());
     let aliases = brand["aliases"].as_array().into_iter().flatten().filter_map(Value::as_str);
     fixed.chain(aliases)
         .map(|term| term.split_whitespace().collect::<Vec<_>>().join(" ").to_lowercase())
