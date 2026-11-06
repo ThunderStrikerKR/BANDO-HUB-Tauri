@@ -59,9 +59,9 @@ test("factory Logen workbook exports exactly 15 expected columns with preserved 
   assert.equal(sheet.getCell("L2").value,"22300");
   assert.equal(sheet.getCell("I2").value,"BD 709 블랙 3개 / BD 900 화이트 1개");
   assert.equal(sheet.getCell("J2").value,"문 앞 배송 요청");
-  assert.equal(sheet.getCell("F2").value,null,"factory fills package count");
-  assert.equal(sheet.getCell("G2").value,null,"factory fills postage");
-  assert.equal(sheet.getCell("B2").value,null,"no guessed recipient postcode");
+  assert.equal(sheet.getCell("F2").value,"","factory fills package count");
+  assert.equal(sheet.getCell("G2").value,"","factory fills postage");
+  assert.equal(sheet.getCell("B2").value,"","no guessed recipient postcode");
 });
 
 test("after Save As succeeds, mark queue EXPORTED and freeze audit without marking delivered", () => {
@@ -114,7 +114,7 @@ test("020 is preserved as a text freight code while factory postal data remains 
   const wb=new ExcelJS.Workbook();
   await wb.xlsx.load(Buffer.from(bytes));
   assert.equal(wb.worksheets[0].getCell("H2").value,"020");
-  assert.equal(wb.worksheets[0].getCell("L2").value,null);
+  assert.equal(wb.worksheets[0].getCell("L2").value,"");
 });
 
 test("Tauri native Save As wired; canceled dialog does not mark export in UI", () => {
