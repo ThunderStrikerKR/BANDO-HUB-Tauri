@@ -64,8 +64,8 @@ const api: Api = {
   startupMetrics: async () => notReady("시작 성능 계측"),
   retryStartup: async () => notReady("다시 시작"),
   receiptArchive: () => invoke<{ id: string; orderId: string; record: Record<string, unknown> }[]>("receipt_archive"),
-  captureReceipt: async () => notReady("접수 원문 감사 저장"),
-  recordReceiptCorrection: async () => notReady("접수 원문 정정 감사"),
+  // Confirmed receipts and corrections are written atomically by state_save.
+  // The old Electron secondary-write IPC is intentionally not duplicated.
   registrationTemplate: async () => notReady("상품 일괄 등록 양식 다운로드"),
   registrationPreview: async () => notReady("상품 일괄 등록 검증"),
   registrationCommit: async () => notReady("상품 일괄 등록 반영"),

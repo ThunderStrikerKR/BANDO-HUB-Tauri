@@ -556,11 +556,6 @@ export interface Api {
   >;
   resetTestDatabase?: (revision: number) => Promise<{ backup: string }>;
   receiptArchive: () => Promise<{ id: string; orderId: string; record: Record<string, unknown> }[]>;
-  captureReceipt: (id: string, text: string) => Promise<NonNullable<Order["receipt"]>>;
-  recordReceiptCorrection: (
-    id: string,
-    record: NonNullable<Order["rawCorrections"]>[number],
-  ) => Promise<void>;
   registrationTemplate: () => Promise<void>;
   registrationPreview: () => Promise<{
     fingerprint: string;

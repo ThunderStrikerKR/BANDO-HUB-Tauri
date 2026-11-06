@@ -65,10 +65,23 @@ fn write_snapshot(conn: &mut Connection, mut state: Value, expected_revision: u6
         }
     }
     for (id, order_id, record) in archive_entries {
-        tx.execute(
-            "INSERT OR IGNORE INTO receipt_archive(id,order_id,record) VALUES (?1,?2,?3)",
-            params![id,order_id,serde_json::to_string(&record).map_err(err)?]
-        ).map_err(err)?;
+        // Never silently discard a colliding audit ID with a different owner or payload.
+        let stored: Option<(String, String)> = tx.query_row(
+            "SELECT order_id,record FROM receipt_archive WHERE id=?1",
+            params![id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        ).optional().map_err(err)?;
+        if let Some((stored_owner, stored_payload)) = stored {
+            let stored_record: Value = serde_json::from_str(&stored_payload).map_err(err)?;
+            if stored_owner != order_id || stored_record != record {
+                return Err("기존 원문 감사 기록과 ID가 충돌합니다. 변경을 저장하지 않았습니다.".into());
+            }
+        } else {
+            tx.execute(
+                "INSERT INTO receipt_archive(id,order_id,record) VALUES (?1,?2,?3)",
+                params![id,order_id,serde_json::to_string(&record).map_err(err)?],
+            ).map_err(err)?;
+        }
     }
     tx.commit().map_err(err)?;
     Ok(state)
@@ -358,6 +371,36 @@ fn receipt_archive(db: State<'_, Database>) -> Result<Value, String> {
         let order_id: String = row.get(1).map_err(err)?;
         let record: String = row.get(2).map_err(err)?;
         archive.push(json!({"id":id,"orderId":order_id,"record":serde_json::from_str::<Value>(&record).map_err(err)?}));
+    }
+    // Historical orders may predate the independent audit table. Display their
+    // current snapshot as unverified reference data; never fabricate an audit row.
+    let known: std::collections::HashSet<String> = archive.iter()
+        .filter_map(|row| row["id"].as_str().map(str::to_owned)).collect();
+    let snapshot = get_snapshot(&conn)?;
+    for order in snapshot["orders"].as_array().into_iter().flatten() {
+        if order["confirmedAt"].as_str().is_none() { continue; }
+        let Some(order_id) = order["id"].as_str() else { continue; };
+        if !known.contains(&format!("receipt:{order_id}")) {
+            let original = order["receipt"]["original"].as_str()
+                .or_else(|| order["rawHistory"].get(0).and_then(|r| r["raw"].as_str()))
+                .or_else(|| order["raw"].as_str()).unwrap_or("");
+            archive.push(json!({"id":format!("legacy:{order_id}"),"orderId":order_id,
+                "record":{"original":original,
+                    "at":order["receipt"]["at"].as_str().or_else(||order["createdAt"].as_str()).unwrap_or(""),
+                    "actor":"과거 주문 / 최초 접수 검증 불가",
+                    "legacy":true,"verified":false}}));
+        }
+        for correction in order["rawCorrections"].as_array().into_iter().flatten() {
+            let Some(cid) = correction["id"].as_str() else { continue; };
+            if known.contains(&format!("correction:{cid}")) { continue; }
+            let mut reference = correction.clone();
+            if let Some(fields) = reference.as_object_mut() {
+                fields.insert("legacy".into(), json!(true));
+                fields.insert("verified".into(), json!(false));
+            }
+            archive.push(json!({"id":format!("legacy-correction:{cid}"),
+                "orderId":order_id,"record":reference}));
+        }
     }
     Ok(json!(archive))
 }

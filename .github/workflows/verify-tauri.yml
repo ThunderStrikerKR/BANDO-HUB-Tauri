@@ -24,3 +24,11 @@ jobs:
         run: npm run check:types
       - name: Node tests
         run: npm test
+  rust-reception:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Rust receipt boundary unit tests (no Tauri GUI libraries)
+        run: cargo test --manifest-path tests/reception-rust/Cargo.toml
