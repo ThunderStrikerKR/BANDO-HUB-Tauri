@@ -1,4 +1,5 @@
 import { replyNeedsReview } from "./factory-replies";
+import { approveFactoryReplyRow } from "./factory-reply-workbook";
 import { confirmAction } from "./dialogs";
 import { useState } from "react";
 import type { State } from "./types";
@@ -8,10 +9,14 @@ export function FactoryNotifications({
   state,
   onClose,
   onOpen,
+  onSave,
+  onRefresh,
 }: {
   state: State;
   onClose: () => void;
   onOpen: (id: string) => void;
+  onSave: (next: State) => Promise<void>;
+  onRefresh: () => Promise<void>;
 }) {
   const [error, setError] = useState("");
   return (
@@ -21,7 +26,7 @@ export function FactoryNotifications({
       </p>
       <div className="factory-notifications">
         {!state.factoryReplies?.length && (
-          <p>공장 회신 내역이 없습니다. 설정에서 회신 수신 폴더를 지정하세요.</p>
+          <p>공장 회신 내역이 없습니다. 공장 목록의 엑셀 작성 이력에서 회신 파일을 업로드하세요.</p>
         )}
         {state.factoryReplies
           ?.slice()
@@ -39,13 +44,15 @@ export function FactoryNotifications({
               <small>
                 {record.businessDate} / {new Date(record.at).toLocaleString("ko-KR")}
               </small>
-              <button
-                onClick={() =>
-                  void window.bando!.openFactoryFile!(record.id).catch((e) => setError(String(e)))
-                }
-              >
-                회신 파일 열기
-              </button>
+              {record.archivedPath && record.id.startsWith("factory-reply-") && (
+                <button type="button"
+                  onClick={() =>
+                    void window.bando!.openFactoryFile!(record.id).catch((e) => setError(String(e)))
+                  }
+                >
+                  회신 원본 열기
+                </button>
+              )}
               {record.error && <p className="form-error">{record.error}</p>}
               {record.rows.map((row) => (
                 <div key={row.row}>
@@ -70,7 +77,11 @@ export function FactoryNotifications({
                           )
                             return;
                           try {
-                            await window.bando!.approveFactoryConflict!(record.id, row.row);
+                            const latest = await window.bando!.load();
+                            const next = approveFactoryReplyRow(latest, record.id, row.row);
+                            await window.bando!.backup();
+                            await onSave(next);
+                            await onRefresh();
                           } catch (e) {
                             setError(String(e));
                           }
