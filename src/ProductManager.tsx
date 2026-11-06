@@ -236,7 +236,7 @@ export function ProductManager({
                 >
                   {priceMode ? "가격 수정 모드 종료" : "가격 수정 모드 켜기"}
                 </button>
-                <RegistrationManager state={state} onSave={onSave} onRefresh={onRefresh} onNotice={onNotice} />
+                <ProductSyncWorkbookTools onSave={onSave} onRefresh={onRefresh} onNotice={onNotice} />
                 <ProductNameCleanupPanel onSave={onSave} onRefresh={onRefresh} onNotice={onNotice} />
                 <button onClick={() => setAdding(!adding)}>상품 추가</button>
               </div>
