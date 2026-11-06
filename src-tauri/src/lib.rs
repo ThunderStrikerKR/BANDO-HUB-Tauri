@@ -510,6 +510,20 @@ fn open_factory_reply_file(db: State<'_, Database>, id: String) -> Result<(), St
 }
 
 #[tauri::command]
+async fn save_settlement_workbook(
+    app: tauri::AppHandle, bytes: Vec<u8>,
+) -> Result<Option<String>, String> {
+    save_xlsx_with_dialog(app, "일일결산", bytes).await
+}
+
+#[tauri::command]
+async fn save_order_history_workbook(
+    app: tauri::AppHandle, bytes: Vec<u8>,
+) -> Result<Option<String>, String> {
+    save_xlsx_with_dialog(app, "주문내역", bytes).await
+}
+
+#[tauri::command]
 async fn save_factory_workbook(
     app: tauri::AppHandle, bytes: Vec<u8>,
 ) -> Result<Option<String>, String> {
@@ -651,7 +665,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             state_load, state_save, settings_patch, price_set, clipboard_write, clipboard_read,
-            product_open, catalog_report, catalog_approve, receipt_archive, backup_create, backup_list, backup_restore, save_product_workbook, save_registration_workbook, save_client_workbook, save_product_sync_workbook, save_factory_workbook, archive_factory_reply, open_factory_reply_file,
+            product_open, catalog_report, catalog_approve, receipt_archive, backup_create, backup_list, backup_restore, save_product_workbook, save_registration_workbook, save_client_workbook, save_product_sync_workbook, save_factory_workbook, save_settlement_workbook, save_order_history_workbook, archive_factory_reply, open_factory_reply_file,
             fetch_official_product_html
         ])
         .run(tauri::generate_context!())
