@@ -95,10 +95,8 @@ export async function exportClientWorkbook(state: State): Promise<number[]> {
   for (const client of state.clients) sheet.addRow(rowValues(client));
   sheet.views = [{ state: "frozen", ySplit: 1 }];
   sheet.autoFilter = { from: "A1", to: "R1" };
-  sheet.columns.forEach((column, index) => {
-    column.width = [38, 30, 30, 44, 14, 19, 19, 19, 24, 16, 16, 16, 18, 16, 32, 32, 39, 14][index];
-    column.numFmt = "@";
-  });
+  sheet.columns = [38, 30, 30, 44, 14, 19, 19, 19, 24, 16, 16, 16, 18, 16, 32, 32, 39, 14]
+    .map((width) => ({ width, style: { numFmt: "@" } }));
   sheet.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
   sheet.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF303030" } };
   const guide = workbook.addWorksheet("작성 안내");
