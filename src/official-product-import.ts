@@ -36,12 +36,12 @@ function parsePrice(raw: string): number | null {
 
 function pageFields(doc: Document): (name: string) => string {
   const map = new Map<string, string>();
-  for (const row of doc.querySelectorAll("tr")) {
+  for (const row of Array.from(doc.querySelectorAll("tr"))) {
     const header = clean(row.querySelector("th")?.textContent).replace(/[\s:：]/g, "");
     const data = clean(row.querySelector("td")?.textContent);
     if (header && data && !map.has(header)) map.set(header, data);
   }
-  for (const item of doc.querySelectorAll("dl")) {
+  for (const item of Array.from(doc.querySelectorAll("dl"))) {
     const header = clean(item.querySelector("dt")?.textContent).replace(/[\s:：]/g, "");
     const data = clean(item.querySelector("dd")?.textContent);
     if (header && data && !map.has(header)) map.set(header, data);
