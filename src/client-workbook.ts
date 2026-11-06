@@ -193,15 +193,22 @@ function changedFields(before: Client, after: Client): string[] {
   return keys.filter((key) => JSON.stringify(before[key] ?? "") !== JSON.stringify(after[key] ?? ""))
     .map((key) => String(key) + ": " + String(before[key] ?? "") + " → " + String(after[key] ?? ""));
 }
+function identityChanged(before: Client | undefined, after: Client): boolean {
+  return !before || normalize(before.name) !== normalize(after.name) ||
+    phoneKey(before.phone ?? "") !== phoneKey(after.phone ?? "") ||
+    phoneKey(before.mobile ?? "") !== phoneKey(after.mobile ?? "");
+}
 function collision(candidate: Client, others: Client[]): string[] {
   const name = normalize(candidate.name);
-  const phone = phoneKey(candidate.phone || candidate.mobile || "");
+  const phones = [candidate.phone, candidate.mobile].map((s) => phoneKey(s ?? ""))
+    .filter((s) => s.length >= 7);
   const conflicts: string[] = [];
   for (const previous of others) {
     if (previous.id === candidate.id || previous.deletedAt) continue;
     const sameName = !!name && normalize(previous.name) === name;
-    const priorPhone = phoneKey(previous.phone || previous.mobile || "");
-    const samePhone = !!phone && !!priorPhone && phone === priorPhone;
+    const otherPhones = [previous.phone, previous.mobile].map((s) => phoneKey(s ?? ""))
+      .filter((s) => s.length >= 7);
+    const samePhone = phones.some((number) => otherPhones.includes(number));
     if (sameName || samePhone) conflicts.push(previous.name);
   }
   return [...new Set(conflicts)];
@@ -244,7 +251,7 @@ export function previewClientRows(
       } else {
         changes = original ? changedFields(original, candidate) : ["신규 거래처 등록"];
         status = original ? (changes.length ? "UPDATE" : "UNCHANGED") : "ADD";
-        if (status !== "UNCHANGED") {
+        if (status !== "UNCHANGED" && identityChanged(original, candidate)) {
           const conflicts = collision(candidate, [...state.clients, ...seenNew]);
           if (conflicts.length) {
             errors.push("동일한 상호 또는 전화번호가 있습니다: " + conflicts.join(", "));
@@ -265,6 +272,8 @@ export function previewClientRows(
   const proposed = rows.filter((row) => row.status === "ADD" || row.status === "UPDATE");
   for (const row of proposed) {
     if (!row.client) continue;
+    const previous = state.clients.find((client) => client.id === row.client?.id);
+    if (!identityChanged(previous, row.client)) continue;
     const peers = proposed.filter((other) => other !== row).flatMap((other) => other.client ? [other.client] : []);
     const conflicts = collision(row.client, peers);
     if (conflicts.length) {
