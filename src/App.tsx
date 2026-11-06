@@ -164,6 +164,7 @@ export function App() {
                     date={model.historyDate}
                     onDate={model.setHistoryDate}
                     onOpen={model.open}
+                    onNotice={model.setNotice}
                   />
                 )}{" "}
                 {tab === "결산" && (
