@@ -89,6 +89,12 @@ export function connectFactoryReply(input: State, reply: FactoryReply, approveCo
       continue;
     }
     claimed.add(ship.id);
+    if (s.workflow!.shipments.some((other) =>
+      other.id !== ship.id && other.tracking?.FACTORY === row.tracking
+    )) {
+      row.issue = "운송장번호가 다른 배송 건에 이미 연결되어 있습니다.";
+      continue;
+    }
     const tracking = ship.tracking?.FACTORY,
       actual = actualFreightOf(ship, q.snapshot!.recipient, "FACTORY");
     if (
