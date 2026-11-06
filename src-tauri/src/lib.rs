@@ -714,3 +714,197 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("BANDO HUB Tauri runtime error");
 }
+
+
+#[cfg(test)]
+mod receipt_sqlite_integration_tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn test_path() -> PathBuf {
+        let id = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        std::env::temp_dir().join(format!("bando-receipt-ci-{}-{id}.sqlite", std::process::id()))
+    }
+
+    fn seed() -> Value {
+        json!({
+            "revision": 0,
+            "products": [{
+                "id": "p-709", "code": "709B", "name": "709B",
+                "active": true, "variants": [{ "id": "v-black" }]
+            }],
+            "orders": [],
+            "clients": [{
+                "id": "client-1", "name": "테스트 거래처",
+                "address": "서울시 테스트로 1", "phone": "02-1234-5678",
+                "mobile": "", "tier": "wholesale"
+            }],
+            "aliases": [], "queue": [], "exports": [],
+            "settings": { "accounts": [], "operatorName": "검증 담당자" },
+            "workflow": { "shipments": [], "events": [] }
+        })
+    }
+
+    fn open_db(path: &Path) -> Connection {
+        let conn = Connection::open(path).unwrap();
+        conn.execute_batch(r#"
+            CREATE TABLE app_state(id INTEGER PRIMARY KEY, payload TEXT NOT NULL);
+            CREATE TABLE product_index(id TEXT PRIMARY KEY, code TEXT NOT NULL,
+                name TEXT NOT NULL, payload TEXT NOT NULL);
+            CREATE TABLE order_index(id TEXT PRIMARY KEY, client_id TEXT NOT NULL,
+                created_at TEXT NOT NULL, confirmed_at TEXT, status TEXT NOT NULL);
+            CREATE TABLE receipt_archive(id TEXT PRIMARY KEY, order_id TEXT NOT NULL,
+                record TEXT NOT NULL);
+        "#).unwrap();
+        conn.execute("INSERT INTO app_state(id,payload) VALUES (1,?1)",
+            [seed().to_string()]).unwrap();
+        conn
+    }
+
+    fn confirmed(base: &Value) -> Value {
+        let mut next = base.clone();
+        let at = "2026-11-07T12:00:00+09:00";
+        let raw = "709B 블랙 2개 / 수취인 김테스트";
+        let recipients = json!([{
+            "id": "r-1", "name": "김테스트",
+            "items": [{ "id": "i-1", "productId": "p-709",
+                "variantId": "v-black", "quantity": 2 }]
+        }]);
+        let mut order = json!({
+            "id": "order-1", "receptionVersion": 1,
+            "clientId": "client-1", "orderType": "AGENCY",
+            "raw": raw, "createdAt": at, "confirmedAt": at,
+            "status": "STATEMENT", "recipients": recipients,
+            "receipt": { "original": raw, "at": at, "actor": "검증 담당자",
+                "clientId": "client-1", "legacy": false },
+            "rawCorrections": []
+        });
+        order["confirmationSnapshot"] = json!({
+            "at": at, "raw": raw, "client": next["clients"][0].clone(),
+            "recipients": recipients, "data": order.clone()
+        });
+        next["orders"] = json!([order]);
+        next["workflow"] = json!({
+            "shipments": [{
+                "id": "ship-1", "orderId": "order-1",
+                "recipientId": "r-1", "step": 1
+            }],
+            "events": [{ "action": "주문 확인 완료", "shipmentIds": ["ship-1"] }]
+        });
+        next
+    }
+
+    fn correction(id: &str) -> Value {
+        json!({
+            "id": id, "at": "2026-11-07T12:05:00+09:00",
+            "actor": "검증 담당자", "reason": "붙여넣기 오타",
+            "before": "709B 블랙 2개 / 수취인 김테스트",
+            "after": "709B 블랙 3개 / 수취인 김테스트",
+            "affectedRecipientIds": ["r-1"]
+        })
+    }
+
+    fn count_archive(conn: &Connection) -> i64 {
+        conn.query_row("SELECT COUNT(*) FROM receipt_archive", [], |r| r.get(0)).unwrap()
+    }
+
+    #[test]
+    fn confirmed_receipt_and_correction_survive_sqlite_reopen() {
+        let path = test_path();
+        let mut conn = open_db(&path);
+        let first = write_snapshot(&mut conn, confirmed(&seed()), 0, true).unwrap();
+        assert_eq!(first["revision"], 1);
+        assert_eq!(count_archive(&conn), 1);
+        let original: String = conn.query_row(
+            "SELECT record FROM receipt_archive WHERE id='receipt:order-1'",
+            [], |row| row.get(0)).unwrap();
+        assert_eq!(serde_json::from_str::<Value>(&original).unwrap()["original"],
+            "709B 블랙 2개 / 수취인 김테스트");
+
+        let mut edited = first.clone();
+        edited["orders"][0]["analysisRaw"] = json!("709B 블랙 3개 / 수취인 김테스트");
+        edited["orders"][0]["rawCorrections"] = json!([correction("fix-1")]);
+        let second = write_snapshot(&mut conn, edited, 1, true).unwrap();
+        assert_eq!(second["revision"], 2);
+        assert_eq!(count_archive(&conn), 2);
+
+        // Saving unrelated settings must not replay or duplicate any receipt event.
+        let mut unrelated = second.clone();
+        unrelated["settings"]["uiScale"] = json!(110);
+        let third = write_snapshot(&mut conn, unrelated, 2, true).unwrap();
+        assert_eq!(third["revision"], 3);
+        assert_eq!(count_archive(&conn), 2);
+        drop(conn);
+
+        let reopened = Connection::open(&path).unwrap();
+        let restored = get_snapshot(&reopened).unwrap();
+        assert_eq!(restored["revision"], 3);
+        assert_eq!(restored["orders"][0]["raw"],
+            "709B 블랙 2개 / 수취인 김테스트");
+        assert_eq!(restored["orders"][0]["analysisRaw"],
+            "709B 블랙 3개 / 수취인 김테스트");
+        assert_eq!(restored["orders"][0]["receipt"]["original"],
+            "709B 블랙 2개 / 수취인 김테스트");
+        assert_eq!(restored["orders"][0]["rawCorrections"].as_array().unwrap().len(), 1);
+        assert_eq!(count_archive(&reopened), 2);
+        let actual_correction: String = reopened.query_row(
+            "SELECT record FROM receipt_archive WHERE id='correction:fix-1'",
+            [], |row| row.get(0)).unwrap();
+        assert_eq!(serde_json::from_str::<Value>(&actual_correction).unwrap()["reason"],
+            "붙여넣기 오타");
+        drop(reopened);
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn tampered_original_and_colliding_audit_id_rollback_entire_save() {
+        let path = test_path();
+        let mut conn = open_db(&path);
+        let first = write_snapshot(&mut conn, confirmed(&seed()), 0, true).unwrap();
+
+        let mut tampered = first.clone();
+        tampered["orders"][0]["raw"] = json!("위조된 최초 원문");
+        assert!(write_snapshot(&mut conn, tampered, 1, true).unwrap_err()
+            .contains("최초 원문"));
+        assert_eq!(get_snapshot(&conn).unwrap(), first);
+        assert_eq!(count_archive(&conn), 1);
+
+        // Simulate an ID already held by a different archive owner.
+        conn.execute(
+            "INSERT INTO receipt_archive(id,order_id,record) VALUES (?1,?2,?3)",
+            params!["correction:collision", "other-order", r#"{"unexpected":true}"#]
+        ).unwrap();
+        let mut edited = first.clone();
+        edited["orders"][0]["analysisRaw"] = json!("709B 블랙 3개 / 수취인 김테스트");
+        edited["orders"][0]["rawCorrections"] = json!([correction("collision")]);
+        assert!(write_snapshot(&mut conn, edited, 1, true).unwrap_err().contains("충돌"));
+        assert_eq!(get_snapshot(&conn).unwrap(), first);
+        assert_eq!(count_archive(&conn), 2);
+        let original_order_index: String = conn.query_row(
+            "SELECT id FROM order_index WHERE id='order-1'", [], |r| r.get(0)).unwrap();
+        assert_eq!(original_order_index, "order-1");
+
+        drop(conn);
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn stale_revision_and_incomplete_draft_never_commit_audit() {
+        let path = test_path();
+        let mut conn = open_db(&path);
+        let mut draft = seed();
+        draft["orders"] = json!([{
+            "id":"draft-1", "receptionVersion":1, "raw":"709 2개"
+        }]);
+        assert!(write_snapshot(&mut conn, draft, 0, true).unwrap_err().contains("주문 확인 완료"));
+        assert_eq!(count_archive(&conn), 0);
+        let committed = write_snapshot(&mut conn, confirmed(&seed()), 0, true).unwrap();
+        assert_eq!(committed["revision"], 1);
+        assert!(write_snapshot(&mut conn, committed.clone(), 0, true).unwrap_err()
+            .contains("다른 작업"));
+        assert_eq!(get_snapshot(&conn).unwrap(), committed);
+        assert_eq!(count_archive(&conn), 1);
+        drop(conn);
+        std::fs::remove_file(path).unwrap();
+    }
+}

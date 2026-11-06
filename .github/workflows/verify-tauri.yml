@@ -32,3 +32,40 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Rust receipt boundary unit tests (no Tauri GUI libraries)
         run: cargo test --manifest-path tests/reception-rust/Cargo.toml
+
+  windows-native-sqlite:
+    name: Windows SQLite persistence and Rust tests
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Test real app Rust / SQLite persistence on Windows
+        run: cargo test --manifest-path src-tauri/Cargo.toml --lib -- --nocapture
+  windows-release-build:
+    name: Windows Tauri executable compilation
+    runs-on: windows-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install frontend dependencies
+        run: npm install --no-audit --no-fund
+      - name: Build actual Windows executable
+        run: npm run build:windows
+      - name: Verify EXE exists
+        shell: pwsh
+        run: |
+          $exe = "src-tauri/target/release/bando_hub_tauri.exe"
+          if (!(Test-Path $exe)) { throw "Tauri Windows EXE was not produced" }
+          Write-Host "EXE generated: $((Get-Item $exe).Length) bytes"
+      - name: Upload unsigned Windows test executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: BANDO-HUB-Tauri-v0.0.4-Windows-unsigned-test
+          path: src-tauri/target/release/bando_hub_tauri.exe
+          if-no-files-found: error
+          retention-days: 7
