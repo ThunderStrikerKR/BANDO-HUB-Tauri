@@ -26,6 +26,7 @@ import { ProductImports } from "./ProductImports";
 import { ProductNameCleanupPanel } from "./ProductNameCleanupPanel";
 import { optimizeProductImage } from "./product-image-preprocess";
 import { RegistrationManager } from "./RegistrationManager";
+import { SkuSplitPanel } from "./SkuSplitPanel";
 import type { NoticeSink } from "./shared/notices";
 import { useAsyncTask } from "./shared/useAsyncTask";
 import type { Product, State, Variant } from "./types";
@@ -333,7 +334,10 @@ export function ProductManager({
           <RegistrySettings state={state} onSave={onSave} onNotice={onNotice} categories={false} />
         )}
         {section === "상품 동기화" && (
-          <CatalogPanel state={state} onRefresh={onRefresh} onError={onNotice} />
+          <>
+            <SkuSplitPanel state={state} onSave={onSave} onRefresh={onRefresh} onNotice={onNotice} />
+            <CatalogPanel state={state} onSave={onSave} onRefresh={onRefresh} onError={onNotice} />
+          </>
         )}
         {edit && (
           <Modal
