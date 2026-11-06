@@ -152,3 +152,22 @@ test("client Excel is native saved, previewed, backed up, and revision checked",
   assert.match(ui, /await onSave\(next\)/);
   assert.doesNotMatch(manager, /<BulkTools kind="clients"/);
 });
+
+test("address updates remain available for historical shared-phone clients", () => {
+  const state = baseState();
+  state.clients[1].phone = state.clients[0].phone;
+  const preview = mod.previewClientRows(state, 7, [
+    { row: 2, cells: values("client-A", "기존 대리점", { address: "서울 종로구 55" }) },
+  ]);
+  assert.equal(preview.rows[0].status, "UPDATE");
+  assert.equal(mod.applyClientWorkbook(state, preview).updated, 1);
+});
+
+test("new clients sharing another client's mobile phone are flagged", () => {
+  const state = baseState();
+  state.clients[0].mobile = "010-5555-2222";
+  const cells = values("", "새 지점", { address: "경기 고양시 2", phone: "" });
+  cells[6] = "010-5555-2222";
+  const preview = mod.previewClientRows(state, 7, [{ row: 2, cells }]);
+  assert.equal(preview.rows[0].status, "HOLD");
+});
