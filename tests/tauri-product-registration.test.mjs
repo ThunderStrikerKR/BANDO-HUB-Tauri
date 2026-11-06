@@ -77,5 +77,5 @@ test("Excel Save As does not overwrite an existing file or accept another extens
   assert.match(rust, /\.create_new\(true\)/);
   assert.match(rust, /eq_ignore_ascii_case\("xlsx"\)/);
   assert.match(rust, /동일한 이름의 파일이 이미 있습니다/);
-  assert.match(rust, /상품 Excel 파일은 \.xlsx 확장자로만 저장/);
+  assert.match(rust, /Excel 파일은 \.xlsx 확장자로만 저장/);
 });
