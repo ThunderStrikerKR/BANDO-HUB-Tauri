@@ -1,5 +1,7 @@
 import { FactoryReplyHistory } from "./FactoryReplyHistory";
 import { ActualFreightField } from "./ActualFreightField";
+import { createFactoryWorkbook, previewFactoryExport, recordFactoryExport } from "./factory-export";
+import { confirmAction } from "./dialogs";
 import { useState } from "react";
 import { markFactoryDelivered, reopenUnsentExport } from "./corrections";
 import { won } from "./domain";
@@ -50,7 +52,8 @@ export function WorkflowQueue({
           .map((id) => state.orders.find((o) => o.id === id)!)
           .filter((o) => o && (o.raw + o.clientSnapshot?.name).includes(query))
       : [];
-  const visible = [...rows.map((q) => q.id), ...legacy.map((o) => o.id)],
+  // Historical orders without frozen export snapshots are not directly exportable.
+  const visible = rows.map((q) => q.id),
     chosen = selected.filter((id) => visible.includes(id)),
     all = !!visible.length && chosen.length === visible.length;
   const companyMissing = chosen.some((id) => {
@@ -126,9 +129,14 @@ export function WorkflowQueue({
                       </small>
                     </td>
                     <td>
-                      <button onClick={() => void run(() => window.bando!.openExportFile(e.id))}>
-                        파일 열기
-                      </button>
+                      {e.savedPath ? (
+                        <button onClick={() => void run(async () => {
+                          await window.bando!.copy(e.savedPath!);
+                          onNotice("저장 경로를 복사했습니다.", "success");
+                        })}>
+                          파일 경로 복사
+                        </button>
+                      ) : <span className="muted">기존 파일 위치를 확인하세요.</span>}
                       <details>
                         <summary>관련 주문</summary>
                         {e.orderIds.map((id) => (
@@ -266,7 +274,9 @@ export function WorkflowQueue({
                   <td>
                     <input
                       type="checkbox"
-                      aria-label={"이전 주문 선택 " + o.id}
+                      disabled
+                      title="기존 주문은 출고 이관 후 출력할 수 있습니다."
+                      aria-label={"이전 주문 선택 불가 " + o.id}
                       checked={chosen.includes(o.id)}
                       onChange={(e) =>
                         setSelected(
@@ -293,26 +303,42 @@ export function WorkflowQueue({
         )}
       </div>
       <footer className="excel-fixed-footer">
-        <button onClick={() => void run(() => window.bando!.openExcelDirectory())}>
-          폴더 열기
-        </button>
+        {scope === "FACTORY" && <small className="muted">저장 위치는 Windows 저장 창에서 선택합니다.</small>}
         {companyMissing && onSettings && <button onClick={onSettings}>반도스탠드 정보 설정</button>}
         {scope !== "HISTORY" && (
           <button
             className="primary"
-            disabled={busy || !chosen.length}
+            disabled={busy || !chosen.length || scope !== "FACTORY"}
             onClick={() =>
               void run(async () => {
-                const result = await window.bando!.exportExcel(chosen);
-                if (!result.cancelled) {
+                if (scope !== "FACTORY") {
+                  throw Error("매장 발송 Excel은 아직 Tauri 이식 전입니다. 개별 배송 건의 매장 발송 확인을 사용하세요.");
+                }
+                const current = await window.bando!.load();
+                const preview = previewFactoryExport(current, chosen);
+                if (!(await confirmAction(
+                  "공장 발송 " + preview.rows.length + "건의 로젠택배 Excel을 작성할까요? 저장 후 실제 공장 전달은 별도로 확인합니다."
+                ))) return;
+                if (!window.bando!.saveFactoryWorkbook) throw Error("공장 Excel 저장 기능이 연결되지 않았습니다.");
+                await window.bando!.backup();
+                const bytes = await createFactoryWorkbook(preview);
+                const savedPath = await window.bando!.saveFactoryWorkbook(bytes);
+                if (!savedPath) return;
+                try {
+                  const latest = await window.bando!.load();
+                  const result = recordFactoryExport(latest, preview, savedPath);
+                  await onSave(result.next);
                   await onRefresh();
                   setSelected([]);
-                  onNotice("발송 엑셀을 저장했습니다.", "success");
+                  onNotice("공장 발송 " + preview.rows.length + "건의 출력 이력을 저장했습니다. 실제 공장 전달은 별도로 확인해 주세요.", "success");
+                } catch (error) {
+                  throw Error("Excel 파일은 저장됐지만 출력 이력 기록에 실패했습니다. 공장에 전달하지 말고 파일을 확인하세요: " +
+                    savedPath + " / " + String(error));
                 }
               })
             }
           >
-            선택 {chosen.length}건 엑셀 작성
+            {scope === "STORE" ? "매장 Excel 출력 미이식" : "선택 " + chosen.length + "건 공장 Excel 작성"}
           </button>
         )}
       </footer>
