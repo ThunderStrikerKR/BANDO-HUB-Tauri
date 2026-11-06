@@ -171,3 +171,16 @@ test("new clients sharing another client's mobile phone are flagged", () => {
   const preview = mod.previewClientRows(state, 7, [{ row: 2, cells }]);
   assert.equal(preview.rows[0].status, "HOLD");
 });
+
+test("unchanged legacy clients missing newly-required contact fields do not block updates", () => {
+  const state = baseState();
+  state.clients[1].address = "";
+  state.clients[1].phone = "";
+  const preview = mod.previewClientRows(state, 7, [
+    { row: 2, cells: values("client-B", "다른 대리점") },
+    { row: 3, cells: values("client-A", "기존 대리점", { address: "서울 종로구 88" }) },
+  ]);
+  assert.deepEqual(Array.from(preview.rows, (row) => row.status), ["UNCHANGED", "UPDATE"]);
+  const { next } = mod.applyClientWorkbook(state, preview);
+  assert.equal(next.clients[1].address, "");
+});
