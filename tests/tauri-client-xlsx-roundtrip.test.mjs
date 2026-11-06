@@ -12,6 +12,7 @@ const require = createRequire(import.meta.url);
 const code = readFileSync(new URL("../src/client-workbook.ts", import.meta.url), "utf8");
 const cjs = ts.transpileModule(code, { compilerOptions: {
   module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022,
+  esModuleInterop: true,
 }}).outputText;
 const exports = {};
 vm.runInNewContext(cjs, { exports, require, structuredClone, crypto: webcrypto }, {
