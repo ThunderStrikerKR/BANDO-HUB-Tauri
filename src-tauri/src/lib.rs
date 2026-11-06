@@ -457,6 +457,67 @@ async fn save_registration_workbook(
     save_xlsx_with_dialog(app, label, bytes).await
 }
 
+// Read-only official product fetch. URL validation and redirect blocking prevent
+// arbitrary network requests from the renderer (including local-network targets).
+#[tauri::command]
+async fn fetch_official_product_html(target: String) -> Result<String, String> {
+    const MAX_BODY: usize = 4 * 1024 * 1024;
+    if target.len() > 2048 {
+        return Err("상품 URL이 너무 깁니다.".into());
+    }
+    let url = url::Url::parse(&target).map_err(|_| "상품 상세 URL을 확인하세요.".to_string())?;
+    if url.scheme() != "https" ||
+        url.port().is_some() ||
+        !url.username().is_empty() ||
+        url.password().is_some() ||
+        !matches!(url.host_str(), Some("bandostand.com" | "www.bandostand.com" |
+            "bandomall.co.kr" | "www.bandomall.co.kr")) ||
+        !url.path().starts_with("/product/") {
+        return Err("반도스탠드 또는 반도몰의 HTTPS 상품 상세 주소만 허용됩니다.".into());
+    }
+    // Accept Cafe24's detail.html?product_no=... and SEO detail paths.
+    let has_product_number = if url.path() == "/product/detail.html" {
+        url.query_pairs().any(|(key, value)| key == "product_no" &&
+            !value.is_empty() && value.chars().all(|c| c.is_ascii_digit()))
+    } else {
+        url.path_segments().is_some_and(|parts| {
+            parts.filter(|s| !s.is_empty()).any(|s| !s.is_empty() &&
+                s.chars().all(|c| c.is_ascii_digit()))
+        })
+    };
+    if !has_product_number {
+        return Err("상품번호가 포함된 공식 상세페이지 URL을 사용하세요.".into());
+    }
+
+    let client = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .timeout(std::time::Duration::from_secs(15))
+        .user_agent("BANDO-HUB/0.0.4 (official product preview)")
+        .build().map_err(err)?;
+    let mut response = client.get(url).send().await.map_err(|e| format!("공식 홈페이지 연결 실패: {e}"))?;
+    if !response.status().is_success() {
+        return Err(format!("상품 페이지를 읽지 못했습니다 (HTTP {}).", response.status()));
+    }
+    let content_type = response.headers().get(reqwest::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok()).unwrap_or("");
+    if !content_type.to_ascii_lowercase().starts_with("text/html") &&
+        !content_type.to_ascii_lowercase().starts_with("application/xhtml+xml") {
+        return Err("상품 페이지가 HTML 형식이 아닙니다.".into());
+    }
+    if response.content_length().is_some_and(|length| length > MAX_BODY as u64) {
+        return Err("상품 페이지가 허용 크기를 초과했습니다.".into());
+    }
+    let mut body = Vec::new();
+    while let Some(part) = response.chunk().await.map_err(err)? {
+        if body.len().saturating_add(part.len()) > MAX_BODY {
+            return Err("상품 페이지가 허용 크기를 초과했습니다.".into());
+        }
+        body.extend_from_slice(&part);
+    }
+    String::from_utf8(body).map_err(|_| "현재 페이지의 문자 인코딩을 안전하게 해석할 수 없습니다.".into())
+}
+
+
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -470,7 +531,8 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             state_load, state_save, settings_patch, price_set, clipboard_write, clipboard_read,
-            product_open, catalog_report, catalog_approve, receipt_archive, backup_create, backup_list, backup_restore, save_product_workbook, save_registration_workbook
+            product_open, catalog_report, catalog_approve, receipt_archive, backup_create, backup_list, backup_restore, save_product_workbook, save_registration_workbook,
+            fetch_official_product_html
         ])
         .run(tauri::generate_context!())
         .expect("BANDO HUB Tauri runtime error");
