@@ -1,7 +1,8 @@
 import { useId } from "react";
 import { useField } from "../ui/Field";
+import { seoulDate } from "./settlement-report";
 export function moveDate(value: string, delta: number) {
-  const base = value || new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" });
+  const base = value || seoulDate(new Date().toISOString());
   const date = new Date(base + "T12:00:00Z");
   date.setUTCDate(date.getUTCDate() + delta);
   return date.toISOString().slice(0, 10);
