@@ -122,10 +122,15 @@ fn valid_new_order(order: &Value, next: &Value) -> Result<(), String> {
 pub(crate) fn validate_reception(previous: &Value, next: &Value) -> Result<(), String> {
     let previous_orders: HashMap<&str, &Value> = list(previous, "orders").iter()
         .filter_map(|o| o["id"].as_str().map(|id| (id, o))).collect();
+    // Detect duplicate IDs before any other per-order validation. A malformed
+    // first row must not hide a duplicate ID in the same incoming snapshot.
     let mut seen = HashSet::new();
     for order in list(next, "orders") {
         let id = identifier(order, "주문")?;
         if !seen.insert(id) { return Err("주문 ID가 중복되었습니다.".into()); }
+    }
+    for order in list(next, "orders") {
+        let id = identifier(order, "주문")?;
         if let Some(old) = previous_orders.get(id) {
             if !is_confirmed(old) && is_confirmed(order) {
                 valid_new_order(order, next)?;
