@@ -388,11 +388,13 @@ export function previewProductSyncRows(state: State, source: WorkbookSource): Pr
       product.saleUnit = product.variants.length === 1;
       product.updatedAt = new Date().toISOString();
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       rows.push({
         sheet: "상품 목록", row: source.products.find((x) => x.cells[0] === product.id ||
           (x.cells[1] && keys.get(x.cells[1]) === product.id))?.row ?? 0,
-        id: product.id, name: product.name, status: "ERROR", changes: [],
-        errors: [error instanceof Error ? error.message : String(error)],
+        id: product.id, name: product.name,
+        status: /동일 모델코드|같은 상품코드|중복 상품/.test(message) ? "HOLD" : "ERROR",
+        changes: [], errors: [message],
       });
     }
   }
