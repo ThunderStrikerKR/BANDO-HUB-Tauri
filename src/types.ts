@@ -526,6 +526,7 @@ export interface StartupMetrics {
 }
 export interface Api {
   saveProductWorkbook?: (bytes: number[]) => Promise<string>;
+  saveRegistrationWorkbook?: (kind: "양식" | "결과", bytes: number[]) => Promise<string>;
   openFactoryFile?: (id: string) => Promise<void>;
   productImage?: (id: string) => Promise<{ data: string; source: string } | null>;
   approveFactoryConflict?: (id: string, row: number) => Promise<void>;
