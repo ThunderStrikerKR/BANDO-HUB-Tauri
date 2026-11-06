@@ -530,6 +530,7 @@ export interface StartupMetrics {
 export interface Api {
   saveProductWorkbook?: (bytes: number[]) => Promise<string | null>;
   saveProductSyncWorkbook?: (bytes: number[]) => Promise<string | null>;
+  saveFactoryWorkbook?: (bytes: number[]) => Promise<string | null>;
   saveClientWorkbook?: (bytes: number[]) => Promise<string | null>;
   saveRegistrationWorkbook?: (kind: "양식" | "결과", bytes: number[]) => Promise<string | null>;
   openFactoryFile?: (id: string) => Promise<void>;
