@@ -23,6 +23,7 @@ import {
 } from "./product-models";
 import { classifiedProducts } from "./product-registry";
 import { ProductImports } from "./ProductImports";
+import { ProductNameCleanupPanel } from "./ProductNameCleanupPanel";
 import { optimizeProductImage } from "./product-image-preprocess";
 import { RegistrationManager } from "./RegistrationManager";
 import type { NoticeSink } from "./shared/notices";
@@ -84,7 +85,7 @@ export function ProductManager({
       p.catalog !== "DEMO" &&
       !p.variants.some((v) => v.source === "DEMO") &&
       classifiedIds.has(p.id) &&
-      (p.name + " " + p.code + " " + p.subtitle)
+      (p.name + " " + p.code + " " + (p.subtitle ?? "") + " " + (p.originalName ?? ""))
         .toLowerCase()
         .replace(/\s/g, "")
         .includes(search.toLowerCase().replace(/\s/g, "")) &&
@@ -230,6 +231,7 @@ export function ProductManager({
                   {priceMode ? "가격 수정 모드 종료" : "가격 수정 모드 켜기"}
                 </button>
                 <RegistrationManager state={state} onSave={onSave} onRefresh={onRefresh} onNotice={onNotice} />
+                <ProductNameCleanupPanel onSave={onSave} onRefresh={onRefresh} onNotice={onNotice} />
                 <button onClick={() => setAdding(!adding)}>상품 추가</button>
               </div>
             </div>
@@ -426,7 +428,7 @@ export function ProductManager({
                 </div>
               </div>
               <div className="product-detail-wide-fields">
-                <Field label="상품명 / 모델명">
+                <Field label="상품명 (모델명)">
                   <input value={edit.name} onChange={(event) => setEdit({ ...edit, name: event.target.value })} />
                 </Field>
                 <Field label="상품 설명">
