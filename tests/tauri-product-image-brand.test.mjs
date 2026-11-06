@@ -22,7 +22,7 @@ test("Image preprocessing cleans up temporary object URLs even on decoding failu
   assert.match(optimizer, /try \{/);
   assert.match(optimizer, /finally \{/);
   assert.match(optimizer, /URL\.revokeObjectURL\(objectUrl\)/);
-  assert.match(optimizer, /throw Error\("이미지를 열 수 없습니다/);
+  assert.match(optimizer, /image\.onerror = \(\) => reject\(Error\("이미지를 열 수 없습니다/);
 });
 
 test("Brands are validated for cross-brand aliases and evidence URLs before UI save", () => {
