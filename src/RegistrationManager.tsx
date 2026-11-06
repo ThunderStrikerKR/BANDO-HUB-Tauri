@@ -1,132 +1,106 @@
-import { useState } from "react";
-import type { RegistrationRow } from "./product-registry";
+import { useRef, useState } from "react";
+import type { RegistrationBatch } from "./product-registry";
+import {
+  exportRegistrationResults, exportRegistrationTemplate,
+  prepareRegistrationCommit, previewRegistrationWorkbook,
+  type RegistrationWorkbookPreview,
+} from "./product-registration-xlsx";
 import type { NoticeSink } from "./shared/notices";
 import { useAsyncTask } from "./shared/useAsyncTask";
+import type { State } from "./types";
 import { Modal } from "./ui";
+
 export function RegistrationManager({
-  onRefresh,
-  onNotice,
+  state, onSave, onRefresh, onNotice,
 }: {
+  state: State;
+  onSave: (value: State) => Promise<void>;
   onRefresh: () => Promise<void>;
   onNotice: NoticeSink;
 }) {
   const { busy, run } = useAsyncTask(onNotice);
-  const [open, setOpen] = useState(false),
-    [preview, setPreview] = useState<{
-      fingerprint: string;
-      rows: RegistrationRow[];
-    }>(),
-    [approved, setApproved] = useState(false);
-  return (
-    <>
-      <button onClick={() => setOpen(true)}>엑셀 대량 등록</button>
-      {open && (
-        <Modal busy={busy} title="상품 엑셀 대량 등록" onClose={() => setOpen(false)}>
-          <p>실제 판매 구성 하나를 한 행으로 작성하세요. 기존 상품과 가격은 덮어쓰지 않습니다.</p>
-          <div className="actions">
-            <button
-              disabled={busy}
-              onClick={() => void run(() => window.bando!.registrationTemplate())}
-            >
-              등록 양식 다운로드
-            </button>
-            <button
-              disabled={busy}
-              onClick={() =>
-                void run(async () => {
-                  setPreview((await window.bando!.registrationPreview()) ?? undefined);
-                  setApproved(false);
-                })
-              }
-            >
-              파일 업로드 / 검증
-            </button>
-            <button
-              disabled={busy}
-              onClick={() => void run(() => window.bando!.registrationResults())}
-            >
-              등록 결과 다운로드
-            </button>
-          </div>
-          {preview && (
-            <>
-              <p>
-                등록 가능 {preview.rows.filter((r) => r.status === "READY").length} / 오류{" "}
-                {preview.rows.filter((r) => r.status === "ERROR").length} / 중복 후보{" "}
-                {preview.rows.filter((r) => r.status === "DUPLICATE").length} / 보류{" "}
-                {preview.rows.filter((r) => r.status === "HOLD").length}
-              </p>
-              <div className="registration-preview">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>행</th>
-                      <th>상품</th>
-                      <th>판정</th>
-                      <th>사유 / 연결 후보</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {preview.rows.map((r) => (
-                      <tr key={r.row}>
-                        <td>{r.row}</td>
-                        <td>{r.values["최종 등록명"] || "상품명 없음"}</td>
-                        <td>
-                          {
-                            {
-                              READY: "등록 가능",
-                              ERROR: "오류",
-                              DUPLICATE: "중복 후보",
-                              HOLD: "보류",
-                            }[r.status]
-                          }
-                        </td>
-                        <td>
-                          {r.errors.join(" / ") || r.duplicateIds.join(", ") || r.values["비고"]}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <label className="check">
-                <input
-                  type="checkbox"
-                  checked={approved}
-                  onChange={(e) => setApproved(e.target.checked)}
-                />{" "}
-                등록 가능한 행과 명시한 기존 상품 연결을 확인했습니다. 오류 / 보류 행은 등록하지
-                않습니다.
-              </label>
-              <button
-                className="primary"
-                disabled={
-                  busy ||
-                  !approved ||
-                  !preview.rows.some(
-                    (r) =>
-                      r.status === "READY" ||
-                      (r.status === "DUPLICATE" && r.values["기존 상품 연결 ID"]),
-                  )
-                }
-                onClick={() =>
-                  void run(async () => {
-                    const result = await window.bando!.registrationCommit(preview.fingerprint);
-                    await onRefresh();
-                    setPreview(undefined);
-                    onNotice(
-                      `상품 ${result.created}개 등록 / 신규 생성 제외 ${result.skipped}행`,
-                      "success",
-                    );
-                  })
-                }
-              >
-                확인한 데이터 등록
-              </button>
-            </>
-          )}
-        </Modal>
-      )}
-    </>
-  );
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [open, setOpen] = useState(false);
+  const [preview, setPreview] = useState<RegistrationWorkbookPreview>();
+  const [approved, setApproved] = useState(false);
+  const [lastBatch, setLastBatch] = useState<RegistrationBatch>();
+  const [source, setSource] = useState("");
+  const close = () => { if (!busy) { setOpen(false); setPreview(undefined); setApproved(false); } };
+  const download = (kind: "양식" | "결과", bytes: number[]) =>
+    window.bando!.saveRegistrationWorkbook!(kind, bytes);
+  const createTemplate = () => void run(async () => {
+    const path = await download("양식", await exportRegistrationTemplate(state));
+    onNotice("상품 등록 양식을 저장했습니다: " + path, "success");
+  });
+  const chooseFile = (file?: File) => {
+    if (!file) return;
+    void run(async () => {
+      setPreview(undefined);
+      setApproved(false);
+      const current = await window.bando!.load();
+      setPreview(await previewRegistrationWorkbook(current, file));
+      setSource(file.name);
+    });
+  };
+  const commit = () => void run(async () => {
+    if (!preview || !approved) return;
+    const current = await window.bando!.load();
+    const result = prepareRegistrationCommit(current, preview, current.settings.operatorName ?? "관리자");
+    // Existing revision-checked application save performs SQLite validation atomically.
+    await onSave(result.next);
+    await onRefresh();
+    setLastBatch(result.batch);
+    setPreview(undefined);
+    setApproved(false);
+    onNotice("신규 상품 " + result.created + "개 등록, 미등록 " + result.skipped + "행. 기존 가격은 유지했습니다.", "success");
+  });
+  const saveResults = () => void run(async () => {
+    if (!lastBatch) return;
+    const path = await download("결과", await exportRegistrationResults(lastBatch));
+    onNotice("상품 등록 결과를 저장했습니다: " + path, "success");
+  });
+  return <>
+    <button type="button" onClick={() => setOpen(true)}>엑셀 대량 등록</button>
+    {open && <Modal busy={busy} title="상품 엑셀 대량 등록" onClose={close}>
+      <p>판매 구성 하나당 한 행을 입력합니다. 기존 상품과 가격은 자동 변경하지 않습니다.</p>
+      <div className="actions">
+        <button type="button" disabled={busy} onClick={createTemplate}>등록 양식 다운로드</button>
+        <button type="button" disabled={busy} onClick={() => fileInput.current?.click()}>파일 업로드 / 검증</button>
+        <button type="button" disabled={busy || !lastBatch} onClick={saveResults}>최근 등록 결과 다운로드</button>
+        <input ref={fileInput} hidden type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          onChange={(event) => {
+            chooseFile(event.currentTarget.files?.[0]);
+            event.currentTarget.value = "";
+          }}/>
+      </div>
+      {preview && <>
+        <p><strong>{source}</strong> / 등록 가능 {preview.rows.filter((r) => r.status === "READY").length}행
+          / 오류 {preview.rows.filter((r) => r.status === "ERROR").length}행
+          / 중복 {preview.rows.filter((r) => r.status === "DUPLICATE").length}행
+          / 보류 {preview.rows.filter((r) => r.status === "HOLD").length}행
+        </p>
+        <div className="registration-preview">
+          <table>
+            <thead><tr><th>행</th><th>상품</th><th>판정</th><th>검증 결과</th></tr></thead>
+            <tbody>{preview.rows.map((row) => <tr key={row.row}>
+              <td>{row.row}</td><td>{row.values["최종 등록명"] || "상품명 없음"}</td>
+              <td>{{ READY:"등록 가능", ERROR:"오류", DUPLICATE:"중복", HOLD:"보류" }[row.status]}</td>
+              <td>{row.errors.join(" / ") || row.duplicateIds.join(", ") || "정상"}</td>
+            </tr>)}</tbody>
+          </table>
+        </div>
+        <label className="check">
+          <input type="checkbox" checked={approved} onChange={(e) => setApproved(e.target.checked)}/>
+          등록 가능한 행만 추가하고 오류, 중복, 보류 행은 등록하지 않는 데 동의합니다.
+        </label>
+        <div className="row-end">
+          <button type="button" disabled={busy} onClick={() => setPreview(undefined)}>취소</button>
+          <button type="button" className="primary" disabled={busy || !approved ||
+            !preview.rows.some((row) => row.status === "READY")} onClick={commit}>
+            검증한 신규 상품 등록
+          </button>
+        </div>
+      </>}
+    </Modal>}
+  </>;
 }
