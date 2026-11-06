@@ -168,7 +168,7 @@ export function App() {
                   />
                 )}{" "}
                 {tab === "결산" && (
-                  <DailySettlement date={model.settlementDate} onDate={model.setSettlementDate} />
+                  <DailySettlement state={state} date={model.settlementDate} onDate={model.setSettlementDate} onNotice={model.setNotice} />
                 )}{" "}
                 {tab === "공장목록" && (
                   <WorkflowQueue
