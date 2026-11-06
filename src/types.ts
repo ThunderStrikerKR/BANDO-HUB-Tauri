@@ -457,6 +457,8 @@ export interface ImportPreview {
   warnings: string[];
   sourceUrl: string;
   related?: Product[];
+  canApply?: boolean;
+  revision?: number;
 }
 export interface OfficialLink {
   name: string;
