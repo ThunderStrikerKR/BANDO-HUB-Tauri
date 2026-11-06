@@ -7,7 +7,7 @@ test('Tauri v0.0.4 versions agree', () => {
   assert.equal(JSON.parse(read('package.json')).version,'0.0.4');
   assert.equal(JSON.parse(read('src-tauri/tauri.conf.json')).version,'0.0.4');
   assert.match(read('src-tauri/Cargo.toml'), /^version = "0\.0\.4"$/m);
-  assert.match(read('BUILD_WINDOWS_TAURI.cmd'), /release\\BANDO-HUB-v0\.0\.4\.exe/);
+  assert.match(read('BUILD_WINDOWS_TAURI.cmd'), /release\\bando_hub\.exe/);
 });
 test('existing v0.0.1 user profile and product prices stay at same location', () => {
   const cfg = JSON.parse(read('src-tauri/tauri.conf.json'));
