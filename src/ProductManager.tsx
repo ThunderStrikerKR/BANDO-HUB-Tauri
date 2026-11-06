@@ -24,6 +24,7 @@ import {
 import { classifiedProducts } from "./product-registry";
 import { ProductImports } from "./ProductImports";
 import { ProductNameCleanupPanel } from "./ProductNameCleanupPanel";
+import { ProductSyncWorkbookTools } from "./ProductSyncWorkbookTools";
 import { optimizeProductImage } from "./product-image-preprocess";
 import { RegistrationManager } from "./RegistrationManager";
 import { SkuSplitPanel } from "./SkuSplitPanel";
