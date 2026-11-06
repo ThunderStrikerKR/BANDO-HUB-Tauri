@@ -238,18 +238,23 @@ export function previewClientRows(
       if (id && !original) throw Error("등록되지 않은 거래처 ID입니다. 기존 ID는 수정하면 안 됩니다.");
       if (id) ids.add(id);
       candidate = createCandidate(original, cells);
-      if (!candidate.name.trim() || !candidate.address?.trim() ||
-        !(candidate.phone?.trim() || candidate.mobile?.trim())) {
-        throw Error("거래처명, 주소, 전화번호 또는 휴대폰은 필수입니다.");
-      }
-      if (candidate.preferredAccountId &&
-        !state.settings.accounts.some((account) => account.id === candidate?.preferredAccountId)) {
-        throw Error("등록되지 않은 입금 계좌 ID입니다.");
+      changes = original ? changedFields(original, candidate) : ["신규 거래처 등록"];
+      // An untouched historical record may lack fields now required for new
+      // registrations. Keep it unchanged rather than blocking unrelated edits.
+      if (changes.length) {
+        if (!candidate.name.trim() || !candidate.address?.trim() ||
+          !(candidate.phone?.trim() || candidate.mobile?.trim())) {
+          throw Error("거래처명, 주소, 전화번호 또는 휴대폰은 필수입니다.");
+        }
+        if (candidate.preferredAccountId &&
+          !state.settings.accounts.some((account) => account.id === candidate?.preferredAccountId)) {
+          throw Error("등록되지 않은 입금 계좌 ID입니다.");
+        }
       }
       if (original?.deletedAt) {
         status = "UNCHANGED";
+        changes = [];
       } else {
-        changes = original ? changedFields(original, candidate) : ["신규 거래처 등록"];
         status = original ? (changes.length ? "UPDATE" : "UNCHANGED") : "ADD";
         if (status !== "UNCHANGED" && identityChanged(original, candidate)) {
           const conflicts = collision(candidate, [...state.clients, ...seenNew]);
