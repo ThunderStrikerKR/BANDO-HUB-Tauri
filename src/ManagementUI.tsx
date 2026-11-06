@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { confirmAction, promptText } from "./dialogs";
 import { clientCandidates, suggestClient, won } from "./domain";
+import { applyCatalogPriceSync, previewCatalogPriceSync, type CatalogPricePreview } from "./catalog-price-sync";
 import { colorLabel, productKey, registeredProducts } from "./product-models";
 import type { NoticeSink } from "./shared/notices";
 import { useAsyncTask } from "./shared/useAsyncTask";
@@ -209,59 +210,81 @@ export function BulkTools({
 }
 export function CatalogPanel({
   state,
+  onSave,
   onRefresh,
   onError,
 }: {
   state: State;
+  onSave: (state: State) => Promise<void>;
   onRefresh: () => Promise<void>;
   onError: NoticeSink;
 }) {
   const { busy, run } = useAsyncTask(onError);
-  const [report, setReport] = useState<CatalogReport>(),
-    [show, setShow] = useState(false);
+  const [report, setReport] = useState<CatalogReport>();
+  const [review, setReview] = useState<CatalogPricePreview>();
+  const [approved, setApproved] = useState(false);
+  const counts = {
+    ready: review?.rows.filter((row) => row.status === "READY").length ?? 0,
+    same: review?.rows.filter((row) => row.status === "UNCHANGED").length ?? 0,
+    hold: review?.rows.filter((row) => row.status === "HOLD").length ?? 0,
+    notFound: review?.rows.filter((row) => row.status === "UNREGISTERED").length ?? 0,
+  };
+  const load = () => void run(async () => {
+    const source = await window.bando!.catalogReport();
+    const current = await window.bando!.load();
+    setReport(source);
+    setReview(previewCatalogPriceSync(current, source));
+    setApproved(false);
+  });
+  const apply = () => void run(async () => {
+    if (!report || !review || !approved || !counts.ready) return;
+    if (!(await confirmAction(
+      "확인된 " + counts.ready + "개 옵션의 소매가만 수정할까요? 도매가, 반도매가, 수동 입력 가격은 유지합니다."
+    ))) return;
+    const current = await window.bando!.load();
+    const { next, updated } = applyCatalogPriceSync(current, report, review);
+    await window.bando!.backup();
+    await onSave(next);
+    await onRefresh();
+    setReview(undefined);
+    setReport(undefined);
+    setApproved(false);
+    onError("카탈로그 소매가 " + updated + "개 옵션을 갱신했습니다.", "success");
+  });
   return (
     <section className="card">
       <div className="section-title">
-        <h2>공식 카탈로그 수집 / 변경 검토</h2>
-        <button
-          disabled={busy}
-          onClick={() =>
-            run(async () => {
-              setReport(await window.bando!.catalogReport());
-              setShow(true);
-            })
-          }
-        >
-          전체 수집 결과 / 변경 검토
+        <h2>공식 카탈로그 수집본 검토</h2>
+        <button type="button" disabled={busy} onClick={load}>
+          내장 수집본 불러오기 / 가격 비교
         </button>
       </div>
       <p className="muted">
-        검증된 공개 상세페이지 수집본을 검토하고 승인합니다. 도매 / 반도매 / 특수 지정가와 이전 주문
-        단가는 유지됩니다.
+        현재 파일은 과거에 저장한 공식 홈페이지 카탈로그 수집본입니다.
+        실시간 홈페이지 가격이 아니며, 검증된 옵션의 소매가만 변경합니다.
       </p>
-      {show && report && (
+      {report && review && (
         <>
+          <p className="muted">
+            수집 시각: {new Date(report.collectedAt).toLocaleString("ko-KR")} /
+            수집 상품 {report.sourceProductCount ?? report.products.length}개
+          </p>
           <div className="catalog-stats">
-            <b>카테고리 {report.categories.length}개</b>
-            <b>
-              독립 모델 {report.products.length}개 / 원본{" "}
-              {report.sourceProductCount ?? report.products.length}개
-            </b>
-            <b>
-              등록 가능한 옵션{" "}
-              {report.products.flatMap((p) => p.variants).filter((v) => v.retail !== null).length}개
-            </b>
-            <b>
-              가격 확인 필요{" "}
-              {report.products.flatMap((p) => p.variants).filter((v) => v.retail === null).length}개
-            </b>
+            <b>변경 가능 {counts.ready}개</b>
+            <b>동일 {counts.same}개</b>
+            <b>검토 필요 {counts.hold}개</b>
+            <b>등록 상품 없음 {counts.notFound}개</b>
           </div>
-          <small>{new Date(report.collectedAt).toLocaleString("ko-KR")} 수집본</small>
           <details>
-            <summary>카테고리별 페이지 / 상품 수</summary>
+            <summary>수집 오류와 카테고리 확인</summary>
+            {report.failures.map((f, i) => (
+              <p key={i} className="warnings">
+                {f.productId || f.category}: {f.error}
+              </p>
+            ))}
             {report.categories.map((c) => (
-              <p key={c.id}>
-                {c.name} / {c.pages}페이지 / {c.ids.length}개 {c.errors.join(" / ")}
+              <p key={c.id}>{c.name} / {c.pages}페이지 / 상품 {c.ids.length}개
+                {c.errors.length ? " / " + c.errors.join(" / ") : ""}
               </p>
             ))}
           </details>
@@ -269,70 +292,44 @@ export function CatalogPanel({
             <table>
               <thead>
                 <tr>
-                  <th>상품 / 색상 / 옵션</th>
+                  <th>상품 / 옵션</th>
                   <th>기존 소매가</th>
-                  <th>수집 판매가</th>
-                  <th>구분</th>
+                  <th>수집 소매가</th>
+                  <th>처리 구분 / 사유</th>
                 </tr>
               </thead>
               <tbody>
-                {report.products.flatMap((p) =>
-                  p.variants.map((v) => {
-                    const old = registeredProducts(state.products).find(
-                      (x) => productKey(x) === productKey(p),
-                    );
-                    const ov = old?.variants.find(
-                      (x) =>
-                        x.siteOptionId === v.siteOptionId &&
-                        x.color === v.color &&
-                        (x.option ?? "") === (v.option ?? ""),
-                    );
-                    return (
-                      <tr key={v.id}>
-                        <td>
-                          {p.code}
-                          <small>
-                            {p.subtitle} / {colorLabel(v.color)}
-                          </small>
-                        </td>
-                        <td>{won(ov?.retail ?? null)}</td>
-                        <td>{won(v.retail)}</td>
-                        <td>
-                          {old ? "기존 상품" : "신규"}
-                          <small>{v.retailNote}</small>
-                        </td>
-                      </tr>
-                    );
-                  }),
-                )}
+                {review.rows.map((row, index) => (
+                  <tr key={row.sourceProductId + ":" + row.variantId + ":" + index}>
+                    <td>{row.label}</td>
+                    <td>{won(row.oldPrice)}</td>
+                    <td>{won(row.newPrice)}</td>
+                    <td>
+                      {{ READY: "수정 가능", UNCHANGED: "변경 없음",
+                        HOLD: "보류", UNREGISTERED: "미등록" }[row.status]}
+                      <small>{row.reason}</small>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
-          {report.failures.map((f, i) => (
-            <p className="warnings" key={i}>
-              {f.productId || f.category}: {f.error}
-            </p>
-          ))}
-          <button
-            className="primary"
-            disabled={busy}
-            onClick={() =>
-              run(async () => {
-                if (
-                  !(await confirmAction(
-                    "수집 원본과 변경사항을 확인하셨습니까? 백업 후 승인한 소매가를 등록합니다.",
-                  ))
-                )
-                  return;
-                const result = await window.bando!.approveCatalog();
-                await onRefresh();
-                onError(`공식 상품 반영: 신규 ${result.created} / 갱신 ${result.updated}`);
-                setShow(false);
-              })
-            }
-          >
-            백업 후 소매가 등록 승인
-          </button>
+          <label className="check">
+            <input type="checkbox" checked={approved}
+              onChange={(event) => setApproved(event.target.checked)}/>
+            변경 내용을 확인했으며, 확인된 옵션의 소매가만 수정하는 데 동의합니다.
+          </label>
+          <div className="actions">
+            <button type="button" disabled={busy} onClick={() => {
+              setReport(undefined);
+              setReview(undefined);
+              setApproved(false);
+            }}>검토 닫기</button>
+            <button type="button" className="primary"
+              disabled={busy || !approved || counts.ready === 0} onClick={apply}>
+              백업 후 소매가 {counts.ready}건 갱신
+            </button>
+          </div>
         </>
       )}
     </section>
