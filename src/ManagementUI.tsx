@@ -287,7 +287,7 @@ export function CatalogPanel({
               </p>
             ))}
           </details>
-          <div className="bulk-diff">
+          <div className="bulk-diff catalog-price-sync-review">
             <table>
               <thead>
                 <tr>
