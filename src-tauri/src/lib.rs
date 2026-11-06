@@ -389,76 +389,77 @@ fn backup_restore(db: State<'_, Database>, filename: String) -> Result<(), Strin
     Ok(())
 }
 
-// Only export application-generated XLSX bytes into the user's Downloads directory.
-// The caller cannot specify an arbitrary destination or a file path.
-#[tauri::command]
-fn save_product_workbook(db: State<'_, Database>, bytes: Vec<u8>) -> Result<String, String> {
+// Only application-generated XLSX bytes are accepted; the destination is chosen
+// in a native Save As dialog. No filesystem path is accepted from JavaScript.
+async fn save_xlsx_with_dialog(
+    app: tauri::AppHandle,
+    label: &'static str,
+    bytes: Vec<u8>,
+) -> Result<Option<String>, String> {
     if bytes.len() < 4 || bytes.len() > 25 * 1024 * 1024 || !bytes.starts_with(b"PK") {
         return Err("올바른 XLSX 데이터가 아니거나 파일 크기가 너무 큽니다.".into());
     }
-    let folder = std::env::var_os("USERPROFILE")
-        .map(PathBuf::from)
-        .map(|p| p.join("Downloads"))
-        .filter(|p| p.is_dir())
-        .unwrap_or_else(|| db.base.join("exports"));
-    fs::create_dir_all(&folder).map_err(err)?;
-    let stamp = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH).map_err(err)?.as_millis();
-    for n in 0..100 {
-        let filename = format!("BANDO-HUB-상품가격표-{stamp}-{n}.xlsx");
-        let destination = folder.join(filename);
-        match fs::OpenOptions::new().write(true).create_new(true).open(&destination) {
-            Ok(mut file) => {
-                use std::io::Write;
-                file.write_all(&bytes).map_err(err)?;
-                file.sync_all().map_err(err)?;
-                return Ok(destination.to_string_lossy().into_owned());
-            }
-            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
-            Err(e) => return Err(err(e)),
+    tauri::async_runtime::spawn_blocking(move || -> Result<Option<String>, String> {
+        use tauri_plugin_dialog::DialogExt;
+        use std::io::Write;
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_err(err)?.as_millis();
+        let filename = format!("BANDO-HUB-{label}-{stamp}.xlsx");
+        let selected = app.dialog().file()
+            .set_title("Excel 파일 저장 위치 선택")
+            .set_file_name(filename)
+            .add_filter("Excel 통합 문서", &["xlsx"])
+            .blocking_save_file();
+        let Some(selected) = selected else { return Ok(None); };
+        let mut destination = selected.into_path().map_err(err)?;
+        if destination.extension().is_none() {
+            destination.set_extension("xlsx");
         }
-    }
-    Err("가격표 파일명 충돌이 반복되었습니다. 다시 시도하세요.".into())
+        if !destination.extension().and_then(|e| e.to_str())
+            .is_some_and(|e| e.eq_ignore_ascii_case("xlsx")) {
+            return Err("상품 Excel 파일은 .xlsx 확장자로만 저장할 수 있습니다.".into());
+        }
+        // Do not overwrite an existing workbook even if the file dialog points at it.
+        let mut file = fs::OpenOptions::new()
+            .write(true).create_new(true).open(&destination).map_err(|error| {
+                if error.kind() == std::io::ErrorKind::AlreadyExists {
+                    "동일한 이름의 파일이 이미 있습니다. 다른 이름으로 저장해 주세요.".into()
+                } else {
+                    err(error)
+                }
+            })?;
+        if let Err(error) = file.write_all(&bytes).and_then(|_| file.sync_all()) {
+            drop(file);
+            let _ = fs::remove_file(&destination);
+            return Err(err(error));
+        }
+        Ok(Some(destination.to_string_lossy().into_owned()))
+    }).await.map_err(err)?
 }
 
-// Store only two application-generated registration workbooks in Downloads.
-// The renderer cannot pass filesystem paths or arbitrary filenames.
 #[tauri::command]
-fn save_registration_workbook(db: State<'_, Database>, kind: String, bytes: Vec<u8>) -> Result<String, String> {
+async fn save_product_workbook(
+    app: tauri::AppHandle, bytes: Vec<u8>,
+) -> Result<Option<String>, String> {
+    save_xlsx_with_dialog(app, "상품가격표", bytes).await
+}
+
+#[tauri::command]
+async fn save_registration_workbook(
+    app: tauri::AppHandle, kind: String, bytes: Vec<u8>,
+) -> Result<Option<String>, String> {
     let label = match kind.as_str() {
         "양식" => "상품등록양식",
         "결과" => "상품등록결과",
         _ => return Err("허용되지 않은 상품 등록 파일 유형입니다.".into()),
     };
-    if bytes.len() < 4 || bytes.len() > 25 * 1024 * 1024 || !bytes.starts_with(b"PK") {
-        return Err("올바른 XLSX 데이터가 아니거나 파일 크기가 너무 큽니다.".into());
-    }
-    let folder = std::env::var_os("USERPROFILE")
-        .map(PathBuf::from)
-        .map(|p| p.join("Downloads"))
-        .filter(|p| p.is_dir())
-        .unwrap_or_else(|| db.base.join("exports"));
-    fs::create_dir_all(&folder).map_err(err)?;
-    let stamp = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH).map_err(err)?.as_millis();
-    for n in 0..100 {
-        let destination = folder.join(format!("BANDO-HUB-{label}-{stamp}-{n}.xlsx"));
-        match fs::OpenOptions::new().write(true).create_new(true).open(&destination) {
-            Ok(mut file) => {
-                use std::io::Write;
-                file.write_all(&bytes).map_err(err)?;
-                file.sync_all().map_err(err)?;
-                return Ok(destination.to_string_lossy().into_owned());
-            }
-            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
-            Err(e) => return Err(err(e)),
-        }
-    }
-    Err("파일명이 충돌하여 저장하지 못했습니다. 다시 시도하세요.".into())
+    save_xlsx_with_dialog(app, label, bytes).await
 }
 
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let base = app.path().app_data_dir()?;
             fs::create_dir_all(&base)?;
