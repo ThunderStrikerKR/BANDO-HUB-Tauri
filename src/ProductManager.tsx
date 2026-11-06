@@ -23,6 +23,7 @@ import {
 } from "./product-models";
 import { classifiedProducts } from "./product-registry";
 import { ProductImports } from "./ProductImports";
+import { optimizeProductImage } from "./product-image-preprocess";
 import { RegistrationManager } from "./RegistrationManager";
 import type { NoticeSink } from "./shared/notices";
 import { useAsyncTask } from "./shared/useAsyncTask";
@@ -352,20 +353,18 @@ export function ProductManager({
                       <input
                         type="file"
                         accept="image/jpeg,image/png,image/webp"
+                        disabled={savingView}
                         onChange={(event) => {
                           const file = event.currentTarget.files?.[0];
-                          if (!file) return;
-                          if (!/^image\/(jpeg|png|webp)$/.test(file.type) || file.size > 5 * 1024 * 1024) {
-                            onNotice("이미지는 JPG, PNG, WEBP 형식이며 5MB 이하여야 합니다.", "error");
-                            return;
-                          }
-                          const reader = new FileReader();
-                          reader.onload = () => {
-                            if (typeof reader.result === "string")
-                              setEdit((prev) => prev ? { ...prev, imageData: reader.result as string, imageOverride: "MANUAL" } : prev);
-                          };
-                          reader.readAsDataURL(file);
                           event.currentTarget.value = "";
+                          if (!file) return;
+                          const editingId = edit.id;
+                          void runSave(async () => {
+                            const imageData = await optimizeProductImage(file);
+                            setEdit((previous) => previous?.id === editingId
+                              ? { ...previous, imageData, imageOverride: "MANUAL" }
+                              : previous);
+                          });
                         }}
                       />
                     </label>
