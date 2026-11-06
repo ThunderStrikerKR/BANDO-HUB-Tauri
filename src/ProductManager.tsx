@@ -322,7 +322,7 @@ export function ProductManager({
         {section === "카테고리 관리" && (
           <CategoryManager state={state} onSave={onSave} onNotice={onNotice} query={search} />
         )}
-        {section === "모델군 관리" && <RepresentativeManager state={state} onSave={onSave} query={search} />}
+        {section === "모델군 관리" && <RepresentativeManager state={state} onRefresh={onRefresh} query={search} />}
         {section === "별칭 관리" && (
           <AliasManager state={state} onSave={onSave} onNotice={onNotice} />
         )}
