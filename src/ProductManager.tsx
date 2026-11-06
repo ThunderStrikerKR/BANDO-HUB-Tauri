@@ -237,7 +237,7 @@ export function ProductManager({
                 <button className="primary" onClick={create}>
                   직접 등록
                 </button>
-                <ProductImports state={state} onSave={onSave} onNotice={onNotice} />
+                <ProductImports state={state} onSave={onSave} onRefresh={onRefresh} onNotice={onNotice} />
               </section>
             )}
             <section className="card product-prices">
