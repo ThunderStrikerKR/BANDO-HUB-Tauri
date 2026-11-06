@@ -1,0 +1,45 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+const read = (path) => readFileSync(new URL("../" + path, import.meta.url), "utf8");
+
+test("all seven KakaoTalk dock IPC commands call the Tauri native backend",()=>{
+  const rust=read("src-tauri/src/lib.rs");
+  const bridge=read("src/tauri-bridge.ts");
+  for(const command of ["dock_status_native","dock_cycle_native",
+    "dock_start_native","dock_stop_native","dock_select_native",
+    "dock_windows_native","dock_region_native"]) {
+    assert.ok(rust.includes("kakao_dock::"+command),command+" missing Rust command");
+    assert.ok(bridge.includes('invoke("'+command+'"'),command+" missing TypeScript bridge");
+  }
+  assert.doesNotMatch(bridge,/dockCycle: async \(\) => notReady/);
+  assert.match(rust,/RunEvent::Exit/);
+  assert.match(rust,/restore_on_exit/);
+});
+
+test("native docking is restricted to KakaoTalk process, restores position, and does not reparent",()=>{
+  const native=read("src-tauri/src/kakao_dock.rs");
+  assert.match(native,/QueryFullProcessImageNameW/);
+  assert.match(native,/eq_ignore_ascii_case\("KakaoTalk.exe"\)/);
+  assert.match(native,/GetWindowThreadProcessId/);
+  assert.match(native,/GetWindowPlacement/);
+  assert.match(native,/SetWindowPlacement/);
+  assert.match(native,/IsWindowVisible/);
+  assert.match(native,/restore_on_exit/);
+  assert.doesNotMatch(native,/SetParent/);
+  assert.doesNotMatch(native,/ReadProcessMemory|WriteProcessMemory|SetWindowsHookEx/);
+});
+
+test("screen supports choosing among multiple KakaoTalk windows and three view modes",()=>{
+  const header=read("src/app/AppHeader.tsx");
+  const shell=read("src/HubShell.tsx");
+  const app=read("src/App.tsx");
+  const model=read("src/app/useAppModel.ts");
+  assert.match(header,/dock\.mode === "OVERLAP"/);
+  assert.match(header,/dock\.mode === "STACK"/);
+  assert.match(shell,/stacked = dock\.active && dock\.mode === "STACK"/);
+  assert.match(shell,/hidden=\{stacked\}/);
+  assert.match(app,/KakaoDockPicker/);
+  assert.match(model,/setDockCandidates\(await window\.bando!\.dockWindows\(\)\)/);
+  assert.match(model,/dockSelect\(handle\)/);
+});

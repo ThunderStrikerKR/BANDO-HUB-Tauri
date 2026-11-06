@@ -26,7 +26,8 @@ export function HubShell({
     region = useRef<HTMLDivElement>(null),
     drag = useRef<{ x: number; width: number; r: number[] } | undefined>(undefined);
   const r = live ?? validPanels(ratios),
-    total = r.reduce((a, b) => a + b, 0);
+    total = r.reduce((a, b) => a + b, 0),
+    stacked = dock.active && dock.mode === "STACK";
   useLayoutEffect(() => {
     const el = region.current;
     if (!el) return;
@@ -35,7 +36,9 @@ export function HubShell({
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
         const b = el.getBoundingClientRect();
-        document.documentElement.style.setProperty("--kakao-reserved-width", b.right + 6 + "px");
+        document.documentElement.style.setProperty(
+          "--kakao-reserved-width", stacked ? "0px" : b.right + 6 + "px",
+        );
         void window.bando
           ?.dockRegion({ x: b.x, y: b.y, width: b.width, height: b.height })
           .catch(() => {});
@@ -50,26 +53,30 @@ export function HubShell({
       observer.disconnect();
       window.removeEventListener("resize", send);
     };
-  }, []);
+  }, [stacked]);
   return (
     <div className="hub-shell-scroll">
       <div
         className="hub-shell"
         style={{
-          gridTemplateColumns: `minmax(${kakaoMinimum}px,${r[0]}fr) 6px minmax(${mainMinimum}px,${total - r[0]}fr)`,
+          minWidth: stacked ? "1024px" : undefined,
+          gridTemplateColumns: stacked
+            ? "minmax(1024px, 1fr)"
+            : `minmax(${kakaoMinimum}px,${r[0]}fr) 6px minmax(${mainMinimum}px,${total - r[0]}fr)`,
         }}
       >
-        <aside className="hub-panel-slot hub-slot-0 hub-kakao-slot">
+        <aside className="hub-panel-slot hub-slot-0 hub-kakao-slot" hidden={stacked}>
           <div ref={region} className="kakao-native-region">
             {!dock.active && (
-              <button className="kakao-connect" disabled={busy || window.bando?.isTestWorkspace} onClick={onConnect}>
-                {window.bando?.isTestWorkspace ? "카카오톡 창 연결은 후속 버전에서 지원" : busy ? "연결 중…" : "카카오톡 연결"}
+              <button className="kakao-connect" disabled={busy} onClick={onConnect}>
+                {busy ? "연결 중…" : "카카오톡 연결"}
               </button>
             )}
           </div>
         </aside>
         <div
           className="hub-split"
+          hidden={stacked}
           role="separator"
           tabIndex={0}
           aria-label="패널 너비 조절 1"

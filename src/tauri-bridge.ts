@@ -10,7 +10,6 @@ import { parseOfficialProductPage } from "./official-product-import";
 const notReady = (feature: string): never => {
   throw new Error(`${feature}: Tauri v0.0.4에서 아직 이전하지 않은 기능입니다.`);
 };
-const inactiveDock = { active: false, ratio: 0.8 } as const;
 const appWindow = () => getCurrentWindow();
 const safeImage = (siteId?: string) => {
   if (!siteId || !Object.prototype.hasOwnProperty.call(productImages, siteId)) return null;
@@ -54,13 +53,13 @@ const api: Api = {
     if (hasUnsavedChanges && !window.confirm("저장하지 않은 변경사항이 있습니다. 종료할까요?")) return;
     await appWindow().close();
   },
-  dockStatus: async () => ({ ...inactiveDock }),
-  dockCycle: async () => notReady("카카오톡 창 도킹"),
-  dockStart: async () => notReady("카카오톡 창 도킹"),
-  dockStop: async () => ({ ...inactiveDock }),
-  dockSelect: async () => notReady("카카오톡 창 선택"),
-  dockWindows: async () => notReady("카카오톡 창 검색"),
-  dockRegion: async () => {}, // There is no OS-docking window in this preview.
+  dockStatus: () => invoke("dock_status_native"),
+  dockCycle: () => invoke("dock_cycle_native"),
+  dockStart: (handle, ratio) => invoke("dock_start_native", { handle, ratio }),
+  dockStop: () => invoke("dock_stop_native"),
+  dockSelect: (handle) => invoke("dock_select_native", { handle }),
+  dockWindows: () => invoke("dock_windows_native"),
+  dockRegion: (region) => invoke("dock_region_native", { region }),
   startupMetrics: async () => notReady("시작 성능 계측"),
   retryStartup: async () => notReady("다시 시작"),
   receiptArchive: () => invoke<{ id: string; orderId: string; record: Record<string, unknown> }[]>("receipt_archive"),

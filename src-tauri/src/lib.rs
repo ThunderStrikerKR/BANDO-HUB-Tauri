@@ -1,4 +1,5 @@
 mod reception;
+mod kakao_dock;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde_json::{json, Value};
 use std::{fs, path::{Path, PathBuf}, sync::Mutex};
@@ -697,6 +698,7 @@ async fn fetch_official_product_html(target: String) -> Result<String, String> {
 
 pub fn run() {
     tauri::Builder::default()
+        .manage(kakao_dock::Dock::default())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let base = app.path().app_data_dir()?;
@@ -709,10 +711,19 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             state_load, state_save, settings_patch, price_set, clipboard_write, clipboard_read,
             product_open, catalog_report, catalog_approve, receipt_archive, backup_create, backup_list, backup_restore, save_product_workbook, save_registration_workbook, save_client_workbook, save_product_sync_workbook, save_factory_workbook, save_settlement_workbook, save_order_history_workbook, archive_factory_reply, open_factory_reply_file,
-            fetch_official_product_html
+            fetch_official_product_html,
+            kakao_dock::dock_windows_native, kakao_dock::dock_status_native,
+            kakao_dock::dock_cycle_native, kakao_dock::dock_start_native,
+            kakao_dock::dock_select_native, kakao_dock::dock_stop_native,
+            kakao_dock::dock_region_native
         ])
-        .run(tauri::generate_context!())
-        .expect("BANDO HUB Tauri runtime error");
+        .build(tauri::generate_context!())
+        .expect("BANDO HUB Tauri runtime build error")
+        .run(|app, event| {
+            if let tauri::RunEvent::Exit = event {
+                kakao_dock::restore_on_exit(&app.state::<kakao_dock::Dock>());
+            }
+        });
 }
 
 

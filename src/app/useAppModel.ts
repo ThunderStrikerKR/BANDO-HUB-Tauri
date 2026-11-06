@@ -5,7 +5,7 @@ import { newReception, persistedReceptionState } from "../orders/reception";
 import { useHasPendingChanges } from "../shared/pending-changes";
 import { useAsyncTask } from "../shared/useAsyncTask";
 import { useNotice } from "../shared/useNotice";
-import type { DockStatus, InboxEntry, Order, State } from "../types";
+import type { DockStatus, DockWindow, InboxEntry, Order, State } from "../types";
 import { clone } from "../ui";
 import type { WorkflowSelection } from "../WorkflowBoard";
 import { onlyDeletedGroups } from "../workspace-selection";
@@ -24,6 +24,7 @@ export function useAppModel() {
     [query, setQuery] = useState(""),
     [dock, setDock] = useState<DockStatus>({ active: false, ratio: 0.8 }),
     [dockBusy, setDockBusy] = useState(false),
+    [dockCandidates, setDockCandidates] = useState<DockWindow[]>([]),
     [workflowSelection, setWorkflowSelection] = useState<WorkflowSelection>();
   const { run } = useAsyncTask(setNotice);
   useEffect(() => {
@@ -190,7 +191,20 @@ export function useAppModel() {
     if (dockBusy) return;
     setDockBusy(true);
     try {
-      setDock(await window.bando!.dockCycle());
+      const result = await window.bando!.dockCycle();
+      setDock(result);
+      if (result.selectionRequired) setDockCandidates(await window.bando!.dockWindows());
+      else setDockCandidates([]);
+    } finally {
+      setDockBusy(false);
+    }
+  };
+  const selectDock = async (handle: string) => {
+    if (dockBusy) return;
+    setDockBusy(true);
+    try {
+      setDock(await window.bando!.dockSelect(handle));
+      setDockCandidates([]);
     } finally {
       setDockBusy(false);
     }
@@ -301,6 +315,9 @@ export function useAppModel() {
     setSettlementDate,
     dock,
     dockBusy,
+    dockCandidates,
+    setDockCandidates,
+    selectDock,
     workflowSelection,
     setWorkflowSelection,
     setRawEditDirty,

@@ -520,6 +520,7 @@ export interface DockStatus {
   active: boolean;
   ratio: number;
   handle?: string;
+  selectionRequired?: boolean;
 }
 export interface StartupMetrics {
   windowShownMs: number;

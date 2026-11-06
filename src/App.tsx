@@ -7,6 +7,7 @@ import { DailySettlement } from "./app/DailySettlement";
 import { OrderHistory } from "./app/OrderHistory";
 import { useAppModel } from "./app/useAppModel";
 import { HubShell } from "./HubShell";
+import { KakaoDockPicker } from "./KakaoDockPicker";
 import { HubWorkspace } from "./HubWorkspace";
 import { NoticeContext } from "./shared/NoticeContext";
 import { EmptyState } from "./ui/PageHeading";
@@ -62,6 +63,14 @@ export function App() {
           onDock={() => void model.run(model.docking)}
           onWindow={(action) => void model.run(() => model.windowAction(action))}
         />
+        {model.dockCandidates.length > 0 && (
+          <KakaoDockPicker
+            windows={model.dockCandidates}
+            busy={model.dockBusy}
+            onClose={() => model.setDockCandidates([])}
+            onSelect={(handle) => void model.run(() => model.selectDock(handle))}
+          />
+        )}
         {notifications && (
           <FactoryNotifications
             state={state}

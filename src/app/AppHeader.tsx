@@ -49,14 +49,14 @@ export function AppHeader({
           </button>
         )}
         <button
-          disabled={busy || window.bando?.isTestWorkspace}
+          disabled={busy}
           onClick={onDock}
           title={
-            window.bando?.isTestWorkspace ? "Tauri v0.0.2에서 카카오톡 창 도킹은 아직 지원하지 않습니다." : dock.mode === "OVERLAP"
-              ? "다음: 나누어 보기"
+            dock.mode === "OVERLAP"
+              ? "다음: 카카오톡과 나누어 보기"
               : dock.mode === "STACK"
-                ? "다음: 카카오톡 원래 위치"
-                : "카카오톡을 왼쪽에 겹쳐 배치"
+                ? "다음: 카카오톡 창 원래 위치 복구"
+                : "실행 중인 카카오톡 창을 연결"
           }
         >
           {busy
