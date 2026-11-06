@@ -45,7 +45,7 @@ export function SkuSplitPanel({
         <small>분리 대상 {candidates.length}개 / 자동 일괄 변경 없음</small>
       </div>
       <p className="muted">
-        색상과 옵션을 독립 상품으로 관리하기 위한 기능입니다. 원본 상품과 확정된 주문은 보존합니다.
+        홈페이지에 없는 자체 상품에도 사용할 수 있습니다. 원본 상품과 확정된 주문은 보존합니다.
         분리할 상품을 선택한 뒤 주문, 별칭, 연결 정보의 영향을 확인하세요.
       </p>
       <input aria-label="복합 옵션 상품 검색" placeholder="모델코드 또는 상품명 검색"
