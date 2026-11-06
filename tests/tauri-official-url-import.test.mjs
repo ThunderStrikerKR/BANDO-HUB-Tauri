@@ -21,7 +21,7 @@ test("Official page read is bounded by size and time", () => {
   assert.match(rust, /from_secs\(15\)/);
   assert.match(rust, /while let Some\(part\) = response\.chunk\(\)\.await/);
   assert.match(rust, /String::from_utf8\(body\)/);
-  assert.match(rust, /fetch_official_product_html\s*\n/);
+  assert.match(rust, /fetch_official_product_html\s*,?\s*\n/);
 });
 test("Frontend uses DOMParser, model and site ID, and blocks ambiguous options", () => {
   const parser = read("src/official-product-import.ts");

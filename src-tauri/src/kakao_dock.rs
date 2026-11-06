@@ -133,7 +133,7 @@ mod native {
         1
     }
     pub fn candidates()->Vec<Candidate> {
-        let mut found=Vec::new();
+        let mut found: Vec<Candidate> = Vec::new();
         unsafe {EnumWindows(Some(enumerate),&mut found as *mut _ as isize);}
         found.sort_by_key(|c|if c.kind=="MAIN"{0}else{1});
         found
@@ -166,7 +166,8 @@ mod native {
     }
     fn set_rect(hwnd:Hwnd,r:Rect,above:Hwnd)->Result<(),String>{
         if r.width()<100||r.height()<100{return Err("창을 배치할 공간이 부족합니다.".into());}
-        if unsafe{SetWindowPos(hwnd,above,r.left,r.top,r.width(),r.height(),SWP_NOACTIVATE)}==0{
+        let flags=SWP_NOACTIVATE | if above==0 {SWP_NOZORDER}else{0};
+        if unsafe{SetWindowPos(hwnd,above,r.left,r.top,r.width(),r.height(),flags)}==0{
             Err(os("창 배치 실패"))
         }else{Ok(())}
     }
@@ -207,7 +208,7 @@ mod native {
     }}
     #[derive(Clone,Copy)]
     pub struct Session{
-        hwnd:Hwnd,pid:u32,main:Hwnd,
+        pub(super) hwnd:Hwnd,pid:u32,main:Hwnd,
         kakao_original:Placement,main_original:Placement,
         original_topmost:bool,pub mode:Mode,pub width:i32,
     }
@@ -246,7 +247,10 @@ mod native {
     pub fn stack(s:&mut Session)->Result<(),String>{
         let (kakao,main)=split_rect(monitor_work(s.main)?,s.width)?;
         unsafe{ShowWindow(s.main,SW_RESTORE);}
-        set_rect(s.main,main,0)?;
+        if let Err(error)=set_rect(s.main,main,0) {
+            unsafe{SetWindowPlacement(s.main,&s.main_original);}
+            return Err(error)
+        }
         set_z(s.hwnd,s.original_topmost);
         unsafe{ShowWindow(s.hwnd,SW_RESTORE);}
         if let Err(e)=set_rect(s.hwnd,kakao,0){
@@ -380,11 +384,13 @@ pub fn dock_start_native(app:AppHandle,dock:State<'_,Dock>,handle:String,ratio:f
     if !ratio.is_finite()||!(0.1..=1.0).contains(&ratio){
         return Err("배치 비율이 올바르지 않습니다.".into())
     }
-    start(&app,&mut lock(&dock)?,&handle)
+    let mut inner=lock(&dock)?;
+    start(&app,&mut inner,&handle)
 }
 #[tauri::command]
 pub fn dock_select_native(app:AppHandle,dock:State<'_,Dock>,handle:String)->Result<Status,String>{
-    start(&app,&mut lock(&dock)?,&handle)
+    let mut inner=lock(&dock)?;
+    start(&app,&mut inner,&handle)
 }
 #[tauri::command]
 pub fn dock_stop_native(dock:State<'_,Dock>)->Result<Status,String>{

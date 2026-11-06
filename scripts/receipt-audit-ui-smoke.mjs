@@ -71,10 +71,27 @@ try {
   page.on("pageerror", (err) => pageErrors.push(err.message));
   await page.addInitScript(
     ({ state, archive }) => {
+      let mode = "ORIGINAL";
+      const response = (extra = {}) => ({
+        active: mode !== "ORIGINAL", mode, ratio: 0.8,
+        handle: mode !== "ORIGINAL" ? "123" : undefined, ...extra,
+      });
       window.__TAURI_INTERNALS__ = {
         invoke: async (command) => {
           if (command === "state_load") return structuredClone(state);
           if (command === "receipt_archive") return structuredClone(archive);
+          if (command === "dock_region_native") return undefined;
+          if (command === "dock_status_native") return response();
+          if (command === "dock_cycle_native") {
+            if (mode === "ORIGINAL") return response({ selectionRequired: true });
+            mode = mode === "OVERLAP" ? "STACK" : "ORIGINAL";
+            return response();
+          }
+          if (command === "dock_windows_native") return [
+            { handle: "123", title: "카카오톡", processId: 11, kind: "MAIN" },
+            { handle: "456", title: "테스트 대화", processId: 11, kind: "CHAT" },
+          ];
+          if (command === "dock_select_native") { mode = "OVERLAP"; return response(); }
           throw Error("Unexpected native IPC in UI smoke test: " + command);
         },
       };
@@ -106,8 +123,18 @@ try {
   await nav.getByRole("button", { name: "설정" }).click();
   await page.getByRole("button", { name: "감사 기록 열기" }).click();
   await page.getByText("3건 조회").waitFor();
+  // A separate mock-native scenario checks the full three-mode UI and picker.
+  await page.reload();
+  await page.getByRole("button", { name: "카카오톡 함께 보기" }).click();
+  await page.getByText("연결할 카카오톡 창 선택").waitFor();
+  await page.getByRole("button", { name: /카카오톡 기본 창/ }).click();
+  await page.getByRole("button", { name: "카카오톡 / 겹쳐 보기" }).waitFor();
+  await page.getByRole("button", { name: "카카오톡 / 겹쳐 보기" }).click();
+  await page.locator(".hub-kakao-slot[hidden]").waitFor({ state: "attached" });
+  await page.getByRole("button", { name: "카카오톡 / 나누어 보기" }).click();
+  await page.getByRole("button", { name: "카카오톡 함께 보기" }).waitFor();
   assert.deepEqual(pageErrors, [], "React runtime errors: " + pageErrors.join("\n"));
-  console.log("PASS: audit UI open, raw preservation, before/after, search, legacy labeling, reload");
+  console.log("PASS: audit UI and KakaoTalk picker / overlap / split / restore (mock native IPC)");
 } finally {
   if (browser) await browser.close();
   server.kill("SIGTERM");
