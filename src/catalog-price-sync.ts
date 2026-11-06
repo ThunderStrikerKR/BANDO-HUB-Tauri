@@ -25,6 +25,19 @@ export function previewCatalogPriceSync(state: State, report: CatalogReport): Ca
   const active = registeredProducts(state.products);
   const rows: CatalogPriceRow[] = [];
   const encountered = new Set<string>();
+  const variantCounts = new Map<string, number>();
+  const officialOptionCounts = new Map<string, number>();
+  for (const item of report.products) {
+    for (const option of item.variants) {
+      const prefix = (item.catalog ?? "BANDOSTAND") + "|" + (item.siteId ?? "") + "|";
+      const variantKey = prefix + option.id;
+      variantCounts.set(variantKey, (variantCounts.get(variantKey) ?? 0) + 1);
+      if (option.siteOptionId) {
+        const officialKey = prefix + option.siteOptionId;
+        officialOptionCounts.set(officialKey, (officialOptionCounts.get(officialKey) ?? 0) + 1);
+      }
+    }
+  }
   for (const source of report.products) {
     const catalog = source.catalog ?? "BANDOSTAND";
     for (const incoming of source.variants) {
@@ -42,7 +55,9 @@ export function previewCatalogPriceSync(state: State, report: CatalogReport): Ca
       const newPrice = incoming.retail;
       let status: CatalogPriceStatus = "HOLD";
       let reason = "";
-      if (!source.siteId || !incoming.id || encountered.has(lookupKey)) {
+      if (!source.siteId || !incoming.id || encountered.has(lookupKey) ||
+        (variantCounts.get(lookupKey) ?? 0) !== 1 ||
+        (!!incoming.siteOptionId && (officialOptionCounts.get(catalog + "|" + source.siteId + "|" + incoming.siteOptionId) ?? 0) !== 1)) {
         reason = "홈페이지 상품번호나 판매 옵션 ID가 없거나 중복되었습니다.";
       } else if (candidates.length > 1) {
         reason = "동일한 공식 옵션에 연결된 상품이 여러 개 있습니다.";
