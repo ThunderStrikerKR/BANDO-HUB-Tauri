@@ -159,3 +159,25 @@ test("SKU split is wired into product synchronization behind review and backup",
   assert.match(panel,/await window\.bando!\.backup\(\)/);
   assert.match(panel,/await onSave\(next\)/);
 });
+
+test("Every variant sharing a duplicate official option ID is held", () => {
+  const state = structuredClone(seed);
+  const p = state.products.find((x) => x.siteId === "343");
+  const incoming = structuredClone(p);
+  incoming.variants[1].siteOptionId = incoming.variants[0].siteOptionId;
+  incoming.variants[1].retail += 9000;
+  incoming.variants[1].officialRetail = incoming.variants[1].retail;
+  const report = { products:[incoming], categories:[], failures:[],
+    collectedAt:"2026-12-01T00:00:00.000Z" };
+  const preview = prices.previewCatalogPriceSync(state,report);
+  assert.equal(preview.rows[0].status,"HOLD");
+  assert.equal(preview.rows[1].status,"HOLD");
+});
+
+test("Existing conflicting option mapping prevents SKU conversion", () => {
+  const state=structuredClone(seed);
+  const p=state.products.find((x)=>x.siteId==="343");
+  state.productMappings = { [p.id+"|"+p.variants[0].id]: "existing-sku-elsewhere" };
+  const preview=split.previewSkuSplit(state,p.id);
+  assert.ok(preview.blockers.some((reason)=>reason.includes("연결 이력")));
+});
