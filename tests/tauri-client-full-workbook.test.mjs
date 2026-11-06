@@ -143,7 +143,7 @@ test("client Excel is native saved, previewed, backed up, and revision checked",
   const manager = read("src/ClientManager.tsx");
   const ui = read("src/ClientWorkbookTools.tsx");
   assert.match(rust, /async fn save_client_workbook/);
-  assert.match(rust, /save_client_workbook,\s*fetch_official_product_html/);
+  assert.match(rust, /save_client_workbook,\s*save_product_sync_workbook,/);
   assert.match(bridge, /invoke<string \| null>\("save_client_workbook"/);
   assert.match(manager, /<ClientWorkbookTools onSave=\{onSave\}/);
   assert.match(ui, /await exportClientWorkbook\(current\)/);
