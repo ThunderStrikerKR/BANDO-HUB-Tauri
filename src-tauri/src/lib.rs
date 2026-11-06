@@ -500,7 +500,7 @@ fn open_factory_reply_file(db: State<'_, Database>, id: String) -> Result<(), St
     let digest = reply_digest(&id)?;
     let data = get_snapshot(&*db.connection.lock().map_err(|_| "DB 잠금 오류")?)?;
     if !data["factoryReplies"].as_array().is_some_and(|rows|
-        rows.iter().any(|row| row["id"].as_str() == Some(&id) &&
+        rows.iter().any(|row| row["id"].as_str() == Some(id.as_str()) &&
             row["archivedPath"].as_str().is_some())) {
         return Err("보관된 공장 회신 파일을 찾지 못했습니다.".into());
     }
