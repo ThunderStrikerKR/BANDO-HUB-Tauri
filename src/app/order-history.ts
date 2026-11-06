@@ -1,6 +1,7 @@
 import { orderClient, statusNames, totals } from "../domain";
 import type { State } from "../types";
 import { shipmentContext, shipmentTotals } from "../workflow";
+import { seoulDate } from "./settlement-report";
 import { onlyDeletedGroups } from "../workspace-selection";
 export function orderHistory(state: State, query: string, date: string) {
   return state.orders
@@ -10,9 +11,7 @@ export function orderHistory(state: State, query: string, date: string) {
         !onlyDeletedGroups(state, order.id) &&
         !(order.receptionVersion === 1 && !order.confirmedAt) &&
         (!date ||
-          new Date(order.confirmedAt ?? order.createdAt).toLocaleDateString("en-CA", {
-            timeZone: "Asia/Seoul",
-          }) === date) &&
+          seoulDate(order.confirmedAt ?? order.createdAt) === date) &&
         ((orderClient(order, state)?.name ?? "") + " " + order.raw)
           .toLocaleLowerCase()
           .includes(query.toLocaleLowerCase()),
