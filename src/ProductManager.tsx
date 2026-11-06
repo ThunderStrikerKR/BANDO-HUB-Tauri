@@ -523,7 +523,7 @@ export function ProductManager({
                 </section>
               )}
               <details className="product-detail-advanced">
-                <summary>고급 정보 / 공식 상품 URL / 배송 그룹 / 변경 이력</summary>
+                <summary>고급 정보 / 홈페이지 연결 (선택) / 배송 그룹 / 변경 이력</summary>
                 <Field label="배송 그룹">
                   <select
                     value={edit.shippingGroupId ?? ""}
@@ -537,7 +537,7 @@ export function ProductManager({
                 </Field>
                 {edit.variants.map((variant, index) => (
                   <div key={variant.id} className="product-detail-variant-extra">
-                    <Field label={"공식 상세페이지 URL " + (index + 1)}>
+                    <Field label={"홈페이지 상품 연결 (선택) " + (index + 1)}>
                       <input
                         value={variant.url}
                         onChange={(event) => setEdit({ ...edit, variants: edit.variants.map((v) => v.id === variant.id ? { ...v, url: event.target.value } : v) })}
