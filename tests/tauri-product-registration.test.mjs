@@ -49,3 +49,33 @@ test("Price workbook remains separate from the registration workbook", () => {
   assert.match(read("src/ProductManager.tsx"), /<RegistrationManager state=\{state\} onSave=\{onSave\}/);
   assert.match(read("src/product-registration-xlsx.ts"), /exportRegistrationResults/);
 });
+
+test("Excel exports use a native Save As dialog with user-chosen folder and name", () => {
+  const rust = read("src-tauri/src/lib.rs");
+  const cargo = read("src-tauri/Cargo.toml");
+  assert.match(cargo, /tauri-plugin-dialog = "2"/);
+  assert.match(rust, /tauri_plugin_dialog::init\(\)/);
+  assert.match(rust, /\.blocking_save_file\(\)/);
+  assert.match(rust, /\.set_file_name\(filename\)/);
+  assert.match(rust, /async fn save_product_workbook/);
+  assert.match(rust, /async fn save_registration_workbook/);
+  assert.doesNotMatch(rust, /USERPROFILE/);
+});
+
+test("Cancelling Save As is not an error or a false success notice", () => {
+  const rust = read("src-tauri/src/lib.rs");
+  const client = read("src/RegistrationManager.tsx");
+  const price = read("src/ProductPriceWorkbookTools.tsx");
+  assert.match(rust, /let Some\(selected\) = selected else \{ return Ok\(None\); \}/);
+  assert.match(client, /if \(path\) onNotice\("상품 등록 양식을 저장했습니다/);
+  assert.match(client, /if \(path\) onNotice\("상품 등록 결과를 저장했습니다/);
+  assert.match(price, /if \(path\) onNotice\("상품 가격표를 저장했습니다/);
+});
+
+test("Excel Save As does not overwrite an existing file or accept another extension", () => {
+  const rust = read("src-tauri/src/lib.rs");
+  assert.match(rust, /\.create_new\(true\)/);
+  assert.match(rust, /eq_ignore_ascii_case\("xlsx"\)/);
+  assert.match(rust, /동일한 이름의 파일이 이미 있습니다/);
+  assert.match(rust, /상품 Excel 파일은 \.xlsx 확장자로만 저장/);
+});
