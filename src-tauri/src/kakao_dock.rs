@@ -33,7 +33,7 @@ mod native {
     use std::path::Path;
     type Hwnd = isize;
     type Handle = isize;
-    #[derive(Clone, Copy, Default)]
+    #[derive(Clone, Copy, Default, PartialEq, Eq)]
     #[repr(C)]
     pub struct Rect {left:i32, top:i32, right:i32, bottom:i32}
     impl Rect {
@@ -161,11 +161,15 @@ mod native {
     }
     fn topmost(hwnd:Hwnd)->bool{unsafe{GetWindowLongPtrW(hwnd,-20)&0x8!=0}}
     fn set_z(hwnd:Hwnd,ontop:bool){
+        if topmost(hwnd)==ontop{return}
         unsafe{SetWindowPos(hwnd,if ontop{HWND_TOPMOST}else{HWND_NOTOPMOST},
             0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE);}
     }
     fn set_rect(hwnd:Hwnd,r:Rect,above:Hwnd)->Result<(),String>{
         if r.width()<100||r.height()<100{return Err("창을 배치할 공간이 부족합니다.".into());}
+        if rect(hwnd).is_ok_and(|now|now==r)&&(above==0||topmost(hwnd)){
+            return Ok(())
+        }
         let flags=SWP_NOACTIVATE | if above==0 {SWP_NOZORDER}else{0};
         if unsafe{SetWindowPos(hwnd,above,r.left,r.top,r.width(),r.height(),flags)}==0{
             Err(os("창 배치 실패"))
@@ -184,7 +188,8 @@ mod native {
         let main=app.get_webview_window("main").ok_or("반도허브 창을 찾지 못했습니다.")?;
         let pos=main.inner_position().map_err(|e|e.to_string())?;
         let scale=main.scale_factor().map_err(|e|e.to_string())?;
-        if !scale.is_finite()||scale<=0.0||r.width<100.0||r.height<100.0
+        if !scale.is_finite()||scale<=0.0||scale>8.0||r.width<100.0||r.height<100.0
+            ||r.width>10000.0||r.height>10000.0||r.x.abs()>10000.0||r.y.abs()>10000.0
             ||![r.x,r.y,r.width,r.height].iter().all(|x|x.is_finite()){
             return Err("카카오톡 영역을 확인할 수 없습니다.".into())
         }
@@ -194,12 +199,14 @@ mod native {
         let height=(r.height*scale).round() as i32;
         Ok(Rect{left,top,right:left+width,bottom:top+height})
     }
-    fn focus_on_app_or_kakao(pid:u32)->bool{
+    fn focus_on_app_or_kakao(selected:Hwnd)->bool{
         let hwnd=unsafe{GetForegroundWindow()};
         if hwnd==0{return false}
+        if hwnd==selected{return true}
         let mut focused_pid=0u32;
         unsafe{GetWindowThreadProcessId(hwnd,&mut focused_pid);}
-        focused_pid==pid||focused_pid==unsafe{GetCurrentProcessId()}
+        // Do not keep a docked Kakao window above another KakaoTalk chat.
+        focused_pid==unsafe{GetCurrentProcessId()}
     }
     #[derive(Clone,Copy,PartialEq,Eq)]
     pub enum Mode {Overlap,Stack}
@@ -257,12 +264,14 @@ mod native {
             unsafe{SetWindowPlacement(s.main,&s.main_original);}
             return Err(e)
         }
-        s.mode=Mode::Stack; Ok(())
+        s.mode=Mode::Stack;
+        s.width=kakao.width();
+        Ok(())
     }
     pub fn sync(s:&Session,app:&AppHandle,region:Option<Region>)->Result<(),String>{
         if !live(s){return Err("카카오톡 연결이 끊어졌습니다.".into())}
         if s.mode==Mode::Overlap{
-            if unsafe{IsIconic(s.main)}!=0 || !focus_on_app_or_kakao(s.pid) {
+            if unsafe{IsIconic(s.main)}!=0 || !focus_on_app_or_kakao(s.hwnd) {
                 set_z(s.hwnd,s.original_topmost);
             }else if let Some(area)=region{
                 set_rect(s.hwnd,overlay_region(app,area)?,HWND_TOPMOST)?;
@@ -403,6 +412,8 @@ pub fn dock_stop_native(dock:State<'_,Dock>)->Result<Status,String>{
 pub fn dock_region_native(app:AppHandle,dock:State<'_,Dock>,region:Region)->Result<(),String>{
     let mut inner=lock(&dock)?;
     if region.width>=100.0&&region.height>=100.0
+        &&region.width<=10000.0&&region.height<=10000.0
+        &&region.x.abs()<=10000.0&&region.y.abs()<=10000.0
         &&[region.x,region.y,region.width,region.height].iter().all(|v|v.is_finite()){
         inner.region=Some(region);
     }
