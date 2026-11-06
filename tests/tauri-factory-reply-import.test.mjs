@@ -170,17 +170,19 @@ test("numeric tracking loses leading-zero guarantee and must be rejected", async
   const s=stateFixture();
   const row=goodRow();
   row[16]=12345678901;
+  const file = await workbookFile([row]);
   await assert.rejects(
-    () => parseFactoryReplyWorkbook(s,await workbookFile([row])),
+    () => parseFactoryReplyWorkbook(s, file),
     /텍스트 셀로 입력하세요/,
   );
 });
 
 test("unrecognized 15-column export without the Q return column is rejected explicitly", async () => {
   const s=stateFixture();
+  const file = await workbookFile([goodRow().slice(0,15)],
+    "출력양식.xlsx",headers.slice(0,15));
   await assert.rejects(
-    () => parseFactoryReplyWorkbook(s,await workbookFile([goodRow().slice(0,15)],
-      "출력양식.xlsx",headers.slice(0,15))),
+    () => parseFactoryReplyWorkbook(s, file),
     /Q열 운송장번호를 찾지 못했습니다/,
   );
 });
