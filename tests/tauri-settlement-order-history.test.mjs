@@ -212,8 +212,8 @@ test("retail orders and legacy paid flags do not fabricate bank payments", () =>
   assert.equal(a.cashEvidenceMissing,false);
   state.workflow.payments=[];
   const missing=get(state);
-  assert.equal(missing.orderRows.find((r)=>r.orderId==="order-a").cashEvidenceMissing,false,
-    "An explicit approval still exists and should be distinguished from missing bank cash");
+  assert.equal(missing.orderRows.find((r)=>r.orderId==="order-a").cashEvidenceMissing,true,
+    "An approval does not count as a verified bank receipt");
   state.workflow.confirmations=[];
   assert.equal(get(state).orderRows.find((r)=>r.orderId==="order-a").cashEvidenceMissing,true);
   assert.equal(get(state).paidCash,0);
