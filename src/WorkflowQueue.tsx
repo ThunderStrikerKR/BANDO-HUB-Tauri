@@ -1,4 +1,5 @@
 import { FactoryReplyHistory } from "./FactoryReplyHistory";
+import { FactoryReplyImport } from "./FactoryReplyImport";
 import { ActualFreightField } from "./ActualFreightField";
 import { createFactoryWorkbook, previewFactoryExport, recordFactoryExport } from "./factory-export";
 import { confirmAction } from "./dialogs";
@@ -90,6 +91,9 @@ export function WorkflowQueue({
         placeholder="거래처 / 수취인 / 상품 검색"
         onChange={(e) => setQuery(e.target.value)}
       />
+      {scope === "HISTORY" && (
+        <FactoryReplyImport onSave={onSave} onRefresh={onRefresh} onNotice={onNotice} />
+      )}
       <div className="excel-table-scroll">
         {scope === "HISTORY" ? (
           <table>
@@ -305,7 +309,8 @@ export function WorkflowQueue({
           </table>
         )}
         {scope === "HISTORY" && (
-          <FactoryReplyHistory state={state} query={query} onOpen={onOpen} onNotice={onNotice} />
+          <FactoryReplyHistory state={state} query={query} onOpen={onOpen}
+            onSave={onSave} onRefresh={onRefresh} onNotice={onNotice} />
         )}
       </div>
       <footer className="excel-fixed-footer">
