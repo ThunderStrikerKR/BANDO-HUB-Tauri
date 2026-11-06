@@ -257,3 +257,15 @@
 .client-workbook-preview table { min-width: 680px; }
 .client-workbook-preview thead { position: sticky; top: 0; z-index: 1; background: #252525; }
 .client-workbook-preview td:last-child { max-width: 460px; overflow-wrap: anywhere; }
+
+
+/* Factory reply import and review use the same compact neutral dark workspace. */
+.factory-reply-import { display: grid; gap: 9px; margin: 12px 0; }
+.factory-reply-import .section-title { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; }
+.factory-reply-review { max-height: min(440px, 48dvh); overflow: auto; border: 1px solid #484848; border-radius: 6px; }
+.factory-reply-review table { min-width: 700px; }
+.factory-reply-review thead { position: sticky; top: 0; background: #242424; z-index: 1; }
+.factory-reply-review td { overflow-wrap: anywhere; }
+.factory-reply-history-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 9px 4px; border-bottom: 1px solid #444; }
+.factory-reply-history-row:last-child { border-bottom: none; }
+.factory-reply-history-row button { margin-left: auto; }
