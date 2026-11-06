@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { CategoriesPanel } from "./ManagementUI";
-import { classifiedProducts, registryKey } from "./product-registry";
+import { classifiedProducts, registryKey, validateBrands } from "./product-registry";
 import type { NoticeSink } from "./shared/notices";
 import type { Product, State } from "./types";
 import { Field } from "./ui";
@@ -117,28 +117,25 @@ export function RegistrySettings({
           <button
             onClick={async () => {
               try {
-                if (!name.trim() || !/^https:\/\//.test(evidence))
-                  throw Error("브랜드 공식명과 확인 근거 URL을 입력하세요.");
-                if (
-                  state.brands?.some(
-                    (b) => b.id !== editing && registryKey(b.name) === registryKey(name),
-                  )
-                )
-                  throw Error("동일 공식명이 있습니다. 기존 브랜드를 정정하세요.");
-                const b = {
+                const official = name.trim();
+                const knownNames = new Map<string, string>();
+                for (const value of aliases.split(",").map((value) => value.trim()).filter(Boolean)) {
+                  knownNames.set(registryKey(value), value);
+                }
+                const brandRow = {
                   id: editing ?? crypto.randomUUID(),
-                  name: name.trim(),
+                  name: official,
                   korean: korean.trim(),
-                  aliases: aliases
-                    .split(",")
-                    .map((s) => s.trim())
-                    .filter(Boolean),
-                  evidenceUrl: evidence,
+                  aliases: [...knownNames.values()],
+                  evidenceUrl: evidence.trim(),
                 };
-                await onSave({
+                const next = {
                   ...state,
-                  brands: [...(state.brands ?? []).filter((b) => b.id !== editing), b],
-                });
+                  brands: [...(state.brands ?? []).filter((brand) => brand.id !== editing), brandRow],
+                };
+                validateBrands(next, state);
+                await onSave(next);
+                onNotice("브랜드 정보를 저장했습니다. 기존 연결 상품은 유지됩니다.", "success");
                 setEditing(undefined);
                 setName("");
                 setKorean("");
