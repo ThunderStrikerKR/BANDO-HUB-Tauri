@@ -221,7 +221,7 @@ test("In-house multi-option products split into SKUs without any homepage linkag
 
 test("Manual product UI supports option creation without assigning a website URL", () => {
   const ui = read("src/ProductManager.tsx");
-  assert.match(ui, /const manualOptionEditor = !!edit && !edit\.siteId/);
+  assert.match(ui, /const manualOptionEditor = !!edit && !edit\.sourceProductId/);
   assert.match(ui, /판매 옵션 추가/);
   assert.match(ui, /source: "MANUAL"/);
   assert.match(ui, /p\.saleUnit = p\.variants\.length === 1/);
