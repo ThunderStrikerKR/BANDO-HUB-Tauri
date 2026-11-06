@@ -207,3 +207,21 @@ test("native archive and conflict UI are wired with backup and review, not legac
   assert.match(history,/approveFactoryReplyRow\(latest, id, row\)/);
   assert.match(notification,/approveFactoryReplyRow\(latest, record\.id, row\.row\)/);
 });
+
+
+test("different XLSX files with already-applied identical waybill and postage are idempotent", async () => {
+  const state = stateFixture();
+  const first = await parseFactoryReplyWorkbook(state, await workbookFile([goodRow()]));
+  const afterFirst = applyFactoryReplyPreview(state, first).next;
+  afterFirst.revision = 6;
+  const repeatRow = goodRow();
+  repeatRow[9] = "같은 결과 재회신"; // distinct file bytes, same delivery identity and values
+  const second = await parseFactoryReplyWorkbook(afterFirst, await workbookFile([repeatRow]));
+  assert.equal(second.applied, 1);
+  const beforeEvents = afterFirst.workflow.events.length;
+  const result = applyFactoryReplyPreview(afterFirst, second).next;
+  assert.equal(result.workflow.events.length, beforeEvents);
+  assert.equal(result.factoryReplies.length, 2);
+  assert.equal(result.workflow.shipments[0].tracking.FACTORY, "001234567891");
+  assert.equal(result.workflow.shipments[0].actualFreight.FACTORY, 4000);
+});
