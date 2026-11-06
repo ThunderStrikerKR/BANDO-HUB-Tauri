@@ -42,6 +42,12 @@ async function makeWorkbook(state) {
   const buffer = await exports.exportClientWorkbook(state);
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(Buffer.from(buffer));
+  // Diagnostic output from the generated workbook; no personal data.
+  console.log("XLSX WORKSHEETS", JSON.stringify(workbook.worksheets.map((sheet) => ({
+    name: sheet.name, rows: sheet.rowCount,
+    A1: String(sheet.getCell("A1").value),
+    B1: String(sheet.getCell("B1").value),
+  }))));
   return workbook;
 }
 async function previewWorkbook(state, workbook) {
