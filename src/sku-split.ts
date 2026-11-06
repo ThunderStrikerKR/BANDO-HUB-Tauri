@@ -54,6 +54,10 @@ export function previewSkuSplit(state: State, sourceId: string): SkuSplitPreview
     if (state.products.some((p) => p.id === skuId(source.id, variant.id))) {
       blockers.push("새 SKU의 상품 ID가 이미 등록되어 있습니다.");
     }
+    const priorMapping = state.productMappings?.[source.id + "|" + variant.id];
+    if (priorMapping && priorMapping !== skuId(source.id, variant.id)) {
+      blockers.push("기존 판매 옵션의 연결 이력이 있습니다. 자동 분리로 덮어쓸 수 없습니다.");
+    }
   }
   const siteIds = variants.map((v) => v.siteOptionId).filter(Boolean);
   if (new Set(siteIds).size !== siteIds.length) {
