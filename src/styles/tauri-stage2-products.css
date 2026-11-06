@@ -204,3 +204,5 @@
   .sku-split-list-row { align-items: flex-start; flex-wrap: wrap; }
   .sku-split-list-row span { white-space: normal; }
 }
+
+.catalog-price-sync-review { max-height: 420px; overflow: auto; border: 1px solid #464646; border-radius: 6px; }
