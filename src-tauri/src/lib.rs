@@ -456,6 +456,13 @@ async fn save_product_workbook(
 }
 
 #[tauri::command]
+async fn save_factory_workbook(
+    app: tauri::AppHandle, bytes: Vec<u8>,
+) -> Result<Option<String>, String> {
+    save_xlsx_with_dialog(app, "공장발송로젠", bytes).await
+}
+
+#[tauri::command]
 async fn save_product_sync_workbook(
     app: tauri::AppHandle, bytes: Vec<u8>,
 ) -> Result<Option<String>, String> {
@@ -590,7 +597,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             state_load, state_save, settings_patch, price_set, clipboard_write, clipboard_read,
-            product_open, catalog_report, catalog_approve, receipt_archive, backup_create, backup_list, backup_restore, save_product_workbook, save_registration_workbook, save_client_workbook, save_product_sync_workbook,
+            product_open, catalog_report, catalog_approve, receipt_archive, backup_create, backup_list, backup_restore, save_product_workbook, save_registration_workbook, save_client_workbook, save_product_sync_workbook, save_factory_workbook,
             fetch_official_product_html
         ])
         .run(tauri::generate_context!())
