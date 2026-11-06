@@ -165,3 +165,42 @@
   .app-modal-layer.product-detail-dialog .product-detail-advanced { min-width: 0; }
   .catalog-admin-workspace .catalog-panel-titleline { align-items: flex-start; flex-direction: column; }
 }
+
+
+/* Product SKU conversion keeps the existing neutral BANDO HUB dark theme. */
+.sku-split-list {
+  display: grid;
+  gap: 6px;
+  max-height: 260px;
+  overflow-y: auto;
+  margin: 12px 0;
+  padding: 5px;
+  border: 1px solid #3f3f3f;
+  border-radius: 7px;
+}
+.sku-split-list-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 45px;
+  padding: 7px 12px;
+  background: #292929;
+  border: 1px solid #3a3a3a;
+  border-radius: 6px;
+}
+.sku-split-list-row span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sku-split-list-row small { color: #b1b1b1; margin-left: 8px; }
+.sku-split-list-row button { flex-shrink: 0; }
+.sku-split-preview { padding: 14px; border: 1px solid #505050; border-radius: 7px; }
+.sku-split-preview .bulk-diff { max-height: 340px; overflow-y: auto; }
+.sku-split-preview td:first-child { overflow-wrap: anywhere; }
+@media (max-width: 780px) {
+  .sku-split-list-row { align-items: flex-start; flex-wrap: wrap; }
+  .sku-split-list-row span { white-space: normal; }
+}
