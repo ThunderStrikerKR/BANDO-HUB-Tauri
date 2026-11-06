@@ -181,3 +181,50 @@ test("Existing conflicting option mapping prevents SKU conversion", () => {
   const preview=split.previewSkuSplit(state,p.id);
   assert.ok(preview.blockers.some((reason)=>reason.includes("연결 이력")));
 });
+
+
+test("In-house multi-option products split into SKUs without any homepage linkage", () => {
+  const state = structuredClone(seed);
+  const original = structuredClone(state.products.find((p) => p.siteId === "343"));
+  original.id = "in-house-custom-stand";
+  original.name = "자체 제작 보면대";
+  original.code = "CUSTOM-STAND";
+  original.saleUnit = false;
+  delete original.siteId;
+  delete original.siteRefs;
+  delete original.siteCode;
+  original.variants = original.variants.slice(0, 2).map((variant, index) => {
+    const v = {
+      ...variant,
+      id: "internal-option-" + index,
+      source: "MANUAL",
+      url: "",
+      wholesale: index === 0 ? 50000 : 60000,
+      semi: index === 0 ? 55000 : 65000,
+      retail: index === 0 ? 80000 : 90000,
+    };
+    delete v.siteOptionId;
+    delete v.siteProductId;
+    return v;
+  });
+  state.products.push(original);
+  const review = split.previewSkuSplit(state, original.id);
+  assert.deepEqual(Array.from(review.blockers), []);
+  const { next, created } = split.applySkuSplit(state, review);
+  assert.equal(created, 2);
+  const products = next.products.filter((p) => p.sourceProductId === original.id);
+  assert.equal(products.length, 2);
+  assert.ok(products.every((p) => !p.siteId && !p.variants[0].siteOptionId));
+  assert.deepEqual(products.map((p) => p.variants[0].wholesale), [50000, 60000]);
+  assert.deepEqual(products.map((p) => p.variants[0].retail), [80000, 90000]);
+});
+
+test("Manual product UI supports option creation without assigning a website URL", () => {
+  const ui = read("src/ProductManager.tsx");
+  assert.match(ui, /const manualOptionEditor = !!edit && !edit\.siteId/);
+  assert.match(ui, /판매 옵션 추가/);
+  assert.match(ui, /source: "MANUAL"/);
+  assert.match(ui, /p\.saleUnit = p\.variants\.length === 1/);
+  assert.match(ui, /홈페이지 등록 없이 직접 상품과 옵션을 관리/);
+  assert.match(ui, /defaultColor: index === 0 \? color : prev\.defaultColor/);
+});
