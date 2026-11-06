@@ -428,7 +428,7 @@ async fn save_xlsx_with_dialog(
         }
         if !destination.extension().and_then(|e| e.to_str())
             .is_some_and(|e| e.eq_ignore_ascii_case("xlsx")) {
-            return Err("상품 Excel 파일은 .xlsx 확장자로만 저장할 수 있습니다.".into());
+            return Err("Excel 파일은 .xlsx 확장자로만 저장할 수 있습니다.".into());
         }
         // Do not overwrite an existing workbook even if the file dialog points at it.
         let mut file = fs::OpenOptions::new()
@@ -453,6 +453,13 @@ async fn save_product_workbook(
     app: tauri::AppHandle, bytes: Vec<u8>,
 ) -> Result<Option<String>, String> {
     save_xlsx_with_dialog(app, "상품가격표", bytes).await
+}
+
+#[tauri::command]
+async fn save_client_workbook(
+    app: tauri::AppHandle, bytes: Vec<u8>,
+) -> Result<Option<String>, String> {
+    save_xlsx_with_dialog(app, "거래처전체목록", bytes).await
 }
 
 #[tauri::command]
@@ -576,7 +583,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             state_load, state_save, settings_patch, price_set, clipboard_write, clipboard_read,
-            product_open, catalog_report, catalog_approve, receipt_archive, backup_create, backup_list, backup_restore, save_product_workbook, save_registration_workbook,
+            product_open, catalog_report, catalog_approve, receipt_archive, backup_create, backup_list, backup_restore, save_product_workbook, save_registration_workbook, save_client_workbook,
             fetch_official_product_html
         ])
         .run(tauri::generate_context!())
