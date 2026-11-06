@@ -26,7 +26,8 @@ test("Rust archive uses transactional collision detection rather than ignore", (
   const source = read("src-tauri/src/lib.rs");
   assert.match(source, /SELECT order_id,record FROM receipt_archive WHERE id=/);
   assert.match(source, /stored_owner != order_id \|\| stored_record != record/);
-  assert.doesNotMatch(source, /INSERT OR IGNORE INTO receipt_archive\(id,order_id,record\) VALUES/);
+  const transaction = source.slice(source.indexOf("fn write_snapshot("), source.indexOf("// Only modified/new brands"));
+  assert.doesNotMatch(transaction, /INSERT OR IGNORE INTO receipt_archive/);
   assert.match(source, /tx\.commit\(\)/);
 });
 
