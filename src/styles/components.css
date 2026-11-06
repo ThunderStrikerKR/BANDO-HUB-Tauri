@@ -1,0 +1,359 @@
+/* Shared controls. Workspace dimensions and semantic issue colours remain in their owning modules. */
+.app-v03 .management-container,
+.app-modal-layer {
+  color: var(--text-primary);
+}
+.app-v03 .management-container :is(h1, h2),
+.app-modal-layer .modal > header h2 {
+  font-family: var(--font-heading);
+  font-weight: 650;
+  line-height: 1.35;
+  font-size: calc(20px * var(--ui-scale, 1));
+  letter-spacing: 0;
+}
+.app-v03 .management-container h3 {
+  font-size: calc(16px * var(--ui-scale, 1));
+  line-height: 1.4;
+  margin: 12px 0;
+}
+.app-v03 .management-container button,
+.app-modal-layer button,
+.ui-button {
+  box-sizing: border-box;
+  min-height: var(--control-height);
+  border-radius: var(--radius-control);
+  padding: 8px 12px;
+  font-family: var(--font-body);
+  font-size: calc(14px * var(--ui-scale, 1));
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: 0;
+  white-space: nowrap;
+  transition:
+    background-color 100ms,
+    border-color 100ms;
+}
+.app-v03 .management-container :is(input:not([type="checkbox"]):not([type="radio"]), select),
+.app-modal-layer :is(input:not([type="checkbox"]):not([type="radio"]), select) {
+  box-sizing: border-box;
+  height: var(--control-height);
+  min-height: var(--control-height);
+  max-width: 100%;
+  padding: 7px 10px;
+  background: var(--surface-input);
+  color: var(--text-primary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  font-family: var(--font-body);
+  font-size: calc(14px * var(--ui-scale, 1));
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 1.4;
+}
+.app-v03 .management-container :is(textarea),
+.app-modal-layer textarea {
+  font-family: var(--font-body);
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 1.6;
+  border-radius: var(--radius-control);
+}
+.app-v03 .management-container button:disabled,
+.app-modal-layer button:disabled {
+  cursor: default;
+  opacity: 0.48;
+}
+.app-v03 .management-container :is(button, input, select, textarea):focus-visible,
+.app-modal-layer :is(button, input, select, textarea):focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+.app-v03 .management-container :is(input, select, textarea):focus,
+.app-modal-layer :is(input, select, textarea):focus {
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.app-v03 .management-container .field,
+.app-modal-layer .field {
+  margin: 0 0 12px;
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+.field > .field-label {
+  font-size: calc(13px * var(--ui-scale, 1));
+  font-weight: 600;
+  color: var(--text-secondary);
+  line-height: 1.35;
+  min-width: 0;
+}
+.compact-review .recipient-fields .field > .field-label {
+  font-size: 14px;
+  line-height: 1.3;
+  margin: 0;
+}
+.compact-review .recipient-fields > .field > .field-label {
+  white-space: nowrap;
+}
+.app-v03 .management-container .manager-bar,
+.page-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0 0 16px;
+}
+.page-heading h1,
+.page-heading p {
+  margin: 0;
+}
+.page-heading p {
+  margin-top: 5px;
+}
+.page-heading .field {
+  margin: 0 !important;
+}
+.app-v03 .management-container .actions,
+.app-modal-layer .actions,
+.app-modal-layer .row-end {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.app-modal-layer .row-end {
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+.app-v03 .management-container :is(.card, .shipping-card) {
+  border-radius: var(--radius-panel);
+  border-color: var(--border-default);
+}
+.app-v03 .management-container table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.app-v03 .management-container th {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+  color: var(--text-secondary);
+  padding: 11px 12px;
+  background: #242424;
+}
+.app-v03 .management-container td {
+  padding: 10px 12px;
+  line-height: 1.45;
+  vertical-align: middle;
+}
+.app-v03 .management-container td button {
+  min-height: var(--control-compact);
+  padding: 6px 10px;
+  font-size: 13px;
+}
+.app-v03 .management-container td input[data-price-cell] {
+  height: var(--control-height);
+}
+.table-scroll {
+  max-width: 100%;
+  overflow: auto;
+}
+.money-value {
+  font-family: var(--font-money);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.result-count {
+  white-space: nowrap;
+  color: var(--text-secondary);
+}
+.empty-state {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 8px;
+  min-height: 120px;
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+.empty-state p {
+  margin: 0;
+  font-weight: 500;
+}
+.empty-state small {
+  max-width: 480px;
+  font-weight: 400;
+  line-height: 1.6;
+}
+.empty-state button {
+  margin-top: 6px;
+}
+.form-error {
+  padding: 12px;
+  margin: 0 0 16px;
+  border: 1px solid #a35757;
+  border-radius: 6px;
+  color: var(--tone-error);
+  background: #322020;
+}
+.form-error p {
+  margin: 0 0 8px;
+}
+.draft-status {
+  display: block;
+  color: var(--tone-warning);
+  margin: 8px 0 16px;
+}
+.app-notice.notice-error {
+  border-color: #925555;
+  color: #ffd4d4;
+}
+.app-notice.notice-success {
+  border-color: #50705b;
+}
+.app-notice .ui-button {
+  min-height: 28px;
+  padding: 3px 7px;
+}
+.app-modal-layer .ui-button-compact {
+  min-height: 32px;
+  padding: 6px 10px;
+}
+.settings-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.settings-layout > .settings {
+  margin-top: 0;
+}
+.settings-support {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.settings-support > .card {
+  margin: 0;
+}
+.settings-layout .account-row {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  align-items: end;
+  gap: 8px;
+}
+.settings-layout .account-row .field {
+  margin: 0;
+}
+.settings-layout .account-row > button {
+  min-height: 40px;
+  height: 40px;
+  align-self: end;
+}
+.settings-layout .account-recommendations {
+  gap: 12px;
+}
+.settings-support .history {
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.settings-support .history span {
+  overflow-wrap: anywhere;
+}
+.app-modal-layer .product-search-results {
+  max-height: 52dvh;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.app-modal-layer .product-search-results > article {
+  padding: 8px 0;
+  gap: 8px;
+}
+.app-modal-layer .product-search-results > article > button:first-child {
+  white-space: normal;
+}
+.app-modal-layer .product-search-results > article > button:first-child > span {
+  display: block;
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+.ui-button-compact {
+  min-height: 32px;
+  padding: 6px 10px;
+}
+.ui-button-quiet {
+  background: transparent;
+  border-color: transparent;
+}
+.ui-button-primary {
+  background: var(--accent-action);
+  color: #171717;
+}
+@media (max-width: 1600px) {
+  .settings-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .app-v03 .management-container td,
+  .app-v03 .management-container th {
+    padding: 9px 8px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-v03 button,
+  .app-modal-layer button {
+    transition: none;
+  }
+}
+
+.modal-fields {
+  display: contents;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.app-v03 .management-container input.money-input,
+.app-modal-layer input.money-input {
+  font-family: var(--font-money);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.app-v03 .management-container button {
+  height: var(--control-height);
+}
+.app-v03 .management-container td button {
+  height: var(--control-compact);
+}
+.app-v03 .management-container .account-picker > button,
+.settings-layout .account-row > button {
+  height: var(--control-height);
+  min-height: var(--control-height);
+}
+
+.app-v03 .management-container .manager-filters,
+.app-modal-layer .manager-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.app-v03 .management-container .manager-filters > select,
+.app-modal-layer .manager-filters > select {
+  flex: 1 1 180px;
+  min-width: 0;
+  max-width: 320px;
+}
+.app-v03 .management-container .manager-filters > input {
+  flex: 1 1 240px;
+}
+.app-v03 .management-container .manager-filters > .check {
+  flex: none;
+  white-space: nowrap;
+  margin: 0;
+}

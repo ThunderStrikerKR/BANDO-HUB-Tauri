@@ -1,0 +1,854 @@
+import { useRef, useState, type KeyboardEvent } from "react";
+import { ProductSearchDialog } from "../ProductSearchDialog";
+import { deliveryRequirements } from "../delivery-requirements";
+import { usePendingChanges } from "../shared/pending-changes";
+import type { NoticeSink } from "../shared/notices";
+import type { Order, Product, State } from "../types";
+import { orderIssues } from "../validation";
+import { ManualPrompt } from "./ManualPrompt";
+import {
+  applyManual,
+  assignManualBlock,
+  cellKey,
+  emptyManualItem,
+  initialManual,
+  manualValue,
+  newManualRecipient,
+  pendingManualQuantity,
+  releaseManualBlock,
+  setManualValue,
+  validManualQuantity,
+  type Cell,
+  type ManualModel,
+} from "./manual-classification";
+
+type Frame = {
+  model: ManualModel;
+  entry: Record<string, string>;
+  quantityText: Record<string, string>;
+  pending?: Cell;
+  rollback?: Frame;
+};
+export function ManualClassification({
+  state,
+  order,
+  onApply,
+  onClose,
+}: {
+  state: State;
+  order: Order;
+  onApply: (order: Order) => void;
+  onClose: () => void;
+  onNotice: NoticeSink;
+}) {
+  const [model, setModel] = useState(() => initialManual(order));
+  const initial = useRef(JSON.stringify(model));
+  const [count, setCount] = useState(String(model.rows.length));
+  const [active, setActive] = useState<Cell>(),
+    [search, setSearch] = useState<Cell>();
+  const [pending, setPendingState] = useState<Cell>();
+  const [entry, setEntry] = useState<Record<string, string>>({});
+  const [quantityText, setQuantityText] = useState<Record<string, string>>({});
+  const [error, setError] = useState<{ key?: string; message: string }>();
+  const [completion, setCompletion] = useState(false);
+  const [confirm, setConfirm] = useState<{ title: string; message: string; execute: () => void }>();
+  const root = useRef<HTMLElement>(null),
+    pendingRef = useRef<Cell | undefined>(undefined);
+  const history = useRef<Frame[]>([]),
+    beforeProduct = useRef<Frame | undefined>(undefined);
+  const editStart = useRef<{ cell: Cell; frame: Frame } | undefined>(undefined),
+    applying = useRef(false);
+  usePendingChanges(JSON.stringify(model) !== initial.current || Object.keys(entry).length > 0);
+  const frame = (): Frame =>
+    structuredClone({ model, entry, quantityText, pending, rollback: beforeProduct.current });
+  const checkpoint = () => {
+    history.current.push(frame());
+    if (history.current.length > 100) history.current.shift();
+  };
+  const setPending = (cell?: Cell) => {
+    pendingRef.current = cell;
+    setPendingState(cell);
+  };
+  const restore = (value: Frame) => {
+    setModel(value.model);
+    setEntry(value.entry);
+    setQuantityText(value.quantityText);
+    setPending(value.pending);
+    beforeProduct.current = value.rollback;
+    setCount(String(value.model.rows.length));
+    setError(undefined);
+  };
+  const focus = (cell: Cell) => {
+    setActive(cell);
+    requestAnimationFrame(() => {
+      const input = root.current?.querySelector<HTMLInputElement>(
+        `input[data-cell="${CSS.escape(cellKey(cell))}"]`,
+      );
+      input?.focus({ preventScroll: true });
+      input?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    });
+  };
+  const fail = (message: string, cell?: Cell) =>
+    setError({ key: cell ? cellKey(cell) : undefined, message });
+  const attempt = (action: () => void, cell?: Cell) => {
+    try {
+      action();
+      setError(undefined);
+    } catch (e) {
+      fail(String(e).replace(/^Error: /, ""), cell);
+    }
+  };
+  const allowed = (cell: Cell) =>
+    !pendingRef.current || cellKey(pendingRef.current) === cellKey(cell);
+  const nextMissing = (next: ManualModel, cell: Cell) => {
+    const slots = next.rows.flatMap((row) => {
+      const required = deliveryRequirements(row, order.receptionVersion !== 1);
+      return [
+        !required.name && { recipientId: row.id, field: "name" },
+        !required.address && { recipientId: row.id, field: "address" },
+        !required.contact && { recipientId: row.id, field: "mobile" },
+      ].filter(Boolean) as Cell[];
+    });
+    const rowIndex = next.rows.findIndex((row) => row.id === cell.recipientId);
+    const fields = ["name", "address", "mobile", "phone"];
+    const position = rowIndex * 4 + fields.indexOf(cell.field);
+    const following = slots.find(
+      (slot) =>
+        next.rows.findIndex((row) => row.id === slot.recipientId) * 4 + fields.indexOf(slot.field) >
+        position,
+    );
+    if (following) focus(following);
+  };
+  const cancelProduct = () => {
+    const cell = pendingRef.current;
+    if (!cell) return;
+    checkpoint();
+    if (beforeProduct.current) restore(beforeProduct.current);
+    else {
+      setPending(undefined);
+      setQuantityText({});
+    }
+    beforeProduct.current = undefined;
+    setEntry((old) => {
+      const next = { ...old };
+      delete next[cellKey({ ...cell, field: "product" })];
+      return next;
+    });
+    setQuantityText((old) => {
+      const next = { ...old };
+      delete next[cellKey(cell)];
+      return next;
+    });
+    focus({ ...cell, field: "product" });
+  };
+  const selectProduct = (cell: Cell, value: string, product?: Product) => {
+    if (!allowed(cell)) return;
+    attempt(() => {
+      const next = setManualValue(model, cell, value, state, order, product);
+      checkpoint();
+      beforeProduct.current = frame();
+      setModel(next);
+      setEntry((old) => {
+        const copy = { ...old };
+        delete copy[cellKey(cell)];
+        return copy;
+      });
+      setQuantityText((old) => ({ ...old, [cellKey({ ...cell, field: "quantity" })]: "" }));
+      setSearch(undefined);
+      setPending({ ...cell, field: "quantity" });
+      focus({ ...cell, field: "quantity" });
+    }, cell);
+  };
+  const finishQuantity = (): boolean => {
+    const cell = pendingRef.current;
+    if (!cell) return true;
+    const item = model.rows
+      .find((row) => row.id === cell.recipientId)
+      ?.items.find((item) => item.id === cell.itemId);
+    if (!item || !validManualQuantity(item.quantity)) {
+      fail("수량을 1 이상의 정수로 입력하세요.", cell);
+      focus(cell);
+      return false;
+    }
+    const next = structuredClone(model);
+    next.rows
+      .find((row) => row.id === cell.recipientId)!
+      .items.find((item) => item.id === cell.itemId)!.quantityConfirmed = true;
+    checkpoint();
+    setModel(next);
+    setPending(undefined);
+    beforeProduct.current = undefined;
+    setError(undefined);
+    return true;
+  };
+  const useBlock = (id: string) => {
+    const assigned = model.assignments[id];
+    if (assigned) {
+      if (pendingRef.current && assigned.itemId !== pendingRef.current.itemId) {
+        fail("선택한 상품의 수량을 먼저 확정하세요.", pendingRef.current);
+        return;
+      }
+      attempt(() => {
+        const next = releaseManualBlock(model, id, true, state, order);
+        checkpoint();
+        setModel(next);
+        setEntry((old) => {
+          const copy = { ...old };
+          delete copy[cellKey(assigned)];
+          return copy;
+        });
+        if (assigned.itemId)
+          setQuantityText((old) => {
+            const copy = { ...old };
+            delete copy[cellKey({ ...assigned, field: "quantity" })];
+            return copy;
+          });
+        if (assigned.field === "product") {
+          setPending(undefined);
+          beforeProduct.current = undefined;
+        }
+        if (assigned.field === "quantity") setPending({ ...assigned, field: "quantity" });
+      }, assigned);
+      return;
+    }
+    const cell = pendingRef.current ?? active;
+    if (!cell) {
+      fail("입력할 셀을 선택하세요.");
+      return;
+    }
+    if (pendingRef.current && model.blocks.find((block) => block.id === id)?.field !== "quantity") {
+      fail("선택한 상품의 수량을 먼저 확정하세요.", pendingRef.current);
+      return;
+    }
+    attempt(() => {
+      const next = assignManualBlock(model, id, cell, state, order);
+      checkpoint();
+      setModel(next);
+      setEntry((old) => {
+        const copy = { ...old };
+        delete copy[cellKey(cell)];
+        return copy;
+      });
+      if (cell.field === "product") {
+        beforeProduct.current = frame();
+        setPending({ ...cell, field: "quantity" });
+        setQuantityText((old) => ({ ...old, [cellKey({ ...cell, field: "quantity" })]: "" }));
+        focus({ ...cell, field: "quantity" });
+      } else if (cell.field === "quantity") {
+        setQuantityText((old) => ({ ...old, [cellKey(cell)]: manualValue(next, cell) }));
+        setPending(undefined);
+        beforeProduct.current = undefined;
+      } else nextMissing(next, cell);
+    }, cell);
+  };
+  const resize = (n: number) => {
+    if (!Number.isSafeInteger(n) || n < 1 || n > 100) {
+      fail("배송 건수는 1~100건입니다.");
+      return;
+    }
+    if (pendingRef.current) {
+      setCount(String(model.rows.length));
+      fail("수량을 확정하거나 상품 선택을 취소하세요.", pendingRef.current);
+      return;
+    }
+    if (n === model.rows.length) {
+      setCount(String(n));
+      return;
+    }
+    const execute = () => {
+      const next = structuredClone(model);
+      next.rows = next.rows.slice(0, n);
+      while (next.rows.length < n) next.rows.push(newManualRecipient());
+      const ids = new Set(next.rows.map((row) => row.id));
+      next.assignments = Object.fromEntries(
+        Object.entries(next.assignments).filter(([, a]) => ids.has(a.recipientId)),
+      );
+      setModel(next);
+      setCount(String(n));
+      setEntry({});
+      setQuantityText({});
+      history.current = [];
+      setError(undefined);
+      if (active && !ids.has(active.recipientId)) setActive(undefined);
+    };
+    const removed = model.rows.slice(n);
+    const populated = removed.some(
+      (row) =>
+        row.name ||
+        row.address ||
+        row.mobile ||
+        row.phone ||
+        row.note ||
+        row.items.some((item) => item.name || item.productId || item.quantity !== null) ||
+        Object.values(model.assignments).some((a) => a.recipientId === row.id),
+    );
+    setCount(String(model.rows.length));
+    if (populated)
+      setConfirm({
+        title: "배송 건수 줄이기",
+        message: "마지막 배송 건의 입력값과 원문 배정을 제거할까요?",
+        execute,
+      });
+    else execute();
+  };
+  const addProduct = (recipientId: string) => {
+    const item = emptyManualItem();
+    checkpoint();
+    setModel((old) => ({
+      ...old,
+      rows: old.rows.map((row) =>
+        row.id === recipientId ? { ...row, items: [...row.items, item] } : row,
+      ),
+    }));
+    setError(undefined);
+    focus({ recipientId, itemId: item.id, field: "product" });
+  };
+  const removeProduct = (cell: Cell) => {
+    checkpoint();
+    setModel((old) => ({
+      ...old,
+      rows: old.rows.map((row) =>
+        row.id === cell.recipientId
+          ? { ...row, items: row.items.filter((item) => item.id !== cell.itemId) }
+          : row,
+      ),
+      assignments: Object.fromEntries(
+        Object.entries(old.assignments).filter(([, a]) => a.itemId !== cell.itemId),
+      ),
+    }));
+    setError(undefined);
+  };
+  const move = (cell: Cell, key: string, shift = false) => {
+    const inputs = Array.from(
+      root.current?.querySelectorAll<HTMLInputElement>("input[data-cell]") ?? [],
+    );
+    const index = inputs.findIndex((input) => input.dataset.cell === cellKey(cell));
+    let target: HTMLInputElement | undefined;
+    if (key === "ArrowUp" || key === "ArrowDown") {
+      const rows = model.rows,
+        rowIndex = rows.findIndex((row) => row.id === cell.recipientId),
+        nextRow = rows[rowIndex + (key === "ArrowUp" ? -1 : 1)];
+      if (nextRow) {
+        const current = rows[rowIndex].items.findIndex((item) => item.id === cell.itemId);
+        const nextCell = {
+          ...cell,
+          recipientId: nextRow.id,
+          itemId: cell.itemId
+            ? nextRow.items[Math.min(Math.max(current, 0), nextRow.items.length - 1)]?.id
+            : undefined,
+        };
+        target = inputs.find((input) => input.dataset.cell === cellKey(nextCell));
+      }
+    } else target = inputs[index + (key === "ArrowLeft" || (key === "Tab" && shift) ? -1 : 1)];
+    if (target && !target.disabled) {
+      target.focus({ preventScroll: true });
+      target.scrollIntoView({ block: "nearest", inline: "nearest" });
+    }
+  };
+  const keyDown = (event: KeyboardEvent<HTMLInputElement>, cell: Cell) => {
+    if (event.nativeEvent.isComposing || event.keyCode === 229) return;
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") return;
+    const key = cellKey(cell);
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      if (pendingRef.current) {
+        cancelProduct();
+        return;
+      }
+      if (cell.field === "product")
+        setEntry((old) => {
+          const copy = { ...old };
+          delete copy[key];
+          return copy;
+        });
+      else if (editStart.current && cellKey(editStart.current.cell) === key) {
+        const previous = editStart.current.frame.model.rows.find(
+          (row) => row.id === cell.recipientId,
+        );
+        if (previous) {
+          checkpoint();
+          if (cell.itemId) {
+            setModel((old) => ({
+              ...old,
+              rows: old.rows.map((row) =>
+                row.id === cell.recipientId
+                  ? {
+                      ...row,
+                      items: row.items.map((item) =>
+                        item.id === cell.itemId
+                          ? structuredClone(previous.items.find((item) => item.id === cell.itemId)!)
+                          : item,
+                      ),
+                    }
+                  : row,
+              ),
+            }));
+            setQuantityText((old) => {
+              const copy = { ...old };
+              delete copy[key];
+              return copy;
+            });
+          } else
+            setModel((old) => ({
+              ...old,
+              rows: old.rows.map((row) =>
+                row.id === cell.recipientId
+                  ? { ...row, [cell.field]: previous[cell.field as "name"] }
+                  : row,
+              ),
+            }));
+        }
+      }
+      setError(undefined);
+      return;
+    }
+    if (!["Tab", "Enter", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key))
+      return;
+    event.preventDefault();
+    if (
+      cell.field === "product" &&
+      entry[key] !== undefined &&
+      entry[key] !== manualValue(model, cell)
+    ) {
+      selectProduct(cell, entry[key]);
+      return;
+    }
+    if (pendingRef.current) {
+      if (cell.field === "quantity" && (event.key === "Enter" || event.key === "Tab")) {
+        if (!finishQuantity()) return;
+        requestAnimationFrame(() => move(cell, event.key, event.shiftKey));
+        return;
+      } else {
+        fail("수량을 확정하거나 상품 선택을 취소하세요.", pendingRef.current);
+        return;
+      }
+    }
+    move(cell, event.key, event.shiftKey);
+  };
+  const textCell = (cell: Cell, label: string) => {
+    const key = cellKey(cell),
+      row = model.rows.find((row) => row.id === cell.recipientId)!,
+      required = deliveryRequirements(row, order.receptionVersion !== 1);
+    const item = row.items.find((item) => item.id === cell.itemId);
+    const invalid =
+      cell.field === "name"
+        ? !required.name
+        : cell.field === "address"
+          ? !required.address
+          : ["phone", "mobile"].includes(cell.field)
+            ? !required.contact
+            : cell.field === "product"
+              ? !item?.productId || !item?.variantId
+              : cell.field === "quantity"
+                ? !validManualQuantity(item?.quantity) || item?.quantityConfirmed === false
+                : false;
+    const value =
+      cell.field === "product"
+        ? (entry[key] ?? manualValue(model, cell))
+        : cell.field === "quantity"
+          ? (quantityText[key] ?? manualValue(model, cell))
+          : manualValue(model, cell);
+    const input = (
+      <input
+        data-cell={key}
+        aria-label={label}
+        aria-selected={!!active && cellKey(active) === key}
+        aria-invalid={invalid}
+        title={invalid ? "필수정보를 확인하세요" : undefined}
+        disabled={!allowed(cell)}
+        value={value}
+        inputMode={cell.field === "quantity" ? "numeric" : undefined}
+        onFocus={() => {
+          setActive(cell);
+          editStart.current = { cell, frame: frame() };
+        }}
+        onChange={(event) => {
+          if (!allowed(cell)) return;
+          const value = event.target.value;
+          checkpoint();
+          setError(undefined);
+          if (cell.field === "product") {
+            setEntry((old) => {
+              const next = { ...old };
+              if (value === manualValue(model, cell)) delete next[key];
+              else next[key] = value;
+              return next;
+            });
+            return;
+          }
+          if (cell.field === "quantity") {
+            setQuantityText((old) => ({ ...old, [key]: value }));
+            const next = setManualValue(model, cell, value, state, order);
+            next.rows
+              .find((row) => row.id === cell.recipientId)!
+              .items.find((item) => item.id === cell.itemId)!.quantityConfirmed = false;
+            if (!pendingRef.current) beforeProduct.current = frame();
+            setModel(next);
+            setPending(cell);
+            return;
+          }
+          attempt(() => setModel(setManualValue(model, cell, value, state, order)), cell);
+        }}
+        onBlur={() => {
+          if (
+            cell.field === "product" &&
+            entry[key] !== undefined &&
+            entry[key] !== manualValue(model, cell)
+          )
+            selectProduct(cell, entry[key]);
+        }}
+        onKeyDown={(event) => keyDown(event, cell)}
+      />
+    );
+    if (cell.field !== "quantity") return input;
+    const increment = (delta: number) => {
+      if (!allowed(cell)) return;
+      checkpoint();
+      const value = Math.max(1, Number(manualValue(model, cell) || 0) + delta);
+      const next = setManualValue(model, cell, String(value), state, order);
+      next.rows
+        .find((r) => r.id === cell.recipientId)!
+        .items.find((i) => i.id === cell.itemId)!.quantityConfirmed = true;
+      setModel(next);
+      setQuantityText((old) => ({ ...old, [key]: String(value) }));
+      setPending(undefined);
+      setError(undefined);
+      requestAnimationFrame(() => focus(cell));
+    };
+    return (
+      <div className="manual-quantity-cell">
+        <div className="quantity-stepper">
+          <button
+            aria-label={label + " 감소"}
+            disabled={!allowed(cell)}
+            onClick={() => increment(-1)}
+          >
+            −
+          </button>
+          {input}
+          <button
+            aria-label={label + " 증가"}
+            disabled={!allowed(cell)}
+            onClick={() => increment(1)}
+          >
+            +
+          </button>
+        </div>
+        {pending?.itemId === cell.itemId && (
+          <button className="manual-cancel-product" onClick={cancelProduct}>
+            상품 선택 취소
+          </button>
+        )}
+      </div>
+    );
+  };
+  const segments = [];
+  let cursor = 0;
+  for (const block of model.blocks) {
+    segments.push((order.analysisRaw ?? order.raw).slice(cursor, block.start));
+    segments.push(
+      <button
+        key={block.id}
+        className={"manual-block" + (model.assignments[block.id] ? " assigned" : "")}
+        aria-pressed={!!model.assignments[block.id]}
+        aria-label={`${model.assignments[block.id] ? "배정됨" : "미배정"} ${block.text}`}
+        onPointerDown={(event) => event.preventDefault()}
+        onMouseDown={(event) => event.preventDefault()}
+        onClick={() => useBlock(block.id)}
+      >
+        {block.text}
+      </button>,
+    );
+    cursor = block.end;
+  }
+  segments.push((order.analysisRaw ?? order.raw).slice(cursor));
+  const uncommitted = model.rows.some((row) =>
+    row.items.some(
+      (item) =>
+        entry[cellKey({ recipientId: row.id, itemId: item.id, field: "product" })] !== undefined,
+    ),
+  );
+  const issues = orderIssues({ ...order, recipients: model.rows }).filter(
+    (issue) => issue.severity === "ACTION",
+  );
+  const layer = completion || !!confirm || !!search;
+  return (
+    <section
+      ref={root}
+      className="manual-workspace"
+      role="dialog"
+      aria-modal="false"
+      aria-label="수동 분류"
+      onKeyDown={(event) => {
+        if (event.nativeEvent.isComposing || layer) return;
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") {
+          event.preventDefault();
+          const previous = history.current.pop();
+          if (previous) {
+            restore(previous);
+            if (active) focus(active);
+          }
+        }
+      }}
+    >
+      <div className="manual-workspace-body" inert={layer}>
+        <header className="manual-workspace-heading">
+          <h2>수동 분류</h2>
+          <button
+            onClick={() =>
+              setConfirm({
+                title: "전체 초기화",
+                message: "구성표와 배정을 초기화할까요? 최초 원문과 마스터는 보존됩니다.",
+                execute: () => {
+                  setModel({ ...model, rows: [newManualRecipient()], assignments: {} });
+                  setCount("1");
+                  setActive(undefined);
+                  setPending(undefined);
+                  setEntry({});
+                  setQuantityText({});
+                  history.current = [];
+                  beforeProduct.current = undefined;
+                  setError(undefined);
+                },
+              })
+            }
+          >
+            초기화
+          </button>
+          <button onClick={onClose}>닫기 ×</button>
+        </header>
+        <div className="manual-classification">
+          <div className="manual-status" role="status" data-error-cell={error?.key}>
+            {pending ? (
+              <>
+                <span>선택한 상품의 수량을 확정하세요.</span>
+              </>
+            ) : (
+              <span>
+                {error?.message || "셀 선택 → 원문 블록 배정 / 방향키/Tab 이동 / Ctrl+Z 복구"}
+              </span>
+            )}
+            {pending && error && <small>{error.message}</small>}
+          </div>
+          <div className="manual-columns">
+            <section className="manual-source">
+              <h3>발주 원문</h3>
+              <small>흰 블록: 미배정 / 회색 블록: 클릭하여 강제 회수</small>
+              <pre>{segments}</pre>
+            </section>
+            <section className="manual-sheet">
+              <div className="manual-sheet-heading">
+                <h3>배송 정보 구성표</h3>
+                <div className="manual-count">
+                  <span>배송 건수</span>
+                  <button
+                    aria-label="배송 건수 감소"
+                    disabled={!!pending || model.rows.length <= 1}
+                    onClick={() => resize(model.rows.length - 1)}
+                  >
+                    −
+                  </button>
+                  <input
+                    aria-label="배송 건수"
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={count}
+                    disabled={!!pending}
+                    onChange={(event) => {
+                      setCount(event.target.value);
+                      if (event.target.value !== "") resize(Number(event.target.value));
+                    }}
+                    onBlur={() => setCount(String(model.rows.length))}
+                  />
+                  <button
+                    aria-label="배송 건수 증가"
+                    disabled={!!pending || model.rows.length >= 100}
+                    onClick={() => resize(model.rows.length + 1)}
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+              <div className="manual-grid-scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      {[
+                        "배송",
+                        "이름",
+                        "주소",
+                        "휴대폰",
+                        "전화",
+                        "배송 요청",
+                        "상품",
+                        "수량",
+                        "행 동작",
+                      ].map((text) => (
+                        <th key={text}>{text}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {model.rows.map((row, index) =>
+                      (row.items.length ? row.items : [undefined]).map((item, itemIndex) => (
+                        <tr key={item?.id ?? row.id}>
+                          {itemIndex === 0 && (
+                            <>
+                              <th rowSpan={Math.max(row.items.length, 1)}>배송 {index + 1}</th>
+                              {["name", "address", "mobile", "phone", "note"].map((field, n) => (
+                                <td key={field} rowSpan={Math.max(row.items.length, 1)}>
+                                  {textCell(
+                                    { recipientId: row.id, field },
+                                    `배송 ${index + 1} ${["이름", "주소", "휴대폰", "전화", "배송 요청"][n]}`,
+                                  )}
+                                </td>
+                              ))}
+                            </>
+                          )}
+                          <td>
+                            {item ? (
+                              <div className="manual-product-cell">
+                                {textCell(
+                                  { recipientId: row.id, itemId: item.id, field: "product" },
+                                  `배송 ${index + 1} 상품 ${itemIndex + 1}`,
+                                )}
+                                <button
+                                  disabled={!!pending}
+                                  onClick={() =>
+                                    setSearch({
+                                      recipientId: row.id,
+                                      itemId: item.id,
+                                      field: "product",
+                                    })
+                                  }
+                                >
+                                  검색
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                className="manual-missing-product"
+                                aria-invalid="true"
+                                disabled={!!pending}
+                                onClick={() => addProduct(row.id)}
+                              >
+                                상품 추가
+                              </button>
+                            )}
+                          </td>
+                          <td>
+                            {item &&
+                              textCell(
+                                { recipientId: row.id, itemId: item.id, field: "quantity" },
+                                `배송 ${index + 1} 수량 ${itemIndex + 1}`,
+                              )}
+                          </td>
+                          <td>
+                            {item && (
+                              <>
+                                <button
+                                  disabled={!!pending}
+                                  onClick={() =>
+                                    removeProduct({
+                                      recipientId: row.id,
+                                      itemId: item.id,
+                                      field: "product",
+                                    })
+                                  }
+                                >
+                                  상품 행 제외
+                                </button>
+                                {itemIndex === 0 && (
+                                  <button disabled={!!pending} onClick={() => addProduct(row.id)}>
+                                    상품 추가
+                                  </button>
+                                )}
+                              </>
+                            )}
+                          </td>
+                        </tr>
+                      )),
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+          <footer className="manual-footer">
+            <span>적용 후 확인 {issues.length}개 / 정식 접수는 주문 확인 완료</span>
+            <button onClick={onClose}>취소</button>
+            <button
+              className="primary"
+              disabled={
+                !!pending || !model.rows.length || uncommitted || !!pendingManualQuantity(model)
+              }
+              onClick={() => setCompletion(true)}
+            >
+              초안에 적용
+            </button>
+          </footer>
+        </div>
+      </div>
+      {search && (
+        <ProductSearchDialog
+          surface={ManualPrompt}
+          state={state}
+          clientId={order.clientId}
+          onClose={() => {
+            setSearch(undefined);
+            if (active) focus(active);
+          }}
+          onChoose={(product) => selectProduct(search, product.code, product)}
+        />
+      )}
+      {confirm && (
+        <ManualPrompt title={confirm.title} onClose={() => setConfirm(undefined)}>
+          <p>{confirm.message}</p>
+          <div className="manual-confirm-actions">
+            <button
+              className="primary"
+              onClick={() => {
+                confirm.execute();
+                setConfirm(undefined);
+              }}
+            >
+              확인
+            </button>
+            <button onClick={() => setConfirm(undefined)}>취소</button>
+          </div>
+        </ManualPrompt>
+      )}
+      {completion && (
+        <ManualPrompt title="수동 분류 완료" onClose={() => setCompletion(false)}>
+          <p>수동 분류 결과를 어떻게 처리할까요?</p>
+          <div className="manual-completion-actions">
+            <div className="manual-completion-ai">
+              <button disabled>AI 자동분류 개선</button>
+            </div>
+            <button
+              className="primary"
+              data-autofocus
+              onClick={() => {
+                if (applying.current) return;
+                applying.current = true;
+                try {
+                  onApply(applyManual(order, model));
+                  onClose();
+                } catch (e) {
+                  applying.current = false;
+                  setCompletion(false);
+                  fail(String(e));
+                }
+              }}
+            >
+              피드백 없이 진행
+            </button>
+            <button onClick={() => setCompletion(false)}>취소</button>
+          </div>
+        </ManualPrompt>
+      )}
+    </section>
+  );
+}

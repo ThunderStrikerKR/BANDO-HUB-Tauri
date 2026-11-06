@@ -1,0 +1,67 @@
+/* Viewing and editing use identical text metrics and content boxes. */
+.app-v03 .linked-text-editor > :is(textarea, .linked-text-view) {
+  font-family: var(--font-body);
+  font-size: calc(16px * var(--ui-scale));
+  font-weight: 400;
+  font-style: normal;
+  font-kerning: normal;
+  font-variant-ligatures: normal;
+  letter-spacing: 0;
+  word-spacing: 0;
+  line-height: 1.65;
+  tab-size: 4;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  padding: 12px;
+  margin: 0;
+  width: 100%;
+  min-height: 50px;
+  border: 0;
+  border-radius: 0;
+  box-sizing: border-box;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  outline: none;
+  box-shadow: none;
+}
+.app-v03 .linked-text-editor:focus-within {
+  border-color: #a3a3a3;
+  box-shadow: 0 0 0 1px #a3a3a3;
+}
+.app-v03 .linked-text-editor .linked-token {
+  font: inherit;
+  letter-spacing: inherit;
+  word-spacing: inherit;
+  line-height: inherit;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  box-decoration-break: clone;
+}
+.app-v03 :is(input, textarea, select) {
+  font-kerning: normal;
+}
+.client-choice-modal {
+  width: min(680px, 100%);
+}
+.client-choice-modal .client-result {
+  width: 100%;
+  margin-top: 10px;
+  padding: 14px;
+  text-align: left;
+}
+.client-choice-modal > p {
+  line-height: 1.6;
+  color: #bbb;
+}
+.client-choice-reopen {
+  margin-top: 8px;
+}
+
+.app-notice {
+  pointer-events: none;
+}
+.app-notice > button {
+  pointer-events: auto;
+}

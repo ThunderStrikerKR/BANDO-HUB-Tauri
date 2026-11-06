@@ -1,0 +1,24 @@
+:root {
+  --surface-canvas: #101010;
+  --surface-panel: #202020;
+  --surface-input: #292929;
+  --surface-hover: #353535;
+  --border-default: #505050;
+  --border-focus: #bcbcbc;
+  --text-primary: #ededed;
+  --text-secondary: #b9b9b9;
+  --text-muted: #999;
+  --accent-action: #eee;
+  --tone-error: #ffb4b4;
+  --tone-success: #a9dab5;
+  --tone-warning: #f2ba64;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --radius-control: 6px;
+  --radius-panel: 9px;
+  --control-height: calc(40px * var(--ui-scale, 1));
+  --control-compact: calc(32px * var(--ui-scale, 1));
+}

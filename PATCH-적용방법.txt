@@ -1,0 +1,11 @@
+BANDO HUB Tauri v0.0.3 부분 패치
+
+v0.0.2 소스 프로젝트 폴더에서 이 ZIP의 파일을 상대 경로 그대로 덮어쓰세요.
+실행파일이나 win-unpacked, release 폴더에는 붙여넣으면 안 됩니다.
+새 폴더에 전체 소스를 압축 해제하여 빌드하는 방법을 권장합니다.
+
+Windows: BUILD_WINDOWS_TAURI.cmd 실행 → release\BANDO-HUB-v0.0.3.exe
+기존 Tauri 앱 ID 및 SQLite 파일명은 유지되어 상품 가격 데이터가 보존됩니다.
+원래 EXE 파일과 데이터 백업을 유지하세요.
+
+Rust 및 Windows 실제 실행 검증은 아직 미완료입니다.

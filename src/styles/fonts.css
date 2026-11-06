@@ -1,0 +1,58 @@
+@font-face {
+  font-family: "Pretendard";
+  src: url("/fonts/PretendardVariable.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: "SUIT";
+  src: url("/fonts/SUIT-Variable.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Roboto Mono";
+  src: url("/fonts/RobotoMono.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 100 700;
+  font-display: swap;
+}
+:root {
+  --font-body: "Pretendard", "Malgun Gothic", sans-serif;
+  --font-heading: "SUIT", "Pretendard", sans-serif;
+  --font-money: "Roboto Mono", "Pretendard", monospace;
+}
+body,
+button,
+input,
+select,
+textarea {
+  font-family: var(--font-body);
+}
+h1,
+h2,
+h3,
+h4,
+.app-header nav button,
+.wordmark,
+.pane-heading,
+.shipping-tabs button {
+  font-family: var(--font-heading);
+}
+.desk-totals b,
+.item-figures > div b,
+.desk-message header b,
+.price-cell input,
+input[type="number"],
+input[inputmode="numeric"],
+.shipping-stats b {
+  font-family: var(--font-money);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.025em;
+}
+.desk-message textarea,
+.source-text {
+  font-family: var(--font-body);
+}

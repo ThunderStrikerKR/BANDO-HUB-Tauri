@@ -1,0 +1,338 @@
+.hub-slot-3 .workflow-board {
+  flex: 1 1 0;
+  max-height: none;
+  min-height: 0;
+  overflow: auto;
+  display: block;
+}
+.hub-slot-3 .workflow-group {
+  flex-shrink: 0;
+}
+.hub-slot-3 .workflow-board-heading {
+  position: sticky;
+  top: 0;
+  background: #1c1c1c;
+  z-index: 2;
+  padding: 5px 0;
+}
+.hub-slot-3 .workflow-group.selected {
+  border-left-color: transparent;
+  background: transparent;
+}
+.hub-slot-3 .workflow-group.selected .flow-group-name b {
+  color: inherit;
+}
+.hub-slot-3 .workflow-shipment.chosen,
+.hub-slot-3 .workflow-shipment.linked-active {
+  outline: none !important;
+  box-shadow: none !important;
+  color: inherit !important;
+  background: transparent !important;
+}
+.workflow-shipment {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.workflow-shipment > span,
+.workflow-shipment > small {
+  position: relative;
+  z-index: 1;
+}
+.workflow-shipment.chosen:before,
+.workflow-shipment.query-leaving:before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: #f59e0b33;
+  box-shadow: inset 3px 0 0 #f59e0b;
+  z-index: 0;
+  pointer-events: none;
+}
+.workflow-shipment.chosen:before {
+  animation: query-enter 330ms ease-out both;
+}
+.workflow-shipment.query-leaving:before {
+  animation: query-exit 330ms ease-in both;
+}
+@keyframes query-enter {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+@keyframes query-exit {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+:root {
+  view-transition-name: none;
+}
+.recipient-body {
+  view-transition-name: recipient-details;
+}
+::view-transition-old(recipient-details) {
+  animation: detail-out 180ms ease-in both;
+}
+::view-transition-new(recipient-details) {
+  animation: detail-in 260ms 160ms ease-out both;
+}
+@keyframes detail-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes detail-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+::view-transition-group(root) {
+  animation: none;
+}
+::view-transition-old(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+.hub-panels .compact-review > .order-grand-total {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 7px;
+  padding: 12px 8px;
+  border-top: 1px solid #444;
+  white-space: nowrap;
+  font-size: 18px;
+}
+.order-grand-total b {
+  font: 600 22px var(--font-money);
+}
+.order-grand-total small {
+  font-size: 13px;
+}
+.hub-panels .review-pane .inline-shipping {
+  max-height: none;
+  overflow: visible;
+}
+.freight-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.freight-line > select {
+  width: 75px;
+  flex: none;
+  padding: 6px !important;
+}
+.freight-line > input {
+  width: 78px;
+  flex: none;
+  padding: 6px !important;
+  height: 34px;
+}
+.freight-line > button {
+  padding: 7px !important;
+  font-size: 13px !important;
+}
+.freight-line > small {
+  font-size: 12px;
+}
+.shipment-vat {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 12px 0;
+  font-size: 14px;
+}
+.shipment-vat .check {
+  white-space: nowrap;
+}
+.freight-needs-focus input:not(:disabled) {
+  border: 2px solid #f59e0b !important;
+  background: #3b2919 !important;
+  outline-color: #f59e0b !important;
+}
+.product-search-top {
+  display: flex;
+  gap: 10px;
+}
+.product-search-top input {
+  flex: 1;
+  min-width: 0;
+}
+.product-search-results {
+  max-height: 55vh;
+  overflow: auto;
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.product-search-results > button {
+  text-align: left;
+  display: flex;
+  gap: 16px;
+  padding: 12px;
+}
+.product-search-results small {
+  margin-left: auto;
+}
+.simple-item-editor > button {
+  margin: 5px;
+}
+.additional-questions:empty {
+  display: none;
+}
+.additional-questions {
+  max-height: 110px;
+  overflow: auto;
+}
+.additional-questions > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 9px;
+  gap: 8px;
+}
+.additional-questions span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+.additional-questions button {
+  font-size: 13px;
+  padding: 5px 10px;
+}
+.hub-main-content > .management-fixed {
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.management-fixed > .hub-desk-host[hidden] {
+  display: none;
+}
+.fixed-manager {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+.management-search {
+  flex: none;
+  padding: 16px 20px 12px;
+  background: #101010;
+  border-bottom: 1px solid #383838;
+}
+.management-search input {
+  width: 100%;
+  height: 48px;
+  font-size: 17px !important;
+  padding: 12px !important;
+}
+.management-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px 20px;
+}
+.management-scroll .manager-bar {
+  margin-top: 0;
+}
+.client-table tr[tabindex] {
+  cursor: pointer;
+}
+.client-table tbody tr:hover {
+  background: #292929;
+}
+.client-table {
+  width: 100%;
+}
+.client-table td {
+  vertical-align: middle;
+}
+.client-table th:first-child {
+  width: 16%;
+}
+.client-table th:nth-child(2) {
+  width: 28%;
+}
+@media (prefers-reduced-motion: reduce) {
+  .workflow-shipment:before,
+  ::view-transition-old(recipient-details),
+  ::view-transition-new(recipient-details) {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+  }
+}
+
+.compact-items .freight-item-row > td {
+  padding: 4px 0;
+}
+.compact-items .freight-line {
+  margin: 0;
+  min-width: 0;
+  gap: 7px;
+}
+.freight-name {
+  flex: none;
+  white-space: nowrap;
+  font-size: 15px;
+  color: inherit;
+}
+.freight-money {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+.freight-money > input {
+  width: 84px;
+  height: 34px;
+  padding: 6px !important;
+  text-align: right;
+  font: 500 16px var(--font-money) !important;
+}
+.freight-money > span {
+  font-size: 14px;
+}
+.freight-line > button {
+  margin-left: auto;
+  white-space: nowrap;
+  flex: none;
+}
+.compact-review .order-settings {
+  padding: 0;
+  background: transparent;
+  border: 0;
+  max-height: none !important;
+  overflow: visible !important;
+}
+.order-settings .shipment-vat {
+  margin: 9px 0;
+}
+.compact-items .freight-line > select {
+  font-size: 14px;
+}
+.compact-items .freight-input-area {
+  scroll-margin-block: 8px;
+}

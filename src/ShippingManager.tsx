@@ -1,0 +1,784 @@
+import { useMemo, useState } from "react";
+import { confirmAction, promptText } from "./dialogs";
+import { money, won } from "./domain";
+import { internalModel } from "./matching";
+import { colorLabel, registeredProducts, sortProducts } from "./product-models";
+import { ProductFreightPanel } from "./ProductFreightPanel";
+import type { NoticeSink } from "./shared/notices";
+import { useAsyncTask } from "./shared/useAsyncTask";
+import {
+  bundleCounts,
+  changeShippingBasis,
+  combinationCurrent,
+  combinationVersions,
+  deleteShippingGroup,
+  editableShippingRule,
+  emptyProductRule,
+  initialShipping,
+} from "./shipping";
+import type { ShippingRule, ShippingState, State } from "./types";
+import { Field, Modal } from "./ui";
+import { PageHeading } from "./ui/PageHeading";
+export function ShippingManager({
+  state,
+  onSave,
+  onNotice,
+}: {
+  state: State;
+  onSave: (s: State) => Promise<void>;
+  onNotice: NoticeSink;
+}) {
+  const { busy, run: runSave } = useAsyncTask(onNotice);
+  const [deleting, setDeleting] = useState("");
+  const shipping = state.shipping ?? initialShipping();
+  const [tab, setTab] = useState<"products" | "assign" | "rates" | "history">("products"),
+    [query, setQuery] = useState(""),
+    [filter, setFilter] = useState("all"),
+    [selected, setSelected] = useState<string[]>([]),
+    [group, setGroup] = useState(""),
+    [pending, setPending] = useState<Record<string, string>>({}),
+    [editing, setEditing] = useState<{
+      id: string;
+      rule: ShippingRule;
+    }>(),
+    [newName, setNewName] = useState("");
+  const products = useMemo(
+    () =>
+      sortProducts(
+        registeredProducts(state.products).filter(
+          (p) => p.catalog !== "DEMO" && !p.variants.some((v) => v.source === "DEMO"),
+        ),
+      ),
+    [state.products],
+  );
+  const rows = products.filter(
+    (p) =>
+      (p.name + " " + p.code + " " + p.subtitle + " " + p.category)
+        .toLowerCase()
+        .includes(query.toLowerCase()) &&
+      (filter === "all" ||
+        (filter === "none" && !p.shippingGroupId) ||
+        p.shippingGroupId === filter),
+  );
+  const unassigned = products.filter((p) => !p.shippingGroupId).length;
+  const save = async (next: State, message: string) =>
+    (
+      await runSave(async () => {
+        await onSave(next);
+        onNotice(message, "success");
+      })
+    ).ok;
+  const applyBulk = () => {
+    if (!selected.length) return;
+    setPending((prev) => ({
+      ...prev,
+      ...Object.fromEntries(selected.map((id) => [id, group])),
+    }));
+  };
+  const changes = Object.entries(pending).filter(
+    ([id, g]) => products.find((p) => p.id === id)?.shippingGroupId !== (g || undefined),
+  );
+  return (
+    <div className="shipping-manager">
+      <PageHeading
+        title="배송 그룹 관리"
+        description="상품별 최대 묶음 수량과 운임을 등록합니다. 모델이 달라도 동급 그룹으로 지정하면 수량을 합산합니다."
+        actions={<span className="shipping-version">운임 기준 {shipping.epoch}</span>}
+      />
+      <div className="shipping-stats">
+        <article>
+          <span>등록 상품</span>
+          <b>
+            {products.length}
+            <small>개</small>
+          </b>
+        </article>
+        <article>
+          <span>그룹 지정 완료</span>
+          <b>
+            {products.length - unassigned}
+            <small>개</small>
+          </b>
+        </article>
+        <article className="pending-stat">
+          <span>그룹 미지정</span>
+          <b>
+            {unassigned}
+            <small>개</small>
+          </b>
+        </article>
+        <article>
+          <span>배송 그룹</span>
+          <b>
+            {shipping.groups.filter((g) => !g.deletedAt).length}
+            <small>개</small>
+          </b>
+        </article>
+      </div>
+      <div className="shipping-tabs" role="group" aria-label="배송 관리">
+        <button
+          aria-pressed={tab === "products"}
+          className={tab === "products" ? "chosen" : ""}
+          onClick={() => setTab("products")}
+        >
+          상품별 기본 운임
+        </button>
+        <button
+          aria-pressed={tab === "assign"}
+          className={tab === "assign" ? "chosen" : ""}
+          onClick={() => setTab("assign")}
+        >
+          동급 배송 그룹 지정
+        </button>
+        <button
+          aria-pressed={tab === "rates"}
+          className={tab === "rates" ? "chosen" : ""}
+          onClick={() => setTab("rates")}
+        >
+          동급 그룹 운임표
+        </button>
+        <button
+          aria-pressed={tab === "history"}
+          className={tab === "history" ? "chosen" : ""}
+          onClick={() => setTab("history")}
+        >
+          조합 / 기준 이력
+        </button>
+      </div>
+      {tab === "products" && (
+        <ProductFreightPanel state={{ ...state, shipping }} onSave={onSave} onNotice={onNotice} />
+      )}
+      {tab === "assign" && (
+        <section className="shipping-card">
+          <div className="shipping-tools">
+            <div className="shipping-search">
+              <span>⌕</span>
+              <input
+                aria-label="배송 그룹 상품 검색"
+                placeholder="모델명 / 상품명 / 카테고리 검색"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+            </div>
+            <select
+              aria-label="배송 그룹 필터"
+              value={filter}
+              onChange={(e) => {
+                setFilter(e.target.value);
+                setSelected([]);
+              }}
+            >
+              <option value="all">전체 상품</option>
+              <option value="none">그룹 미지정만</option>
+              {shipping.groups
+                .filter((g) => !g.deletedAt)
+                .map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))}
+            </select>
+          </div>
+          <div className="shipping-bulk">
+            <label>
+              <input
+                type="checkbox"
+                aria-label="보이는 상품 전체 선택"
+                checked={!!rows.length && rows.every((p) => selected.includes(p.id))}
+                onChange={(e) => setSelected(e.target.checked ? rows.map((p) => p.id) : [])}
+              />{" "}
+              <b>{selected.length}개 선택</b>
+            </label>
+            <span className="bulk-divider" />
+            <select
+              aria-label="일괄 지정할 배송 그룹"
+              value={group}
+              onChange={(e) => setGroup(e.target.value)}
+            >
+              <option value="">미지정으로 변경</option>
+              {shipping.groups
+                .filter((g) => !g.deletedAt)
+                .map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))}
+            </select>
+            <button disabled={!selected.length} onClick={applyBulk}>
+              선택 상품에 적용
+            </button>
+            <small>변경사항을 확인한 뒤 아래에서 저장하세요.</small>
+          </div>
+          <div className="shipping-table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th />
+                  <th>상품명 / 부제</th>
+                  <th>카테고리</th>
+                  <th>색상 / 옵션</th>
+                  <th>배송 그룹</th>
+                  <th>지정 상태</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((p) => {
+                  const value = pending[p.id] ?? p.shippingGroupId ?? "";
+                  const changed =
+                    pending[p.id] !== undefined && pending[p.id] !== p.shippingGroupId;
+                  return (
+                    <tr className={changed ? "changed-row" : ""} key={p.id}>
+                      <td>
+                        <input
+                          type="checkbox"
+                          aria-label={"선택 " + p.name}
+                          checked={selected.includes(p.id)}
+                          onChange={(e) =>
+                            setSelected(
+                              e.target.checked
+                                ? [...selected, p.id]
+                                : selected.filter((id) => id !== p.id),
+                            )
+                          }
+                        />
+                      </td>
+                      <td>
+                        <strong>{internalModel(p.name)}</strong>
+                        <small>{p.subtitle || p.originalName || p.name}</small>
+                      </td>
+                      <td>
+                        <span className="category-label">{p.category || "분류 미지정"}</span>
+                      </td>
+                      <td>
+                        {[...new Set(p.variants.map((v) => colorLabel(v.color)))].join(" / ")}
+                      </td>
+                      <td>
+                        <select
+                          aria-label={p.name + " 배송 그룹"}
+                          value={value}
+                          onChange={(e) => setPending({ ...pending, [p.id]: e.target.value })}
+                        >
+                          <option value="">그룹 선택</option>
+                          {shipping.groups
+                            .filter((g) => !g.deletedAt)
+                            .map((g) => (
+                              <option key={g.id} value={g.id}>
+                                {g.name}
+                              </option>
+                            ))}
+                        </select>
+                      </td>
+                      <td>
+                        {changed ? (
+                          <span className="assignment-badge changed">변경 예정</span>
+                        ) : value ? (
+                          <span className="assignment-badge assigned">지정 완료</span>
+                        ) : (
+                          <span className="assignment-badge unassigned">미지정</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            {!rows.length && <p className="empty">검색 조건에 맞는 상품이 없습니다.</p>}
+          </div>
+          <footer className="shipping-savebar">
+            <span>
+              {changes.length ? (
+                <>
+                  <b>{changes.length}개 상품</b>의 배송 그룹을 변경합니다.
+                </>
+              ) : (
+                "등록된 상품을 임의로 분류하지 않습니다. 직원이 확인한 그룹을 지정해 주세요."
+              )}
+            </span>
+            <div>
+              <button disabled={!changes.length || busy} onClick={() => setPending({})}>
+                변경 취소
+              </button>
+              <button
+                className="primary"
+                disabled={!changes.length || busy}
+                onClick={() => {
+                  const updatedShipping = structuredClone(shipping);
+                  for (const [id, value] of changes)
+                    if (!value) {
+                      updatedShipping.productRules ??= {};
+                      updatedShipping.productHistory ??= {};
+                      const old = updatedShipping.productRules[id];
+                      if (old)
+                        updatedShipping.productHistory[id] = [
+                          ...(updatedShipping.productHistory[id] ?? []),
+                          old,
+                        ];
+                      updatedShipping.productRules[id] = emptyProductRule();
+                    }
+                  const next = {
+                    ...state,
+                    shipping: updatedShipping,
+                    products: state.products.map((p) =>
+                      pending[p.id] !== undefined
+                        ? { ...p, shippingGroupId: pending[p.id] || undefined }
+                        : p,
+                    ),
+                  };
+                  void save(next, "배송 그룹 지정을 저장했습니다.").then((ok) => {
+                    if (ok) {
+                      setPending({});
+                      setSelected([]);
+                    }
+                  });
+                }}
+              >
+                그룹 지정 저장 {changes.length > 0 && ` / ${changes.length}개`}
+              </button>
+            </div>
+          </footer>
+        </section>
+      )}
+      {tab === "rates" && (
+        <section className="shipping-card shipping-rates">
+          <div className="section-title">
+            <h3>확인된 기본 운임만 추천합니다</h3>
+            <button
+              onClick={async () => {
+                if (
+                  await confirmAction(
+                    "전체 운임 기준을 변경하면 이전 운임의 자동 추천을 중단합니다. 새 운임은 다시 확인하여 등록해야 합니다. 계속할까요?",
+                  )
+                )
+                  void save(
+                    { ...state, shipping: changeShippingBasis(shipping) },
+                    "전체 운임 기준을 변경했습니다. 새 운임을 등록하세요.",
+                  );
+              }}
+            >
+              전체 운임 기준 변경
+            </button>
+          </div>
+          <div className="new-group">
+            <input
+              aria-label="새 배송 그룹명"
+              placeholder="새 배송 그룹명"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+            />
+            <button
+              disabled={busy || !newName.trim()}
+              onClick={async () => {
+                if (shipping.groups.some((g) => g.name === newName.trim())) {
+                  onNotice("같은 배송 그룹이 있습니다.");
+                  return;
+                }
+                const next: ShippingState = structuredClone(shipping);
+                next.groups.push({
+                  id: crypto.randomUUID(),
+                  name: newName.trim(),
+                  current: {
+                    version: crypto.randomUUID(),
+                    at: new Date().toISOString(),
+                    fees: {},
+                    maxBundle: null,
+                    maxConfirmed: false,
+                    perItem: null,
+                    notes: "운임 확인 필요",
+                  },
+                  history: [],
+                });
+                if (await save({ ...state, shipping: next }, "새 배송 그룹을 등록했습니다."))
+                  setNewName("");
+              }}
+            >
+              배송 그룹 추가
+            </button>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>배송 그룹</th>
+                <th>합포장</th>
+                {[1, 2, 3, 4, 5, 6].map((n) => (
+                  <th key={n}>{n}개</th>
+                ))}
+                <th>관리</th>
+              </tr>
+            </thead>
+            <tbody>
+              {shipping.groups
+                .filter((g) => !g.deletedAt)
+                .map((g) => (
+                  <tr key={g.id}>
+                    <td>
+                      <b>{g.name}</b>
+                      <button
+                        onClick={async () => {
+                          const name = await promptText("배송 그룹명", g.name);
+                          if (!name?.trim()) return;
+                          const next = structuredClone(shipping);
+                          next.groups.find((x) => x.id === g.id)!.name = name.trim();
+                          void save({ ...state, shipping: next }, "배송 그룹명을 변경했습니다.");
+                        }}
+                      >
+                        이름 수정
+                      </button>
+                      <small>{g.current.notes}</small>
+                    </td>
+                    <td>
+                      {g.current.maxBundle ?? "미확정"}
+                      {!g.current.maxConfirmed && " / 잠정"}
+                    </td>
+                    {[1, 2, 3, 4, 5, 6].map((n) => (
+                      <td key={n}>
+                        {won(
+                          g.current.perItem !== null
+                            ? g.current.perItem * n
+                            : (g.current.fees[n] ?? null),
+                        )}
+                      </td>
+                    ))}
+                    <td>
+                      <button
+                        onClick={() =>
+                          setEditing({
+                            id: g.id,
+                            rule: editableShippingRule(g.current),
+                          })
+                        }
+                      >
+                        운임 수정
+                      </button>
+                      <button className="danger" onClick={() => setDeleting(g.id)}>
+                        삭제
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (
+                            await confirmAction(
+                              g.name + " 기준을 변경하고 이전 운임 추천을 중단할까요?",
+                            )
+                          )
+                            void save(
+                              {
+                                ...state,
+                                shipping: changeShippingBasis(shipping, g.id),
+                              },
+                              "그룹 운임 기준을 변경했습니다.",
+                            );
+                        }}
+                      >
+                        기준 변경
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </section>
+      )}
+      {tab === "history" && (
+        <section className="shipping-card shipping-rates">
+          <h3>확인된 배송 조합</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>조합</th>
+                <th>청구 운임</th>
+                <th>실제 운임</th>
+                <th>기준</th>
+                <th>수정</th>
+              </tr>
+            </thead>
+            <tbody>
+              {shipping.combinations
+                .slice()
+                .reverse()
+                .map((c) => (
+                  <tr key={c.id}>
+                    <td>
+                      {c.description}
+                      <small>
+                        {new Date(c.at).toLocaleString("ko-KR")}
+                        {c.verifiedAt
+                          ? ` / 실배송 검증 ${c.sampleCount ?? 1}회`
+                          : " / 직원 등록 기준"}
+                      </small>
+                    </td>
+                    <td>{won(c.charge)}</td>
+                    <td>{won(c.actual)}</td>
+                    <td>
+                      {combinationCurrent(c, { ...state, shipping }) ? "현재 유효" : "과거 이력"}
+                    </td>
+                    <td>
+                      <button
+                        onClick={async () => {
+                          const text = await promptText(
+                            "새로 확인된 청구 운임 (원)",
+                            String(c.charge),
+                          );
+                          if (text === null) return;
+                          const n = Number(text);
+                          if (!text.trim() || !money.safeParse(n).success) {
+                            onNotice("올바른 운임을 입력하세요.");
+                            return;
+                          }
+                          const next = structuredClone(shipping),
+                            old = next.combinations.find((x) => x.id === c.id)!;
+                          old.active = false;
+                          next.combinations.push({
+                            ...old,
+                            verifiedAt: undefined,
+                            shipmentId: undefined,
+                            sampleCount: 0,
+                            observedCharge: undefined,
+                            id: crypto.randomUUID(),
+                            charge: n,
+                            epoch: next.epoch,
+                            versions: combinationVersions(old.key, state),
+                            at: new Date().toISOString(),
+                            active: true,
+                          });
+                          void save(
+                            { ...state, shipping: next },
+                            "새 예외 운임을 저장하고 이전 값을 이력으로 보존했습니다.",
+                          );
+                        }}
+                      >
+                        예외 운임 변경
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+          {!shipping.combinations.length && (
+            <p className="empty">실제 배송 완료 후 검증한 운임 조합이 여기에 표시됩니다.</p>
+          )}
+          <h3>이전 그룹 운임 기준</h3>
+          {shipping.groups
+            .filter((g) => !g.deletedAt)
+            .map((g) => (
+              <details key={g.id}>
+                <summary>
+                  {g.name} / {g.history.length}개 기준
+                </summary>
+                {g.history.map((r) => (
+                  <p key={r.version}>
+                    {r.at} / {JSON.stringify(r.fees)} / 개당 {won(r.perItem)}
+                  </p>
+                ))}
+              </details>
+            ))}
+        </section>
+      )}
+      {deleting && (
+        <Modal draft={editing} busy={busy} title="배송 그룹 삭제" onClose={() => setDeleting("")}>
+          <p>{shipping.groups.find((g) => g.id === deleting)?.name}</p>
+          {products.filter((p) => p.shippingGroupId === deleting).length > 0 ? (
+            <>
+              <p className="warnings">
+                사용 중인 상품이 있습니다. 상품을 다른 그룹으로 옮기거나 미지정으로 변경한 후
+                삭제해야 합니다.
+              </p>
+              <ul>
+                {products
+                  .filter((p) => p.shippingGroupId === deleting)
+                  .map((p) => (
+                    <li key={p.id}>
+                      {internalModel(p.name)} / {colorLabel(p.variants[0].color)}
+                    </li>
+                  ))}
+              </ul>
+            </>
+          ) : (
+            <p>연결된 현재 상품이 없습니다. 과거 운임과 주문 기록은 보존합니다.</p>
+          )}
+          <button
+            className="danger"
+            onClick={async () => {
+              const linked = products.some((p) => p.shippingGroupId === deleting);
+              if (
+                await confirmAction(
+                  linked
+                    ? "표시된 상품을 미지정으로 변경하고 이 그룹을 삭제할까요?"
+                    : "이 그룹을 삭제할까요?",
+                )
+              )
+                void save(
+                  deleteShippingGroup(state, deleting, linked),
+                  "그룹을 삭제하고 과거 운임 기록을 보존했습니다.",
+                ).then((ok) => {
+                  if (ok) setDeleting("");
+                });
+            }}
+          >
+            {products.some((p) => p.shippingGroupId === deleting)
+              ? "상품 연결을 미지정으로 변경하고 삭제"
+              : "그룹 삭제"}
+          </button>
+        </Modal>
+      )}
+      {editing && (
+        <Modal
+          title="배송 그룹 운임 수정"
+          onClose={() => {
+            if (!busy) setEditing(undefined);
+          }}
+        >
+          <h3>{shipping.groups.find((g) => g.id === editing.id)?.name} 운임</h3>
+          <p className="muted">
+            미확정 운임은 빈칸으로 둡니다. 기존 기준을 바꾸려면 ‘기준 변경’ 후 새 값을 입력하세요.
+          </p>
+          <div className="form-row">
+            <label>
+              최대 합포장 수량
+              <select
+                value={editing.rule.maxBundle ?? ""}
+                onChange={(e) =>
+                  setEditing({
+                    ...editing,
+                    rule: {
+                      ...editing.rule,
+                      maxBundle: e.target.value ? Number(e.target.value) : null,
+                    },
+                  })
+                }
+              >
+                <option value="">미확정</option>
+                {[1, 2, 3, 4, 5, 6].map((n) => (
+                  <option key={n}>{n}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+          {!editing.rule.maxBundle && <p className="muted">최대 묶음 수량을 먼저 선택하세요.</p>}
+          <div className="rate-inputs">
+            {bundleCounts(editing.rule.maxBundle).map((n) => (
+              <label key={n}>
+                {n}개 운임
+                <input
+                  aria-label={n + "개 운임"}
+                  inputMode="numeric"
+                  value={editing.rule.fees[n] ?? ""}
+                  onChange={(e) => {
+                    const v = e.target.value === "" ? null : Number(e.target.value);
+                    if (v === null || money.safeParse(v).success)
+                      setEditing({
+                        ...editing,
+                        rule: {
+                          ...editing.rule,
+                          fees: { ...editing.rule.fees, [n]: v },
+                        },
+                      });
+                  }}
+                />
+              </label>
+            ))}
+          </div>
+          <div className="form-row">
+            <Field label="운임 적용 시작일">
+              <input
+                type="date"
+                value={editing.rule.validFrom ?? ""}
+                onChange={(e) =>
+                  setEditing({
+                    ...editing,
+                    rule: {
+                      ...editing.rule,
+                      validFrom: e.target.value || undefined,
+                    },
+                  })
+                }
+              />
+            </Field>
+            <Field label="운임 적용 종료일">
+              <input
+                type="date"
+                value={editing.rule.validUntil ?? ""}
+                onChange={(e) =>
+                  setEditing({
+                    ...editing,
+                    rule: {
+                      ...editing.rule,
+                      validUntil: e.target.value || undefined,
+                    },
+                  })
+                }
+              />
+            </Field>
+          </div>
+          <Field label="운임 적용 기준">
+            <input
+              value={editing.rule.basis ?? ""}
+              onChange={(e) =>
+                setEditing({
+                  ...editing,
+                  rule: { ...editing.rule, basis: e.target.value },
+                })
+              }
+            />
+          </Field>
+          <Field label="실제 합포장 가능 여부">
+            <select
+              value={
+                editing.rule.packable === undefined || editing.rule.packable === null
+                  ? ""
+                  : String(editing.rule.packable)
+              }
+              onChange={(e) =>
+                setEditing({
+                  ...editing,
+                  rule: {
+                    ...editing.rule,
+                    packable: e.target.value === "" ? null : e.target.value === "true",
+                  },
+                })
+              }
+            >
+              <option value="">확인 필요</option>
+              <option value="true">가능</option>
+              <option value="false">불가</option>
+            </select>
+          </Field>
+          <label>
+            비고
+            <input
+              value={editing.rule.notes}
+              onChange={(e) =>
+                setEditing({
+                  ...editing,
+                  rule: { ...editing.rule, notes: e.target.value },
+                })
+              }
+            />
+          </label>
+          <button
+            className="primary"
+            disabled={busy}
+            onClick={async () => {
+              const next = structuredClone(shipping),
+                g = next.groups.find((g) => g.id === editing.id)!;
+              g.history.push(g.current);
+              g.current = {
+                ...editing.rule,
+                maxConfirmed: editing.rule.maxBundle !== null,
+                version: crypto.randomUUID(),
+                at: new Date().toISOString(),
+              };
+              if (
+                await save(
+                  { ...state, shipping: next },
+                  "운임표를 저장했습니다. 변경 전 기준은 이력에 보존됩니다.",
+                )
+              )
+                setEditing(undefined);
+            }}
+          >
+            확인한 운임 저장
+          </button>
+        </Modal>
+      )}
+    </div>
+  );
+}

@@ -1,0 +1,30 @@
+[package]
+name = "bando_hub_tauri"
+version = "0.0.4"
+description = "BANDO HUB Tauri migration"
+authors = ["BANDO HUB"]
+edition = "2021"
+
+[lib]
+name = "bando_hub_tauri_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rusqlite = { version = "0.32", features = ["bundled"] }
+arboard = "3"
+open = "5"
+url = "2"
+base64 = "0.22"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = "symbols"
+panic = "abort"

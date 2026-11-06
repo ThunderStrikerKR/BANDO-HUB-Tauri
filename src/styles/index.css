@@ -1,0 +1,18 @@
+@import "./tokens.css";
+@import "./shell.css";
+@import "./shipping.css";
+@import "./application.css";
+@import "./foundation.css";
+@import "./fonts.css";
+@import "./theme.css";
+@import "./typography.css";
+@import "./dialogs.css";
+@import "./receipt-layout.css";
+@import "./workflow.css";
+@import "./workflow-states.css";
+@import "./receipt-document.css";
+@import "./modals.css";
+@import "./components.css";
+@import "./reception-manual.css";
+
+@import "./patch-v0808.css";

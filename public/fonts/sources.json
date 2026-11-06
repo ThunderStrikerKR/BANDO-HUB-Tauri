@@ -1,0 +1,38 @@
+[
+  {
+    "file": "PretendardVariable.woff2",
+    "source": "https://raw.githubusercontent.com/orioncactus/pretendard/main/packages/pretendard/dist/web/variable/woff2/PretendardVariable.woff2",
+    "bytes": 2057688,
+    "sha256": "9599f12fd42fc0bce1cd50b47a0c022e108d7aa64dd0d1bb0ed44f3282d900b4"
+  },
+  {
+    "file": "Pretendard-LICENSE.txt",
+    "source": "https://raw.githubusercontent.com/orioncactus/pretendard/main/LICENSE",
+    "bytes": 4816,
+    "sha256": "82e9c8a4b203261f10ddba1296422d64914ff3d4b7bd8a12896d03f0f088d70a"
+  },
+  {
+    "file": "SUIT-Variable.woff2",
+    "source": "https://raw.githubusercontent.com/sun-typeface/SUIT/main/fonts/variable/woff2/SUIT-Variable.woff2",
+    "bytes": 624536,
+    "sha256": "aa894a204d5a6fbae259dac6868d350cbd373a390caee0313f92946af741df23"
+  },
+  {
+    "file": "SUIT-LICENSE.txt",
+    "source": "https://raw.githubusercontent.com/sun-typeface/SUIT/main/LICENSE",
+    "bytes": 4380,
+    "sha256": "30d101ee3c35ef629d622d933d261a27b2f60223e0a3b0f36791e569c2b9daa9"
+  },
+  {
+    "file": "RobotoMono.ttf",
+    "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/robotomono/RobotoMono%5Bwght%5D.ttf",
+    "bytes": 183700,
+    "sha256": "66a80e79d17e4c7cabd162e2916578a4cc08fd19eef6e2a643305eae9c567b2b"
+  },
+  {
+    "file": "RobotoMono-OFL.txt",
+    "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/robotomono/OFL.txt",
+    "bytes": 4395,
+    "sha256": "50ab8dd54680d3473f649c9db86fece88434d097c7834475c1c72d2f8c429215"
+  }
+]

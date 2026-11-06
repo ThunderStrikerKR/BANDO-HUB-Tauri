@@ -1,0 +1,172 @@
+/* App-wide native top-layer dialogs: uniform dim, native inert/focus trap. */
+.app-modal-layer {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #eee;
+  width: min(880px, calc(100vw - 36px));
+  max-width: calc(100vw - 36px);
+  max-height: calc(100dvh - 36px);
+  overflow: visible;
+  font: 400 15px/1.6 var(--font-body);
+  letter-spacing: normal;
+}
+.app-modal-layer:not([open]) {
+  display: none !important;
+}
+.app-modal-layer::backdrop,
+.app-action-dialog::backdrop {
+  background: rgb(0 0 0 / 65%);
+}
+.app-modal-layer > .modal {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: none;
+  max-height: calc(100dvh - 36px);
+  margin: 0;
+  overflow: auto;
+  background: #202020;
+  color: #eee;
+  padding: 24px;
+  border: 1px solid #555;
+  border-radius: 10px;
+  box-shadow: 0 18px 70px #0009;
+}
+.app-modal-layer .modal > header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.app-modal-layer .modal > header h2 {
+  margin: 0;
+}
+.app-modal-layer button,
+.app-modal-layer input,
+.app-modal-layer select,
+.app-modal-layer textarea {
+  font: inherit;
+  letter-spacing: normal;
+}
+.app-modal-layer textarea {
+  width: 100%;
+  min-height: 180px;
+  background: #292929;
+  color: #eee;
+  border: 1px solid #555;
+  border-radius: 5px;
+  padding: 10px;
+}
+.app-modal-layer pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 320px;
+  overflow: auto;
+}
+.app-action-dialog {
+  left: 50%;
+  width: min(560px, calc(100vw - 36px));
+}
+.receipt-client {
+  padding: 4px 0 12px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid #505050;
+}
+.receipt-meta {
+  padding-top: 0;
+}
+.client-chooser {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+.client-chooser > p {
+  margin: 0;
+}
+.client-chooser > input {
+  flex: none;
+  padding: 10px;
+  background: #292929;
+  color: #eee;
+  border: 1px solid #555;
+  border-radius: 5px;
+}
+.client-chooser-list {
+  max-height: 52dvh;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.client-chooser-list .client-result {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  padding: 10px 12px;
+  margin: 4px 0;
+  background: #292929;
+  border: 1px solid #444;
+  border-radius: 5px;
+}
+.client-chooser-list .client-result small {
+  display: block;
+  color: #bbb;
+}
+.client-result[aria-current="true"] {
+  border-color: #aaa;
+  background: #353535;
+}
+.receipt-difference article {
+  border-top: 1px solid #444;
+  padding: 8px 0;
+}
+.receipt-difference p {
+  margin: 5px 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.delete-undo {
+  margin: 10px;
+  padding: 10px;
+  background: #292929;
+  border: 1px solid #666;
+  border-radius: 6px;
+  font-size: 13px;
+}
+.delete-undo button {
+  margin-left: 6px;
+}
+.app-header nav {
+  display: flex;
+  flex-wrap: nowrap;
+  min-width: 0;
+  gap: 2px;
+}
+.app-header nav > button {
+  font-size: 13px;
+  padding: 9px 10px;
+  white-space: nowrap;
+  min-height: 40px;
+}
+.daily-settlement input {
+  max-width: 200px;
+}
+@media (max-width: 1400px) {
+  .app-header nav > button {
+    padding: 8px 6px;
+    font-size: 12px;
+  }
+  .app-header .header-actions {
+    gap: 5px;
+  }
+  .app-header .header-actions > button {
+    font-size: 12px;
+    padding: 8px;
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "source": "User supplied red Bando symbol photograph",
+  "method": "Original photograph pixels rendered through an SVG red-channel alpha mask. Background and counters transparent. No generated geometry used.",
+  "imagegenAttempts": "Built-in edit, transparent cutout requested twice; results discarded because glow/shape did not faithfully preserve original.",
+  "prompt": "Extract only the red symbol; transparent background and internal cutouts; preserve original geometry; no glow, shadow or new design."
+}

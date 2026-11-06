@@ -1,0 +1,19 @@
+BANDO HUB Tauri v0.0.4 상품 관리 1차 패치
+
+[추천: 전체 소스 ZIP]
+1. 기존 v0.0.3 EXE와 소스 폴더는 삭제하지 마세요.
+2. BANDO-HUB-Tauri-v0.0.4-stage2-source.zip을 새 폴더에 압축 해제합니다.
+3. BUILD_WINDOWS_TAURI.cmd를 더블클릭합니다.
+4. 성공하면 release\BANDO-HUB-v0.0.4.exe가 생성됩니다.
+
+[기존 v0.0.3 소스에 덮어쓰기]
+1. 현재 사용 중인 Tauri 소스 프로젝트 폴더를 복사하여 백업합니다.
+2. 이 패치 ZIP을 풉니다. 압축 파일 안의 src, src-tauri, tests, package.json 등을
+   기존 프로젝트의 최상위 폴더에 넣고 같은 이름이 나오면 덮어쓰기합니다.
+   EXE가 있는 release 폴더나 Windows 다운로드 폴더에 소스를 넣지 마세요.
+3. 기존 프로젝트 폴더의 BUILD_WINDOWS_TAURI.cmd를 실행합니다.
+4. 성공하면 release\BANDO-HUB-v0.0.4.exe를 실행합니다.
+
+기존 데이터 보존: 앱 식별자와 SQLite 저장 경로는 v0.0.3과 동일합니다.
+주의: 이 패치는 소스 패치이며, 기존 EXE에 단순히 덮어쓰는 실행파일 패치가 아닙니다.
+주의: 이 환경에서는 Windows Rust 빌드 및 실제 Excel 동작을 검증하지 못했습니다.

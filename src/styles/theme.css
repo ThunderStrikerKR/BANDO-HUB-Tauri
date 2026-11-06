@@ -1,0 +1,1244 @@
+:root {
+  --ui-scale: 1;
+  color-scheme: dark;
+}
+body,
+.app-v03 {
+  background: #101010;
+  color: #f5f5f5;
+}
+.app-v03 {
+  min-width: 800px;
+}
+.app-header {
+  background: #1c1c1c;
+  border-color: #404040;
+  gap: 12px;
+  height: 64px;
+  -webkit-app-region: drag;
+}
+.app-header button,
+.app-header nav,
+.header-actions,
+.window-controls {
+  -webkit-app-region: no-drag;
+}
+.app-header nav button {
+  color: #bdbdbd;
+  font-size: calc(15px * var(--ui-scale));
+  padding: 10px;
+}
+.app-header nav button.current {
+  background: #404040;
+  color: #fff;
+}
+.wordmark span {
+  color: #ddd;
+}
+.window-controls {
+  display: flex;
+  align-self: stretch;
+  flex-shrink: 0;
+}
+.window-controls button {
+  width: 40px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: 20px;
+  padding: 0;
+  color: #eee;
+}
+.window-controls button:hover {
+  background: #404040;
+}
+.window-controls button:last-child:hover {
+  background: #b42332;
+}
+.header-actions button {
+  font-size: calc(13px * var(--ui-scale));
+}
+.desk-grid {
+  grid-template-columns: minmax(250px, 0.9fr) minmax(310px, 1.05fr) minmax(445px, 1.5fr);
+  gap: 10px;
+}
+.source-pane {
+  order: 1;
+}
+.messages-pane {
+  order: 2;
+}
+.review-pane {
+  order: 3;
+}
+.desk-pane,
+.card,
+.shipping-card,
+.modal {
+  background: #1c1c1c;
+  border-color: #404040;
+  color: #f5f5f5;
+}
+.pane-heading,
+.review-toolbar,
+.recipient-review,
+.desk-message + .desk-message,
+.order-item {
+  border-color: #404040;
+}
+.pane-heading {
+  padding: 12px 14px;
+}
+.pane-heading h2 {
+  font-size: calc(18px * var(--ui-scale));
+}
+.pane-heading small,
+.review-toolbar small,
+.source-actions small,
+.policy-line,
+.item-color,
+.freight-reason,
+.message-account small,
+.muted,
+.card details,
+.card summary,
+.shipping-heading p,
+.shipping-tools small,
+.shipping-bulk small {
+  color: #a3a3a3;
+  font-size: calc(13px * var(--ui-scale));
+}
+.pane-heading button {
+  font-size: calc(13px * var(--ui-scale));
+  padding: 7px;
+}
+.management-container h1,
+.management-container h2 {
+  font-size: calc(23px * var(--ui-scale));
+}
+.app-v03 input,
+.app-v03 select,
+.app-v03 textarea {
+  background: #262626;
+  border: 1px solid #404040;
+  color: #f5f5f5;
+  font-size: calc(15px * var(--ui-scale));
+  padding: 9px;
+  min-width: 0;
+}
+.app-v03 input:focus,
+.app-v03 select:focus,
+.app-v03 textarea:focus {
+  border-color: #c4c4c4;
+  outline: 1px solid #a3a3a3;
+}
+.app-v03 button {
+  background: #303030;
+  border-color: #505050;
+  color: #f5f5f5;
+  font-size: calc(15px * var(--ui-scale));
+}
+.app-v03 button.primary {
+  background: #e3e3e3;
+  color: #111;
+  border-color: #e3e3e3;
+}
+.app-v03 button:disabled {
+  opacity: 0.45;
+}
+.app-v03 .text-button {
+  background: transparent;
+  color: #c4c4c4;
+}
+.app-v03 .field > .field-label,
+.app-v03 .field > label {
+  font-size: calc(14px * var(--ui-scale));
+  color: #c4c4c4;
+}
+.app-v03 .field {
+  min-width: 0;
+}
+.app-v03 .linked-field {
+  min-width: 0;
+  flex: 1;
+  border-radius: 5px;
+}
+.app-v03 .form-row {
+  align-items: stretch;
+}
+.app-v03 .form-row > .linked-field .field {
+  height: 100%;
+}
+.app-v03 .check,
+.app-v03 td,
+.app-v03 th {
+  font-size: calc(14px * var(--ui-scale));
+}
+.app-v03 td {
+  border-color: #404040;
+}
+.app-v03 th {
+  background: #202020;
+  color: #bdbdbd;
+}
+.app-v03 .check input,
+.app-v03 input[type="checkbox"] {
+  accent-color: #a3a3a3;
+  width: auto;
+}
+.review-toolbar button {
+  font-size: calc(14px * var(--ui-scale));
+  padding: 8px;
+}
+.review-toolbar {
+  flex-wrap: wrap;
+}
+.review-footer {
+  background: #222;
+  border-color: #505050;
+  max-height: 49%;
+  overflow: auto;
+}
+.freight-row {
+  flex-wrap: wrap;
+}
+.freight-row > .field {
+  flex-basis: 100%;
+}
+.freight-row button {
+  font-size: calc(13px * var(--ui-scale));
+}
+.freight-reason {
+  max-height: 45px;
+}
+.desk-totals {
+  border-color: #505050;
+  flex-wrap: wrap;
+}
+.desk-totals small {
+  color: #a3a3a3;
+  font-size: calc(13px * var(--ui-scale));
+}
+.desk-totals b {
+  font-size: calc(16px * var(--ui-scale));
+}
+.desk-totals .check {
+  font-size: calc(13px * var(--ui-scale));
+}
+.desk-totals .bill-total b {
+  font-size: calc(23px * var(--ui-scale));
+  color: #fff;
+}
+.order-status-actions {
+  flex-wrap: wrap;
+}
+.order-status-actions button {
+  font-size: calc(14px * var(--ui-scale));
+  min-width: 40%;
+  padding: 8px;
+  flex: 1;
+}
+.queue-action button,
+.queue-action select {
+  font-size: calc(14px * var(--ui-scale));
+}
+.recipient-review h3,
+.item-heading {
+  font-size: calc(16px * var(--ui-scale));
+}
+.recipient-review .field > .field-label {
+  font-size: calc(14px * var(--ui-scale));
+}
+.option-buttons button {
+  font-size: calc(14px * var(--ui-scale));
+  padding: 8px;
+}
+.option-buttons .selected {
+  background: #404040;
+  color: #fff;
+  border-color: #aaa;
+}
+.item-figures {
+  grid-template-columns: 70px 1fr 1fr;
+  gap: 10px;
+}
+.item-figures > .field:last-child {
+  grid-column: 1/-1;
+}
+.item-figures > div small {
+  font-size: calc(13px * var(--ui-scale));
+  color: #a3a3a3;
+}
+.item-figures > div b {
+  font-size: calc(16px * var(--ui-scale));
+}
+.desk-message {
+  overflow: auto;
+  padding: 12px;
+  gap: 8px;
+}
+.desk-message h3,
+.desk-message header b {
+  font-size: calc(16px * var(--ui-scale));
+  color: #f5f5f5;
+}
+.desk-message button,
+.desk-message > .check {
+  font-size: calc(13px * var(--ui-scale));
+}
+.message-account .form-row {
+  flex-wrap: wrap;
+}
+.message-account select {
+  width: 100%;
+  font-size: calc(14px * var(--ui-scale));
+}
+.message-warning {
+  font-size: calc(13px * var(--ui-scale));
+  max-height: 65px;
+  flex-shrink: 0;
+}
+.linked-text-editor {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 80px;
+  overflow: hidden;
+  background: #262626;
+  border: 1px solid #404040;
+  border-radius: 5px;
+}
+.source-pane > .linked-text-editor {
+  margin: 8px 12px;
+}
+.linked-text-view {
+  padding: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.65;
+  font-size: calc(16px * var(--ui-scale));
+  overflow: auto;
+  flex: 1;
+  min-height: 50px;
+}
+.linked-text-editor textarea {
+  flex: 1;
+  resize: none;
+  border: 0;
+  line-height: 1.65;
+  font-size: calc(16px * var(--ui-scale));
+  min-height: 70px;
+}
+.text-edit-tools {
+  display: flex;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+.text-edit-tools button {
+  font-size: calc(13px * var(--ui-scale));
+  padding: 4px 10px;
+}
+.linked-token {
+  border: 2px solid transparent;
+  box-decoration-break: clone;
+  cursor: default;
+  border-radius: 3px;
+}
+.linked-active {
+  outline: 2px solid #fff !important;
+  outline-offset: 1px;
+  color: #60a5fa !important;
+  background: #383838 !important;
+  box-shadow: 0 0 8px #ffffff44;
+}
+.linked-active input {
+  color: #60a5fa !important;
+}
+.candidate-button {
+  margin: 5px 5px 5px 0;
+}
+.product-title-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 9px;
+}
+.product-title-line span {
+  font-size: calc(15px * var(--ui-scale));
+  color: #a3a3a3;
+}
+.product-title-line b {
+  font-size: calc(16px * var(--ui-scale));
+}
+.app-v03 .price-cell input {
+  font-size: calc(16px * var(--ui-scale));
+  width: 125px;
+  background: #262626;
+}
+.app-v03 td small {
+  font-size: calc(13px * var(--ui-scale));
+  color: #a3a3a3;
+}
+.shipping-heading h2 {
+  color: #eee;
+}
+.shipping-stats article {
+  background: #1c1c1c;
+  border-color: #404040;
+}
+.shipping-stats b,
+.shipping-stats article span {
+  color: #eee;
+}
+.shipping-version,
+.shipping-tabs .chosen,
+.assignment-badge.assigned {
+  background: #303030;
+  color: #eee;
+  border-color: #777;
+}
+.shipping-table-scroll {
+  max-height: 60vh;
+}
+.shipping-bulk,
+.shipping-savebar,
+.shipping-search {
+  background: #222;
+  border-color: #404040;
+}
+.shipping-tabs button {
+  font-size: calc(15px * var(--ui-scale));
+}
+.shipping-search input {
+  font-size: calc(15px * var(--ui-scale));
+}
+.selected-client {
+  background: #252525;
+  border-color: #606060;
+}
+.client-result {
+  background: #262626;
+}
+.client-result small,
+.selected-client small {
+  color: #a3a3a3;
+  font-size: calc(13px * var(--ui-scale));
+}
+.app-v03 .empty {
+  font-size: calc(15px * var(--ui-scale));
+  color: #aaa;
+}
+.app-v03 .empty b {
+  color: #ddd;
+}
+.app-v03 .tag:not([class*="tier-"]) {
+  background: #383838;
+  color: #ddd;
+}
+.app-v03 .warnings {
+  background: #342c1e;
+  color: #f1cd86;
+  border-color: #795f30;
+  font-size: calc(14px * var(--ui-scale));
+}
+.app-v03 .danger {
+  color: #ffb3b3;
+  border-color: #8b4141;
+}
+.docked .desk-grid {
+  grid-template-columns: minmax(170px, 0.8fr) minmax(230px, 1fr) minmax(320px, 1.4fr);
+}
+.docked .app-header {
+  gap: 5px;
+  padding: 0 7px;
+}
+.docked .app-header nav button {
+  font-size: calc(13px * var(--ui-scale));
+  padding: 8px 6px;
+}
+.docked .header-actions button {
+  font-size: calc(12px * var(--ui-scale));
+  padding: 6px;
+}
+.docked .window-controls button {
+  width: 30px;
+  font-size: 18px;
+}
+.docked .desk-totals {
+  gap: 10px;
+}
+.docked .pane-heading h2 {
+  font-size: calc(17px * var(--ui-scale));
+}
+.docked .desk-message textarea,
+.docked .source-text {
+  font-size: calc(16px * var(--ui-scale));
+}
+.docked .item-figures {
+  grid-template-columns: 60px 1fr;
+}
+.docked .item-figures > div:nth-child(3) {
+  grid-column: 2;
+}
+.docked .policy-line {
+  font-size: calc(13px * var(--ui-scale));
+}
+.app-notice {
+  background: #333;
+  border-color: #777;
+  color: #f5f5f5;
+  font-size: calc(14px * var(--ui-scale));
+}
+
+.app-v03 {
+  font-size: calc(16px * var(--ui-scale));
+}
+.header-actions select {
+  max-width: 160px;
+}
+.source-top .client-results {
+  max-height: 220px;
+}
+.source-top .client-result {
+  font-size: calc(15px * var(--ui-scale));
+}
+.source-top .selected-client {
+  font-size: calc(16px * var(--ui-scale));
+}
+.item-color {
+  display: block;
+  margin-top: 8px;
+}
+.price-table-scroll {
+  overflow: auto;
+  max-height: min(60vh, 42rem);
+}
+.docked .app-header .header-actions {
+  max-width: 340px;
+}
+.docked .app-header .header-actions select {
+  max-width: 120px;
+}
+.docked .window-controls {
+  flex-shrink: 0;
+}
+
+.app-header nav {
+  -webkit-app-region: drag;
+}
+.app-header nav button {
+  -webkit-app-region: no-drag;
+}
+@media (max-width: 1400px) {
+  .app-header {
+    gap: 8px;
+    padding: 0 8px;
+  }
+  .wordmark span,
+  .wordmark small {
+    display: none;
+  }
+  .app-header nav button {
+    padding: 9px 7px;
+  }
+  .header-actions button {
+    font-size: calc(13px * var(--ui-scale));
+    padding: 7px;
+  }
+  .window-controls button {
+    width: 34px;
+  }
+}
+
+html,
+body,
+#root,
+.loading {
+  background: #101010;
+  color: #f5f5f5;
+}
+.loading p {
+  color: #a3a3a3;
+}
+.overlay {
+  background: #000c;
+}
+.app-v03 .mobile-url,
+.app-v03 .override-list,
+.app-v03 .variant-editor,
+.app-v03 .import-preview,
+.app-v03 .reply-diff article {
+  background: #262626;
+  border-color: #404040;
+  color: #f5f5f5;
+}
+::selection {
+  background: #525252;
+  color: #fff;
+}
+
+.selected-client .tag[class*="tier-"] {
+  font-size: calc(18px * var(--ui-scale));
+  font-weight: 700;
+  padding: 8px 12px;
+  line-height: 1.2;
+}
+.policy-line {
+  margin-top: 8px;
+}
+
+.review-footer {
+  max-height: 62%;
+}
+
+/* Only semantic colors remain; base styles are neutral at every load stage. */
+.tier-wholesale {
+  background: #234c37 !important;
+  color: #a6edc0 !important;
+}
+.tier-semi {
+  background: #53451c !important;
+  color: #ffe393 !important;
+}
+.tier-retail {
+  background: #542c30 !important;
+  color: #ffb2b9 !important;
+}
+.tier-special {
+  background: #44305c !important;
+  color: #dab5ff !important;
+}
+.app-v03 button:hover:not(.primary):not(.danger) {
+  background: #404040;
+}
+.app-v03 .client-result:hover {
+  background: #353535;
+}
+.app-v03 a {
+  color: #d4d4d4;
+}
+.app-v03 .notice {
+  background: #333;
+  border-color: #555;
+  color: #f5f5f5;
+}
+
+.settings {
+  --settings-control-height: calc(42px * var(--ui-scale));
+}
+.account-rows {
+  display: grid;
+  gap: 16px;
+  margin: 18px 0 14px;
+}
+.account-row {
+  display: grid;
+  grid-template-columns:
+    minmax(130px, 1fr) minmax(180px, 1.3fr) minmax(130px, 1fr)
+    112px;
+  gap: 12px;
+  align-items: end;
+}
+.account-row .field {
+  margin: 0;
+}
+.account-row input,
+.settings .account-row > button,
+.settings-actions > button,
+.account-picker > button {
+  height: var(--settings-control-height);
+  min-height: var(--settings-control-height);
+  padding: 8px 14px;
+  line-height: 1.3;
+  box-sizing: border-box;
+}
+.settings .account-delete {
+  width: 112px;
+  align-self: end;
+}
+.settings-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0 22px;
+}
+.settings-actions > button {
+  min-width: 112px;
+}
+.account-recommendations {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin: 20px 0;
+}
+.account-picker {
+  position: relative;
+  min-width: 0;
+  display: grid;
+  gap: 7px;
+}
+.account-picker > span {
+  font-size: calc(14px * var(--ui-scale));
+  font-weight: 600;
+  color: #c4c4c4;
+}
+.account-picker > button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+  width: 100%;
+  background: #262626;
+  border-color: #404040;
+  font-weight: 400;
+}
+.account-picker > button > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.account-options {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 30;
+  max-height: 240px;
+  overflow: auto;
+  margin-top: 6px;
+  padding: 5px;
+  background: #262626;
+  border: 1px solid #777;
+  border-radius: 7px;
+  box-shadow: 0 8px 24px #0008;
+}
+.account-options.above {
+  top: auto;
+  bottom: calc(100% - 20px);
+  margin: 0;
+}
+.account-options > button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+  padding: 10px;
+  border-radius: 4px;
+  font-weight: 400;
+}
+.account-options > button.focused,
+.account-options > button[aria-selected="true"] {
+  background: #454545;
+}
+.app-v03 .shipping-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  background: #1c1c1c;
+  border: 1px solid #404040;
+  border-radius: 9px;
+  padding: 5px;
+  margin: 0 0 20px;
+  align-items: stretch;
+}
+.app-v03 .shipping-tabs > button {
+  min-height: calc(44px * var(--ui-scale));
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: #bdbdbd;
+  line-height: 1.4;
+  white-space: normal;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.app-v03 .shipping-tabs > button.chosen {
+  background: #404040;
+  color: #fff;
+  border-color: #777;
+  box-shadow: inset 0 -2px #d4d4d4;
+}
+.app-v03 .shipping-tabs > button:focus-visible,
+.account-picker button:focus-visible {
+  outline: 2px solid #ddd;
+  outline-offset: 2px;
+}
+@media (max-width: 1100px) {
+  .account-row {
+    grid-template-columns:
+      minmax(110px, 1fr) minmax(140px, 1.2fr) minmax(110px, 1fr)
+      112px;
+  }
+}
+.direct-edit > .text-edit-tools:empty {
+  display: none;
+}
+.direct-edit .linked-text-view[aria-readonly="false"] {
+  cursor: text;
+}
+.direct-edit textarea,
+.direct-edit .linked-text-view {
+  padding: 12px;
+}
+.app-v03 .window-controls button {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  flex: 0 0 36px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  border-radius: 0;
+}
+.app-v03 .window-controls button:hover {
+  background: #404040;
+}
+.app-v03 .window-controls button:last-child:hover {
+  background: #b42332;
+}
+.window-controls svg {
+  display: block;
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.2;
+  pointer-events: none;
+}
+.app-v03 .price-cell {
+  display: grid;
+  grid-template-rows: 42px 18px;
+  gap: 4px;
+  min-width: 110px;
+  max-width: 140px;
+}
+.app-v03 .price-cell input {
+  height: 42px;
+  width: 100%;
+  margin: 0;
+}
+.app-v03 .price-cell small {
+  display: block;
+  height: 18px;
+  min-height: 18px;
+  max-width: 140px;
+  line-height: 18px;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 11px;
+}
+.price-cell[data-locked="true"] input {
+  cursor: default;
+  color: #bdbdbd;
+  border-color: #333;
+  background: #202020;
+}
+.price-edit-fields {
+  border: 1px solid #505050;
+  border-radius: 6px;
+  margin-top: 12px;
+  padding: 12px;
+  min-width: 0;
+}
+.price-edit-fields:disabled {
+  opacity: 0.65;
+}
+.product-prices table {
+  table-layout: fixed;
+  width: 100%;
+}
+.product-prices th:first-child {
+  width: 46%;
+}
+.product-prices th:nth-child(2),
+.product-prices th:nth-child(3),
+.product-prices th:nth-child(4) {
+  width: 14%;
+}
+.product-prices th:last-child {
+  width: 12%;
+}
+.product-prices thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #242424;
+}
+.product-prices th,
+.product-prices td {
+  padding: 12px 10px;
+}
+.app-notice {
+  z-index: 140;
+}
+.management-container .manager-bar .actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.management-container .manager-bar > div:first-child {
+  min-width: 0;
+}
+.workflow-board {
+  flex: 0 1 auto;
+  max-height: 34%;
+  min-height: 72px;
+  overflow: auto;
+  border-bottom: 1px solid #404040;
+  padding: 8px;
+}
+.workflow-board-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+  font-size: 14px;
+  margin: 0 2px 7px;
+}
+.workflow-board-heading small {
+  font-size: 12px;
+  color: #aaa;
+}
+.workflow-group {
+  border: 1px solid #444;
+  border-radius: 6px;
+  margin: 0 0 7px;
+  background: #202020;
+  padding: 6px;
+}
+.workflow-group.selected {
+  border-color: #909090;
+}
+.workflow-group > header {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+.app-v03 .workflow-group > header > button {
+  font-size: 12px;
+  padding: 6px;
+}
+.app-v03 .workflow-group .flow-toggle {
+  width: 25px;
+  flex: 0 0 25px;
+  padding: 3px;
+  background: transparent;
+  border: 0;
+}
+.app-v03 .flow-group-name {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  padding: 3px;
+}
+.flow-group-name b,
+.flow-group-name small {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.flow-group-name b {
+  font-size: 14px;
+}
+.flow-group-name small {
+  font-size: 11px;
+  color: #bdbdbd;
+  margin-top: 4px;
+}
+.workflow-progress {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 6px 0;
+}
+.workflow-signals {
+  display: inline-flex;
+  gap: 4px;
+  flex: 0 0 auto;
+  align-items: center;
+}
+.signal {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid #666;
+  display: inline-block;
+  background: #333;
+}
+.signal.current {
+  background: #e99a35;
+  border-color: #f5b760;
+}
+.signal.done {
+  background: #49a66a;
+  border-color: #69c688;
+}
+.signal.pending {
+  background: #333;
+  border-color: #555;
+}
+.app-v03 .workflow-progress > .primary {
+  flex: 1;
+  min-width: 0;
+  font-size: calc(13px * var(--ui-scale));
+  line-height: 1.3;
+  min-height: 34px;
+  padding: 6px 8px;
+}
+.app-v03 .workflow-undo {
+  flex: 0 0 30px;
+  width: 30px;
+  height: 34px;
+  min-width: 30px;
+  padding: 0;
+  font-size: 20px;
+}
+.workflow-shipment-list {
+  display: grid;
+  gap: 2px;
+}
+.app-v03 .workflow-shipment {
+  display: grid;
+  grid-template-columns: minmax(65px, 0.8fr) minmax(100px, 2fr);
+  gap: 3px 8px;
+  text-align: left;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 6px;
+  font-size: calc(13px * var(--ui-scale));
+  font-weight: 400;
+  min-width: 0;
+}
+.workflow-shipment span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.workflow-shipment small {
+  grid-column: 2;
+  font-size: 11px;
+  color: #aaa;
+}
+.app-v03 .workflow-shipment.chosen {
+  background: #3b3b3b;
+  box-shadow: inset 2px 0 #ddd;
+}
+.workflow-secondary {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+.app-v03 .workflow-secondary button {
+  font-size: 12px;
+  padding: 3px 7px;
+  background: transparent;
+  border-color: #444;
+}
+.flow-recheck {
+  display: block;
+  color: #f1cd86;
+  font-size: 12px;
+  margin: 3px 0;
+}
+.flow-history {
+  border-bottom: 1px solid #444;
+  font-size: 14px;
+  padding: 9px 0;
+}
+.flow-history small {
+  display: block;
+  color: #aaa;
+  margin-top: 5px;
+}
+.notice-snapshot {
+  font: inherit;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: #262626;
+  padding: 12px;
+}
+.flow-payment-row,
+.flow-manage-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+}
+.flow-manage-row > span {
+  flex: 1;
+}
+.flow-manage-row {
+  border-bottom: 1px solid #444;
+}
+.workflow-footer {
+  max-height: 38%;
+  padding: 9px 10px;
+}
+.flow-selected-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+.flow-selected-title small {
+  font-size: 12px;
+  color: #bdbdbd;
+}
+.flow-freight-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1.1fr) minmax(100px, 1fr);
+  gap: 4px 10px;
+}
+.flow-freight-row .field {
+  margin: 0;
+}
+.flow-freight-row .field > .field-label {
+  font-size: 12px;
+}
+.flow-freight-recommendation {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  justify-content: flex-end;
+}
+.flow-freight-recommendation small {
+  font-size: 12px;
+  color: #bdbdbd;
+}
+.app-v03 .flow-freight-recommendation button {
+  font-size: 12px;
+  padding: 5px;
+}
+.flow-freight-reason {
+  grid-column: 1/-1;
+  color: #aaa;
+  font-size: 11px;
+  line-height: 1.4;
+  margin-bottom: 6px;
+}
+.workflow-balance {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  color: #bdbdbd;
+  padding: 4px 0;
+}
+.flow-footer-actions {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+.flow-footer-actions .field {
+  margin: 0;
+  flex: 1;
+}
+.app-v03 .flow-footer-actions .field > .field-label {
+  font-size: 11px;
+}
+.app-v03 .flow-footer-actions select {
+  padding: 5px;
+  font-size: 13px;
+}
+.app-v03 .flow-footer-actions button {
+  font-size: 13px;
+  padding: 7px;
+}
+.review-pane .recipient-review {
+  padding: 8px;
+  margin-bottom: 8px;
+}
+.review-pane .order-item {
+  padding: 8px 0;
+  margin-top: 6px;
+}
+.review-pane .review-scroll {
+  padding: 8px;
+}
+.review-pane .review-toolbar {
+  padding: 7px 10px;
+}
+.review-pane > .pane-heading .tag {
+  display: none;
+}
+.workflow-queue-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 16px;
+}
+.app-v03 .workflow-queue-tabs button[aria-pressed="true"] {
+  background: #e3e3e3;
+  color: #111;
+}
+.queue-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.app-v03 .queue-row-actions button {
+  font-size: 13px;
+  padding: 7px;
+}
+@media (max-height: 850px) {
+  .workflow-board {
+    max-height: 30%;
+  }
+  .workflow-footer {
+    max-height: 42%;
+  }
+  .workflow-board-heading small {
+    display: none;
+  }
+  .workflow-shipment small {
+    display: none;
+  }
+  .workflow-group {
+    padding: 4px;
+  }
+  .workflow-secondary {
+    margin: 0;
+  }
+  .workflow-progress {
+    margin: 4px 0;
+  }
+}
+
+.price-cell.invalid input {
+  border-color: #ef4444;
+}
+.price-cell [role="alert"] {
+  color: #fca5a5;
+}
+
+:root {
+  background: #101010;
+  color: #f5f5f5;
+}
+
+.unassigned-client-hint {
+  font-size: calc(13px * var(--ui-scale));
+  line-height: 1.5;
+  color: #bdbdbd;
+  margin: 8px 0;
+}

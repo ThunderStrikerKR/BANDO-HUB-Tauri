@@ -1,0 +1,494 @@
+.hub-workspace-scroll {
+  height: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.hub-panels {
+  height: 100%;
+  display: grid;
+  gap: 0;
+  align-items: stretch;
+}
+.hub-panel-slot {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.hub-panel-slot > .desk-pane {
+  height: 100%;
+  border-radius: 3px;
+}
+.hub-split {
+  position: relative;
+  cursor: col-resize;
+  touch-action: none;
+  outline: none;
+}
+.hub-split:after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 2px;
+  width: 1px;
+  background: #505050;
+}
+.hub-split:hover:after,
+.hub-split:focus:after {
+  background: white;
+  width: 2px;
+}
+.hub-kakao-placeholder {
+  padding: 16px;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+.hub-kakao-placeholder p {
+  color: #aaa;
+  line-height: 1.8;
+}
+.hub-slot-3 .workflow-board {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.hub-slot-3 .workflow-group {
+  border-width: 0 0 1px;
+  border-radius: 0;
+  margin: 0;
+  padding: 10px 6px;
+}
+.hub-slot-3 .workflow-shipment {
+  grid-template-columns: minmax(65px, 1fr) minmax(90px, 1.8fr);
+  font-size: 14px;
+  min-height: 35px;
+}
+.hub-slot-3 .workflow-shipment small {
+  display: none;
+}
+.hub-slot-3 .workflow-group header {
+  flex-wrap: wrap;
+}
+.hub-slot-3 .workflow-progress {
+  gap: 5px;
+}
+.hub-slot-3 .workflow-progress .primary {
+  font-size: 13px;
+}
+.hub-slot-3 .flow-group-name small {
+  font-size: 12px;
+}
+.hub-panels .pane-heading {
+  padding: 10px;
+}
+.hub-panels .pane-heading h2 {
+  font-size: 16px;
+}
+.hub-panels .source-top {
+  padding: 10px 8px 0;
+}
+.hub-panels .form-row {
+  flex-wrap: wrap;
+}
+.hub-panels .form-row > * {
+  min-width: 100px;
+  flex: 1;
+}
+.hub-panels input,
+.hub-panels select {
+  min-width: 0;
+}
+.hub-panels .linked-text-view,
+.hub-panels textarea {
+  font-size: 16px;
+}
+.hub-panels .desk-message {
+  overflow: auto;
+}
+.hub-panels .item-figures {
+  grid-template-columns: 60px 1fr 1fr;
+}
+.hub-panels .linked-active,
+.hub-panels .workflow-shipment.chosen {
+  outline: 1px solid white;
+  color: #70b4ff;
+  background: #292929;
+}
+.hub-panels .linked-token.linked-active {
+  border-color: white;
+  color: #70b4ff;
+}
+.hub-panels .field > .field-label {
+  font-size: 13px;
+}
+.hub-panels .recipient-review input {
+  font-size: 16px;
+}
+.hub-panels .source-actions button {
+  font-size: 13px;
+}
+.hub-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.hub-brand img {
+  width: 72px;
+  height: 28px;
+  object-fit: contain;
+  background: white;
+}
+.hub-brand span {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.hub-portal-target {
+  height: 100%;
+  min-height: 0;
+}
+.hub-portal-target > .desk-pane {
+  height: 100%;
+  border-radius: 3px;
+}
+.hub-order-engine,
+.hub-order-engine > .desk-grid {
+  display: contents;
+}
+.hub-workspace-scroll .hub-slot-3 {
+  height: 100%;
+}
+.hub-workspace-scroll .workflow-shipment {
+  white-space: nowrap;
+  overflow: hidden;
+}
+.hub-workspace-scroll .workflow-shipment > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hub-panels .review-pane:not(.editing-products) .item-select input,
+.hub-panels .review-pane:not(.editing-products) .option-buttons,
+.hub-panels .review-pane .item-color,
+.hub-panels .review-pane:not(.editing-products) .recipient-review > select,
+.hub-panels .review-pane:not(.editing-products) .item-figures > .field:last-child,
+.hub-panels .review-pane:not(.editing-products) .item-heading > button {
+  display: none;
+}
+.hub-panels .recipient-review {
+  padding: 10px;
+  margin-bottom: 8px;
+  border: 0;
+}
+.hub-panels .order-item {
+  padding: 8px 0;
+}
+.hub-panels .review-pane .workflow-footer {
+  max-height: 48%;
+  overflow: auto;
+}
+
+.message-tabs {
+  display: flex;
+  border-bottom: 1px solid #505050;
+  flex-shrink: 0;
+}
+.message-tabs button {
+  flex: 1;
+  padding: 10px 5px;
+  font-size: 13px;
+  border: 0;
+  border-radius: 0;
+  background: #252525;
+}
+.message-tabs button[aria-selected="true"] {
+  border-bottom: 2px solid white;
+  background: #393939;
+}
+.staff-blocks {
+  max-height: 27%;
+  overflow: auto;
+  flex-shrink: 0;
+}
+.staff-block {
+  padding: 10px;
+  border-left: 3px solid #d8903d;
+  background: #302a22;
+  color: #e8b477;
+  margin: 6px;
+}
+.staff-block p {
+  font-size: 13px;
+  margin: 5px 0 0;
+}
+.hub-panels .desk-message .row-end {
+  flex-wrap: wrap;
+}
+.hub-panels .desk-message {
+  flex: 1;
+}
+.hub-panels .message-warning {
+  max-height: 70px;
+}
+
+.hub-reception-stack {
+  height: 100%;
+  display: grid;
+  min-height: 0;
+  min-width: 0;
+}
+.hub-reception-stack > .hub-portal-target {
+  min-height: 0;
+  overflow: hidden;
+}
+.hub-split.horizontal {
+  cursor: row-resize;
+}
+.hub-split.horizontal:after {
+  top: 2px;
+  bottom: auto;
+  left: 0;
+  right: 0;
+  height: 1px;
+  width: auto;
+}
+.hub-split.horizontal:hover:after {
+  height: 2px;
+}
+.hub-reception-stack .source-top {
+  padding: 6px 8px 0;
+}
+.hub-reception-stack .source-actions {
+  padding: 4px 8px 6px;
+  flex-direction: row;
+  align-items: center;
+}
+.hub-reception-stack .source-actions small {
+  flex: 1;
+  font-size: 11px;
+}
+.hub-reception-stack .source-actions button {
+  font-size: 12px;
+  padding: 8px;
+}
+.hub-reception-stack .desk-message {
+  padding: 8px;
+  gap: 5px;
+}
+.hub-reception-stack .message-account small {
+  display: none;
+}
+.hub-reception-stack .staff-blocks {
+  max-height: 22%;
+}
+.hub-reception-stack .linked-text-view {
+  padding: 10px;
+}
+.hub-reception-stack .desk-message header {
+  display: none;
+}
+
+.hub-panels .recipient-contact-row {
+  display: grid;
+  grid-template-columns: minmax(90px, 6.5em) repeat(2, minmax(132px, 14ch));
+  justify-content: start;
+  gap: 6px;
+  align-items: end;
+  font-size: 15px;
+}
+.hub-panels .recipient-address-row {
+  display: grid;
+  grid-template-columns: minmax(170px, 1fr) minmax(110px, 0.55fr);
+  gap: 6px;
+  align-items: end;
+  margin-top: 5px;
+}
+.hub-panels .recipient-review .field {
+  margin: 0;
+}
+.hub-panels .recipient-review .field > .field-label {
+  font-size: 12px;
+  margin-bottom: 3px;
+  line-height: 1.2;
+}
+.hub-panels .recipient-review input {
+  height: 34px;
+  font-size: 15px;
+  padding: 5px 7px;
+  min-width: 0;
+}
+.hub-panels .recipient-review > .row-end {
+  margin-bottom: 6px;
+}
+.hub-panels .recipient-review h3 {
+  font-size: 13px;
+}
+.hub-panels .recipient-review {
+  padding: 7px;
+  margin: 0;
+}
+.hub-panels .review-toolbar {
+  padding: 5px 8px;
+  gap: 6px;
+}
+.hub-panels .review-toolbar button {
+  padding: 5px 8px;
+  font-size: 12px;
+}
+.hub-panels .review-toolbar small {
+  font-size: 11px;
+}
+.hub-panels .review-pane .review-scroll {
+  flex: 0 1 auto;
+  padding: 7px 9px;
+}
+.hub-panels .item-figures {
+  grid-template-columns: 60px minmax(100px, 1fr) minmax(110px, 1fr);
+  gap: 8px;
+  margin-top: 6px;
+}
+.hub-panels .item-figures > div:nth-child(3) {
+  grid-column: auto;
+  grid-row: auto;
+}
+.hub-panels .item-figures > div small {
+  font-size: 12px;
+  margin-bottom: 3px;
+}
+.hub-panels .item-figures > div b {
+  font-size: 16px;
+}
+.hub-panels .order-item {
+  margin-top: 7px;
+  padding: 7px 0;
+}
+.hub-panels .workflow-footer {
+  padding: 8px 10px;
+}
+.hub-panels .flow-freight-row {
+  gap: 5px;
+}
+.hub-panels .desk-totals {
+  padding: 7px 0;
+}
+.docked .hub-brand span {
+  display: inline;
+  font-size: 13px;
+}
+.docked .hub-brand img {
+  width: 66px;
+}
+
+.hub-desk-host {
+  height: 100%;
+  min-height: 0;
+}
+.hub-desk-host[hidden] {
+  display: none;
+}
+.waiting-payment {
+  color: #e3a454;
+  font:
+    700 15px Roboto Mono,
+    monospace;
+}
+.hub-slot-3 .workflow-progress {
+  flex-wrap: wrap;
+}
+.hub-slot-3 .waiting-payment {
+  flex-basis: 100%;
+  text-align: right;
+}
+
+.hub-panels .review-pane .item-figures {
+  display: grid;
+  grid-template-columns: 60px minmax(100px, 1fr) minmax(110px, 1fr);
+}
+.hub-panels .review-pane .item-figures > div:nth-child(3) {
+  grid-column: auto;
+  grid-row: auto;
+}
+
+/* The Kakao slot exists on every page, before and after native connection. */
+.hub-shell-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px;
+}
+.hub-shell {
+  display: grid;
+  height: 100%;
+  min-height: 500px;
+  min-width: 1380px;
+  gap: 0;
+}
+.hub-main-content {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.hub-main-content > .desk-container {
+  padding: 0;
+  min-width: 0;
+}
+.hub-main-content > .management-container {
+  padding: 20px;
+  min-width: 0;
+}
+.hub-kakao-slot {
+  border: 1px solid #3d3d3d;
+  border-radius: 3px;
+  background: #212121;
+  overflow: hidden;
+}
+.kakao-native-region {
+  height: 100%;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.kakao-connect {
+  font-size: 15px;
+  padding: 13px 20px;
+}
+.hub-brand span {
+  display: inline;
+}
+.hub-shell .hub-panels {
+  min-width: 982px;
+}
+
+.app-header .hub-brand img {
+  width: 38px;
+  height: 30px;
+  object-fit: contain;
+  background: transparent;
+}
+
+.app-v03 .overlay {
+  left: var(--kakao-reserved-width, 0px);
+  padding: 20px;
+}
+
+@media (max-width: 1350px) {
+  .hub-shell-scroll {
+    padding: 6px;
+  }
+}
+
+.hub-reception-stack .source-actions {
+  flex-wrap: wrap;
+}
+.saved-source-actions {
+  display: flex;
+  gap: 7px;
+  flex-shrink: 0;
+}
+.saved-source-actions button {
+  min-width: 80px;
+}

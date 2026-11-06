@@ -1,0 +1,36 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "반도허브 BANDO HUB",
+  "version": "0.0.4",
+  "identifier": "com.bandostand.bandohub.tauri",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://127.0.0.1:5173",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "반도허브 BANDO HUB v0.0.4",
+        "width": 1520,
+        "height": 1000,
+        "minWidth": 1024,
+        "minHeight": 700,
+        "backgroundColor": "#101010",
+        "decorations": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": false,
+    "icon": [
+      "icons/icon.png",
+      "icons/icon.ico"
+    ]
+  }
+}

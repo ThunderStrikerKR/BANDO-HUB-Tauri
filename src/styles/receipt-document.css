@@ -1,0 +1,236 @@
+.source-pane.received-source .linked-text-view,
+.stage-message-preview .linked-text-view {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  cursor: default !important;
+  outline: none !important;
+}
+.source-pane .source-top {
+  flex: none;
+}
+.receipt-client {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+}
+.receipt-client > b {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.receipt-client button,
+.receipt-meta button {
+  font-size: 12px;
+  padding: 4px 8px;
+}
+.receipt-meta {
+  font-size: 12px;
+  color: #aaa;
+  padding: 5px 0;
+}
+.receipt-placeholder {
+  padding: 8px 12px;
+  color: #aaa;
+}
+.source-document {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.source-document > .linked-text-editor {
+  flex: 1;
+  min-height: 0;
+  border: 0;
+  background: transparent;
+}
+.source-document textarea {
+  height: 100%;
+  min-height: 100px;
+}
+.received-source .source-document {
+  padding: 6px;
+}
+.source-pane .source-actions {
+  flex: none;
+}
+.source-pane .source-actions button {
+  font-size: 12px;
+}
+.source-pane .source-actions small {
+  font-size: 11px;
+}
+.receipt-client .tag {
+  flex: none;
+}
+.essential-issue {
+  border-color: #dc6666 !important;
+  background: #321e1e !important;
+}
+.staff-checks .essential-issue .issue-heading {
+  color: #ffabab !important;
+}
+.app-v03 .staff-checks .issue-actions button {
+  color: #eee;
+  border-color: #666;
+  background: #343434;
+}
+.app-v03 .staff-checks .issue-actions button:hover {
+  background: #484848;
+}
+.app-v03 .product-chip-error {
+  background: #4b2525;
+  border-color: #d96969;
+  color: #ffb4b4;
+}
+.app-v03 .flow-group-name {
+  cursor: default;
+  background: transparent;
+  border: 0;
+  flex: 1;
+  min-width: 0;
+}
+.flow-group-name b {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  display: block;
+}
+.trash-button {
+  font-size: 14px !important;
+  padding: 4px 6px !important;
+  flex: none;
+}
+.deleted-groups {
+  font-size: 13px;
+  padding: 8px;
+  color: #aaa;
+}
+.deleted-groups p {
+  white-space: normal;
+}
+.app-notice {
+  top: auto;
+  bottom: 16px;
+  right: 16px;
+  max-width: 520px;
+}
+.recipient-fields {
+  padding-bottom: 13px;
+  border-bottom: 1px solid #555;
+  margin-bottom: 14px;
+}
+.product-search-results > article {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid #444;
+  padding: 5px;
+}
+.product-search-results > article > button:first-child {
+  flex: 1;
+  text-align: left;
+  white-space: normal;
+}
+.product-search-results > article > button:last-child {
+  flex: none;
+}
+.item-editor-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.registration-preview {
+  max-height: 45vh;
+  overflow: auto;
+  margin: 12px 0;
+}
+.registration-preview td {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.category-paths {
+  max-height: 240px;
+  overflow: auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+  margin: 10px 0;
+}
+.source-pane .modal pre {
+  white-space: pre-wrap;
+  max-height: 300px;
+  overflow: auto;
+  overflow-wrap: anywhere;
+}
+.source-pane .modal textarea {
+  min-height: 180px;
+  width: 100%;
+}
+.received-source .linked-token {
+  cursor: default;
+}
+.received-source .linked-token:focus {
+  outline: 1px solid #888;
+}
+.source-document .linked-text-view {
+  padding: 9px 6px;
+}
+.resolver-progress {
+  font-size: 13px;
+  color: #aaa;
+  margin: 6px 0;
+}
+.resolver-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 18px;
+}
+@keyframes receipt-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes receipt-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+::view-transition-old(receipt-source) {
+  animation: receipt-out 180ms ease-in both;
+}
+::view-transition-new(receipt-source) {
+  animation: receipt-in 260ms ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(receipt-source),
+  ::view-transition-new(receipt-source) {
+    animation: none;
+  }
+}
+
+.stage-message-preview {
+  border: 0;
+  border-radius: 0;
+}
+.modal pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 350px;
+  overflow: auto;
+}
+
+.compact-review .recipient-fields > .field {
+  grid-template-columns: 76px minmax(0, 1fr);
+}
+.compact-review .recipient-fields > .field > .field-label {
+  white-space: nowrap;
+}

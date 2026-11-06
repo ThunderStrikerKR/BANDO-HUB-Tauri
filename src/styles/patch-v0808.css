@@ -1,0 +1,569 @@
+/* v0.8.08: fixed work columns, independent panels, shared form geometry. */
+.app-header .hub-brand {
+  height: 38px;
+  gap: 6px;
+  align-items: center;
+  margin-right: 8px;
+  padding-right: 12px;
+  border-right: 1px solid #454545;
+}
+.app-header .hub-brand span {
+  font-size: 18px;
+  font-weight: 600;
+}
+.app-header nav button {
+  border-radius: 5px;
+  padding: 8px 10px;
+  height: 38px;
+  position: relative;
+}
+.app-header nav button + button:before {
+  content: "";
+  position: absolute;
+  left: -1px;
+  top: 10px;
+  bottom: 10px;
+  border-left: 1px solid #393939;
+}
+.app-header nav button.current {
+  background: #294457 !important;
+  color: #fff;
+}
+.app-header {
+  border-bottom: 1px solid #444;
+}
+.hub-management > .pane-heading {
+  gap: 6px;
+  min-height: 48px;
+  flex-shrink: 0;
+}
+.hub-management > .pane-heading h2 {
+  font-size: 15px;
+  margin-right: auto;
+}
+.hub-management > .pane-heading button {
+  min-width: 0;
+  padding: 7px 8px;
+  font-size: 13px;
+}
+.hub-panels > .hub-split {
+  cursor: default;
+}
+.review-layout {
+  grid-template-rows: minmax(0, 0.28fr) minmax(0, 0.32fr) minmax(0, 0.4fr);
+  gap: 6px;
+}
+.review-layout > .staff-checks,
+.review-layout > .recipient-body,
+.review-layout > .items-freight-panel {
+  border: 1px solid #444;
+  border-radius: 5px;
+  min-height: 0;
+  margin: 0;
+}
+.review-layout > .recipient-body {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}
+.review-layout .receipt-panel-content {
+  overflow: auto;
+  min-height: 0;
+  padding: 10px 12px;
+  flex: 1;
+}
+.receipt-panel-content > .recipient-review {
+  padding: 0;
+}
+.recipient-section-heading {
+  flex-shrink: 0;
+  border-bottom: 1px solid #444;
+  padding: 8px !important;
+}
+.items-freight-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.items-freight-scroll {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  padding: 0 8px;
+}
+.items-freight-panel .workflow-footer {
+  flex-shrink: 0;
+  border-top: 1px solid #444;
+}
+.items-freight-panel .compact-items {
+  width: 100%;
+  table-layout: fixed;
+}
+.items-freight-panel .compact-items th:first-child {
+  width: 40%;
+}
+.dispatch-origin {
+  display: flex;
+  gap: 6px;
+  padding: 8px 0;
+}
+.dispatch-origin button[aria-pressed="true"] {
+  background: #414141;
+  border-color: #ddd;
+}
+.messages-pane {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.messages-pane .stage-message-preview {
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+.message-copy-actions {
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  flex-shrink: 0;
+  border-top: 1px solid #444;
+}
+.message-copy-actions button {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  padding: 8px;
+}
+.flow-fixed-summary {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-height: 48px;
+  font-size: 13px;
+  padding: 6px 9px;
+  font-variant-numeric: tabular-nums;
+}
+.source-actions {
+  min-height: 48px;
+  gap: 5px !important;
+}
+.source-actions button {
+  padding: 7px 8px;
+  flex-shrink: 0;
+  font-size: 13px;
+}
+.retail-order-dialog {
+  display: flex;
+  flex-direction: column;
+  height: min(740px, calc(100dvh - 160px));
+  min-height: 0;
+}
+.retail-order-body {
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
+  padding-right: 8px;
+}
+.retail-order-body > .field {
+  margin-bottom: 10px;
+}
+.retail-item {
+  padding: 10px 0;
+  border-bottom: 1px solid #444;
+}
+.quantity-stepper {
+  display: flex;
+  align-items: stretch;
+  gap: 3px;
+}
+.quantity-stepper input {
+  min-width: 0;
+  width: 70px;
+  text-align: center;
+}
+.quantity-stepper button {
+  min-width: 28px;
+  padding: 4px 6px;
+}
+.manual-quantity-cell {
+  min-width: 0;
+}
+.manual-quantity-cell .quantity-stepper input {
+  width: 48px;
+}
+.manual-quantity-cell .quantity-stepper button {
+  font-size: 14px;
+}
+.manual-cancel-product {
+  font-size: 11px !important;
+  padding: 3px !important;
+}
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  padding-top: 12px;
+  border-top: 1px solid #444;
+}
+.modal-footer > [role="status"] {
+  margin-right: auto;
+  white-space: pre-line;
+}
+.app-modal-layer > .modal {
+  display: flex;
+  flex-direction: column;
+  height: min(820px, calc(100dvh - 36px));
+  overflow: hidden;
+}
+.app-modal-layer .modal > header {
+  flex-shrink: 0;
+}
+.app-modal-layer .modal-fields {
+  overflow: auto;
+  min-height: 0;
+  flex: 1;
+}
+.app-modal-layer:has(.retail-order-dialog) .modal-fields {
+  overflow: hidden;
+}
+.app-modal-layer .modal-fields:has(> .row-end.modal-footer) {
+  display: flex;
+  flex-direction: column;
+}
+.modal-fields > .modal-footer {
+  position: sticky;
+  bottom: 0;
+  background: #202020;
+  margin-top: auto;
+}
+.resolver-original {
+  border: 1px solid #e68d20;
+  background: #30251b;
+  padding: 14px;
+  font-size: 20px;
+  white-space: pre-wrap;
+}
+.resolver-candidates button {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-align: left;
+  width: 100%;
+  min-width: 0;
+}
+.resolver-candidates button span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.resolver-candidates button small {
+  white-space: normal;
+}
+.representative-panel {
+  border: 1px solid #555;
+  border-radius: 5px;
+  padding: 12px;
+  margin: 12px 0;
+}
+.representative-members {
+  max-height: 180px;
+  overflow: auto;
+}
+.representative-members > div {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px;
+  gap: 8px;
+}
+.representative-badge {
+  display: inline-block;
+  margin-left: 5px;
+  border: 1px solid #aaa;
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+.excel-workspace {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+.excel-table-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid #444;
+}
+.excel-table-scroll thead {
+  position: sticky;
+  top: 0;
+  background: #252525;
+  z-index: 1;
+}
+.excel-fixed-footer {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: space-between;
+  border-top: 1px solid #444;
+  padding: 10px 0;
+}
+.date-navigator {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.date-navigator > * {
+  height: 38px;
+  min-height: 38px;
+}
+.date-navigator button {
+  padding: 5px 12px;
+}
+.date-navigator-with-clear {
+  gap: 6px;
+}
+.date-navigator-with-clear > * {
+  box-sizing: border-box;
+  height: 40px;
+  min-height: 40px;
+}
+.date-navigator-with-clear button {
+  flex: none;
+  white-space: nowrap;
+}
+
+.app-header .hub-brand span {
+  display: inline !important;
+  margin: 0;
+}
+.items-freight-panel .compact-items th:first-child {
+  width: 45%;
+}
+.items-freight-panel .compact-items th:nth-child(2) {
+  width: 20%;
+}
+.items-freight-panel .compact-items th:nth-child(3) {
+  width: 35%;
+}
+.items-freight-panel .compact-items input[type="number"] {
+  max-width: 100%;
+  width: 54px;
+}
+.recipient-fields {
+  container-type: inline-size;
+}
+@container (max-width:330px) {
+  .recipient-phones {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .compact-review .recipient-phones > .linked-field:last-child .field {
+    grid-template-columns: 56px minmax(0, 1fr);
+  }
+}
+
+.recipient-fields .field > .form-error {
+  grid-column: 1/-1;
+  font-size: 12px;
+  white-space: normal;
+}
+
+.app-modal-layer:has(.resolver-steps) .modal-fields {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.resolver-steps {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.resolver-actions {
+  flex-shrink: 0;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding-top: 12px;
+  border-top: 1px solid #444;
+}
+.manual-grid-scroll th:nth-child(8) {
+  width: 120px;
+}
+.manual-quantity-cell .quantity-stepper {
+  width: 106px;
+}
+.manual-quantity-cell .quantity-stepper input {
+  width: 46px;
+}
+.manual-quantity-cell .quantity-stepper button {
+  min-width: 26px;
+}
+
+.flow-fixed-summary {
+  height: 72px;
+  min-height: 72px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 3px 6px;
+  overflow: hidden;
+}
+.flow-fixed-summary span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.flow-fixed-summary span:nth-child(2) {
+  grid-column: 1/-1;
+  order: 4;
+}
+
+/* Two reserved toolbar rows keep all three entry buttons visible at narrow resolutions. */
+.source-pane .source-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: 34px 34px;
+  flex: 0 0 82px;
+  height: 82px;
+  min-height: 82px;
+  max-height: 82px;
+  gap: 4px;
+  padding: 5px 6px;
+  overflow: hidden;
+}
+.source-pane .source-actions > button {
+  width: 100%;
+  min-width: 0;
+  padding: 5px;
+  font-size: 12px;
+}
+.source-pane .source-actions-right {
+  grid-column: 2/4;
+  width: 100%;
+  justify-content: flex-end;
+  margin: 0;
+  gap: 4px;
+}
+.source-pane .source-actions-right button {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  padding: 5px;
+}
+.hub-management {
+  container-type: inline-size;
+}
+.hub-management > .pane-heading h2 {
+  white-space: nowrap;
+}
+@container (max-width:350px) {
+  .hub-management > .pane-heading {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 22px 32px;
+    min-height: 74px;
+    max-height: 74px;
+    padding: 6px;
+    gap: 5px;
+  }
+  .hub-management > .pane-heading h2 {
+    grid-column: 1/-1;
+    margin: 0;
+    font-size: 14px;
+  }
+  .hub-management > .pane-heading button {
+    height: 32px;
+    min-height: 32px;
+    padding: 4px;
+    font-size: 12px;
+  }
+}
+.items-freight-panel .compact-items th:first-child {
+  width: 35%;
+}
+.items-freight-panel .compact-items th:nth-child(2) {
+  width: 25%;
+}
+.items-freight-panel .compact-items th:nth-child(3) {
+  width: 40%;
+}
+.items-freight-panel .compact-items td:nth-child(2) .linked-field {
+  min-width: 0;
+  width: 100%;
+  gap: 2px;
+}
+.items-freight-panel .compact-items input[type="number"] {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  flex: 1;
+  padding: 3px;
+}
+.items-freight-panel .compact-items td:nth-child(2) .linked-field:after {
+  flex-shrink: 0;
+  font-size: 12px;
+}
+.items-freight-panel .compact-items .item-amount {
+  font-size: 14px;
+  padding: 4px 0;
+  white-space: nowrap;
+}
+.items-freight-panel .freight-line {
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.items-freight-panel .freight-line > .freight-money {
+  flex: 1;
+  min-width: 70px;
+}
+.items-freight-panel .freight-money > input {
+  width: 100%;
+  min-width: 0;
+}
+.items-freight-panel .freight-line > button {
+  font-size: 12px;
+  padding: 4px;
+  margin-left: auto;
+}
+
+.source-pane .receipt-client > b {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  overflow-wrap: normal;
+  line-height: 22px;
+}
+.hub-panels .compact-review > .order-grand-total {
+  height: 56px;
+  min-height: 56px;
+  max-height: 56px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: 1fr 1fr;
+  align-items: center;
+  padding: 6px 8px;
+  gap: 1px 6px;
+  font-size: 13px;
+  overflow: hidden;
+}
+.hub-panels .compact-review > .order-grand-total > .shipment-count {
+  grid-column: 1;
+  grid-row: 2;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.hub-panels .compact-review > .order-grand-total > b {
+  grid-column: 2;
+  grid-row: 1;
+  font-size: 18px;
+  white-space: nowrap;
+}
+.hub-panels .compact-review > .order-grand-total > small {
+  grid-column: 2;
+  grid-row: 2;
+  font-size: 10px;
+  white-space: nowrap;
+}
