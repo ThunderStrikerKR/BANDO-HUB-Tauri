@@ -10,11 +10,12 @@ import type { State } from "./types";
 import { Modal } from "./ui";
 
 export function FactoryReplyImport({
-  onSave, onRefresh, onNotice,
+  onSave, onRefresh, onNotice, previewOnly = false,
 }: {
   onSave: (state: State) => Promise<void>;
   onRefresh: () => Promise<void>;
   onNotice: NoticeSink;
+  previewOnly?: boolean;
 }) {
   const { busy, run } = useAsyncTask(onNotice);
   const input = useRef<HTMLInputElement>(null);
@@ -34,6 +35,7 @@ export function FactoryReplyImport({
     });
   };
   const commit = () => void run(async () => {
+    if (previewOnly) throw Error("UI 검사에서는 공장 회신 원본 보관 및 DB 반영을 실행할 수 없습니다.");
     if (!file || !review || !accepted) return;
     if (!(await confirmAction(
       "공장 회신 " + review.rows.length + "행을 등록할까요? 자동 일치 " +
@@ -108,13 +110,14 @@ export function FactoryReplyImport({
             </table>
           </div>
           <p className="muted">감사용 원본은 앱 데이터에 보관하고, 별도 사본은 지정된 Excel 보관함의 공장 회신 날짜별 폴더에 저장합니다. 등록 후 충돌 건은 회신 이력에서 개별 검토할 수 있습니다.</p>
+          {previewOnly && <p className="muted">UI 검사 전용: 행 검토 화면만 표시하며 원본 보관 및 실제 회신 적용은 차단합니다.</p>}
           <label className="check">
             <input type="checkbox" checked={accepted} onChange={(event) => setAccepted(event.target.checked)}/>
             변경될 운송장과 실제 운임을 확인했습니다. 보류 행은 변경하지 않습니다.
           </label>
           <div className="row-end">
             <button type="button" disabled={busy} onClick={() => { setReview(undefined); setFile(undefined); }}>취소</button>
-            <button type="button" className="primary" disabled={busy || !accepted} onClick={commit}>
+            <button type="button" className="primary" disabled={busy || !accepted || previewOnly} onClick={commit}>
               DB 백업 후 회신 {review.rows.length}건 등록
             </button>
           </div>
