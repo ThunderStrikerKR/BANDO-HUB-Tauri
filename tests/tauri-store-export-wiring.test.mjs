@@ -8,7 +8,13 @@ test("Tauri can save a store Excel independently of factory and only after previ
  assert.match(types,/saveStoreWorkbook\?:/);
  assert.match(bridge,/saveStoreWorkbook: \(bytes\) => invoke<string \| null>\("save_store_workbook", \{ bytes \}\)/);
  assert.match(rust,/async fn save_store_workbook\(/);
- assert.match(rust,/save_xlsx_with_dialog\(app, "매장발송로젠", bytes\)/);
+ // Store shipping now writes directly to the classified, day-based archive.
+ assert.match(rust, /save_xlsx_in_archive\(app, WorkbookKind::Store, bytes\)/);
+ assert.match(rust, /Self::Store => "매장 발송"/);
+ assert.match(rust, /Self::Store => "매장"/);
+ assert.match(rust, /fn archive_daily_directory/);
+ assert.match(rust, /format!\("\{stamp\}\(\{\}\{number\}\)\.xlsx", kind\.stem\(\)\)/);
+ assert.match(rust, /\.create_new\(true\)/);
  assert.match(rust,/save_factory_workbook, save_store_workbook, save_settlement_workbook/);
  assert.match(ui,/previewStoreExport\(current, chosen\)/);
  assert.match(ui,/createStoreWorkbook\(preview\)/);

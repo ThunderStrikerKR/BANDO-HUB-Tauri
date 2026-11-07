@@ -55,6 +55,10 @@ state.workflow.queue.push({
   },
 });
 
+// Date and destination are synthetic; the mock must reflect the native
+// category-first, year/month/day naming rule without touching user files.
+const storePath = "C:\\BANDO_CI_EXPORTS\\매장 발송\\2026년\\11월\\07일\\20261107(매장1).xlsx";
+
 const archive = [
   {
     id: "receipt:ui-audit-test",
@@ -118,7 +122,7 @@ try {
   const pageErrors = [];
   page.on("pageerror", (err) => pageErrors.push(err.message));
   await page.addInitScript(
-    ({ state, archive }) => {
+    ({ state, archive, storePath }) => {
       let mode = "ORIGINAL";
       const response = (extra = {}) => ({
         active: mode !== "ORIGINAL", mode, ratio: 0.8,
@@ -144,7 +148,7 @@ try {
           if (command === "save_store_workbook") {
             if (!Array.isArray(args.bytes) || args.bytes.length <= 1000) throw Error("Invalid workbook bytes");
             window.__storeWorkbookSaved = args.bytes.slice(0, 4).join(",") === "80,75,3,4";
-            return "C:\\BANDO_CI_EXPORTS\\BANDO-CI-STORE.xlsx";
+            return storePath;
           }
           if (command === "state_save") {
             state = structuredClone(args.state);
@@ -172,7 +176,7 @@ try {
         },
       };
     },
-    { state, archive },
+    { state, archive, storePath },
   );
   await page.goto(url);
   const nav = page.getByRole("navigation", { name: "업무 메뉴" });
@@ -183,9 +187,11 @@ try {
   await page.waitForFunction(() => window.__lastOpenedExportId === "ci-open-export");
   await exportRow.getByRole("button", { name: "파일 경로 복사" }).waitFor();
   await nav.getByRole("button", { name: "설정" }).click();
-  await page.getByRole("button", { name: "폴더 선택", exact: true }).click();
+  await page.getByRole("heading", { name: "Excel 보관함 위치" }).waitFor();
+  await page.getByText("공장 발송, 매장 발송, 공장 회신, 상품 관리, 거래처 관리 폴더를 자동으로 구분합니다.").waitFor();
+  await page.getByRole("button", { name: "보관함 폴더 선택", exact: true }).click();
   await page.getByText("C:\\BANDO_CI_SELECTED").waitFor();
-  await page.getByRole("button", { name: "저장된 폴더 열기" }).click();
+  await page.getByRole("button", { name: "보관함 열기", exact: true }).click();
   await page.getByRole("button", { name: "감사 기록 열기" }).click();
   await page.getByText("3건 조회").waitFor();
   await page.locator("summary", { hasText: "ui-audit-test" }).first().click();
@@ -230,7 +236,8 @@ try {
     window.__storeWorkbookSaved === true && window.__storeCommit?.status === "EXPORTED" &&
     window.__storeCommit?.fileOnly === true);
   await page.getByRole("button", { name: "엑셀 작성 이력" }).click();
-  const storeHistory = page.getByRole("row").filter({ hasText: "BANDO-CI-STORE.xlsx" });
+  const storeHistory = page.getByRole("row").filter({ hasText: "20261107(매장1).xlsx" });
+  await storeHistory.getByRole("button", { name: "파일 경로 복사" }).waitFor();
   await storeHistory.locator("summary", { hasText: "관련 주문" }).click();
   await storeHistory.getByRole("button", { name: "매장 발송 확인" }).click();
   await page.getByRole("dialog", { name: "작업 확인" })

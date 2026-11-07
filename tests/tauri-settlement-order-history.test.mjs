@@ -262,7 +262,7 @@ test("real XLSX history export uses current filtered rows and never changes stat
   assert.equal(JSON.stringify(state),before);
 });
 
-test("report screens connect live state, preserve revision and native Save As", () => {
+test("report screens keep live read-only views while Excel export buttons are deferred", () => {
   const app=read("src/App.tsx");
   const daily=read("src/app/DailySettlement.tsx");
   const history=read("src/app/OrderHistory.tsx");
@@ -270,9 +270,20 @@ test("report screens connect live state, preserve revision and native Save As", 
   const bridge=read("src/tauri-bridge.ts");
   assert.match(app,/<DailySettlement state=\{state\}/);
   assert.match(daily,/dailySettlement\(state, date, orderHistory\(state, "", date\)\)/);
-  assert.match(daily,/api\.load\(\)/);
-  assert.match(daily,/exportDailySettlementWorkbook/);
-  assert.match(history,/exportOrderHistoryWorkbook/);
+  // Keep actual daily settlement and order-history queries, filters and warnings.
+  assert.match(daily, /report\.orderRows\.map/);
+  assert.match(daily, /report\.paymentRows\.map/);
+  assert.match(daily, /report\.warnings\.map/);
+  assert.match(history, /orderHistory\(state, query, date\)/);
+  assert.match(history, /onQuery\(event\.target\.value\)/);
+  assert.match(history, /onOpen\(row\.order\)/);
+  // Excel export is intentionally deferred: no actionable download control or handler.
+  assert.doesNotMatch(daily, /현재 결산 Excel 다운로드|saveSettlementWorkbook|exportDailySettlementWorkbook/);
+  assert.doesNotMatch(history, /조회 결과 Excel 다운로드|saveOrderHistoryWorkbook|exportOrderHistoryWorkbook/);
+  // The generation and native export plumbing are retained for later reactivation.
+  const workbook = read("src/app/report-workbook.ts");
+  assert.match(workbook, /exportDailySettlementWorkbook/);
+  assert.match(workbook, /exportOrderHistoryWorkbook/);
   assert.match(history,/소매 주문 \/ 결제 증빙 별도 확인/);
   assert.match(native,/async fn save_settlement_workbook/);
   assert.match(native,/async fn save_order_history_workbook/);
