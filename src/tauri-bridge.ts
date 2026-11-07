@@ -6,6 +6,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { Api, State, CatalogReport } from "./types";
 import productImages from "./tauri-product-images.json";
 import { parseOfficialProductPage } from "./official-product-import";
+import { officialLinksFromSnapshot } from "./official-links";
 
 const notReady = (feature: string): never => {
   throw new Error(`${feature}: Tauri v0.0.4에서 아직 이전하지 않은 기능입니다.`);
@@ -79,7 +80,9 @@ const api: Api = {
     const state = await invoke<State>("state_load");
     return parseOfficialProductPage(url, html, state);
   },
-  officialList: async () => notReady("공식 홈페이지 목록 조회"),
+  // Suggests links from the bundled historical catalog; individual previews
+  // still fetch their official product detail pages live.
+  officialList: async () => officialLinksFromSnapshot(await invoke<CatalogReport>("catalog_report")),
   downloadSheet: async () => notReady("시트 다운로드"),
   previewSheet: async () => notReady("시트 업로드 검증"),
   approveSheet: async () => notReady("시트 업로드 승인"),

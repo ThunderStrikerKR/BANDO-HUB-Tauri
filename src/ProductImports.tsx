@@ -4,7 +4,7 @@ import { won } from "./domain";
 import { applyOfficialProductPreview, leafCategories } from "./official-product-import";
 import type { NoticeSink } from "./shared/notices";
 import { useAsyncTask } from "./shared/useAsyncTask";
-import type { ImportPreview, State } from "./types";
+import type { ImportPreview, OfficialLink, State } from "./types";
 import { Field } from "./ui";
 
 export function ProductImports({
@@ -19,7 +19,16 @@ export function ProductImports({
   const [url, setUrl] = useState("");
   const [preview, setPreview] = useState<ImportPreview>();
   const [categoryId, setCategoryId] = useState("");
+  const [links, setLinks] = useState<OfficialLink[] | null>(null);
+  const [linkSearch, setLinkSearch] = useState("");
+  const matchingLinks = (links ?? []).filter((link) =>
+    (link.name + " " + link.url).toLocaleLowerCase()
+      .includes(linkSearch.trim().toLocaleLowerCase()));
 
+  const loadKnownLinks = () => void run(async () => {
+    const records = await window.bando!.officialList();
+    setLinks(records);
+  });
   const analyze = () => void run(async () => {
     setPreview(undefined);
     setCategoryId("");
@@ -56,9 +65,37 @@ export function ProductImports({
           placeholder="https://bandostand.com/product/.../상품번호/"
         />
       </Field>
-      <button type="button" disabled={busy || !url.trim()} onClick={analyze}>
-        공식 페이지 분석 / 미리보기
-      </button>
+      <div className="actions">
+        <button type="button" disabled={busy || !url.trim()} onClick={analyze}>
+          공식 페이지 분석 / 미리보기
+        </button>
+        <button type="button" disabled={busy} onClick={loadKnownLinks}>
+          내장 수집본에서 상품 찾기
+        </button>
+      </div>
+      {links !== null && (
+        <section className="official-product-preview" aria-label="내장 상품 링크 목록">
+          <p className="muted">
+            2026년 11월 1일에 저장된 카탈로그의 상품 링크 {links.length}개입니다.
+            현재 홈페이지 전체 목록이 아닙니다. 선택 후 공식 페이지를 다시 분석하세요.
+          </p>
+          <Field label="수집본 상품 검색">
+            <input value={linkSearch} onChange={(event) => setLinkSearch(event.target.value)}
+              placeholder="상품명 또는 상품번호 검색" />
+          </Field>
+          <p className="muted">검색 결과 {matchingLinks.length}개 / 최대 40개 표시</p>
+          <div className="official-link-results">
+            {matchingLinks.slice(0, 40).map((link) => (
+              <button type="button" key={link.url} disabled={busy}
+                onClick={() => { setUrl(link.url); setPreview(undefined); setCategoryId(""); setLinks(null); }}>
+                {link.name}
+              </button>
+            ))}
+            {!matchingLinks.length && <p className="muted">검색 결과가 없습니다.</p>}
+          </div>
+          <button type="button" onClick={() => setLinks(null)}>목록 닫기</button>
+        </section>
+      )}
       {preview && (
         <div className="official-product-preview">
           <h4>{preview.product.name}</h4>
