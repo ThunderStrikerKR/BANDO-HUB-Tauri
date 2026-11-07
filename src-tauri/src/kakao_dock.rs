@@ -285,7 +285,7 @@ mod native {
         s.width=kakao.width();
         Ok(())
     }
-    pub fn sync(s:&Session,app:&AppHandle,region:Option<Region>)->Result<(),String>{
+    pub fn sync(s:&mut Session,app:&AppHandle,region:Option<Region>)->Result<(),String>{
         if !live(s){return Err("카카오톡 연결이 끊어졌습니다.".into())}
         // Do not reposition a window that the user explicitly minimized.
         if unsafe{IsIconic(s.hwnd)}!=0 {
@@ -296,7 +296,10 @@ mod native {
             if unsafe{IsIconic(s.main)}!=0 || !focus_on_app_or_kakao(s.hwnd) {
                 set_z(s.hwnd,s.original_topmost);
             }else if let Some(area)=region{
-                set_rect(s.hwnd,overlay_region(app,area)?,HWND_TOPMOST)?;
+                let target=overlay_region(app,area)?;
+                set_rect(s.hwnd,target,HWND_TOPMOST)?;
+                // Dragged CSS width is the width used by the next split view.
+                s.width=target.width();
             }
         }else if unsafe{IsIconic(s.main)}==0{
             let main=rect(s.main)?;
@@ -317,6 +320,13 @@ mod native {
             }
         }
         Ok(())
+    }
+    // Report the physical app-area share rather than the historical fixed 0.8.
+    // Geometry is authoritative: CSS splitter widths and monitor DPI may change.
+    pub fn measured_ratio(s:&Session)->Result<f64,String>{
+        let app=rect(s.main)?.width().max(1) as f64;
+        let kakao=rect(s.hwnd)?.width().max(1) as f64;
+        Ok(app/(app+kakao))
     }
     pub fn restore(s:&Session){
         if unsafe{IsWindow(s.hwnd)}!=0{
@@ -523,7 +533,8 @@ fn lock(dock:&Dock)->Result<std::sync::MutexGuard<'_,Inner>,String>{
 fn status(inner:&Inner)->Status{
     #[cfg(windows)]
     if let Some(s)=inner.session{
-        return Status{active:true,mode:s.mode.name(),ratio:0.8,
+        return Status{active:true,mode:s.mode.name(),
+            ratio:native::measured_ratio(&s).unwrap_or(0.8),
             handle:Some(format!("{:016X}",s.hwnd as usize)),
             notice:None,selection_required:false}
     }
@@ -533,9 +544,17 @@ fn status(inner:&Inner)->Status{
 fn start(app:&AppHandle,inner:&mut Inner,handle:&str)->Result<Status,String>{
     #[cfg(windows)]
     {
-        if let Some(old)=inner.session.take(){native::restore(&old);}
         let region=inner.region.ok_or("도킹 영역의 크기를 아직 확인하지 못했습니다.")?;
+        // A stale/invalid target must never disconnect the current session.
+        // Selecting the current window again is idempotent: never capture
+        // its already-docked bounds as the new original placement.
+        if let Some(current)=inner.session {
+            if format!("{:016X}",current.hwnd as usize)==handle {
+                return Ok(status(inner));
+            }
+        }
         let mut session=native::attach(native::main_window(app)?,handle)?;
+        if let Some(old)=inner.session.take(){native::restore(&old);}
         if let Err(e)=native::overlap(&mut session,app,region){
             native::restore(&session);return Err(e)
         }
@@ -560,8 +579,14 @@ pub fn dock_status_native(app:AppHandle,dock:State<'_,Dock>)->Result<Status,Stri
             let mut s=inactive();s.notice=Some("카카오톡 창 연결이 해제되었습니다.".into());
             return Ok(s)
         }
-        let _=native::sync(&session,&app,inner.region);
+        let mut session=session;
+        let error=native::sync(&mut session,&app,inner.region).err();
         inner.session=Some(session);
+        if let Some(reason)=error {
+            let mut response=status(&inner);
+            response.notice=Some(format!("카카오톡 창 위치 동기화 실패: {reason}"));
+            return Ok(response);
+        }
     }
     #[cfg(not(windows))]{let _=app;}
     Ok(status(&inner))
@@ -618,8 +643,12 @@ pub fn dock_region_native(app:AppHandle,dock:State<'_,Dock>,region:Region)->Resu
         &&[region.x,region.y,region.width,region.height].iter().all(|v|v.is_finite()){
         inner.region=Some(region);
     }
-    #[cfg(windows)]if let Some(s)=inner.session{
-        if native::live(&s){let _=native::sync(&s,&app,inner.region);}
+    #[cfg(windows)]if let Some(mut s)=inner.session{
+        if native::live(&s) {
+            let result=native::sync(&mut s,&app,inner.region);
+            inner.session=Some(s);
+            result?;
+        }
     }
     #[cfg(not(windows))]{let _=app;}
     Ok(())
