@@ -222,6 +222,7 @@ try {
     window.__storeCommit?.fileOnly === true);
   await page.getByRole("button", { name: "엑셀 작성 이력" }).click();
   const storeHistory = page.getByRole("row").filter({ hasText: "BANDO-CI-STORE.xlsx" });
+  await storeHistory.locator("summary", { hasText: "관련 주문" }).click();
   await storeHistory.getByRole("button", { name: "매장 발송 확인" }).click();
   await page.getByRole("dialog", { name: "작업 확인" })
     .getByRole("button", { name: "확인", exact: true }).click();
