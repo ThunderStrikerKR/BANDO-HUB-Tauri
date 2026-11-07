@@ -179,9 +179,12 @@ export function parseOfficialProductPage(urlText: string, html: string, state: S
   const siteCodeRaw = field("상품코드") || field("자체 상품코드");
   const siteCode = CAFE24_CODE.test(siteCodeRaw) ? siteCodeRaw : undefined;
   const presentation = presentationName(name, code);
-  const retail = parsePrice(field("판매가")) ??
-    parsePrice(meta('meta[property="product:price:amount"]')) ??
-    parsePrice(clean(doc.querySelector("#span_product_price_text")?.textContent));
+  const displayedPrice = field("판매가");
+  // Never use a meta-tag base price to mask an ambiguous, explicit price range.
+  const retail = displayedPrice
+    ? parsePrice(displayedPrice)
+    : parsePrice(meta('meta[property="product:price:amount"]')) ??
+      parsePrice(clean(doc.querySelector("#span_product_price_text")?.textContent));
   const description = clean(doc.querySelector("#prdDetail, .prdDetail")?.textContent).slice(0, 6000);
   const explicitColor = field("색상") ||
     name.match(/\b(Black|White|Gray|Grey|Silver|Brown|Blue|Red|Gold|Clear)\b/i)?.[1] ||
@@ -193,7 +196,9 @@ export function parseOfficialProductPage(urlText: string, html: string, state: S
 
   const optionEvidence = inspectOptions(doc);
   const selectableOptions = optionEvidence.length > 0;
-  const unclearOptions = /(?:색상|컬러|사이즈|규격|옵션|바퀴|가방)\s*(?:선택|옵션)/i.test(name);
+  const unclearOptions = /(?:색상|컬러|사이즈|규격|옵션|바퀴|가방)\s*(?:선택|옵션)/i.test(name) ||
+    /\bBD\s*\d{3,4}[A-Z0-9-]*\s*(?:\/|,|\+)\s*(?:BD\s*)?\d{3,4}[A-Z0-9-]*/i.test(name) ||
+    /\bBD\s*\d{3,4}[A-Z0-9-]*\s+\d{3,4}[A-Z][A-Z0-9-]*/i.test(name);
   const matches = exactSourceMatches(state, catalog, id);
   const sameCode = registeredProducts(state.products).filter((p) =>
     (p.catalog ?? "BANDOSTAND") === catalog && !!code && normalizeCode(p.code) === normalizeCode(code)
@@ -208,7 +213,7 @@ export function parseOfficialProductPage(urlText: string, html: string, state: S
     ...(matches.length === 0 && sameCode.length > 0 ?
       ["같은 모델코드의 기존 상품이 있습니다. 중복 또는 색상 구성을 확인해야 합니다."] : []),
     ...(state.products.some((p) => p.deletedAt &&
-      (p.siteId === id || ((p.catalog ?? "BANDOSTAND") === catalog &&
+      (p.siteId === id || ((p.catalog ?? "BANDOSTAND") === catalog && !!code &&
         normalizeCode(p.code) === normalizeCode(code)))) ?
       ["삭제된 상품과 일치할 수 있으므로 자동 복원하지 않습니다."] : []),
   ];
