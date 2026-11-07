@@ -37,12 +37,10 @@ function contentsOf(text: string): { label: string; kind: string; negative: bool
   return found;
 }
 function variantContentsAreUnambiguous(product: Product): boolean {
-  if (product.variants.length <= 1) return true;
-  for (const kind of ["가방", "바퀴"]) {
-    const labels = product.variants.map((v) => contentsOf((v.option ?? "") + " " + v.color)
-      .find((tag) => tag.kind === kind));
-    if (labels.some(Boolean) && labels.some((value) => !value)) return false;
-  }
+  // A parent with multiple distinct sellable variants cannot have all of its
+  // product-defining options safely collapsed into one short model title.
+  // Keep the original display name until the SKU labels are reviewed.
+  if (product.variants.length > 1) return false;
   return true;
 }
 const escapeRegex = (value: string) => value.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&");
@@ -79,6 +77,14 @@ function descriptionFromTitle(name: string, model: string): string {
   return spaces(remainder);
 }
 
+function isOnlyUsageDescription(value: string): boolean {
+  return /^(?:성악용|녹음용|국악용|탁상용|교육용|연주용|실내용|야외용|탁상,국악용)/.test(value);
+}
+function hasUnresolvedAlternatives(text: string): boolean {
+  return /\bBD\s*\d{3,4}[A-Z0-9-]*\s*(?:\/|,|\+)\s*(?:BD\s*)?\d{3,4}[A-Z0-9-]*/i.test(text) ||
+    /\bBD\s*\d{3,4}[A-Z0-9-]*\s+\d{3,4}[A-Z][A-Z0-9-]*/i.test(text);
+}
+
 function combineDescription(extracted: string, existing: string): string {
   const first = spaces(extracted);
   const second = spaces(existing);
@@ -102,18 +108,22 @@ export function previewProductNameCleanup(state: State): ProductNameCleanupPrevi
       ["가방", "바퀴"].some((kind) =>
         contentsOf(other.name).some((item) => item.kind === kind) &&
         !qualifiers.some((item) => item.kind === kind)));
-    if (!model || !variantContentsAreUnambiguous(product) || ambiguousSibling) {
+    if (!model || !variantContentsAreUnambiguous(product) ||
+        ambiguousSibling || hasUnresolvedAlternatives(product.name)) {
       rows.push({
         productId: product.id, code: product.code, oldName: product.name, newName: product.name,
         oldDescription: existing, newDescription: existing,
         status: "HOLD", reason: !model ? "모델명을 확정할 수 없습니다. 상세관리에서 수동으로 확인하세요." :
-          "가방 또는 바퀴의 포함 / 미포함 구분이 누락됐습니다. 실제 상품 구성을 확인하세요.",
+          "색상, 규격, 구성품 또는 선택 옵션이 구분돼 있습니다. 개별 판매 상품명을 확인하세요.",
       });
       continue;
     }
-    const description = combineDescription(descriptionFromTitle(product.name, model.title), existing);
+    const remainder = descriptionFromTitle(product.name, model.title);
+    const usageOnly = isOnlyUsageDescription(remainder);
+    const description = combineDescription(usageOnly ? remainder : "", existing);
     const distinctFlags = [...new Set(qualifiers.map((flag) => flag.label))];
-    const displayName = [model.title, ...distinctFlags].join(" / ");
+    const displayName = [model.title, ...(remainder && !usageOnly ? [remainder] : []),
+      ...distinctFlags].join(" / ");
     if (displayName === product.name && description === existing) continue;
     rows.push({
       productId: product.id, code: product.code, oldName: product.name, newName: displayName,
