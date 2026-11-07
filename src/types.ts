@@ -554,6 +554,11 @@ export interface Api {
   saveClientWorkbook?: (bytes: number[]) => Promise<string | null>;
   saveRegistrationWorkbook?: (kind: "양식" | "결과", bytes: number[]) => Promise<string | null>;
   archiveFactoryReply?: (id: string, bytes: number[]) => Promise<string>;
+  chooseFactoryReplyDirectory?: () => Promise<string | undefined>;
+  factoryReplyWatchScan?: () => Promise<import("./factory-reply-auto.js").WatchedReplyFile[]>;
+  factoryReplyWatchCommit?: (
+    filename: string, id: string, candidate: State, expectedRevision: number,
+  ) => Promise<import("./factory-reply-auto.js").WatchedReplyResult>;
   openFactoryFile?: (id: string) => Promise<void>;
   productImage?: (id: string) => Promise<{ data: string; source: string } | null>;
   approveFactoryConflict?: (id: string, row: number, expectedRevision: number) => Promise<void>;
