@@ -54,8 +54,8 @@ test("Model names are concise and use cases move to the description", () => {
   assert.equal(desktop.newName, "BD 610");
   assert.match(desktop.newDescription, /탁상,국악용 보면대/);
   const bag = find("259");
-  assert.equal(bag.newName, "BD 700");
-  assert.match(bag.newDescription, /가방포함/);
+  assert.equal(bag.newName, "BD 700 / 가방 포함");
+  assert.doesNotMatch(bag.newDescription, /가방포함|가방 포함/);
   const cart = find("84");
   assert.equal(cart.newName, "Cart-20");
   assert.match(cart.newDescription, /보면대카트/);
@@ -108,4 +108,56 @@ test("Name cleanup is available only with a preview, acknowledgment, backup and 
   assert.match(ui, /!accepted/);
   assert.match(manager, /<ProductNameCleanupPanel/);
   assert.match(manager, /p\.originalName \?\? ""/);
+});
+
+test("Explicit included and excluded contents stay in shared product names", () => {
+  const original=seed.products.find((p)=>p.siteId==="259");
+  assert.ok(original);
+  const pairs=[
+    ["가방 포함","BD 700 / 가방 포함"],
+    ["가방 미포함","BD 700 / 가방 미포함"],
+    ["바퀴 포함","BD 700 / 바퀴 포함"],
+    ["바퀴 미포함","BD 700 / 바퀴 미포함"],
+    ["바퀴없음","BD 700 / 바퀴 미포함"],
+  ];
+  for(const [suffix, expected] of pairs) {
+    const fixture=structuredClone(seed);
+    const target=fixture.products.find((p)=>p.siteId==="259");
+    target.name="반도스탠드 BD 700 "+suffix;
+    const report=previewProductNameCleanup(fixture).rows.find((r)=>r.productId===target.id);
+    assert.equal(report.status,"READY");
+    assert.equal(report.newName,expected);
+    assert.doesNotMatch(report.newDescription,/가방|바퀴/);
+    const result=applyProductNameCleanup(fixture,previewProductNameCleanup(fixture));
+    const saved=result.next.products.find((p)=>p.id===target.id);
+    assert.equal(saved.name,expected);
+    assert.deepEqual(saved.variants,target.variants);
+  }
+});
+
+test("Missing opposite configuration is not silently assumed or auto-created", () => {
+  const fixture=structuredClone(seed);
+  const parent=fixture.products.find((p)=>p.siteId==="259");
+  const sibling={...structuredClone(parent),id:"synthetic-bag-unknown",
+    name:"반도스탠드 BD 700",siteId:"SYNTHETIC",siteRefs:["SYNTHETIC"],
+    variants:[{...structuredClone(parent.variants[0]),id:"synthetic-variant"}]};
+  fixture.products.push(sibling);
+  const preview=previewProductNameCleanup(fixture);
+  const row=preview.rows.find((r)=>r.productId===sibling.id);
+  assert.equal(row.status,"HOLD");
+  assert.match(row.reason,/미포함/);
+  const applied=applyProductNameCleanup(fixture,preview);
+  assert.equal(applied.next.products.length,fixture.products.length);
+  assert.equal(applied.next.products.find((p)=>p.id===sibling.id).name,sibling.name);
+});
+
+test("One unlabeled variant in a bag or wheel option group is held for review", () => {
+  const fixture=structuredClone(seed);
+  const p=fixture.products.find((x)=>x.siteId==="259");
+  p.variants.push({...structuredClone(p.variants[0]),id:"synthetic-missing",
+    option:"",color:"색상 확인 필요"});
+  p.variants[0].option="가방 포함";
+  const report=previewProductNameCleanup(fixture).rows.find((r)=>r.productId===p.id);
+  assert.equal(report.status,"HOLD");
+  assert.match(report.reason,/포함/);
 });
