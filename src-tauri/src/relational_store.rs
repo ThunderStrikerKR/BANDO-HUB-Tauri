@@ -262,9 +262,10 @@ fn read_children(conn:&Connection,sql:&str)->Result<HashMap<String,Vec<Value>>,S
 }
 fn attach(parents:&mut [Value],key:&str,mut children:HashMap<String,Vec<Value>>)->Result<(),String>{
     for parent in parents {
-        let id=required_id(parent,"관계형 부모")?;
+        let id=required_id(parent,"관계형 부모")?.to_owned();
+        let nested = children.remove(&id).unwrap_or_default();
         parent.as_object_mut().ok_or("관계형 데이터 객체 오류")?
-            .insert(key.to_string(),json!(children.remove(id).unwrap_or_default()));
+            .insert(key.to_string(),json!(nested));
     }
     if !children.is_empty() { return Err(format!("관계형 데이터에서 소유자가 없는 {key}을 발견했습니다.")); }
     Ok(())
