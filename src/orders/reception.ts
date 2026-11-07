@@ -118,7 +118,7 @@ export function validateReceptionBoundary(before: State, next: State) {
                 product.variants.some((variant) => variant.id === item.variantId),
             )
           )
-            throw Error("등록된 상품과 옵션을 확인하세요.");
+            throw Error("등록된 독립 상품과 가격 기록을 확인하세요.");
       const snapshot = order.confirmationSnapshot!;
       if (
         snapshot.raw !== order.raw ||
