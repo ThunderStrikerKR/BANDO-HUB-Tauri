@@ -29,7 +29,8 @@ function explicitModel(raw: string): string | null {
   const candidate = clean(raw);
   if (!candidate || CAFE24_CODE.test(candidate) ||
       /^(?:미등록|모델명|N\/A|없음|선택|선택하세요)$/i.test(candidate) ||
-      candidate.length > 60 || /[<>]/.test(candidate)) return null;
+      candidate.length > 60 || /[<>,/;+]/.test(candidate) ||
+      /[가-힣]/.test(candidate)) return null;
   const bd = candidate.match(/^BD[\s-]*([A-Za-z0-9]+(?:-[A-Za-z0-9]+)*)$/i);
   return bd ? normalizeModel("BD " + bd[1]) : normalizeModel(candidate);
 }
@@ -197,6 +198,7 @@ export function parseOfficialProductPage(urlText: string, html: string, state: S
   const optionEvidence = inspectOptions(doc);
   const selectableOptions = optionEvidence.length > 0;
   const unclearOptions = /(?:색상|컬러|사이즈|규격|옵션|바퀴|가방)\s*(?:선택|옵션)/i.test(name) ||
+    /[,/;+]/.test(field("모델명")) ||
     /\bBD\s*\d{3,4}[A-Z0-9-]*\s*(?:\/|,|\+)\s*(?:BD\s*)?\d{3,4}[A-Z0-9-]*/i.test(name) ||
     /\bBD\s*\d{3,4}[A-Z0-9-]*\s+\d{3,4}[A-Z][A-Z0-9-]*/i.test(name);
   const matches = exactSourceMatches(state, catalog, id);
