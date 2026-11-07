@@ -12,7 +12,7 @@ test('Tauri v0.0.4 versions agree', () => {
 test('existing v0.0.1 user profile and product prices stay at same location', () => {
   const cfg = JSON.parse(read('src-tauri/tauri.conf.json'));
   assert.equal(cfg.identifier,'com.bandostand.bandohub.tauri');
-  assert.match(read('src-tauri/src/lib.rs'), /bando-hub-v001\.sqlite/);
+  assert.match(read('src-tauri/src/startup_recovery.rs'), /bando-hub-v001\.sqlite/);
   assert.match(read('src-tauri/src/lib.rs'), /state_save/);
 });
 test('receipt archive is connected end-to-end', () => {
