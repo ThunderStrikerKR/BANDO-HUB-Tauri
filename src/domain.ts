@@ -164,7 +164,8 @@ export function itemFromProduct(
   const eligible = p.variants.filter((variant) => normalizeColor(variant.color) === c);
   // Color alone does not distinguish same-color options such as a bag
   // included/excluded, wheels included/excluded or perforated top.
-  const v = explicit ?? ((p.variants.length === 1 && !p.requiresOption) ||
+  const v = selectedVariantId ? explicit :
+    ((p.variants.length === 1 && !p.requiresOption) ||
     (p.variants.length > 1 && !!color && !p.requiresOption && eligible.length === 1)
       ? eligible[0] : undefined);
   const technicalCode = /^(?:P[A-Z0-9]{6,}|BANDO-SITE-|SITE-)/i.test(p.code);
@@ -182,7 +183,8 @@ export function itemFromProduct(
     productId: p.id,
     variantId: v?.id ?? null,
     raw: p.code,
-    name: p.variants.some((variant) => variant.source === "DEMO")
+    name: p.variants.some((variant) => variant.source === "DEMO") &&
+      !productName.startsWith("[가상] ")
       ? "[가상] " + productName : productName,
     color: c,
     quantity,
