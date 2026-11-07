@@ -121,9 +121,10 @@ fn prune_automatic(dir: &Path, date: NaiveDate) -> Result<(), String> {
     Ok(())
 }
 
-/// Called at startup and periodically while the app remains open.
-/// A day without an app process has no invented backup: the next actual
-/// operating day becomes that month's permanent first-backup day.
+/// Called once on application startup. An app left open across midnight
+/// does not schedule another backup until it is launched again.
+/// A day without a backup has no invented file: the next actual backup
+/// becomes that month's permanent first-backup day.
 pub(super) fn automatic_backup_if_needed(
     conn: &Connection, base: &Path, today: NaiveDate
 ) -> Result<Option<String>, String> {
