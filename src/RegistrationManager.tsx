@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { confirmAction } from "./dialogs";
 import {
-  exportRegistrationResults, exportRegistrationTemplate,
+  exportRegistrationTemplate,
   prepareRegistrationCommit, previewRegistrationWorkbook,
   type RegistrationWorkbookPreview,
 } from "./product-registration-xlsx";
@@ -26,10 +26,10 @@ export function RegistrationManager({
   const lastBatch = state.registrationBatches?.at(-1);
   const [source, setSource] = useState("");
   const close = () => { if (!busy) { setOpen(false); setPreview(undefined); setApproved(false); } };
-  const download = (kind: "양식" | "결과", bytes: number[]) =>
-    window.bando!.saveRegistrationWorkbook!(kind, bytes);
+  const download = (bytes: number[]) =>
+    window.bando!.saveRegistrationWorkbook!("양식", bytes);
   const createTemplate = () => void run(async () => {
-    const path = await download("양식", await exportRegistrationTemplate(state));
+    const path = await download(await exportRegistrationTemplate(state));
     if (path) onNotice("상품 등록 양식을 저장했습니다: " + path, "success");
   });
   const chooseFile = (file?: File) => {
@@ -61,15 +61,6 @@ export function RegistrationManager({
     setApproved(false);
     onNotice("신규 상품 " + result.created + "개 등록, 미등록 " + result.skipped + "행. 기존 가격은 유지했습니다.", "success");
   });
-  const saveResults = () => void run(async () => {
-    // Load the persisted record rather than relying on transient React state:
-    // the result workbook remains available after restarting the app.
-    const current = await window.bando!.load();
-    const saved = current.registrationBatches?.at(-1);
-    if (!saved) throw Error("저장된 상품 등록 결과가 없습니다.");
-    const path = await download("결과", await exportRegistrationResults(saved));
-    if (path) onNotice("상품 등록 결과를 저장했습니다: " + path, "success");
-  });
   return <>
     <button type="button" onClick={() => setOpen(true)}>엑셀 대량 등록</button>
     {open && <Modal busy={busy} title="상품 엑셀 대량 등록" onClose={close}>
@@ -77,13 +68,38 @@ export function RegistrationManager({
       <div className="actions">
         <button type="button" disabled={busy} onClick={createTemplate}>등록 양식 다운로드</button>
         <button type="button" disabled={busy} onClick={() => fileInput.current?.click()}>파일 업로드 / 검증</button>
-        <button type="button" disabled={busy || !lastBatch} onClick={saveResults}>최근 등록 결과 다운로드</button>
         <input ref={fileInput} hidden type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
           onChange={(event) => {
             chooseFile(event.currentTarget.files?.[0]);
             event.currentTarget.value = "";
           }}/>
       </div>
+      {lastBatch && (
+        <details className="registration-result-history">
+          <summary>
+            최근 등록 결과 / 성공 {lastBatch.createdIds.length}개 /
+            중복 {lastBatch.rows.filter((r) => r.status === "DUPLICATE").length}개 /
+            오류 {lastBatch.rows.filter((r) => r.status === "ERROR").length}개 /
+            보류 {lastBatch.rows.filter((r) => r.status === "HOLD").length}개
+          </summary>
+          <p className="muted">{lastBatch.at} / 작업자 {lastBatch.actor}</p>
+          <div className="registration-preview">
+            <table>
+              <thead><tr><th>행</th><th>상품</th><th>결과</th><th>사유 / 중복 상품</th></tr></thead>
+              <tbody>
+                {lastBatch.rows.map((row) => (
+                  <tr key={row.row}>
+                    <td>{row.row}</td>
+                    <td>{row.values["최종 등록명"] || "상품명 없음"}</td>
+                    <td>{{ READY:"등록 완료", ERROR:"오류", DUPLICATE:"중복", HOLD:"보류" }[row.status]}</td>
+                    <td>{row.errors.join(" / ") || row.duplicateIds.join(", ") || "정상"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      )}
       {preview && <>
         <p><strong>{source}</strong> / 등록 가능 {preview.rows.filter((r) => r.status === "READY").length}행
           / 오류 {preview.rows.filter((r) => r.status === "ERROR").length}행

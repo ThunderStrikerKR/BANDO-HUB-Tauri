@@ -117,43 +117,30 @@ export function SettingsPanel({
           />
         </Field>
       ))}
-      <h2>공장 회신 수신 폴더</h2>
-      <p>{s.factoryReplyDirectory || "설정되지 않음"}</p>
-      <button
-        onClick={() =>
-          void run(async () => {
-            const folder = await window.bando!.chooseExcelDirectory();
-            if (folder) setS({ ...s, factoryReplyDirectory: folder });
-          })
-        }
-      >
-        공장 회신 폴더 선택
-      </button>
-      <p className="muted">
-        공장 회신 폴더 지정은 가능하지만 자동 감지는 아직 지원하지 않습니다.
-        회신 파일은 공장 회신 가져오기에서 직접 선택해 주세요.
-      </p>
-      <h2>엑셀 기본 저장 폴더</h2>
+      <h2>Excel 보관함 위치</h2>
       <p>{s.excelDirectory || "설정되지 않음"}</p>
-      <button
-        onClick={() =>
-          void run(async () => {
-            const folder = await window.bando!.chooseExcelDirectory();
-            if (folder) setS({ ...s, excelDirectory: folder });
-          })
-        }
-      >
-        폴더 선택
+      <button type="button" disabled={saving}
+        onClick={() => void run(async () => {
+          const folder = await window.bando!.chooseExcelDirectory();
+          if (folder) setS((current) => ({ ...current, excelDirectory: folder }));
+        })}>
+        보관함 폴더 선택
       </button>
       {state.settings.excelDirectory && (
-        <button
-          type="button"
-          disabled={saving}
-          onClick={() => void run(() => window.bando!.openExcelDirectory())}
-        >
-          저장된 폴더 열기
+        <button type="button" disabled={saving}
+          onClick={() => void run(() => window.bando!.openExcelDirectory())}>
+          보관함 열기
         </button>
       )}
+      <p className="muted">
+        보관함 하나를 선택하고 아래 설정 저장을 눌러 주세요.
+        공장 발송, 매장 발송, 공장 회신, 상품 관리, 거래처 관리 폴더를 자동으로 구분합니다.
+        각 폴더 아래는 연도, 월, 일 순서로 분류하며 기존 파일을 덮어쓰지 않습니다.
+      </p>
+      <p className="muted">
+        공장 회신 Excel은 업로드 후 보관함으로 복사하고, 감사용 원본은 앱 데이터에도 별도로 보존합니다.
+        회신 폴더 자동 감지는 아직 지원하지 않습니다.
+      </p>
       <h2>입금 계좌</h2>
       <p className="muted">
         반도스탠드 상품 및 혼합 주문은 반도스탠드 계좌, 반도몰 상품만 있는 주문은 반도몰 계좌를

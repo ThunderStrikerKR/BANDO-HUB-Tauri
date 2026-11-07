@@ -11,7 +11,7 @@ test("Registration UI is connected to the real preview and version-checked state
   assert.match(ui, /await window\.bando!\.backup\(\)/);
   assert.ok(ui.indexOf("await window.bando!.backup()") < ui.indexOf("await onSave(result.next)"));
   assert.match(ui, /confirmAction\(/);
-  assert.match(ui, /current\.registrationBatches\?\.at\(-1\)/);
+  assert.match(ui, /state\.registrationBatches\?\.at\(-1\)/);
   assert.match(ui, /await onRefresh\(\)/);
   assert.doesNotMatch(ui, /window\.bando!\.registrationCommit/);
 });
@@ -37,7 +37,7 @@ test("Review blocks rows with invalid categories, ambiguous brands, formulas, du
   assert.match(workbook, /preview\.revision/);
 });
 
-test("Native download only accepts two fixed registration XLSX names", () => {
+test("Native registration download only accepts the blank template", () => {
   const bridge = read("src/tauri-bridge.ts");
   const rust = read("src-tauri/src/lib.rs");
   assert.match(bridge, /saveRegistrationWorkbook: \(kind, bytes\)/);
@@ -49,10 +49,12 @@ test("Native download only accepts two fixed registration XLSX names", () => {
   assert.match(rust, /save_product_workbook, save_registration_workbook/);
 });
 
-test("Price workbook remains separate from the registration workbook", () => {
-  assert.match(read("src/ProductPriceWorkbookTools.tsx"), /previewPriceWorkbook/);
+test("Old price workbook UI is merged into the complete product workbook", () => {
+  assert.doesNotMatch(read("src/ProductManager.tsx"), /<ProductPriceWorkbookTools/);
+  assert.match(read("src/ProductManager.tsx"), /<ProductSyncWorkbookTools/);
   assert.match(read("src/ProductManager.tsx"), /<RegistrationManager state=\{state\} onSave=\{onSave\}/);
-  assert.match(read("src/product-registration-xlsx.ts"), /exportRegistrationResults/);
+  assert.match(read("src/RegistrationManager.tsx"), /최근 등록 결과/);
+  assert.doesNotMatch(read("src/RegistrationManager.tsx"), /최근 등록 결과 다운로드/);
 });
 
 test("Excel exports use a native Save As dialog with user-chosen folder and name", () => {
@@ -73,7 +75,7 @@ test("Cancelling Save As is not an error or a false success notice", () => {
   const price = read("src/ProductPriceWorkbookTools.tsx");
   assert.match(rust, /let Some\(selected\) = selected else \{ return Ok\(None\); \}/);
   assert.match(client, /if \(path\) onNotice\("상품 등록 양식을 저장했습니다/);
-  assert.match(client, /if \(path\) onNotice\("상품 등록 결과를 저장했습니다/);
+  assert.match(client, /lastBatch\.rows\.map/);
   assert.match(price, /if \(path\) onNotice\("상품 가격표를 저장했습니다/);
 });
 

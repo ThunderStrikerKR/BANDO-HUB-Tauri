@@ -107,7 +107,7 @@ export function FactoryReplyImport({
               ))}</tbody>
             </table>
           </div>
-          <p className="muted">원본 Excel은 앱 데이터 폴더에 보관합니다. 등록 후 충돌 건은 회신 이력에서 개별 검토할 수 있습니다.</p>
+          <p className="muted">감사용 원본은 앱 데이터에 보관하고, 별도 사본은 지정된 Excel 보관함의 공장 회신 날짜별 폴더에 저장합니다. 등록 후 충돌 건은 회신 이력에서 개별 검토할 수 있습니다.</p>
           <label className="check">
             <input type="checkbox" checked={accepted} onChange={(event) => setAccepted(event.target.checked)}/>
             변경될 운송장과 실제 운임을 확인했습니다. 보류 행은 변경하지 않습니다.

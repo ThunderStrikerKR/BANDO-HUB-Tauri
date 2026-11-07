@@ -1,41 +1,24 @@
 import { useMemo } from "react";
 import { won } from "../domain";
-import { useAsyncTask } from "../shared/useAsyncTask";
 import type { NoticeSink } from "../shared/notices";
 import type { State } from "../types";
 import { Field } from "../ui";
 import { EmptyState, PageHeading } from "../ui/PageHeading";
 import { DateNavigator } from "./DateNavigator";
 import { orderHistory } from "./order-history";
-import { exportDailySettlementWorkbook } from "./report-workbook";
 import { dailySettlement } from "./settlement-report";
 
 const cash = (value: number | null) => value === null ? "확인 필요" : won(value);
 export function DailySettlement({
-  state, date, onDate, onNotice,
+  state, date, onDate,
 }: {
   state: State;
   date: string;
   onDate: (date: string) => void;
   onNotice: NoticeSink;
 }) {
-  const { busy, run } = useAsyncTask(onNotice);
   const report = useMemo(() => dailySettlement(state, date, orderHistory(state, "", date)),
     [state, date]);
-  const download = () => void run(async () => {
-    const api = window.bando;
-    if (!api?.saveSettlementWorkbook) throw Error("일일 결산 Excel 저장 기능이 연결되지 않았습니다.");
-    const latest = await api.load();
-    if ((latest.revision ?? 0) !== report.revision) {
-      throw Error("조회 중 데이터가 변경되었습니다. 최신 결산을 확인한 뒤 다시 다운로드하세요.");
-    }
-    const fresh = dailySettlement(latest, date, orderHistory(latest, "", date));
-    const bytes = await exportDailySettlementWorkbook({
-      date, revision: latest.revision ?? 0, report: fresh,
-    });
-    const location = await api.saveSettlementWorkbook(bytes);
-    if (location) onNotice("일일 결산 Excel을 저장했습니다: " + location, "success");
-  });
   return (
     <section className="daily-settlement">
       <PageHeading title="일일 결산"
@@ -46,7 +29,6 @@ export function DailySettlement({
       <section className="card">
         <div className="section-title">
           <h2>{date} / 일일 결산 조회</h2>
-          <button type="button" disabled={busy} onClick={download}>현재 결산 Excel 다운로드</button>
         </div>
         <p className="muted">
           청구 금액은 접수 확정일, 실제 입금액은 은행 입금 일시를 기준으로 조회합니다.

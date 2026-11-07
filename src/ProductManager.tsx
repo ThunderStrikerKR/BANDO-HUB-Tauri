@@ -11,7 +11,6 @@ import { ClassificationFilters, RegistrySettings } from "./Classification";
 import { confirmAction } from "./dialogs";
 import { normalizeColor, uid, validateProduct, won } from "./domain";
 import { CatalogPanel } from "./ManagementUI";
-import { ProductPriceWorkbookTools } from "./ProductPriceWorkbookTools";
 import { PriceCell } from "./PriceCell";
 import {
   colorLabel,
@@ -236,7 +235,6 @@ export function ProductManager({
                 >
                   {priceMode ? "가격 수정 모드 종료" : "가격 수정 모드 켜기"}
                 </button>
-                <ProductSyncWorkbookTools onSave={onSave} onRefresh={onRefresh} onNotice={onNotice} />
                 <ProductNameCleanupPanel onSave={onSave} onRefresh={onRefresh} onNotice={onNotice} />
                 <button onClick={() => setAdding(!adding)}>상품 추가</button>
               </div>
@@ -249,9 +247,16 @@ export function ProductManager({
                 <ProductImports state={state} onSave={onSave} onRefresh={onRefresh} onNotice={onNotice} />
               </section>
             )}
-            <details className="card"><summary>기존 신규 상품 등록 양식 (보조 기능)</summary>
+            <section className="card">
+              <h3>상품 Excel 관리</h3>
+              <p className="muted">
+                상품 전체 Excel로 상품 정보, 옵션, 가격을 조회하고 수정합니다.
+                신규 상품만 대량 등록할 때는 같은 화면의 등록 양식을 이용하세요.
+                등록 성공, 중복, 오류 결과는 반도허브에서 확인합니다.
+              </p>
+              <ProductSyncWorkbookTools onSave={onSave} onRefresh={onRefresh} onNotice={onNotice} />
               <RegistrationManager state={state} onSave={onSave} onRefresh={onRefresh} onNotice={onNotice} />
-            </details>
+            </section>
             <section className="card product-prices">
               <div className="manager-filters">
                 <ClassificationFilters
@@ -274,9 +279,6 @@ export function ProductManager({
                   가격 미등록만
                 </label>
               </div>
-              <details className="product-price-legacy-tools"><summary>기존 가격표 Excel (보조 기능)</summary>
-                <ProductPriceWorkbookTools state={state} onSave={onSave} onRefresh={onRefresh} onNotice={onNotice} locked={!priceMode} />
-              </details>
               <div className="price-table-scroll">
                 <table>
                   <thead>

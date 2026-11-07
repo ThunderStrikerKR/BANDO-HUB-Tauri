@@ -7,8 +7,6 @@ import type { Order, State } from "../types";
 import { Field } from "../ui";
 import { EmptyState, PageHeading } from "../ui/PageHeading";
 import { orderHistory } from "./order-history";
-import { exportOrderHistoryWorkbook } from "./report-workbook";
-import { useAsyncTask } from "../shared/useAsyncTask";
 import type { NoticeSink } from "../shared/notices";
 export function OrderHistory({
   state,
@@ -17,7 +15,6 @@ export function OrderHistory({
   date,
   onDate,
   onOpen,
-  onNotice,
 }: {
   state: State;
   query: string;
@@ -28,19 +25,7 @@ export function OrderHistory({
   onNotice: NoticeSink;
 }) {
   const [expanded, setExpanded] = useState<string[]>([]);
-  const { busy, run } = useAsyncTask(onNotice);
   const rows = useMemo(() => orderHistory(state, query, date), [state, query, date]);
-  const download = () => void run(async () => {
-    const api = window.bando;
-    if (!api?.saveOrderHistoryWorkbook) throw Error("주문내역 Excel 저장 기능이 연결되지 않았습니다.");
-    const latest = await api.load();
-    if ((latest.revision ?? 0) !== (state.revision ?? 0)) {
-      throw Error("조회 중 주문 데이터가 변경됐습니다. 목록을 새로고침한 뒤 다시 다운로드하세요.");
-    }
-    const bytes = await exportOrderHistoryWorkbook(latest, orderHistory(latest, query, date));
-    const saved = await api.saveOrderHistoryWorkbook(bytes);
-    if (saved) onNotice("현재 조회 조건의 주문내역 Excel을 저장했습니다: " + saved, "success");
-  });
   return (
     <>
       <PageHeading
@@ -65,9 +50,6 @@ export function OrderHistory({
             onChange={(event) => onQuery(event.target.value)}
           />
           <small className="result-count">{rows.length}건</small>
-          <button type="button" disabled={busy || rows.length === 0} onClick={download}>
-            조회 결과 Excel 다운로드
-          </button>
         </div>
         <div className="table-scroll">
           <table>
