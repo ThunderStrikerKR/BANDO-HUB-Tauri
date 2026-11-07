@@ -582,7 +582,9 @@ fn start(app:&AppHandle,inner:&mut Inner,handle:&str)->Result<Status,String>{
         // its already-docked bounds as the new original placement.
         if let Some(current)=inner.session {
             if format!("{:016X}",current.hwnd as usize)==handle {
-                return Ok(status(inner));
+                if native::live(&current) { return Ok(status(inner)); }
+                inner.session=None;
+                return Err("기존 카카오톡 창이 종료됐습니다. 창 목록을 다시 확인하세요.".into());
             }
         }
         let mut session=native::attach(native::main_window(app)?,handle)?;
