@@ -455,6 +455,12 @@ export interface State {
 export interface ImportPreview {
   product: Product;
   existingId: string | null;
+  modelSource?: "MODEL_FIELD" | "CUSTOM_CODE" | "TITLE" | "UNRESOLVED";
+  optionEvidence?: {
+    group: string;
+    kind: "SELECT" | "RADIO" | "CHECKBOX" | "CUSTOM";
+    values: { label: string; token: string }[];
+  }[];
   warnings: string[];
   sourceUrl: string;
   related?: Product[];
