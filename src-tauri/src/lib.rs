@@ -876,19 +876,21 @@ pub fn run() {
                 (base, conn)
             };
             app.manage(Database { connection: Mutex::new(conn), base: active_base, is_test });
-            // Automatic backup is attempted at every start and periodically
-            // thereafter, including a calendar-month change during a long run.
+            // Attempt one automatic backup per app launch, not periodically.
+            // A second launch on the same date does not create another backup.
             // TEST and production modes use separate AppData roots.
             let handle = app.handle().clone();
-            std::thread::spawn(move || loop {
+            std::thread::spawn(move || {
                 let db = handle.state::<Database>();
-                if let Ok(conn) = db.connection.lock() {
-                    if let Err(reason) = backup_manager::automatic_backup_if_needed(
-                        &conn, &db.base, Local::now().date_naive()) {
-                        eprintln!("반도허브 자동 백업 실패 (재시도 예정): {reason}");
+                match db.connection.lock() {
+                    Ok(conn) => {
+                        if let Err(reason) = backup_manager::automatic_backup_if_needed(
+                            &conn, &db.base, Local::now().date_naive()) {
+                            eprintln!("반도허브 자동 백업 실패 (다음 실행 시 재시도): {reason}");
+                        }
                     }
+                    Err(reason) => eprintln!("반도허브 자동 백업 DB 잠금 실패: {reason}"),
                 }
-                std::thread::sleep(std::time::Duration::from_secs(1800));
             });
             Ok(())
         })
