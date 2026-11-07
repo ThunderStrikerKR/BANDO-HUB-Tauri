@@ -406,6 +406,41 @@ mod tests {
         verify(&conn).unwrap();
         drop(conn);close(&path);
     }
+
+    #[test]
+    fn duplicate_option_id_rolls_back_every_relation_and_revision() {
+        let path=temp();
+        let mut conn=super::super::initialize_database(&path).unwrap();
+        let before=super::super::get_snapshot(&conn).unwrap();
+        let mut tampered=before.clone();
+        let existing=before["products"][0]["variants"][0]["id"].clone();
+        tampered["products"][1]["variants"][0]["id"]=existing;
+        let result=super::super::write_snapshot(&mut conn,tampered,0,false);
+        assert!(result.unwrap_err().contains("판매 옵션 ID 중복"));
+        assert_eq!(super::super::get_snapshot(&conn).unwrap(),before);
+        verify(&conn).unwrap();
+        drop(conn);close(&path);
+    }
+    #[test]
+    fn upgrades_legacy_json_in_place_with_a_verified_original_backup() {
+        let folder=temp().with_extension("dir");
+        std::fs::create_dir_all(&folder).unwrap();
+        let path=folder.join("old.sqlite");
+        let legacy=Connection::open(&path).unwrap();
+        legacy.execute_batch("CREATE TABLE app_state(id INTEGER PRIMARY KEY,payload TEXT NOT NULL)").unwrap();
+        let original=include_str!("../resources/state-seed.json");
+        legacy.execute("INSERT INTO app_state(id,payload) VALUES (1,?1)",[original]).unwrap();
+        drop(legacy);
+        let conn=super::super::initialize_database(&path).unwrap();
+        assert!(active(&conn).unwrap());
+        assert_eq!(super::super::get_snapshot(&conn).unwrap()["products"].as_array().unwrap().len(),303);
+        verify(&conn).unwrap();
+        let copies=std::fs::read_dir(folder.join("backups")).unwrap().count();
+        assert_eq!(copies,1);
+        drop(conn);
+        std::fs::remove_dir_all(folder).unwrap();
+    }
+
     #[test]
     fn client_order_recipient_and_item_have_reversible_foreign_keys() {
         let path=temp();
