@@ -9,7 +9,7 @@ import type { Catalog, Product, State } from "./types";
 
 /** A row is one actual selling configuration. Existing prices are never overwritten. */
 export const REGISTRATION_HEADERS = [
-  "최종 등록명", "제조사 모델코드", "브랜드", "색상", "옵션", "규격",
+  "최종 등록명", "제조사 모델코드", "브랜드", "색상", "구성 구분", "규격",
   "판매 단위", "상품군", "카테고리 경로", "도매가", "반도매가",
   "소매가", "상품 링크", "비고",
 ] as const;
@@ -90,7 +90,7 @@ export async function exportRegistrationTemplate(state: State): Promise<number[]
   const guide = wb.addWorksheet("작성 안내");
   [
     ["항목", "작성 기준"],
-    ["작성 단위", "실제 판매 구성(모델, 색상, 옵션, 규격, 판매 단위) 하나당 한 행"],
+    ["작성 단위", "실제 판매 가능한 완성 상품(모델, 색상, 규격, 포함 구성) 하나당 한 행. 구분 요소는 최종 등록명에도 기재"],
     ["상품군", "반도스탠드 또는 반도몰 중 하나를 정확히 선택"],
     ["카테고리 경로", "카테고리 경로 목록 시트의 최하위 전체 경로를 그대로 입력"],
     ["도매가 / 반도매가 / 소매가", "공란 또는 0은 미등록. 기존 가격은 덮어쓰지 않음"],
@@ -149,6 +149,10 @@ export async function previewRegistrationWorkbook(state: State, file: File): Pro
     const code = normalizeModel(values["제조사 모델코드"]);
     if (!name) errors.push("최종 등록명을 입력하세요.");
     if (!code) errors.push("제조사 모델코드를 입력하세요.");
+    const configuration = values["구성 구분"].trim();
+    if (configuration && !registryKey(name).includes(registryKey(configuration))) {
+      holds.push("구성 구분 정보는 별도 옵션이 아니라 최종 등록명에 포함해야 합니다.");
+    }
     if (!values["판매 단위"]) errors.push("판매 단위를 입력하세요.");
     const catalog = catalogValue(values["상품군"]);
     if (!catalog) errors.push("상품군을 반도스탠드 또는 반도몰로 지정하세요.");
@@ -172,7 +176,7 @@ export async function previewRegistrationWorkbook(state: State, file: File): Pro
     const color = normalizeColor(values["색상"] || "단일");
     const identity = (catalog ?? "UNKNOWN") + "|" +
       registryIdentity({ ...values, "제조사 모델코드": code, "색상": color }) +
-      "|" + registryKey(values["옵션"] ?? "");
+      "|" + registryKey(values["구성 구분"] ?? "");
     const at = new Date().toISOString();
     const product: Product | undefined = name && code && catalog && category && !errors.length ? {
       id: crypto.randomUUID(), code, name, manufacturerCode: code, catalog,
@@ -189,7 +193,7 @@ export async function previewRegistrationWorkbook(state: State, file: File): Pro
       defaultColor: color, colorStatus: color === "단일" ? "NOT_REQUIRED" : "KNOWN",
       active: true,
       variants: [{
-        id: crypto.randomUUID(), color, option: values["옵션"],
+        id: crypto.randomUUID(), color, option: values["구성 구분"],
         wholesale: prices[0], semi: prices[1], retail: prices[2], url, source: "MANUAL",
       }],
       createdAt: at, updatedAt: at,
