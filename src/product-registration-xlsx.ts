@@ -197,8 +197,13 @@ export async function previewRegistrationWorkbook(state: State, file: File): Pro
     let duplicateIds: string[] = [];
     if (product) {
       duplicateIds = existingMatches({ ...state, products: prior }, product);
-      try { validateProduct(product, registeredProducts(prior)); }
-      catch (error) { errors.push(String(error instanceof Error ? error.message : error)); }
+      // A verified duplicate remains a DUPLICATE in the review, not a
+      // generic ERROR emitted by the product validator for the same record.
+      // Independently malformed fields still take priority as ERROR.
+      if (!duplicateIds.length) {
+        try { validateProduct(product, registeredProducts(prior)); }
+        catch (error) { errors.push(String(error instanceof Error ? error.message : error)); }
+      }
     }
     const earlier = seen.get(identity);
     if (earlier !== undefined) holds.push(String(earlier) + "행과 같은 판매 구성입니다.");
