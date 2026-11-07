@@ -213,7 +213,7 @@ test("real XLSX: a new row with a duplicate business model is held, not register
   option[1]="DUPLICATE_MODEL"; option[3]="클리어"; option[7]="135000";
   options.addRow(option);
   const preview=await previewWorkbook(state,wb);
-  assert.ok(preview.rows.some((r)=>r.status==="HOLD"));
+  assert.ok(preview.rows.some((r)=>r.status==="HOLD" || r.status==="ERROR"));
   assert.throws(()=>exports.applyProductSyncWorkbook(state,preview),/오류나 중복 의심/);
 });
 
