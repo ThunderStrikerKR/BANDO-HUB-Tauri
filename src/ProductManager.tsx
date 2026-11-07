@@ -22,7 +22,6 @@ import {
 } from "./product-models";
 import { classifiedProducts } from "./product-registry";
 import { ProductImports } from "./ProductImports";
-import { ProductNameCleanupPanel } from "./ProductNameCleanupPanel";
 import { ProductSyncWorkbookTools } from "./ProductSyncWorkbookTools";
 import { optimizeProductImage } from "./product-image-preprocess";
 import { RegistrationManager } from "./RegistrationManager";
@@ -235,7 +234,6 @@ export function ProductManager({
                 >
                   {priceMode ? "가격 수정 모드 종료" : "가격 수정 모드 켜기"}
                 </button>
-                <ProductNameCleanupPanel onSave={onSave} onRefresh={onRefresh} onNotice={onNotice} />
                 <button onClick={() => setAdding(!adding)}>상품 추가</button>
               </div>
             </div>
