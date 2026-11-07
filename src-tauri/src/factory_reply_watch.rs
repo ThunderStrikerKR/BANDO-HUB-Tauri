@@ -17,8 +17,14 @@ struct Stamp {
     size: u64,
     modified: SystemTime,
 }
+#[derive(Clone)]
+struct SeenFile {
+    stamp: Stamp,
+    observations: u8,
+    digest: Option<String>,
+}
 #[derive(Default)]
-pub(super) struct InboxWatch(Mutex<HashMap<PathBuf, Stamp>>);
+pub(super) struct InboxWatch(Mutex<HashMap<PathBuf, SeenFile>>);
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -58,7 +64,7 @@ fn inbox_directory(base: &Path, is_test: bool, settings: &Value) -> Result<Optio
     Ok(Some(canonical_excel_directory(Path::new(path))?))
 }
 fn scan_files(
-    dir: &Path, seen: &mut HashMap<PathBuf, Stamp>, registered: &HashSet<String>
+    dir: &Path, seen: &mut HashMap<PathBuf, SeenFile>, registered: &HashSet<String>
 ) -> Result<Vec<InboxFile>, String> {
     let mut files = fs::read_dir(dir).map_err(err)?
         .collect::<Result<Vec<_>, _>>().map_err(err)?;
@@ -77,13 +83,25 @@ fn scan_files(
         }
         let stamp = Stamp { size: metadata.len(), modified: metadata.modified().map_err(err)? };
         active.insert(path.clone());
-        let stable = seen.insert(path.clone(), stamp) == Some(stamp);
-        if !stable || ready.len() >= MAX_FILES_PER_SCAN { continue; }
+        let record = seen.entry(path.clone()).or_insert_with(|| SeenFile {
+            stamp, observations: 0, digest: None,
+        });
+        if record.stamp != stamp {
+            *record = SeenFile { stamp, observations: 0, digest: None };
+        }
+        // Require three unchanged observations before attempting XLSX parse.
+        // A file being copied can have a brief period with stable metadata.
+        record.observations = record.observations.saturating_add(1);
+        if record.observations < 3 || ready.len() >= MAX_FILES_PER_SCAN { continue; }
+        if record.digest.as_ref().is_some_and(|id| registered.contains(id)) {
+            continue; // Never re-read gigabytes of historical processed replies.
+        }
         let bytes = fs::read(&path).map_err(err)?;
         let after = fs::metadata(&path).map_err(err)?;
         if after.len() != stamp.size || after.modified().map_err(err)? != stamp.modified
             || bytes.len() as u64 != stamp.size { continue; }
         let id = file_id(&bytes);
+        if let Some(record) = seen.get_mut(&path) { record.digest = Some(id.clone()); }
         if !registered.contains(&id) {
             ready.push(InboxFile { filename: name, id, bytes });
         }
@@ -388,6 +406,7 @@ mod tests {
         let mut seen = HashMap::new();
         let empty = HashSet::new();
         assert!(scan_files(&root,&mut seen,&empty).unwrap().is_empty());
+        assert!(scan_files(&root,&mut seen,&empty).unwrap().is_empty());
         let scanned = scan_files(&root,&mut seen,&empty).unwrap();
         assert_eq!(scanned.len(),1);
         assert_eq!(scanned[0].filename,"reply.xlsx");
@@ -395,6 +414,7 @@ mod tests {
         let registered = HashSet::from([scanned[0].id.clone()]);
         assert!(scan_files(&root,&mut seen,&registered).unwrap().is_empty());
         fs::write(root.join("reply.xlsx"), b"PK-factory-updated").unwrap();
+        assert!(scan_files(&root,&mut seen,&empty).unwrap().is_empty());
         assert!(scan_files(&root,&mut seen,&empty).unwrap().is_empty());
         assert_eq!(scan_files(&root,&mut seen,&empty).unwrap().len(),1);
         fs::remove_dir_all(root).unwrap();
