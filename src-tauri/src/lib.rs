@@ -4,6 +4,8 @@ mod export_file;
 mod kakao_dock;
 mod developer_workspace;
 mod backup_manager;
+#[cfg(target_os = "windows")]
+mod single_instance;
 use chrono::{Datelike, Local, DateTime};
 use rusqlite::{params, Connection, OptionalExtension};
 use serde_json::{json, Value};
@@ -862,10 +864,24 @@ async fn fetch_official_product_html(target: String) -> Result<String, String> {
 
 
 pub fn run() {
+    // Acquire before Tauri constructs any window or connects to SQLite.
+    // The isolated developer TEST process uses a separate named guard so
+    // the production app and its test lab may coexist.
+    #[cfg(target_os = "windows")]
+    let instance = match single_instance::acquire(
+        std::env::args().skip(1).any(|arg| arg == "--bando-developer-test")
+    ) {
+        Ok(single_instance::Acquisition::First(guard)) => guard,
+        Ok(single_instance::Acquisition::Existing) => return,
+        Err(error) => panic!("반도허브 중복 실행 검사 실패: {error}"),
+    };
     tauri::Builder::default()
         .manage(kakao_dock::Dock::default())
         .plugin(tauri_plugin_dialog::init())
-        .setup(|app| {
+        .setup(move |app| {
+            #[cfg(target_os = "windows")]
+            single_instance::listen(instance, app.handle().clone())
+                .map_err(std::io::Error::other)?;
             let base = app.path().app_data_dir()?;
             fs::create_dir_all(&base)?;
             let is_test = std::env::args().skip(1)
