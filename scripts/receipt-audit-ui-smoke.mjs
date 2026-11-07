@@ -144,6 +144,16 @@ try {
             ],
           };
           if (command === "workspace_mode") return window.__forceTestWorkspace === true;
+          if (command === "startup_status") return {
+            phase: "READY", error: null, attempts: 1, databaseMs: 12,
+            readyMs: 18, isTest: window.__forceTestWorkspace === true,
+          };
+          if (command === "startup_metrics") return {
+            windowShownMs: null, databaseMs: 12, dataMs: null, readyMs: 18,
+          };
+          if (command === "retry_startup") {
+            throw Error("Healthy mock databases must not be reopened during startup");
+          }
           if (command === "test_database_preview") {
             return window.__forceTestWorkspace
               ? {enabled:true, revision:state.revision ?? 0, orders:0, clients:0,
