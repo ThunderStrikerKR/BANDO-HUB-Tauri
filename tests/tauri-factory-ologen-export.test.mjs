@@ -57,7 +57,7 @@ test("factory Logen workbook exports exactly 15 expected columns with preserved 
   assert.equal(sheet.getCell("H2").value,"010");
   assert.equal(sheet.getCell("K2").value,"예시악기");
   assert.equal(sheet.getCell("L2").value,"22300");
-  assert.equal(sheet.getCell("I2").value,"BD 709 블랙 3개 / BD 900 화이트 1개");
+  assert.equal(sheet.getCell("I2").value,"BD 709 3개 / BD 900 1개");
   assert.equal(sheet.getCell("J2").value,"문 앞 배송 요청");
   assert.equal(sheet.getCell("F2").value,"","factory fills package count");
   assert.equal(sheet.getCell("G2").value,"","factory fills postage");
@@ -174,11 +174,15 @@ test("factory workbook blocks missing SKU identity or missing opposite-option wo
   const report=previewFactoryExport(s,["excel:s1:FACTORY"]);
   assert.match(report.rows[0].values[8],/가방 미포함/);
 });
-test("order variant editor resolves by variant ID rather than just its color",()=>{
-  const domain=read("src/domain.ts");
-  const ui=read("src/OrderItemEditor.tsx");
-  assert.match(domain,/selectedVariantId\?: string/);
-  assert.match(domain,/const explicit = selectedVariantId/);
-  assert.match(domain,/eligible\.length === 1/);
-  assert.match(ui,/itemFromProduct\(p, client, v\.color, draft\.quantity, v\.id\)/);
+test("Order editor chooses a complete standalone product rather than a variant dropdown", () => {
+  const source = read("src/OrderItemEditor.tsx");
+  assert.match(source, /itemFromProduct\(p, client/);
+  assert.doesNotMatch(source, /label="옵션"|p\?\.variants\.map/);
+});
+test("Factory export uses the frozen complete product name without a second color label",()=>{
+  const state = stateFixture();
+  state.workflow.queue[0].snapshot.recipient.items[0].name = "BD 709 / 블랙 / 타공 상판";
+  const report = previewFactoryExport(state,["excel:s1:FACTORY"]);
+  assert.match(report.rows[0].values[8], /BD 709 \/ 블랙 \/ 타공 상판 3개/);
+  assert.doesNotMatch(report.rows[0].values[8], /블랙 블랙/);
 });
