@@ -12,6 +12,37 @@ use std::collections::{HashMap, HashSet};
 
 const CORE_KEYS: [&str; 3] = ["products", "clients", "orders"];
 
+/// Existing developer data is not throwaway: create a verified, immutable
+/// pre-migration copy before adding tables or removing the legacy core arrays.
+/// New empty databases skip this, because they are seeded after opening.
+pub(super) fn backup_legacy_if_needed(conn:&Connection,path:&std::path::Path)->Result<(),String>{
+    if active(conn)? { return Ok(()); }
+    let found:bool=conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='app_state')",
+        [],|r|r.get(0)).map_err(err)?;
+    if !found { return Ok(()); }
+    let previous:String=conn.query_row("SELECT payload FROM app_state WHERE id=1",[],|r|r.get(0)).map_err(err)?;
+    valid_state(&serde_json::from_str::<Value>(&previous).map_err(err)?)?;
+    let dir=path.parent().ok_or("DB 파일의 폴더가 없습니다.")?.join("backups");
+    std::fs::create_dir_all(&dir).map_err(err)?;
+    let nanos=std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH).map_err(err)?.as_nanos();
+    let filename=format!("pre-relational-{}-{nanos}.sqlite",std::process::id());
+    let dest=dir.join(filename);
+    let outcome=(||{
+        conn.execute("VACUUM INTO ?1",[dest.to_string_lossy().to_string()]).map_err(err)?;
+        let copy=Connection::open_with_flags(&dest,rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY).map_err(err)?;
+        let status:String=copy.query_row("PRAGMA integrity_check",[],|r|r.get(0)).map_err(err)?;
+        if status!="ok" { return Err(format!("마이그레이션 안전 백업이 손상됐습니다: {status}")); }
+        let text:String=copy.query_row("SELECT payload FROM app_state WHERE id=1",[],|r|r.get(0)).map_err(err)?;
+        if text!=previous { return Err("마이그레이션 안전 백업 데이터가 원본과 다릅니다.".into()); }
+        Ok::<_,String>(())
+    })();
+    if outcome.is_err() { let _=std::fs::remove_file(&dest); }
+    outcome?;
+    Ok(())
+}
+
 fn sql_schema(conn: &Connection) -> Result<(), String> {
     conn.execute_batch(r#"
         CREATE TABLE IF NOT EXISTS core_schema(
