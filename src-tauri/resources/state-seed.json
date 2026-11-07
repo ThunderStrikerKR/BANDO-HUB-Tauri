@@ -4599,7 +4599,7 @@
         {
           "id": "bando-136-P00000FF000F",
           "color": "색상 미표기",
-          "option": "바퀴  추가 안함",
+          "option": "바퀴 미포함",
           "siteOptionId": "P00000FF000F",
           "wholesale": null,
           "semi": null,
@@ -4612,7 +4612,7 @@
         {
           "id": "bando-136-P00000FF000G",
           "color": "색상 미표기",
-          "option": "바퀴 추가",
+          "option": "바퀴 포함",
           "siteOptionId": "P00000FF000G",
           "wholesale": null,
           "semi": null,
@@ -4654,7 +4654,7 @@
         {
           "id": "bando-135-P00000FE000F",
           "color": "색상 미표기",
-          "option": "바퀴 추가 안함",
+          "option": "바퀴 미포함",
           "siteOptionId": "P00000FE000F",
           "wholesale": null,
           "semi": null,
@@ -4667,7 +4667,7 @@
         {
           "id": "bando-135-P00000FE000G",
           "color": "색상 미표기",
-          "option": "바퀴 추가",
+          "option": "바퀴 포함",
           "siteOptionId": "P00000FE000G",
           "wholesale": null,
           "semi": null,
@@ -4709,7 +4709,7 @@
         {
           "id": "bando-134-P00000FD000L",
           "color": "색상 미표기",
-          "option": "바퀴 추가 안함",
+          "option": "바퀴 미포함",
           "siteOptionId": "P00000FD000L",
           "wholesale": null,
           "semi": null,
@@ -4722,7 +4722,7 @@
         {
           "id": "bando-134-P00000FD000M",
           "color": "색상 미표기",
-          "option": "바퀴 추가",
+          "option": "바퀴 포함",
           "siteOptionId": "P00000FD000M",
           "wholesale": null,
           "semi": null,
