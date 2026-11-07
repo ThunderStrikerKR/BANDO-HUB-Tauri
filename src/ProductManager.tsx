@@ -25,7 +25,6 @@ import { ProductImports } from "./ProductImports";
 import { ProductSyncWorkbookTools } from "./ProductSyncWorkbookTools";
 import { optimizeProductImage } from "./product-image-preprocess";
 import { RegistrationManager } from "./RegistrationManager";
-import { SkuSplitPanel } from "./SkuSplitPanel";
 import type { NoticeSink } from "./shared/notices";
 import { useAsyncTask } from "./shared/useAsyncTask";
 import type { Product, State, Variant } from "./types";
@@ -69,9 +68,6 @@ export function ProductManager({
       current = false;
     };
   }, [edit?.id]);
-  // Staff-created products do not need a Cafe24 listing or official option ID.
-  const manualOptionEditor = !!edit && !edit.sourceProductId &&
-    edit.variants.every((variant) => variant.source === "MANUAL");
   const detailImage = edit && (
     edit.imageOverride === "HIDDEN" ? undefined :
     edit.imageOverride === "MANUAL" ? edit.imageData :
@@ -132,8 +128,8 @@ export function ProductManager({
       const p = clone(edit);
       p.code = normalizeModel(p.manufacturerCode?.trim() || p.code || p.name);
       p.name = normalizeModel(p.name || p.code);
-      // A manually entered multi-option product is a parent until its SKUs are reviewed.
-      p.saleUnit = p.variants.length === 1;
+      if (p.variants.length !== 1) throw Error("상품은 한 가지 판매 구성으로만 등록할 수 있습니다. 기존 복수 구성은 각각 별도 상품으로 전환하세요.");
+      p.saleUnit = true;
       p.familyKey ??= p.registrationIdentity
         ? p.id
         : (p.catalog ?? "BANDOSTAND") + "|" + p.code.replace(/\s/g, "").toUpperCase();
@@ -345,7 +341,6 @@ export function ProductManager({
         )}
         {section === "상품 동기화" && (
           <>
-            <SkuSplitPanel state={state} onSave={onSave} onRefresh={onRefresh} onNotice={onNotice} />
             <CatalogPanel state={state} onSave={onSave} onRefresh={onRefresh} onError={onNotice} />
           </>
         )}
@@ -458,75 +453,20 @@ export function ProductManager({
                   </div>
                 </div>
               </div>
-              {manualOptionEditor && (
-                <section className="product-manual-variants">
-                  <div className="product-manual-variants-heading">
-                    <strong>판매 옵션과 가격</strong>
-                    <button type="button" disabled={savingView} onClick={() => setEdit((prev) =>
-                      prev ? {
-                        ...prev,
-                        variants: [...prev.variants, {
-                          id: uid(), color: "", option: "",
-                          wholesale: null, semi: null, retail: null,
-                          url: "", source: "MANUAL",
-                        }],
-                      } : prev
-                    )}>판매 옵션 추가</button>
-                  </div>
-                  <p className="muted">홈페이지 등록 없이 직접 상품과 옵션을 관리할 수 있습니다. 첫 번째 색상을 기본색으로 사용합니다.</p>
-                  {edit.variants.map((variant, index) => {
-                    const existingVariant = state.products.some((product) =>
-                      product.id === edit.id && product.variants.some((item) => item.id === variant.id));
-                    return (
-                      <div className="product-manual-variant-row" key={variant.id}>
-                        <div className="product-manual-variant-header">
-                          <strong>옵션 {index + 1}</strong>
-                          {edit.variants.length > 1 && !existingVariant && (
-                            <button type="button" disabled={savingView} onClick={() => setEdit((prev) =>
-                              prev ? { ...prev, variants: prev.variants.filter((item) => item.id !== variant.id) } : prev
-                            )}>추가 취소</button>
-                          )}
-                        </div>
-                        <div className="product-manual-variant-fields">
-                          <Field label="색상">
-                            <input value={variant.color}
-                              placeholder="예: 블랙 / 색상 구분이 없으면 단일"
-                              onChange={(event) => setEdit((prev) => {
-                                if (!prev) return prev;
-                                const color = event.target.value;
-                                return {
-                                  ...prev,
-                                  defaultColor: index === 0 ? color : prev.defaultColor,
-                                  variants: prev.variants.map((item) => item.id === variant.id
-                                    ? { ...item, color } : item),
-                                };
-                              })}/>
-                          </Field>
-                          <Field label="옵션명">
-                            <input value={variant.option ?? ""} placeholder="예: A형 / 2개 구성 (선택)"
-                              onChange={(event) => setEdit((prev) => prev ? {
-                                ...prev,
-                                variants: prev.variants.map((item) => item.id === variant.id
-                                  ? { ...item, option: event.target.value } : item),
-                              } : prev)}/>
-                          </Field>
-                          {(["wholesale", "semi", "retail"] as const).map((tier) => (
-                            <Field key={tier} label={{ wholesale: "도매가", semi: "반도매가", retail: "소매가" }[tier]}>
-                              <MoneyInput
-                                label={{ wholesale: "도매가", semi: "반도매가", retail: "소매가" }[tier]}
-                                placeholder="미등록" value={variant[tier]}
-                                onChange={(amount) => setEdit((prev) => prev ? {
-                                  ...prev,
-                                  variants: prev.variants.map((item) => item.id === variant.id
-                                    ? { ...item, [tier]: amount } : item),
-                                } : prev)}/>
-                            </Field>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </section>
+              {edit.variants.length === 1 && (
+                <div className="product-detail-wide-fields">
+                  <Field label="상품 색상">
+                    <input
+                      value={edit.variants[0].color}
+                      placeholder="예: 블랙 / 색상 구분이 없으면 단일"
+                      onChange={(event) => setEdit((old) => old ? {
+                        ...old,
+                        defaultColor: event.target.value,
+                        variants: old.variants.map((v) => ({ ...v, color: event.target.value })),
+                      } : old)}
+                    />
+                  </Field>
+                </div>
               )}
               <details className="product-detail-advanced">
                 <summary>고급 정보 / 홈페이지 연결 (선택) / 배송 그룹 / 변경 이력</summary>
