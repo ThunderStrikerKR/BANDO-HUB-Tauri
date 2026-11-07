@@ -137,9 +137,37 @@ export function SettingsPanel({
         공장 발송, 매장 발송, 공장 회신, 상품 관리, 거래처 관리 폴더를 자동으로 구분합니다.
         각 폴더 아래는 연도, 월, 일 순서로 분류하며 기존 파일을 덮어쓰지 않습니다.
       </p>
+      <h2>공장 회신 자동 수신 폴더</h2>
+      <p>{window.bando?.isTestWorkspace ? "격리 TEST / Excel / 공장 회신 수신" :
+        (s.factoryReplyDirectory || "미설정: 수동 Excel 업로드만 사용")}</p>
+      {!window.bando?.isTestWorkspace && (
+        <div className="settings-actions">
+          <button type="button" disabled={saving}
+            onClick={() => void run(async () => {
+              if (!window.bando?.chooseFactoryReplyDirectory) {
+                throw Error("공장 회신 수신 폴더 선택 기능을 사용할 수 없습니다.");
+              }
+              const folder = await window.bando.chooseFactoryReplyDirectory();
+              if (folder) setS((current) => ({ ...current, factoryReplyDirectory: folder }));
+            })}>
+            수신 폴더 선택
+          </button>
+          <button type="button" disabled={saving || !s.factoryReplyDirectory}
+            onClick={() => setS((current) => ({ ...current, factoryReplyDirectory: "" }))}>
+            자동 수신 중지
+          </button>
+        </div>
+      )}
       <p className="muted">
-        공장 회신 Excel은 업로드 후 보관함으로 복사하고, 감사용 원본은 앱 데이터에도 별도로 보존합니다.
-        회신 폴더 자동 감지는 아직 지원하지 않습니다.
+        폴더 선택 후 아래 설정 저장을 누르면 자동 감시가 시작됩니다.
+        반도허브 실행 중 5초마다 새 XLSX 파일을 확인하고,
+        파일 쓰기가 끝난 뒤 수취인 정보가 일치하는 건만 운송장번호와 실제 운임을 반영합니다.
+        잘못된 양식 및 일치하지 않는 행은 공장 회신 이력에 보류합니다.
+        업무 Excel 보관함과 별개의 수신 폴더를 선택하세요.
+      </p>
+      <p className="muted">
+        격리 TEST에서는 별도 수신 폴더만 사용하며 실사용 수신 폴더를 감시하지 않습니다.
+        원본은 앱 데이터에 보관하고 별도 사본은 Excel 보관함에 저장합니다.
       </p>
       <h2>입금 계좌</h2>
       <p className="muted">
