@@ -1399,10 +1399,17 @@ export function markStoreSent(
 ) {
   const state = clone(input),
     q = state.workflow!.queue.find((q) => q.id === queueId);
-  if (!q || q.origin !== "STORE" || q.status !== "QUEUED")
+  if (!q || q.origin !== "STORE" ||
+    !["QUEUED", "EXPORTED"].includes(q.status))
     throw Error("매장 발송 대기 건을 선택하세요.");
+  if (q.status === "EXPORTED" &&
+    (!q.exportId || !state.exports.some((e) =>
+      e.id === q.exportId && e.queueEntryIds?.includes(q.id)))) {
+    throw Error("해당 매장 Excel 출력 이력을 확인할 수 없습니다.");
+  }
   q.status = "STORE_SENT";
-  q.exportedAt = now();
+  q.fileOnly = false;
+  q.exportedAt ??= now();
   event(
     state,
     "매장 발송 확인",

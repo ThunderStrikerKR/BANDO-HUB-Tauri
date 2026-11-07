@@ -196,7 +196,15 @@ export function reopenUnsentExport(input: State, sid: string) {
     ship = state.workflow?.shipments.find((s) => s.id === sid);
   if (!ship || ship.delivery || ship.collectedAt)
     throw Error("현재 배송 상태에서는 복구할 수 없습니다.");
-  const qs = state.workflow!.queue.filter((q) => q.shipmentId === sid && q.status === "EXPORTED");
+  // Reverting a factory file must never roll back an independent STORE
+  // export or shipment within the same combined order.
+  if (state.workflow!.queue.some((q) =>
+    q.shipmentId === sid && q.origin === "STORE" &&
+    (q.status === "EXPORTED" || q.status === "STORE_SENT"))) {
+    throw Error("매장 Excel 출력 또는 발송 이력이 있어 전체 출고를 복구할 수 없습니다.");
+  }
+  const qs = state.workflow!.queue.filter((q) =>
+    q.shipmentId === sid && q.origin === "FACTORY" && q.status === "EXPORTED");
   if (!qs.length || qs.some((q) => q.fileOnly !== true || q.factoryDeliveredAt))
     throw Error("공장 전달 후에는 정정 요청을 사용하세요.");
   for (const q of qs) {

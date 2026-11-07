@@ -22,6 +22,7 @@ const api: Api = {
   saveProductWorkbook: (bytes) => invoke<string | null>("save_product_workbook", { bytes }),
   saveProductSyncWorkbook: (bytes) => invoke<string | null>("save_product_sync_workbook", { bytes }),
   saveFactoryWorkbook: (bytes) => invoke<string | null>("save_factory_workbook", { bytes }),
+  saveStoreWorkbook: (bytes) => invoke<string | null>("save_store_workbook", { bytes }),
   saveSettlementWorkbook: (bytes) => invoke<string | null>("save_settlement_workbook", { bytes }),
   saveOrderHistoryWorkbook: (bytes) => invoke<string | null>("save_order_history_workbook", { bytes }),
   saveClientWorkbook: (bytes) => invoke<string | null>("save_client_workbook", { bytes }),

@@ -2,6 +2,7 @@ import { FactoryReplyHistory } from "./FactoryReplyHistory";
 import { FactoryReplyImport } from "./FactoryReplyImport";
 import { ActualFreightField } from "./ActualFreightField";
 import { createFactoryWorkbook, previewFactoryExport, recordFactoryExport } from "./factory-export";
+import { createStoreWorkbook, previewStoreExport, recordStoreExport } from "./store-export";
 import { confirmAction } from "./dialogs";
 import { useState } from "react";
 import { markFactoryDelivered, reopenUnsentExport } from "./corrections";
@@ -163,6 +164,20 @@ export function WorkflowQueue({
                           .filter((q) => q?.fileOnly)
                           .map((q) => (
                             <div key={q!.id}>
+                              {q!.origin === "STORE" ? (
+                                <button
+                                  disabled={busy}
+                                  onClick={() => void run(async () => {
+                                    if (!(await confirmAction(
+                                      "이 매장 발송 파일의 상품을 실제 발송했나요? 파일 작성만으로 발송 완료 처리하지 않습니다."
+                                    ))) return;
+                                    await onSave(markStoreSent(state, q!.id));
+                                    await onRefresh();
+                                  })}
+                                >
+                                  매장 발송 확인
+                                </button>
+                              ) : (<>
                               <button
                                 disabled={busy}
                                 onClick={() =>
@@ -185,6 +200,7 @@ export function WorkflowQueue({
                               >
                                 전달 전 정정 / 재출력
                               </button>
+                              </>)}
                             </div>
                           ))}
                       </details>
@@ -324,16 +340,40 @@ export function WorkflowQueue({
         )}
       </div>
       <footer className="excel-fixed-footer">
-        {scope === "FACTORY" && <small className="muted">저장 위치는 Windows 저장 창에서 선택합니다.</small>}
+        {scope !== "HISTORY" && <small className="muted">저장 위치는 Windows 저장 창에서 선택합니다. 파일 작성은 발송 완료가 아닙니다.</small>}
         {companyMissing && onSettings && <button onClick={onSettings}>반도스탠드 정보 설정</button>}
         {scope !== "HISTORY" && (
           <button
             className="primary"
-            disabled={busy || !chosen.length || scope !== "FACTORY"}
+            disabled={busy || !chosen.length}
             onClick={() =>
               void run(async () => {
-                if (scope !== "FACTORY") {
-                  throw Error("매장 발송 Excel은 아직 Tauri 이식 전입니다. 개별 배송 건의 매장 발송 확인을 사용하세요.");
+                if (scope === "STORE") {
+                  const current = await window.bando!.load();
+                  const preview = previewStoreExport(current, chosen);
+                  if (!(await confirmAction(
+                    "매장 발송 " + preview.rows.length + "건의 Excel을 작성할까요? 실제 포장과 택배 발송은 별도로 확인합니다."
+                  ))) return;
+                  if (!window.bando!.saveStoreWorkbook) {
+                    throw Error("매장 Excel 저장 기능이 연결되지 않았습니다.");
+                  }
+                  await window.bando!.backup();
+                  const bytes = await createStoreWorkbook(preview);
+                  const savedPath = await window.bando!.saveStoreWorkbook(bytes);
+                  if (!savedPath) return;
+                  try {
+                    const latest = await window.bando!.load();
+                    const result = recordStoreExport(latest, preview, savedPath);
+                    await onSave(result.next);
+                    await onRefresh();
+                    setSelected([]);
+                    onNotice("매장 발송 " + preview.rows.length +
+                      "건의 출력 이력을 저장했습니다. 실제 발송은 별도 확인해야 합니다.", "success");
+                  } catch (error) {
+                    throw Error("Excel 파일 저장 후 매장 출력 이력 기록에 실패했습니다. " +
+                      "이 파일을 사용하지 말고 확인하세요: " + savedPath + " / " + String(error));
+                  }
+                  return;
                 }
                 const current = await window.bando!.load();
                 const preview = previewFactoryExport(current, chosen);
@@ -359,7 +399,7 @@ export function WorkflowQueue({
               })
             }
           >
-            {scope === "STORE" ? "매장 Excel 출력 미이식" : "선택 " + chosen.length + "건 공장 Excel 작성"}
+            {scope === "STORE" ? "선택 " + chosen.length + "건 매장 Excel 작성" : "선택 " + chosen.length + "건 공장 Excel 작성"}
           </button>
         )}
       </footer>
