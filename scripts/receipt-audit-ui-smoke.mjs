@@ -133,7 +133,7 @@ try {
           if (command === "state_load") return structuredClone(state);
           if (command === "backup_create") return "CI-SQLITE-BACKUP";
           if (command === "save_store_workbook") {
-            assert.ok(Array.isArray(args.bytes) && args.bytes.length > 1000);
+            if (!Array.isArray(args.bytes) || args.bytes.length <= 1000) throw Error("Invalid workbook bytes");
             window.__storeWorkbookSaved = args.bytes.slice(0, 4).join(",") === "80,75,3,4";
             return "C:\\BANDO_CI_EXPORTS\\BANDO-CI-STORE.xlsx";
           }
