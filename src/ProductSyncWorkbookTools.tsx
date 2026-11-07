@@ -37,7 +37,7 @@ export function ProductSyncWorkbookTools({
     const state = await window.bando.load();
     const bytes = await exportProductSyncWorkbook(state);
     const destination = await window.bando.saveProductSyncWorkbook(bytes);
-    if (destination) onNotice("상품 및 판매 옵션 전체 목록을 저장했습니다: " + destination, "success");
+    if (destination) onNotice("독립 상품 및 가격 전체 목록을 저장했습니다: " + destination, "success");
   });
   const choose = (file?: File) => {
     if (!file) return;
