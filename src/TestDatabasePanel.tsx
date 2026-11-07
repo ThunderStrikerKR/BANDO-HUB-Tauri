@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { confirmAction } from "./dialogs";
-import type { Api } from "./types";
-export function TestDatabasePanel({ onReset }: { onReset: () => Promise<void> }) {
+import type { Api, State } from "./types";
+export function TestDatabasePanel({ state, onReset }: { state: State; onReset: () => Promise<void> }) {
   const [preview, setPreview] =
       useState<Awaited<ReturnType<NonNullable<Api["testDatabasePreview"]>>>>(),
     [error, setError] = useState(""),
@@ -16,7 +16,9 @@ export function TestDatabasePanel({ onReset }: { onReset: () => Promise<void> })
     return (
       <details className="card">
         <summary>개발자 모드</summary>
-        <p>별도 테스트 작업공간에서 시험 주문과 Excel 작성 이력을 관리합니다.</p>
+        <p>상품, 가격, 운임, 설정을 복사한 별도 SQLite와 Excel 보관함으로 테스트 앱을 실행합니다.
+          실제 거래처, 주문, 입금 및 감사 이력은 복사하지 않습니다.</p>
+        <p className="muted">별도 창의 TEST 표시로 정식 업무 환경과 구분합니다.</p>
         <button
           disabled={busy || !window.bando?.openTestWorkspace}
           onClick={async () => {
@@ -40,9 +42,10 @@ export function TestDatabasePanel({ onReset }: { onReset: () => Promise<void> })
   return (
     <section className="card">
       <h2>개발자 모드 / 테스트 기록 관리</h2>
-      <p>
-        초기화 범위는 {scope}입니다. 관련 원문 / 별칭 / 송장도 함께 초기화합니다. 기준
-        상품 / 가격 / 운임 / 설정과 이미 작성한 Excel 파일은 보관합니다.
+      <p>현재 테스트 데이터: {scope}. 기준 상품 {state.products.length}개는 유지합니다.</p>
+      <p className="muted">
+        시험 주문, 거래처, 별칭, 송장, 회신, 입금, 감사 기록 및 발주서 시험 이력을 초기화합니다.
+        상품, 가격, 운임, 설정 및 이미 작성한 Excel 파일은 유지하고 DB를 먼저 백업합니다.
       </p>
       <button
         className="danger"
@@ -57,8 +60,9 @@ export function TestDatabasePanel({ onReset }: { onReset: () => Promise<void> })
           setBusy(true);
           setError("");
           try {
-            await window.bando!.resetTestDatabase!(preview.revision);
+            const result = await window.bando!.resetTestDatabase!(preview.revision);
             await onReset();
+            window.alert("테스트 DB를 초기화하고 백업했습니다: " + result.backup);
           } catch (e) {
             setError(String(e));
           } finally {

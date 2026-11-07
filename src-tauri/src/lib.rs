@@ -2,13 +2,14 @@ mod reception;
 mod factory_conflict;
 mod export_file;
 mod kakao_dock;
+mod developer_workspace;
 use chrono::{Datelike, Local, DateTime};
 use rusqlite::{params, Connection, OptionalExtension};
 use serde_json::{json, Value};
 use std::{fs, path::{Path, PathBuf}, sync::Mutex};
 use tauri::{Manager, State};
 
-struct Database { connection: Mutex<Connection>, base: PathBuf }
+struct Database { connection: Mutex<Connection>, base: PathBuf, is_test: bool }
 
 fn err<E: std::fmt::Display>(e: E) -> String { e.to_string() }
 fn lock_db<'a>(db: &'a State<'_, Database>) -> Result<std::sync::MutexGuard<'a, Connection>, String> {
@@ -270,6 +271,10 @@ fn state_load(db: State<'_, Database>) -> Result<Value, String> { get_snapshot(&
 
 #[tauri::command]
 fn state_save(db: State<'_, Database>, state: Value) -> Result<(), String> {
+    if db.is_test && state["settings"]["excelDirectory"].as_str()
+        != Some(db.base.join("Excel").to_string_lossy().as_ref()) {
+        return Err("테스트 작업공간 Excel 보관함은 변경할 수 없습니다.".into());
+    }
     let revision = state["revision"].as_u64().ok_or("변경 이력이 없는 데이터를 저장할 수 없습니다.")?;
     write_snapshot(&mut *lock_db(&db)?, state, revision, true)?;
     Ok(())
@@ -282,6 +287,9 @@ fn settings_patch(db: State<'_, Database>, changes: Value, expected: Value) -> R
     let changes = changes.as_object().ok_or("설정 변경 형식 오류")?;
     let expected = expected.as_object().ok_or("설정 기준값 형식 오류")?;
     if changes.is_empty() { return get_snapshot(&*lock_db(&db)?); }
+    if db.is_test && (changes.contains_key("excelDirectory") || changes.contains_key("factoryReplyDirectory")) {
+        return Err("격리 작업공간의 Excel 보관 경로는 변경할 수 없습니다.".into());
+    }
     let allowed = ["senderPostcode", "excelDirectory", "factoryReplyDirectory",
         "modelRepresentatives", "modelFamilies", "kakaoTitleMappings", "kakaoTitleEnabled",
         "panelRatios", "receptionVerticalRatio", "operatorName", "uiScale", "accounts",
@@ -455,7 +463,12 @@ fn canonical_excel_directory(path: &Path) -> Result<PathBuf, String> {
     Ok(resolved)
 }
 #[tauri::command]
-async fn choose_excel_directory(app: tauri::AppHandle) -> Result<Option<String>, String> {
+async fn choose_excel_directory(app: tauri::AppHandle, db: State<'_, Database>) -> Result<Option<String>, String> {
+    if db.is_test {
+        let selected = db.base.join("Excel");
+        fs::create_dir_all(&selected).map_err(err)?;
+        return Ok(Some(canonical_excel_directory(&selected)?.to_string_lossy().into_owned()));
+    }
     tauri::async_runtime::spawn_blocking(move || {
         use tauri_plugin_dialog::DialogExt;
         let selected = app.dialog().file().set_title("Excel 보관함 위치 선택").blocking_pick_folder();
@@ -473,6 +486,12 @@ async fn choose_excel_directory(app: tauri::AppHandle) -> Result<Option<String>,
         Ok(Some(verified.to_string_lossy().to_string()))
     }).await.map_err(err)?
 }
+fn workspace_excel_directory(db: &Database, settings: &Value) -> Result<PathBuf, String> {
+    if db.is_test {
+        return canonical_excel_directory(&db.base.join("Excel"));
+    }
+    saved_excel_directory(settings)
+}
 fn saved_excel_directory(settings: &Value) -> Result<PathBuf, String> {
     let chosen = settings.get("excelDirectory").and_then(Value::as_str)
         .map(str::trim).filter(|s| !s.is_empty())
@@ -482,7 +501,7 @@ fn saved_excel_directory(settings: &Value) -> Result<PathBuf, String> {
 #[tauri::command]
 fn open_excel_directory(db: State<'_, Database>) -> Result<(), String> {
     let saved = get_snapshot(&*lock_db(&db)?)?;
-    let directory = saved_excel_directory(&saved["settings"])?;
+    let directory = workspace_excel_directory(&db, &saved["settings"])?;
     open::that(directory).map_err(err)
 }
 
@@ -563,7 +582,7 @@ async fn save_xlsx_in_archive(
         let root = {
             let guard = db.connection.lock().map_err(|_| "데이터베이스 잠금 오류")?;
             let state = get_snapshot(&guard)?;
-            saved_excel_directory(&state["settings"])?
+            workspace_excel_directory(&db, &state["settings"])?
         };
         let saved = archive_workbook_bytes(&root, kind, Local::now(), &bytes)?;
         Ok(Some(saved.to_string_lossy().into_owned()))
@@ -579,6 +598,9 @@ async fn save_xlsx_with_dialog(
 ) -> Result<Option<String>, String> {
     if bytes.len() < 4 || bytes.len() > 25 * 1024 * 1024 || !bytes.starts_with(b"PK") {
         return Err("올바른 XLSX 데이터가 아니거나 파일 크기가 너무 큽니다.".into());
+    }
+    if app.state::<Database>().is_test {
+        return Err("테스트 공간에서는 보고서의 외부 파일 저장을 사용할 수 없습니다.".into());
     }
     tauri::async_runtime::spawn_blocking(move || -> Result<Option<String>, String> {
         use tauri_plugin_dialog::DialogExt;
@@ -677,7 +699,7 @@ fn archive_factory_reply(db: State<'_, Database>, id: String, bytes: Vec<u8>) ->
     let root = {
         let guard = lock_db(&db)?;
         let state = get_snapshot(&guard)?;
-        saved_excel_directory(&state["settings"])?
+        workspace_excel_directory(&db, &state["settings"])?
     };
     archive_workbook_bytes(&root, WorkbookKind::FactoryReply, Local::now(), &bytes)?;
     Ok(destination.to_string_lossy().into_owned())
@@ -860,9 +882,16 @@ pub fn run() {
         .setup(|app| {
             let base = app.path().app_data_dir()?;
             fs::create_dir_all(&base)?;
-            let conn = initialize_database(&base.join("bando-hub-v001.sqlite"))
-                .map_err(std::io::Error::other)?;
-            app.manage(Database { connection: Mutex::new(conn), base });
+            let is_test = std::env::args().skip(1)
+                .any(|argument| argument == "--bando-developer-test");
+            let (active_base, conn) = if is_test {
+                developer_workspace::open_isolated(&base).map_err(std::io::Error::other)?
+            } else {
+                let conn = initialize_database(&base.join("bando-hub-v001.sqlite"))
+                    .map_err(std::io::Error::other)?;
+                (base, conn)
+            };
+            app.manage(Database { connection: Mutex::new(conn), base: active_base, is_test });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -872,7 +901,13 @@ pub fn run() {
             kakao_dock::dock_windows_native, kakao_dock::dock_status_native,
             kakao_dock::dock_cycle_native, kakao_dock::dock_start_native,
             kakao_dock::dock_select_native, kakao_dock::dock_stop_native,
-            kakao_dock::dock_region_native
+            kakao_dock::dock_region_native,
+            developer_workspace::workspace_mode,
+            developer_workspace::open_test_workspace,
+            developer_workspace::test_database_preview,
+            developer_workspace::reset_test_database,
+            developer_workspace::test_record_run,
+            developer_workspace::test_run_history
         ])
         .build(tauri::generate_context!())
         .expect("BANDO HUB Tauri runtime build error")

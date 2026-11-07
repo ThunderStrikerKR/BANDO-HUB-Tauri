@@ -528,6 +528,22 @@ export interface StartupMetrics {
   dataMs: number;
   readyMs: number;
 }
+export interface DeveloperTestReport {
+  scenario: string;
+  raw: string;
+  passed: boolean;
+  expected: string[];
+  detected: string[];
+  recipients: { name: string; address: string; contact: string; items: string[] }[];
+  notes: string[];
+}
+export interface DeveloperRunHistory {
+  id: number;
+  at: string;
+  scenario: string;
+  passed: boolean;
+  report: DeveloperTestReport;
+}
 export interface Api {
   saveProductWorkbook?: (bytes: number[]) => Promise<string | null>;
   saveProductSyncWorkbook?: (bytes: number[]) => Promise<string | null>;
@@ -542,6 +558,9 @@ export interface Api {
   productImage?: (id: string) => Promise<{ data: string; source: string } | null>;
   approveFactoryConflict?: (id: string, row: number, expectedRevision: number) => Promise<void>;
   isTestWorkspace?: boolean;
+  workspaceMode?: () => Promise<boolean>;
+  testRecordRun?: (report: DeveloperTestReport) => Promise<void>;
+  testRunHistory?: () => Promise<DeveloperRunHistory[]>;
   openTestWorkspace?: () => Promise<void>;
   testDatabasePreview?: () => Promise<
     | { enabled: false }

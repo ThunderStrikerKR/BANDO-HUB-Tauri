@@ -6,6 +6,7 @@ import type { NoticeSink } from "../shared/notices";
 import type { InboxEntry, State } from "../types";
 import { PageHeading } from "../ui/PageHeading";
 import { MobilePanel } from "./MobilePanel";
+import { DeveloperLab } from "../developer/DeveloperLab";
 
 declare const __BANDO_VERSION__: string;
 declare const __BANDO_BUILD_ID__: string;
@@ -49,6 +50,9 @@ export function SettingsView({
           <MobilePanel onNotice={onNotice} onReceive={onReceive} />
         </div>
       </div>
+      {window.bando?.isTestWorkspace && (
+        <DeveloperLab state={state} onNotice={onNotice} revision={state.revision ?? 0} />
+      )}
     </>
   );
 }

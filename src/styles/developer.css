@@ -1,0 +1,31 @@
+/* Developer-only tools; production modal tokens remain unchanged. */
+.developer-workspace-indicator {
+  position: fixed;
+  z-index: 200;
+  right: 18px;
+  top: 66px;
+  padding: 7px 12px;
+  border: 1px solid #dca741;
+  border-radius: 7px;
+  background: #342618;
+  color: #ffe1a3;
+  font: 700 13px/1.4 var(--font-body);
+  pointer-events: none;
+  box-shadow: 0 6px 30px #0008;
+}
+.developer-lab { display: grid; gap: 16px; min-width: 0; }
+.developer-lab .card { min-width: 0; }
+.developer-lab-field { display: grid; gap: 6px; margin: 12px 0; }
+.developer-lab-field label { font-weight: 650; }
+.developer-lab-field textarea { min-height: 180px; resize: vertical; }
+.developer-lab-field input,
+.developer-lab-field textarea,
+.developer-lab-field select { width: 100%; min-width: 0; box-sizing: border-box; }
+.developer-test-result { border-top: 1px solid #565656; padding-top: 14px; margin-top: 14px; }
+.developer-test-result p { overflow-wrap: anywhere; }
+.developer-recipient { border-left: 3px solid #a88a5d; padding: 8px 12px; margin: 8px 0; }
+.developer-history { overflow: auto; max-height: 360px; }
+.developer-history details { margin: 8px 0; padding: 8px; border: 1px solid #555; }
+.developer-history pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+.developer-long-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.developer-preview-dialog input { display: block; width: 100%; margin: 8px 0 20px; }

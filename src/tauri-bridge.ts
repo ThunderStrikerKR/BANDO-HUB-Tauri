@@ -19,7 +19,10 @@ const safeImage = (siteId?: string) => {
 };
 
 const api: Api = {
-  isTestWorkspace: true,
+  isTestWorkspace: false,
+  workspaceMode: () => invoke<boolean>("workspace_mode"),
+  testRecordRun: (report) => invoke<void>("test_record_run", { report }),
+  testRunHistory: () => invoke("test_run_history"),
   saveProductWorkbook: (bytes) => invoke<string | null>("save_product_workbook", { bytes }),
   saveProductSyncWorkbook: (bytes) => invoke<string | null>("save_product_sync_workbook", { bytes }),
   saveFactoryWorkbook: (bytes) => invoke<string | null>("save_factory_workbook", { bytes }),
@@ -94,9 +97,9 @@ const api: Api = {
   openFactoryFile: (id) => invoke<void>("open_factory_reply_file", { id }),
   approveFactoryConflict: (id, row, expectedRevision) =>
     invoke<void>("approve_factory_conflict", { id, row, expectedRevision }),
-  testDatabasePreview: async () => ({ enabled: false as const }),
-  openTestWorkspace: async () => notReady("격리 테스트 작업공간"),
-  resetTestDatabase: async () => notReady("격리 테스트 초기화"),
+  testDatabasePreview: () => invoke("test_database_preview"),
+  openTestWorkspace: () => invoke<void>("open_test_workspace"),
+  resetTestDatabase: (revision) => invoke("reset_test_database", { revision }),
 };
 
 if (typeof window !== "undefined") window.bando = api;

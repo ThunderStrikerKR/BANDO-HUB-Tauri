@@ -143,6 +143,22 @@ try {
                 variants: [{ url: "https://bandostand.com/product/detail.html?product_no=705" }] },
             ],
           };
+          if (command === "workspace_mode") return window.__forceTestWorkspace === true;
+          if (command === "test_database_preview") {
+            return window.__forceTestWorkspace
+              ? {enabled:true, revision:state.revision ?? 0, orders:0, clients:0,
+                  exports:0, shipments:0, payments:0, replies:0}
+              : {enabled:false};
+          }
+          if (command === "test_run_history") return window.__developerRuns ?? [];
+          if (command === "test_record_run") {
+            window.__developerRuns ??= [];
+            window.__developerRuns.unshift({
+              id: window.__developerRuns.length + 1, at:"2026-11-08T00:00:00+09:00",
+              scenario:args.report.scenario, passed:args.report.passed, report:args.report,
+            });
+            return undefined;
+          }
           if (command === "state_load") return structuredClone(state);
           if (command === "backup_create") return "CI-SQLITE-BACKUP";
           if (command === "save_store_workbook") {
@@ -254,8 +270,22 @@ try {
   await page.getByRole("button", { name: "검증용 보면대 704" }).click();
   assert.equal(await page.locator('input[placeholder^="https://bandostand.com/product/"]').inputValue(),
     "https://bandostand.com/product/detail.html?product_no=704");
+  // Native process isolation is separately tested in Rust. This mock checks
+  // that developer controls actually render and the shared Modal operates.
+  await page.addInitScript(() => { window.__forceTestWorkspace = true; });
+  await page.reload();
+  await nav.getByRole("button", { name: "설정" }).click();
+  await page.getByText("TEST / 격리 DB / 외부 발송 금지").waitFor();
+  await page.getByRole("heading", { name: "발주서 오류 검증" }).waitFor();
+  await page.getByRole("button", { name: "현재 발주서 검사" }).click();
+  await page.getByRole("heading", { name: /기대 조건/ }).waitFor();
+  await page.getByRole("button", { name: "선택한 팝업 상태 열기" }).click();
+  const modal = page.getByRole("dialog", { name: "UI 검사 / 발주서 원문 정정" });
+  await modal.waitFor();
+  await modal.getByRole("button", { name: "취소" }).click();
+  await modal.waitFor({ state: "detached" });
   assert.deepEqual(pageErrors, [], "React runtime errors: " + pageErrors.join("\n"));
-  console.log("PASS: audit UI, KakaoTalk docking, STORE shipping, cached official URL picker (mock native IPC)");
+  console.log("PASS: audit UI, docking, STORE, official URL, isolated developer diagnostics and Modal (mock IPC)");
 } finally {
   if (browser) await browser.close();
   server.kill("SIGTERM");
