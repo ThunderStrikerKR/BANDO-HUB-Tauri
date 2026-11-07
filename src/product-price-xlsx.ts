@@ -6,8 +6,8 @@ import type { BulkPreview, Product, State, Variant } from "./types";
 // The hidden identifiers intentionally match the legacy Electron price workbook.
 // Never use row order, an editable name, or a model code as the sole record key.
 export const PRICE_HEADERS = [
-  "상품명", "부제", "색상/옵션", "도매가", "반도매가", "소매가",
-  "__상품ID", "__옵션ID", "__모델코드", "__옵션원본", "__색상ID",
+  "상품명", "상품설명", "상품 색상", "도매가", "반도매가", "소매가",
+  "__상품ID", "__가격기록ID", "__모델코드", "__외부구성원본", "__색상ID",
 ] as const;
 
 export async function exportPriceWorkbook(state: State): Promise<number[]> {
@@ -94,12 +94,12 @@ export async function previewPriceWorkbook(state: State, file: File): Promise<Bu
     }
     const id = state.productMappings?.[values[6] + "|" + values[7]] ?? values[6];
     const key = id + "|" + values[7];
-    if (seen.has(key)) { issue("상품과 옵션 ID가 중복된 행입니다."); continue; }
+    if (seen.has(key)) { issue("상품과 가격기록 ID가 중복된 행입니다."); continue; }
     seen.add(key);
     const product = registeredProducts(products).find((p) => p.id === id);
     const variant = product?.variants.find((v) => v.id === values[7]);
     if (!product || !variant || !rowMatches(product, variant, values)) {
-      issue("상품명, 모델, 옵션 또는 숨김 식별자가 현재 데이터와 일치하지 않습니다. 최신 가격표를 다시 내려받으세요.");
+      issue("상품명, 모델 또는 숨김 가격 식별자가 현재 데이터와 일치하지 않습니다. 최신 가격표를 다시 내려받으세요.");
       continue;
     }
     (["wholesale", "semi", "retail"] as const).forEach((tier, index) => {
