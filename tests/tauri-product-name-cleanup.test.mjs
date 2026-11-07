@@ -57,8 +57,8 @@ test("Model names are concise and use cases move to the description", () => {
   assert.equal(bag.newName, "BD 700 / 가방 포함");
   assert.doesNotMatch(bag.newDescription, /가방포함|가방 포함/);
   const cart = find("84");
-  assert.equal(cart.newName, "Cart-20");
-  assert.match(cart.newDescription, /보면대카트/);
+  assert.equal(cart.newName, "Cart-20 / 보면대카트");
+  assert.match(cart.newDescription, /단종예정\/재고문의/);
 });
 
 test("Placeholder Cafe24 product codes are never treated as model names", () => {
@@ -161,7 +161,7 @@ test("One unlabeled variant in a bag or wheel option group is held for review", 
   p.variants[0].option="가방 포함";
   const report=previewProductNameCleanup(fixture).rows.find((r)=>r.productId===p.id);
   assert.equal(report.status,"HOLD");
-  assert.match(report.reason,/포함/);
+  assert.match(report.reason,/구성품|선택 옵션/);
 });
 
 test("Material, size and color stay in product names rather than descriptions",()=>{
