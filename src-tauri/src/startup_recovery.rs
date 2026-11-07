@@ -84,7 +84,7 @@ fn value_to_status(test: bool, state: &StartupProgress) -> StartupStatus {
 }
 /// Validation only reads the persisted snapshot. Never run VACUUM INTO,
 /// migration rollback, restore, DELETE, or a seed overwrite on startup failure.
-fn open_checked_sqlite(path: &Path) -> Result<Connection, String> {
+fn preflight_existing_sqlite(path: &Path) -> Result<(), String> {
     // An existing file is user data, even if malformed. Do not accidentally
     // treat it as an empty new database and insert a fresh seed.
     if path.exists() {
@@ -100,6 +100,10 @@ fn open_checked_sqlite(path: &Path) -> Result<Connection, String> {
         }
         valid_state(&get_snapshot(&preview)?)?;
     }
+    Ok(())
+}
+fn open_checked_sqlite(path: &Path) -> Result<Connection, String> {
+    preflight_existing_sqlite(path)?;
     let connection = initialize_database(path)?;
     let verdict: String = connection
         .query_row("PRAGMA quick_check(1)", [], |row| row.get(0))
@@ -116,6 +120,9 @@ fn open_database(app: &AppHandle, is_test: bool) -> Result<Database, String> {
     fs::create_dir_all(&base).map_err(err)?;
     let (active_base, connection) = if is_test {
         // Never fall back to the live SQLite file when developer TEST fails.
+        // A malformed existing TEST database must also be preserved instead
+        // of silently replaced by a new seed.
+        preflight_existing_sqlite(&base.join("developer-test").join("bando-hub-test.sqlite"))?;
         let (root, candidate) = developer_workspace::open_isolated(&base)?;
         let check: String = candidate.query_row("PRAGMA quick_check(1)", [], |row| row.get(0))
             .map_err(err)?;
