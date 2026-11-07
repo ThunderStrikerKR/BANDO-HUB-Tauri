@@ -50,17 +50,24 @@ fn write_snapshot(conn: &mut Connection, mut state: Value, expected_revision: u6
     validate_brands(&current, &state)?;
     if validate_orders { reception::validate_reception(&current, &state)?; }
     let archive_entries = reception::new_archive_entries(&current, &state)?;
+    let products_changed = current["products"] != state["products"];
+    let clients_changed = current["clients"] != state["clients"];
+    let orders_changed = current["orders"] != state["orders"];
     state["revision"] = json!(current_revision + 1);
     // The constrained SQLite tables own products, clients and orders.
     // Keep only non-core data in the compatibility envelope, atomically.
     let mut envelope = state.clone();
     if relational_store::active(&tx)? {
-        relational_store::store(&tx, &state)?;
+        // Settings-only changes never rewrite hundreds of product or order rows.
+        if products_changed || clients_changed || orders_changed {
+            relational_store::store(&tx, &state)?;
+        }
         relational_store::strip_core(&mut envelope);
     }
     tx.execute("UPDATE app_state SET payload=?1 WHERE id=1",
         [serde_json::to_string(&envelope).map_err(err)?]).map_err(err)?;
-    // Maintain searchable product index in SQLite alongside the canonical JSON document.
+    // Maintain legacy search indexes only when their actual domain changed.
+    if products_changed {
     tx.execute("DELETE FROM product_index", []).map_err(err)?;
     {
         let mut insert = tx.prepare("INSERT INTO product_index(id,code,name,payload) VALUES (?1,?2,?3,?4)").map_err(err)?;
@@ -71,7 +78,9 @@ fn write_snapshot(conn: &mut Connection, mut state: Value, expected_revision: u6
             insert.execute(params![id, code, name, serde_json::to_string(product).map_err(err)?]).map_err(err)?;
         }
     }
+    }
     // Order index and the append-only reception archive share the snapshot transaction.
+    if orders_changed {
     tx.execute("DELETE FROM order_index", []).map_err(err)?;
     {
         let mut insert = tx.prepare("INSERT INTO order_index(id,client_id,created_at,confirmed_at,status) VALUES (?1,?2,?3,?4,?5)").map_err(err)?;
@@ -84,6 +93,7 @@ fn write_snapshot(conn: &mut Connection, mut state: Value, expected_revision: u6
                 order["status"].as_str().unwrap_or("REVIEW")
             ]).map_err(err)?;
         }
+    }
     }
     for (id, order_id, record) in archive_entries {
         // Never silently discard a colliding audit ID with a different owner or payload.
