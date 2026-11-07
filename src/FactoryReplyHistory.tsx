@@ -65,6 +65,9 @@ export function FactoryReplyHistory({
                       {r.rows.find((row) => row.orderId === id)?.name || "주문 보기"}
                     </button>
                   ))}
+                  {r.error && (
+                    <p className="form-error" role="alert">{r.error}</p>
+                  )}
                   <details>
                     <summary>회신 행 {r.rows.length}건 보기</summary>
                     {r.rows.map((row) => {
