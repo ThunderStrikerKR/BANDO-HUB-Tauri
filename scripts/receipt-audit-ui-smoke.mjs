@@ -150,6 +150,9 @@ try {
                   exports:0, shipments:0, payments:0, replies:0}
               : {enabled:false};
           }
+          if (command === "test_reception_boundary") {
+            return { accepted: false, reason: "주문 확인 완료 전에는 정식 주문으로 저장할 수 없습니다." };
+          }
           if (command === "test_run_history") return window.__developerRuns ?? [];
           if (command === "test_record_run") {
             window.__developerRuns ??= [];
@@ -279,13 +282,23 @@ try {
   await page.getByRole("heading", { name: "발주서 오류 검증" }).waitFor();
   await page.getByRole("button", { name: "현재 발주서 검사" }).click();
   await page.getByRole("heading", { name: /기대 조건/ }).waitFor();
-  await page.getByRole("button", { name: "선택한 팝업 상태 열기" }).click();
-  const modal = page.getByRole("dialog", { name: "UI 검사 / 발주서 원문 정정" });
+  await page.getByRole("button", { name: "Rust 저장 차단 검사" }).click();
+  await page.getByRole("heading", { name: /Rust 저장 경계/ }).waitFor();
+  await page.getByRole("button", { name: "선택한 실제 화면 열기" }).click();
+  const modal = page.getByRole("dialog", { name: "UI 상태 시험 / 기본" });
   await modal.waitFor();
   await modal.getByRole("button", { name: "취소" }).click();
   await modal.waitFor({ state: "detached" });
+  // Actual ProductSearchDialog, not only a mocked common modal title.
+  await page.locator("#dev-popup").selectOption("product-search");
+  await page.getByRole("button", { name: "선택한 실제 화면 열기" }).click();
+  const productDialog = page.getByRole("dialog", { name: "상품 검색" });
+  await productDialog.waitFor();
+  await productDialog.getByRole("textbox", { name: "추가 상품 검색" }).fill("709");
+  await productDialog.getByRole("button", { name: /닫기/ }).click();
+  await productDialog.waitFor({ state: "detached" });
   assert.deepEqual(pageErrors, [], "React runtime errors: " + pageErrors.join("\n"));
-  console.log("PASS: audit UI, docking, STORE, official URL, isolated developer diagnostics and Modal (mock IPC)");
+  console.log("PASS: audit UI, docking, STORE, official URL, isolated developer tests and real Modal (mock IPC)");
 } finally {
   if (browser) await browser.close();
   server.kill("SIGTERM");
