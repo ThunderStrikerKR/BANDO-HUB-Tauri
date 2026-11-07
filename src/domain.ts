@@ -73,7 +73,8 @@ export const productSchema = z.object({
   origin: z.enum(["STORE", "FACTORY"]),
   defaultColor: z.string().min(1),
   active: z.boolean(),
-  variants: z.array(variantSchema).min(1),
+  // Each business product has exactly one price record; website configurations are separate products.
+  variants: z.array(variantSchema).length(1),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -86,15 +87,13 @@ export function validateProduct(p: Product, products: Product[]) {
         normalizeCode(x.code) === normalizeCode(p.code) &&
         p.variants.some((v) => v.source === "DEMO") ===
           x.variants.some((v) => v.source === "DEMO") &&
-        (!p.saleUnit || !x.saleUnit || p.modelKey === x.modelKey) &&
+        p.name.trim().toLowerCase() === x.name.trim().toLowerCase() &&
         (!p.siteId || !x.siteId || p.siteId === x.siteId),
     )
   )
     throw Error("같은 상품코드가 이미 있습니다.");
-  const colors = p.variants.map((v) => normalizeColor(v.color) + "|" + (v.option ?? ""));
-  if (new Set(colors).size !== colors.length) throw Error("색상 / 옵션이 중복됩니다.");
   if (!p.variants.some((v) => normalizeColor(v.color) === normalizeColor(p.defaultColor)))
-    throw Error("기본 색상을 판매 옵션에 등록하세요.");
+    throw Error("상품 색상이 가격 기록과 일치하지 않습니다.");
   for (const v of p.variants)
     if (v.url && !validProductUrl(v.url))
       throw Error("상품 링크는 확인된 반도스탠드 / 반도몰 상세페이지 URL을 입력하세요.");
