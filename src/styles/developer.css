@@ -29,3 +29,30 @@
 .developer-history pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 .developer-long-text { white-space: pre-wrap; overflow-wrap: anywhere; }
 .developer-preview-dialog input { display: block; width: 100%; margin: 8px 0 20px; }
+
+/* The real business managers remain inside the TEST page; only their own
+   dialogs portal to the existing global modal layer. */
+.developer-modal-workbench { min-width: 0; }
+.developer-modal-workbench > .actions { flex-wrap: wrap; }
+.developer-live-container {
+  position: relative;
+  isolation: isolate;
+  overflow: auto;
+  min-height: 260px;
+  max-height: 65vh;
+  padding: 12px;
+  margin-top: 12px;
+  border: 1px solid #565656;
+  border-radius: 7px;
+}
+.developer-live-container .fixed-manager { width: 100%; min-height: 300px; }
+.developer-live-container .management-scroll { max-height: 52vh; overflow: auto; }
+.developer-history table { width: 100%; border-collapse: collapse; min-width: 680px; }
+.developer-history th,
+.developer-history td {
+  padding: 8px;
+  border-bottom: 1px solid #505050;
+  vertical-align: top;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
