@@ -3,11 +3,14 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 const read = (file) => readFileSync(new URL("../" + file, import.meta.url), "utf8");
 
-test("single archive root in settings, 5 category roots and no parallel reply path",()=>{
+test("single archive root for output plus a separately configured monitored inbox",()=>{
  const ui=read("src/SettingsPanel.tsx");
  assert.match(ui, /Excel 보관함 위치/);
  assert.match(ui, /excelDirectory: folder/);
- assert.doesNotMatch(ui,/factoryReplyDirectory: folder/);
+ assert.match(ui,/factoryReplyDirectory: folder/);
+ const monitor=read("src-tauri/src/factory_reply_watch.rs");
+ assert.match(monitor,/factoryReplyDirectory/);
+ assert.match(monitor,/공장 회신 수신/);
  const rust=read("src-tauri/src/lib.rs");
  assert.match(rust,/chrono::\{Datelike, Local, DateTime\}/);
  assert.match(rust,/fn archive_daily_directory/);
