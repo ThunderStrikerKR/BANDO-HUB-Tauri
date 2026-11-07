@@ -911,6 +911,7 @@ pub fn run() {
             developer_workspace::test_database_preview,
             developer_workspace::reset_test_database,
             developer_workspace::test_record_run,
+            developer_workspace::test_reception_boundary,
             developer_workspace::test_run_history
         ])
         .build(tauri::generate_context!())
