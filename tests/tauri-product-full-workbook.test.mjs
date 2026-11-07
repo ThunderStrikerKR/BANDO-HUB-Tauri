@@ -54,12 +54,12 @@ async function previewWorkbook(state, workbook) {
   return exports.previewProductSyncWorkbook(state, file);
 }
 
-test("real XLSX: all 303 products and 360 variant rows survive export and re-import unchanged", async () => {
+test("real XLSX: all 360 independent products and 360 price rows survive export and re-import unchanged", async () => {
   const state = example();
   const original = JSON.stringify(state);
   const wb = await exportAndReload(state);
-  assert.equal(wb.getWorksheet("상품 목록").rowCount, 304);
-  assert.equal(wb.getWorksheet("판매 옵션 및 가격").rowCount, 361);
+  assert.equal(wb.getWorksheet("상품 목록").rowCount, 361);
+  assert.equal(wb.getWorksheet("상품별 가격").rowCount, 361);
   assert.ok(wb.getWorksheet("카테고리 및 브랜드 참고"));
   assert.equal(wb.getWorksheet("__반도허브_관리정보").getCell("B2").value, state.revision ?? 0);
   const preview = await previewWorkbook(state, wb);
@@ -76,7 +76,7 @@ test("real XLSX: all 303 products and 360 variant rows survive export and re-imp
 test("real XLSX: modify one official-product retail price but keep option ID, other tiers and catalog IDs", async () => {
   const state = example();
   const wb = await exportAndReload(state);
-  const options = wb.getWorksheet("판매 옵션 및 가격");
+  const options = wb.getWorksheet("상품별 가격");
   const original = state.products.find((p) => p.siteId === "351");
   const row = options.getRows(2, options.rowCount - 1).find((item) =>
     item.getCell(1).value === original.id && item.getCell(3).value === original.variants[0].id);
@@ -92,48 +92,59 @@ test("real XLSX: modify one official-product retail price but keep option ID, ot
   assert.equal(after.variants[0].semi, original.variants[0].semi);
   assert.equal(after.variants[0].siteOptionId, original.variants[0].siteOptionId);
   assert.equal(after.variants[0].source, "MANUAL");
-  assert.equal(after.variants[1].retail, original.variants[1].retail);
+  const sibling = state.products.find((p) => p.siteId === original.siteId && p.id !== original.id);
+  assert.ok(sibling);
+  assert.equal(sibling.variants[0].retail,
+    exports.applyProductSyncWorkbook(state, review).next.products.find((p) => p.id === sibling.id).variants[0].retail);
   assert.equal(after.siteId, original.siteId);
   assert.equal(after.siteCode, original.siteCode);
   assert.equal(after.priceHistory.at(-1).source, "MANUAL_EXCEL");
 });
 
-test("real XLSX: homepage-free new two-option product is created without Cafe24 IDs", async () => {
+test("real XLSX: two colors create two independent products with one price each", async () => {
   const state = example();
   const wb = await exportAndReload(state);
   const products = wb.getWorksheet("상품 목록");
-  const options = wb.getWorksheet("판매 옵션 및 가격");
-  const p = new Array(exports.PRODUCT_SYNC_HEADERS.length).fill("");
-  p[1] = "NEW900"; p[2] = "BD 900"; p[4] = "BD 900";
-  p[5] = "반도스탠드"; p[6] = "공장"; p[11] = "블랙"; p[12] = "사용";
-  products.addRow(p);
-  for (const [color, retail] of [["블랙", 90000], ["화이트", 99000]]) {
-    const v = new Array(exports.OPTION_SYNC_HEADERS.length).fill("");
-    v[1] = "NEW900"; v[3] = color;
-    v[5] = 50000; v[6] = 65000; v[7] = retail;
-    options.addRow(v);
+  const prices = wb.getWorksheet("상품별 가격");
+  for (const [key, color, retail] of [["NEW900BLACK", "블랙", 90000], ["NEW900WHITE", "화이트", 99000]]) {
+    const p = new Array(exports.PRODUCT_SYNC_HEADERS.length).fill("");
+    p[1] = key; p[2] = "BD 900 / " + color; p[4] = "BD 900";
+    p[5] = "반도스탠드"; p[6] = "공장"; p[11] = color; p[12] = "사용";
+    products.addRow(p);
+    const price = new Array(exports.OPTION_SYNC_HEADERS.length).fill("");
+    price[1] = key; price[3] = color; price[5] = 50000; price[6] = 65000; price[7] = retail;
+    prices.addRow(price);
   }
   const preview = await previewWorkbook(state, wb);
   assert.equal(preview.rows.filter((r) => r.status === "ERROR").length, 0,
-    JSON.stringify(preview.rows.filter((r)=>r.status==="ERROR")));
-  assert.equal(preview.createdProducts, 1);
+    JSON.stringify(preview.rows.filter((r) => r.status === "ERROR")));
+  assert.equal(preview.createdProducts, 2);
   assert.equal(preview.createdOptions, 2);
   const applied = exports.applyProductSyncWorkbook(state, preview);
-  const added = applied.next.products.find((p) => p.code === "BD 900");
-  assert.ok(added);
-  assert.equal(added.name, "BD 900");
-  assert.equal(added.variants.length, 2);
-  assert.equal(added.saleUnit, false);
-  assert.deepEqual(added.variants.map((v) => v.retail), [90000,99000]);
-  assert.ok(added.variants.every((v) => v.source === "MANUAL" && !v.siteOptionId));
-  assert.ok(!added.siteId);
-  assert.equal(applied.next.products.length, state.products.length + 1);
+  const added = applied.next.products.filter((p) => p.code === "BD 900");
+  assert.equal(added.length, 2);
+  assert.deepEqual(added.map((p) => p.name), ["BD 900 / 블랙", "BD 900 / 화이트"]);
+  assert.ok(added.every((p) => p.variants.length === 1 && p.saleUnit && !p.siteId));
+  assert.deepEqual(added.map((p) => p.variants[0].retail), [90000, 99000]);
+  assert.equal(applied.next.products.length, state.products.length + 2);
+});
+
+test("real XLSX: second price row for one product is rejected", async () => {
+  const state = example();
+  const wb = await exportAndReload(state);
+  const prices = wb.getWorksheet("상품별 가격");
+  const first = state.products[0];
+  const extra = new Array(exports.OPTION_SYNC_HEADERS.length).fill("");
+  extra[0] = first.id; extra[3] = "화이트"; extra[7] = 99000;
+  prices.addRow(extra);
+  const review = await previewWorkbook(state, wb);
+  assert.ok(review.rows.some((r) => r.status === "ERROR" && /두 번째 가격 구성/.test(r.errors.join(" "))));
 });
 
 test("real XLSX: unlisted options remain, and unknown or repeated IDs block saving", async () => {
   const state = example();
   const wb = await exportAndReload(state);
-  const sheet = wb.getWorksheet("판매 옵션 및 가격");
+  const sheet = wb.getWorksheet("상품별 가격");
   sheet.spliceRows(2,1);
   let review = await previewWorkbook(state, wb);
   assert.equal(review.missingOptions, 1);
@@ -154,7 +165,7 @@ test("real XLSX: old DB version, formula and unknown original source fields are 
   products.getCell("C2").value={formula:"2+2",result:4};
   await assert.rejects(()=>previewWorkbook(state,wb),/병합된 셀이나 수식/);
   products.getCell("C2").value=state.products[0].name;
-  const variants=wb.getWorksheet("판매 옵션 및 가격");
+  const variants=wb.getWorksheet("상품별 가격");
   variants.getCell("I2").value="MANUAL";
   const review=await previewWorkbook(state,wb);
   assert.ok(review.rows.some((r)=>r.status==="ERROR"));
@@ -191,10 +202,10 @@ test("real XLSX: a new row with a duplicate business model is held, not register
   const state=example();
   const wb=await exportAndReload(state);
   const products=wb.getWorksheet("상품 목록");
-  const options=wb.getWorksheet("판매 옵션 및 가격");
+  const options=wb.getWorksheet("상품별 가격");
   const original=state.products.find((p)=>p.siteId==="351");
   const row=new Array(exports.PRODUCT_SYNC_HEADERS.length).fill("");
-  row[1]="DUPLICATE_MODEL"; row[2]="복사된 상품";
+  row[1]="DUPLICATE_MODEL"; row[2]=original.name;
   row[4]=original.code; row[5]="반도스탠드";
   row[6]="공장"; row[11]="클리어"; row[12]="사용";
   products.addRow(row);
@@ -209,7 +220,7 @@ test("real XLSX: a new row with a duplicate business model is held, not register
 test("real XLSX: an option without a matching parent key cannot be imported", async () => {
   const state=example();
   const wb=await exportAndReload(state);
-  const variants=wb.getWorksheet("판매 옵션 및 가격");
+  const variants=wb.getWorksheet("상품별 가격");
   const option=new Array(exports.OPTION_SYNC_HEADERS.length).fill("");
   option[1]="UNKNOWN_NEW_PRODUCT"; option[3]="블랙"; option[7]="110000";
   variants.addRow(option);
