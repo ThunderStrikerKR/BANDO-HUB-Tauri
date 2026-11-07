@@ -5,7 +5,7 @@ import { newReception, persistedReceptionState } from "../orders/reception";
 import { useHasPendingChanges } from "../shared/pending-changes";
 import { useAsyncTask } from "../shared/useAsyncTask";
 import { useNotice } from "../shared/useNotice";
-import type { DockStatus, DockWindow, InboxEntry, Order, State } from "../types";
+import type { DockStatus, DockWindow, InboxEntry, Order, StartupStatus, State } from "../types";
 import { clone } from "../ui";
 import type { WorkflowSelection } from "../WorkflowBoard";
 import { onlyDeletedGroups } from "../workspace-selection";
@@ -26,24 +26,76 @@ export function useAppModel() {
     [dockBusy, setDockBusy] = useState(false),
     [dockCandidates, setDockCandidates] = useState<DockWindow[]>([]),
     [workflowSelection, setWorkflowSelection] = useState<WorkflowSelection>();
+  const [startup, setStartup] = useState<StartupStatus>({
+    phase: "OPENING", attempts: 1, isTest: false,
+  });
+  const [startupBusy, setStartupBusy] = useState(false);
   const { run } = useAsyncTask(setNotice);
   useEffect(() => {
-    if (!window.bando) {
-      setNotice("PC 프로그램으로 실행하세요.");
-      return;
-    }
-    void window.bando
-      .load()
-      .then((s) => {
-        setState(s);
+    let cancelled = false;
+    const launch = async () => {
+      const api = window.bando;
+      if (!api) {
+        if (!cancelled) setStartup({
+          phase: "ERROR", attempts: 1, isTest: false,
+          error: "PC 프로그램 연결을 확인할 수 없습니다.",
+        });
+        return;
+      }
+      try {
+        const status: StartupStatus = api.startupStatus
+          ? await api.startupStatus()
+          : { phase: "READY", attempts: 1, isTest: !!api.isTestWorkspace };
+        if (cancelled) return;
+        setStartup(status);
+        if (status.phase !== "READY") return;
+        const loaded = await api.load();
+        if (cancelled) return;
+        setState(loaded);
         setDraft(newReception());
-      })
-      .catch((e) => setNotice(String(e), "error"));
-    void window.bando
-      .dockStatus()
-      .then(setDock)
-      .catch((e) => setNotice(String(e), "error"));
+        void api.dockStatus().then((value) => {
+          if (!cancelled) setDock(value);
+        }).catch((error) => {
+          if (!cancelled) setNotice(String(error), "error");
+        });
+      } catch (error) {
+        if (!cancelled) setStartup((previous) => ({
+          ...previous, phase: "ERROR", error: String(error),
+        }));
+      }
+    };
+    void launch();
+    return () => { cancelled = true; };
   }, []);
+
+  const retryStartup = async () => {
+    if (startupBusy || !window.bando) return;
+    const api = window.bando;
+    setStartupBusy(true);
+    setStartup((previous) => ({ ...previous, phase: "RETRYING", error: null }));
+    try {
+      const next = await api.retryStartup();
+      setStartup(next);
+      if (next.phase === "READY") {
+        const loaded = await api.load();
+        setState(loaded);
+        setDraft(newReception());
+        const dock = await api.dockStatus().catch(() => undefined);
+        if (dock) setDock(dock);
+      }
+    } catch (error) {
+      // Re-read the authoritative native error rather than hiding it behind a
+      // generic IPC rejection. Never reset data or restore a backup here.
+      const native = await api.startupStatus?.().catch(() => undefined);
+      setStartup(native?.phase === "ERROR" ? native : {
+        phase: "ERROR", attempts: startup.attempts, isTest: startup.isTest,
+        error: String(error),
+      });
+    } finally {
+      setStartupBusy(false);
+    }
+  };
+
   useEffect(() => {
     document.documentElement.style.setProperty(
       "--ui-scale",
@@ -301,6 +353,9 @@ export function useAppModel() {
   return {
     state,
     draft,
+    startup,
+    startupBusy,
+    retryStartup,
     tab,
     navigate,
     notice,
