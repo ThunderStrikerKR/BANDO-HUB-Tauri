@@ -196,7 +196,7 @@ export function DeveloperLab({ state, onNotice, revision }: {
           </div>
         </details>
       </section>
-      <DeveloperModalWorkbench state={state} onNotice={onNotice}
+      <DeveloperModalWorkbench state={state} raw={raw} onNotice={onNotice}
         onRecorded={async () => { setHistory(await window.bando!.testRunHistory!()); }}/>
     </div>
   );
