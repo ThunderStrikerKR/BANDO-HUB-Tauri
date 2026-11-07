@@ -29,7 +29,7 @@ test("React shows native failure status, guards retry and loads saved state only
   assert.match(app,/model\.startup\.phase === "ERROR"/);
   assert.match(app,/<StartupRecoveryPanel/);
   assert.match(model,/if \(status\.phase !== "READY"\) return/);
-  assert.match(model,/const next = await api\.retryStartup\(\)/);
+  assert.match(model,/native\?\.phase === "READY" \? native : await api\.retryStartup\(\)/);
   assert.match(model,/if \(next\.phase === "READY"\)/);
   assert.match(bridge,/invoke\("startup_status"\)/);
   assert.match(bridge,/invoke\("startup_metrics"\)/);
