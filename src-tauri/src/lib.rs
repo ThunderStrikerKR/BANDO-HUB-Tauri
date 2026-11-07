@@ -1095,3 +1095,61 @@ mod excel_folder_tests {
         assert_eq!(dir, fs::canonicalize(root).unwrap());
     }
 }
+
+
+#[cfg(test)]
+mod dated_archive_tests {
+    use super::*;
+    use chrono::TimeZone;
+
+    #[test]
+    fn factory_and_store_names_increment_without_overwriting_and_reset_by_day() {
+        let unique = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
+        let folder = std::env::temp_dir()
+            .join(format!("bando-archive-{}-{unique}", std::process::id()));
+        fs::create_dir_all(&folder).unwrap();
+        let root = canonical_excel_directory(&folder).unwrap();
+        let day1 = Local.with_ymd_and_hms(2026, 11, 7, 12, 0, 0).single().unwrap();
+        let day2 = Local.with_ymd_and_hms(2026, 11, 8, 12, 0, 0).single().unwrap();
+        let bytes = b"PK\x03\x04synthetic-test-workbook";
+        let first = archive_workbook_bytes(&root, WorkbookKind::Factory, day1, bytes).unwrap();
+        let second = archive_workbook_bytes(&root, WorkbookKind::Factory, day1, bytes).unwrap();
+        let store = archive_workbook_bytes(&root, WorkbookKind::Store, day1, bytes).unwrap();
+        let next_day = archive_workbook_bytes(&root, WorkbookKind::Factory, day2, bytes).unwrap();
+        assert_eq!(first.file_name().unwrap(), "20261107(공장1).xlsx");
+        assert_eq!(second.file_name().unwrap(), "20261107(공장2).xlsx");
+        assert_eq!(store.file_name().unwrap(), "20261107(매장1).xlsx");
+        assert_eq!(next_day.file_name().unwrap(), "20261108(공장1).xlsx");
+        assert!(first.to_string_lossy().contains("공장 발송"));
+        assert!(first.to_string_lossy().contains("2026년"));
+        assert!(first.to_string_lossy().contains("11월"));
+        assert!(first.to_string_lossy().contains("07일"));
+        assert_eq!(fs::read(&first).unwrap(), bytes);
+        assert_eq!(fs::read(&second).unwrap(), bytes);
+        fs::remove_dir_all(&folder).unwrap();
+    }
+
+    #[test]
+    fn templates_clients_and_replies_share_root_without_sharing_name_sequence() {
+        let unique = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
+        let folder = std::env::temp_dir()
+            .join(format!("bando-archive-kinds-{}-{unique}", std::process::id()));
+        fs::create_dir_all(&folder).unwrap();
+        let root = canonical_excel_directory(&folder).unwrap();
+        let date = Local.with_ymd_and_hms(2026, 11, 7, 12, 0, 0).single().unwrap();
+        let bytes = b"PK\x03\x04synthetic-test-workbook";
+        for (kind, expected) in [
+            (WorkbookKind::Product, "20261107(상품전체1).xlsx"),
+            (WorkbookKind::ProductTemplate, "20261107(상품등록양식1).xlsx"),
+            (WorkbookKind::FactoryReply, "20261107(공장회신1).xlsx"),
+            (WorkbookKind::Client, "20261107(거래처전체1).xlsx"),
+        ] {
+            let path = archive_workbook_bytes(&root, kind, date, bytes).unwrap();
+            assert_eq!(path.file_name().unwrap(), expected);
+            assert!(path.starts_with(&root));
+        }
+        fs::remove_dir_all(&folder).unwrap();
+    }
+}

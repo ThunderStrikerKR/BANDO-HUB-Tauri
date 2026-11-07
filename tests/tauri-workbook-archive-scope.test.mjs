@@ -18,7 +18,7 @@ test("single archive root in settings, 5 category roots and no parallel reply pa
  assert.match(rust,/create_new\(true\)/);
  assert.match(rust,/WorkbookKind::FactoryReply, Local::now\(\), &bytes/);
  for(const [cat,slug] of [["Factory","공장"],["Store","매장"]]){
-  assert.match(rust,new RegExp("Self::"+cat+" => \\""+slug+"\\""));
+  assert.match(rust, new RegExp('Self::' + cat + ' => "' + slug + '"'));
  }
 });
 test("workbooks only exposed in product, client, factory/store shipping screens",()=>{
