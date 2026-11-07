@@ -241,35 +241,56 @@ mod native {
         s.mode=Mode::Overlap;
         Ok(())
     }
-    fn split_rect(work:Rect,desired:i32)->Result<(Rect,Rect),String>{
-        let k=desired.clamp(392,620);
-        if work.width()<k+8+1024||work.height()<700{
+    fn split_rect(work:Rect,desired:i32,scale:f64)->Result<(Rect,Rect),String>{
+        if !scale.is_finite()||!(0.5..=8.0).contains(&scale){
+            return Err("모니터 DPI 배율을 확인할 수 없습니다.".into())
+        }
+        // Windows desktop work areas use physical pixels; Tauri minWidth/
+        // minHeight and the CSS layout use logical units.
+        let minimum_kakao=(392.0*scale).ceil() as i32;
+        let maximum_kakao=(620.0*scale).ceil() as i32;
+        let minimum_main=(1024.0*scale).ceil() as i32;
+        let minimum_height=(700.0*scale).ceil() as i32;
+        let gap=(8.0*scale).ceil() as i32;
+        let k=desired.clamp(minimum_kakao,maximum_kakao);
+        if work.width()<k+gap+minimum_main||work.height()<minimum_height{
             return Err("나누어 보기는 모니터 공간이 부족합니다. 겹쳐 보기를 이용하세요.".into())
         }
         Ok((
             Rect{left:work.left,top:work.top,right:work.left+k,bottom:work.bottom},
-            Rect{left:work.left+k+8,top:work.top,right:work.right,bottom:work.bottom}
+            Rect{left:work.left+k+gap,top:work.top,right:work.right,bottom:work.bottom}
         ))
     }
-    pub fn stack(s:&mut Session)->Result<(),String>{
-        let (kakao,main)=split_rect(monitor_work(s.main)?,s.width)?;
+    pub fn stack(s:&mut Session,app:&AppHandle)->Result<(),String>{
+        let window=app.get_webview_window("main").ok_or("반도허브 창을 찾지 못했습니다.")?;
+        let scale=window.scale_factor().map_err(|e|e.to_string())?;
+        let (kakao,main)=split_rect(monitor_work(s.main)?,s.width,scale)?;
+        // Restore to the user's layout immediately before entering split mode,
+        // not the (possibly stale) position at the time KakaoTalk was attached.
+        let before_split=placement(s.main)?;
         unsafe{ShowWindow(s.main,SW_RESTORE);}
         if let Err(error)=set_rect(s.main,main,0) {
-            unsafe{SetWindowPlacement(s.main,&s.main_original);}
+            unsafe{SetWindowPlacement(s.main,&before_split);}
             return Err(error)
         }
         set_z(s.hwnd,s.original_topmost);
         unsafe{ShowWindow(s.hwnd,SW_RESTORE);}
         if let Err(e)=set_rect(s.hwnd,kakao,0){
-            unsafe{SetWindowPlacement(s.main,&s.main_original);}
+            unsafe{SetWindowPlacement(s.main,&before_split);}
             return Err(e)
         }
+        s.main_original=before_split;
         s.mode=Mode::Stack;
         s.width=kakao.width();
         Ok(())
     }
     pub fn sync(s:&Session,app:&AppHandle,region:Option<Region>)->Result<(),String>{
         if !live(s){return Err("카카오톡 연결이 끊어졌습니다.".into())}
+        // Do not reposition a window that the user explicitly minimized.
+        if unsafe{IsIconic(s.hwnd)}!=0 {
+            set_z(s.hwnd,s.original_topmost);
+            return Ok(())
+        }
         if s.mode==Mode::Overlap{
             if unsafe{IsIconic(s.main)}!=0 || !focus_on_app_or_kakao(s.hwnd) {
                 set_z(s.hwnd,s.original_topmost);
@@ -280,7 +301,11 @@ mod native {
             let main=rect(s.main)?;
             let target=Rect{left:main.left-s.width-8,top:main.top,
                 right:main.left-8,bottom:main.bottom};
-            if target.left>=monitor_work(s.main)?.left {set_rect(s.hwnd,target,0)?;}
+            let work=monitor_work(s.main)?;
+            if target.left>=work.left && target.right<=work.right
+                && target.top>=work.top && target.bottom<=work.bottom {
+                set_rect(s.hwnd,target,0)?;
+            }
         }
         Ok(())
     }
@@ -450,12 +475,28 @@ mod native {
             let _=&mut process;
         }
 
+
+        #[test] fn split_layout_respects_dpi_and_negative_monitor_origins(){
+            // 150% scale: at least 588 physical Kakao pixels and 1536
+            // physical app pixels; preserve a monitor left of primary.
+            let work=Rect{left:-2560,top:-120,right:0,bottom:1320};
+            let (kakao,main)=split_rect(work,420,1.5).unwrap();
+            assert_eq!(kakao.left,-2560);
+            assert_eq!(kakao.width(),588);
+            assert_eq!(main.left-kakao.right,12);
+            assert!(main.width()>=1536);
+            assert_eq!(main.right,0);
+            assert!(split_rect(Rect{left:0,top:0,right:1920,bottom:1080},
+                420,1.5).is_err());
+            assert!(split_rect(work,420,f64::NAN).is_err());
+        }
+
         #[test] fn split_layout_reserves_main_minimum(){
             let area=Rect{left:0,top:0,right:1920,bottom:1040};
-            let (left,right)=split_rect(area,420).unwrap();
+            let (left,right)=split_rect(area,420,1.0).unwrap();
             assert_eq!(left.width(),420);
             assert!(right.width()>=1024);
-            assert!(split_rect(Rect{left:0,top:0,right:1280,bottom:1000},420).is_err());
+            assert!(split_rect(Rect{left:0,top:0,right:1280,bottom:1000},420,1.0).is_err());
         }
     }
 }
@@ -522,7 +563,7 @@ pub fn dock_cycle_native(app:AppHandle,dock:State<'_,Dock>)->Result<Status,Strin
         if let Some(mut session)=inner.session.take(){
             if !native::live(&session){native::restore(&session);return Ok(inactive())}
             if session.mode==native::Mode::Overlap{
-                if let Err(e)=native::stack(&mut session){inner.session=Some(session);return Err(e)}
+                if let Err(e)=native::stack(&mut session,&app){inner.session=Some(session);return Err(e)}
                 inner.session=Some(session);return Ok(status(&inner))
             }
             native::restore(&session);return Ok(inactive())

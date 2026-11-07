@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { validPanels } from "./HubPanels";
 import type { DockStatus } from "./types";
 import { useViewportScale } from "./shared/useViewportScale";
@@ -47,11 +48,38 @@ export function HubShell({
     const observer = new ResizeObserver(send);
     observer.observe(el);
     window.addEventListener("resize", send);
+    window.addEventListener("focus", send);
+    document.addEventListener("visibilitychange", send);
+    // A position-only move does not trigger ResizeObserver or DOM resize.
+    // Attach native window events so multi-monitor, DPI and focus changes
+    // re-align the external top-level KakaoTalk window immediately.
+    const unlisten: Array<() => void> = [];
+    let disposed = false;
+    try {
+      const current = getCurrentWindow();
+      for (const subscription of [
+        current.onMoved(send),
+        current.onResized(send),
+        current.onScaleChanged(send),
+        current.onFocusChanged(send),
+      ]) {
+        void subscription.then((off) => {
+          if (disposed) off();
+          else unlisten.push(off);
+        }).catch(() => {});
+      }
+    } catch {
+      // Browser-only UI test: native window events are unavailable.
+    }
     send();
     return () => {
+      disposed = true;
+      unlisten.forEach((off) => off());
       cancelAnimationFrame(frame);
       observer.disconnect();
       window.removeEventListener("resize", send);
+      window.removeEventListener("focus", send);
+      document.removeEventListener("visibilitychange", send);
     };
   }, [stacked]);
   return (

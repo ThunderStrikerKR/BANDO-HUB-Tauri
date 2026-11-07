@@ -43,3 +43,15 @@ test("screen supports choosing among multiple KakaoTalk windows and three view m
   assert.match(model,/setDockCandidates\(await window\.bando!\.dockWindows\(\)\)/);
   assert.match(model,/dockSelect\(handle\)/);
 });
+
+test("KakaoTalk region resyncs on window moves, focus and monitor scale changes",()=>{
+  const shell=read("src/HubShell.tsx");
+  for(const event of ["onMoved","onResized","onScaleChanged","onFocusChanged"]){
+    assert.ok(shell.includes("current."+event+"(send)"),event+" listener missing");
+  }
+  assert.match(shell,/unlisten\.forEach\(\(off\) => off\(\)\)/);
+  const native=read("src-tauri/src/kakao_dock.rs");
+  assert.match(native,/IsIconic\(s\.hwnd\)/);
+  assert.match(native,/split_rect\(work:Rect,desired:i32,scale:f64\)/);
+  assert.match(native,/s\.main_original=before_split/);
+});
