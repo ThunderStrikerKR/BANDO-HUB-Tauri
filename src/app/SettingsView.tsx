@@ -6,6 +6,9 @@ import type { NoticeSink } from "../shared/notices";
 import type { InboxEntry, State } from "../types";
 import { PageHeading } from "../ui/PageHeading";
 import { MobilePanel } from "./MobilePanel";
+
+declare const __BANDO_VERSION__: string;
+declare const __BANDO_BUILD_ID__: string;
 export function SettingsView({
   state,
   onSaveSettings,
@@ -25,6 +28,11 @@ export function SettingsView({
       <div className="settings-layout">
         <SettingsPanel state={state} onSaveSettings={onSaveSettings} onNotice={onNotice} />
         <div className="settings-support">
+          <section className="card" aria-label="프로그램 정보">
+            <h2>프로그램 정보</h2>
+            <p>현재 버전: v{__BANDO_VERSION__}</p>
+            <p>빌드 ID: {__BANDO_BUILD_ID__}</p>
+          </section>
           <TestDatabasePanel onReset={onRestored} />
           <ReceiptArchive />
           <BackupPanel onError={onNotice} onRefresh={onRestored} />
