@@ -334,6 +334,14 @@ export function CatalogPanel({
     </section>
   );
 }
+const backupLabel = (path: string) => {
+  const name = path.split(/[\\/]/).pop() ?? path;
+  if (name.startsWith("monthly-")) return "월간 최초 자동 백업 (영구 보관)";
+  if (name.startsWith("auto-")) return "일반 자동 백업 (30일 보관)";
+  if (name.startsWith("pre-restore-")) return "복원 직전 안전 백업 (영구 보관)";
+  if (name.startsWith("manual-")) return "수동 백업 (영구 보관)";
+  return "기존 백업 (자동 삭제 안 함)";
+};
 export function BackupPanel({
   onRefresh,
   onError,
@@ -345,6 +353,12 @@ export function BackupPanel({
   return (
     <section className="card settings">
       <h2>데이터 백업 및 복구</h2>
+      <p className="muted">
+        프로그램 실행 중 매일 한 번 자동 백업합니다. 일반 자동 백업은 최근 30일,
+        해당 월에 처음 생성된 자동 백업은 날짜와 관계없이 영구 보관합니다.
+        수동 백업과 복원 직전 안전 백업도 자동 삭제하지 않습니다.
+        PC가 꺼진 날에는 백업이 생성되지 않습니다.
+      </p>
       <div className="actions">
         <button
           onClick={async () => {
@@ -372,11 +386,11 @@ export function BackupPanel({
       </div>
       {files.map((f) => (
         <div className="history" key={f}>
-          <span>{f.split(/[\\/]/).pop()}</span>
+          <span>{f.split(/[\\/]/).pop()} <small>{backupLabel(f)}</small></span>
           <button
             onClick={async () => {
               if (
-                !(await confirmAction("현재 데이터를 먼저 백업한 뒤 선택한 시점으로 복구할까요?"))
+                !(await confirmAction("선택한 시점의 전체 데이터베이스로 복원할까요? 현재 데이터는 먼저 안전 백업으로 보관합니다. 주문과 감사 기록도 선택한 시점으로 되돌아갑니다."))
               )
                 return;
               try {
