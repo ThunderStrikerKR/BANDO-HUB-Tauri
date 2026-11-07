@@ -250,7 +250,25 @@ mod tests {
             "manual-20260801-1.sqlite","pre-restore-20260801-1.sqlite","bando-hub-old.sqlite"] {
             assert!(dir.join(retained).exists());
         }
-        fs::remove_dir_all(base).unwrap();
+        // Windows CI can temporarily hold the synthetic .sqlite fixtures open
+        // while virus scanning. This cleanup is not part of the retention
+        // behavior under test: the file presence assertions above are.
+        let mut removed = false;
+        for _ in 0..10 {
+            match fs::remove_dir_all(&base) {
+                Ok(()) => { removed = true; break; },
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                    removed = true; break;
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => {
+                    std::thread::sleep(Duration::from_millis(100));
+                }
+                Err(e) => panic!("테스트 임시 백업 폴더 정리 실패: {e}"),
+            }
+        }
+        if !removed {
+            eprintln!("Windows 테스트 임시 폴더가 잠겨 정리를 건너뜁니다: {}", base.display());
+        }
     }
 
     #[test]
