@@ -14,6 +14,8 @@ test("Excel folder picker and saved-folder opener are backed by native Tauri",()
  assert.match(rust,/blocking_pick_folder\(\)/);
  assert.match(rust,/canonical_excel_directory\(&picked\)/);
  assert.match(rust,/saved_excel_directory\(&saved\["settings"\]\)/);
+ assert.match(rust,/dialog = dialog\.set_directory\(path\)/);
+ assert.match(rust,/let selected = dialog\.blocking_save_file\(\)/);
  assert.match(rust,/mod excel_folder_tests/);
  assert.match(screen,/공장 회신 폴더 지정은 가능하지만 자동 감지는 아직 지원하지 않습니다/);
  assert.match(screen,/저장된 폴더 열기/);

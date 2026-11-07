@@ -492,11 +492,20 @@ async fn save_xlsx_with_dialog(
             .duration_since(std::time::UNIX_EPOCH)
             .map_err(err)?.as_millis();
         let filename = format!("BANDO-HUB-{label}-{stamp}.xlsx");
-        let selected = app.dialog().file()
+        let preferred = {
+            let db = app.state::<Database>();
+            let guard = db.connection.lock().map_err(|_| "데이터베이스 잠금 오류")?;
+            let settings = get_snapshot(&guard)?;
+            saved_excel_directory(&settings["settings"]).ok()
+        };
+        let mut dialog = app.dialog().file()
             .set_title("Excel 파일 저장 위치 선택")
             .set_file_name(filename)
-            .add_filter("Excel 통합 문서", &["xlsx"])
-            .blocking_save_file();
+            .add_filter("Excel 통합 문서", &["xlsx"]);
+        if let Some(path) = preferred {
+            dialog = dialog.set_directory(path);
+        }
+        let selected = dialog.blocking_save_file();
         let Some(selected) = selected else { return Ok(None); };
         let mut destination = selected.into_path().map_err(err)?;
         if destination.extension().is_none() {
