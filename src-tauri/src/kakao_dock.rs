@@ -227,8 +227,20 @@ mod native {
             kakao_original:placement(hwnd)?,main_original:placement(main)?,
             original_topmost:topmost(hwnd),mode:Mode::Overlap,width:420})
     }
+    fn belongs_to_current_app(hwnd:Hwnd)->bool {
+        if unsafe{IsWindow(hwnd)}==0 {return false}
+        let mut pid=0;
+        unsafe{GetWindowThreadProcessId(hwnd,&mut pid);}
+        pid==unsafe{GetCurrentProcessId()}
+    }
+    fn belongs_to_original_kakao(s:&Session)->bool {
+        if unsafe{IsWindow(s.hwnd)}==0 {return false}
+        let mut pid=0;
+        unsafe{GetWindowThreadProcessId(s.hwnd,&mut pid);}
+        pid==s.pid && exe_is_kakao(pid)
+    }
     pub fn live(s:&Session)->bool{
-        verified(s.hwnd)==Some(s.pid)&&unsafe{IsWindow(s.main)}!=0
+        verified(s.hwnd)==Some(s.pid)&&belongs_to_current_app(s.main)
     }
     pub fn overlap(s:&mut Session,app:&AppHandle,region:Region)->Result<(),String>{
         let target=overlay_region(app,region)?;
@@ -337,11 +349,14 @@ mod native {
         Ok(app/(app+kakao))
     }
     pub fn restore(s:&Session){
-        if unsafe{IsWindow(s.hwnd)}!=0{
+        // HWND values can be recycled by Windows after KakaoTalk exits.
+        // Never move an unrelated application that happens to inherit the
+        // previously selected handle.
+        if belongs_to_original_kakao(s){
             set_z(s.hwnd,s.original_topmost);
             unsafe{SetWindowPlacement(s.hwnd,&s.kakao_original);}
         }
-        if s.mode==Mode::Stack && unsafe{IsWindow(s.main)}!=0{
+        if s.mode==Mode::Stack && belongs_to_current_app(s.main){
             unsafe{SetWindowPlacement(s.main,&s.main_original);}
         }
     }
@@ -500,6 +515,10 @@ mod native {
             set_rect(fixture_hwnd,shifted,0).unwrap();
             assert_eq!(rect(fixture_hwnd).unwrap(),shifted,
                 "SetWindowPos must move the actual top-level Win32 window");
+            let wrong_owner=Session{pid:session.pid.wrapping_add(1),..session};
+            restore(&wrong_owner);
+            assert_eq!(rect(fixture_hwnd).unwrap(),shifted,
+                "a stale HWND owner must not have its placement restored");
             restore(&session);
             assert_eq!(rect(fixture_hwnd).unwrap(),old,
                 "SetWindowPlacement must restore the original window bounds");
