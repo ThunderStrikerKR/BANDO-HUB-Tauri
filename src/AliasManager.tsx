@@ -15,7 +15,6 @@ export function AliasManager({
 }) {
   const [text, setText] = useState(""),
     [target, setTarget] = useState(""),
-    [variant, setVariant] = useState(""),
     [scope, setScope] = useState("common"),
     [search, setSearch] = useState(false),
     [editing, setEditing] = useState<string>();
@@ -23,7 +22,7 @@ export function AliasManager({
     <section className="card alias-manager">
       <h2>공통 / 거래처 별칭 관리</h2>
       <p>
-        넓은 상품 종류명과 실제 SKU에 충돌하는 연결은 등록하지 않습니다. 기존 충돌은 삭제하지 않고
+        넓은 상품 종류명과 실제 개별 상품에 충돌하는 별칭은 등록하지 않습니다. 기존 충돌은 삭제하지 않고
         아래에 표시합니다.
       </p>
       <input aria-label="관리 별칭" value={text} onChange={(e) => setText(e.target.value)} />
@@ -42,20 +41,6 @@ export function AliasManager({
           ? internalModel(state.products.find((p) => p.id === target)?.name ?? "상품")
           : "등록 상품 선택"}
       </button>
-      <select
-        aria-label="관리 별칭 옵션"
-        value={variant}
-        onChange={(e) => setVariant(e.target.value)}
-      >
-        <option value="">기본 등록 옵션</option>
-        {state.products
-          .find((p) => p.id === target)
-          ?.variants.map((v) => (
-            <option key={v.id} value={v.id}>
-              {v.color} {v.option}
-            </option>
-          ))}
-      </select>
       <button
         onClick={async () => {
           try {
@@ -64,7 +49,8 @@ export function AliasManager({
                 id: editing ?? uid(),
                 text,
                 productId: target,
-                variantId: variant || undefined,
+                // Compatibility identifier is internal only; a selected sale product is complete.
+                variantId: state.products.find((p) => p.id === target)?.variants[0]?.id,
                 clientId: scope === "common" ? null : scope,
                 actor: state.settings.operatorName || "직원",
                 createdAt: new Date().toISOString(),
@@ -99,7 +85,6 @@ export function AliasManager({
                   setEditing(a.id);
                   setText(a.text);
                   setTarget(a.productId);
-                  setVariant(a.variantId ?? "");
                   setScope(a.clientId ?? "common");
                 }}
               >
@@ -115,7 +100,6 @@ export function AliasManager({
           onClose={() => setSearch(false)}
           onChoose={(p) => {
             setTarget(p.id);
-            setVariant(p.variants[0]?.id ?? "");
             setSearch(false);
           }}
         />
