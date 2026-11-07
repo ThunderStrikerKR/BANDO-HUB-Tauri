@@ -61,12 +61,11 @@ function exportRow(state: State, entry: ExcelQueueEntry): FactoryExportRow {
   for (const item of recipient.items) {
     const product = state.products.find((p) => p.id === item.productId);
     if (!product) continue;
-    if (product.variants.length > 1) {
-      const chosen = product.variants.find((v) => v.id === item.variantId);
-      if (!chosen || !trim(chosen.option) ||
-          !trim(item.name).includes(trim(chosen.option))) {
-        throw Error("공장 출고 품목에 선택 옵션의 구분 표기가 없습니다. 주문 내역을 확인하세요.");
-      }
+    if (product.variants.length !== 1) {
+      throw Error("복수 판매 구성이 묶인 옛 상품은 공장 발송할 수 없습니다. 독립 상품을 확인하세요.");
+    }
+    if (item.variantId && item.variantId !== product.variants[0].id) {
+      throw Error("공장 출고 상품과 가격 기록의 식별자가 다릅니다.");
     }
     for (const kind of ["가방", "바퀴"]) {
       const pattern = new RegExp(kind + "\\s*(?:미포함|포함|미장착|장착|없음|있음)");
