@@ -88,7 +88,8 @@ const api: Api = {
   inbox: async () => [],
   archiveFactoryReply: (id, bytes) => invoke<string>("archive_factory_reply", { id, bytes }),
   openFactoryFile: (id) => invoke<void>("open_factory_reply_file", { id }),
-  approveFactoryConflict: async () => notReady("공장 회신 충돌 승인"),
+  approveFactoryConflict: (id, row, expectedRevision) =>
+    invoke<void>("approve_factory_conflict", { id, row, expectedRevision }),
   testDatabasePreview: async () => ({ enabled: false as const }),
   openTestWorkspace: async () => notReady("격리 테스트 작업공간"),
   resetTestDatabase: async () => notReady("격리 테스트 초기화"),

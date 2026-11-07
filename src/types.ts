@@ -539,7 +539,7 @@ export interface Api {
   archiveFactoryReply?: (id: string, bytes: number[]) => Promise<string>;
   openFactoryFile?: (id: string) => Promise<void>;
   productImage?: (id: string) => Promise<{ data: string; source: string } | null>;
-  approveFactoryConflict?: (id: string, row: number) => Promise<void>;
+  approveFactoryConflict?: (id: string, row: number, expectedRevision: number) => Promise<void>;
   isTestWorkspace?: boolean;
   openTestWorkspace?: () => Promise<void>;
   testDatabasePreview?: () => Promise<

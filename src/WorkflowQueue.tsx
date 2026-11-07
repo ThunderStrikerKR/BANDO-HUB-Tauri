@@ -310,7 +310,7 @@ export function WorkflowQueue({
         )}
         {scope === "HISTORY" && (
           <FactoryReplyHistory state={state} query={query} onOpen={onOpen}
-            onSave={onSave} onRefresh={onRefresh} onNotice={onNotice} />
+            onRefresh={onRefresh} onNotice={onNotice} />
         )}
       </div>
       <footer className="excel-fixed-footer">

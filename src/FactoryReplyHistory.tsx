@@ -1,17 +1,16 @@
 import { confirmAction } from "./dialogs";
-import { approveFactoryReplyRow } from "./factory-reply-workbook";
+import { factoryConflictConfirmation } from "./factory-conflict-review";
 import { replyNeedsReview } from "./factory-replies";
 import { useAsyncTask } from "./shared/useAsyncTask";
 import type { NoticeSink } from "./shared/notices";
 import type { State } from "./types";
 
 export function FactoryReplyHistory({
-  state, query, onOpen, onSave, onRefresh, onNotice,
+  state, query, onOpen, onRefresh, onNotice,
 }: {
   state: State;
   query: string;
   onOpen: (id: string) => void;
-  onSave: (next: State) => Promise<void>;
   onRefresh: () => Promise<void>;
   onNotice: NoticeSink;
 }) {
@@ -20,14 +19,15 @@ export function FactoryReplyHistory({
     .filter((r) => (r.filename + " " + r.businessDate).includes(query))
     .slice().reverse();
   const correct = (id: string, row: number) => void run(async () => {
-    if (!(await confirmAction(
-      "이 한 행의 운송장번호와 실제 운임을 새 값으로 정정할까요? 이전 값과 원본 회신은 보존됩니다."
-    ))) return;
-    const latest = await window.bando!.load();
-    const next = approveFactoryReplyRow(latest, id, row);
-    await window.bando!.backup();
-    await onSave(next);
-    await onRefresh();
+    if (!(await confirmAction(factoryConflictConfirmation(state, id, row)))) return;
+    if (!window.bando?.approveFactoryConflict) {
+      throw Error("공장 회신 충돌 승인 기능을 사용할 수 없습니다.");
+    }
+    try {
+      await window.bando.approveFactoryConflict(id, row, state.revision ?? 0);
+    } finally {
+      await onRefresh();
+    }
     onNotice("회신 충돌 행을 정정하고 이전 값을 이력에 보존했습니다.", "success");
   });
   return (

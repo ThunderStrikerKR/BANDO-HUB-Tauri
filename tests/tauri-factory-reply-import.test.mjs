@@ -204,8 +204,10 @@ test("native archive and conflict UI are wired with backup and review, not legac
   assert.match(ui,/await api\.archiveFactoryReply/);
   assert.match(ui,/await onSave\(next\)/);
   assert.match(queue,/<FactoryReplyImport onSave=\{onSave\}/);
-  assert.match(history,/approveFactoryReplyRow\(latest, id, row\)/);
-  assert.match(notification,/approveFactoryReplyRow\(latest, record\.id, row\.row\)/);
+  assert.match(history,/approveFactoryConflict\(id, row, state\.revision \?\? 0\)/);
+  assert.match(bridge,/invoke<void>\("approve_factory_conflict"/);
+  assert.match(rust,/factory_conflict::approve_factory_conflict/);
+  assert.match(notification,/window\.bando\.approveFactoryConflict/);
 });
 
 

@@ -1,4 +1,5 @@
 mod reception;
+mod factory_conflict;
 mod kakao_dock;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde_json::{json, Value};
@@ -751,7 +752,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             state_load, state_save, settings_patch, price_set, clipboard_write, clipboard_read,
-            product_open, catalog_report, catalog_approve, receipt_archive, backup_create, backup_list, backup_restore, choose_excel_directory, open_excel_directory, save_product_workbook, save_registration_workbook, save_client_workbook, save_product_sync_workbook, save_factory_workbook, save_settlement_workbook, save_order_history_workbook, archive_factory_reply, open_factory_reply_file,
+            product_open, catalog_report, catalog_approve, receipt_archive, backup_create, backup_list, backup_restore, choose_excel_directory, open_excel_directory, save_product_workbook, save_registration_workbook, save_client_workbook, save_product_sync_workbook, save_factory_workbook, save_settlement_workbook, save_order_history_workbook, archive_factory_reply, open_factory_reply_file, factory_conflict::approve_factory_conflict,
             fetch_official_product_html,
             kakao_dock::dock_windows_native, kakao_dock::dock_status_native,
             kakao_dock::dock_cycle_native, kakao_dock::dock_start_native,

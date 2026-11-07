@@ -1,5 +1,5 @@
 import { replyNeedsReview } from "./factory-replies";
-import { approveFactoryReplyRow } from "./factory-reply-workbook";
+import { factoryConflictConfirmation } from "./factory-conflict-review";
 import { confirmAction } from "./dialogs";
 import { useState } from "react";
 import type { State } from "./types";
@@ -9,13 +9,11 @@ export function FactoryNotifications({
   state,
   onClose,
   onOpen,
-  onSave,
   onRefresh,
 }: {
   state: State;
   onClose: () => void;
   onOpen: (id: string) => void;
-  onSave: (next: State) => Promise<void>;
   onRefresh: () => Promise<void>;
 }) {
   const [error, setError] = useState("");
@@ -72,16 +70,21 @@ export function FactoryNotifications({
                         onClick={async () => {
                           if (
                             !(await confirmAction(
-                              "기존 송장 / 실제 운임을 이 공장 회신 값으로 정정할까요? 이전 값과 이력은 보존합니다.",
+                              factoryConflictConfirmation(state, record.id, row.row),
                             ))
                           )
                             return;
                           try {
-                            const latest = await window.bando!.load();
-                            const next = approveFactoryReplyRow(latest, record.id, row.row);
-                            await window.bando!.backup();
-                            await onSave(next);
-                            await onRefresh();
+                            if (!window.bando?.approveFactoryConflict) {
+                              throw Error("공장 회신 충돌 승인 기능을 사용할 수 없습니다.");
+                            }
+                            try {
+                              await window.bando.approveFactoryConflict(
+                                record.id, row.row, state.revision ?? 0,
+                              );
+                            } finally {
+                              await onRefresh();
+                            }
                           } catch (e) {
                             setError(String(e));
                           }
