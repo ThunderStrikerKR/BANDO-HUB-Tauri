@@ -73,8 +73,9 @@ fn acquire_namespace(namespace: &str) -> Result<Acquisition, String> {
     // GetLastError MUST be captured immediately after CreateMutexW.
     let mutex_error = unsafe { GetLastError() };
     if mutex == 0 {
+        let error = os_error("중복 실행 잠금 생성 실패");
         unsafe { CloseHandle(event); }
-        return Err(os_error("중복 실행 잠금 생성 실패"));
+        return Err(error);
     }
     if mutex_error == ERROR_ALREADY_EXISTS {
         // The primary app may still be initializing. The auto-reset event
