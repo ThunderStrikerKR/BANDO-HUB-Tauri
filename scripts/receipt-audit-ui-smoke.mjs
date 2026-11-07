@@ -8,6 +8,11 @@ const root = new URL("../", import.meta.url);
 const state = JSON.parse(readFileSync(new URL("../src-tauri/resources/state-seed.json", import.meta.url), "utf8"));
 // Synthetic audit records only. Business data in the repository is not changed.
 state.settings.excelDirectory = "C:\\BANDO_CI_EXPORTS";
+state.exports.push({
+  id: "ci-open-export", at: "2026-11-07T05:00:00+09:00",
+  filename: "BANDO-CI-EXCEL.xlsx", savedPath: "C:\\BANDO_CI_EXPORTS\\BANDO-CI-EXCEL.xlsx",
+  orderIds: [], queueEntryIds: [],
+});
 const archive = [
   {
     id: "receipt:ui-audit-test",
@@ -78,7 +83,11 @@ try {
         handle: mode !== "ORIGINAL" ? "123" : undefined, ...extra,
       });
       window.__TAURI_INTERNALS__ = {
-        invoke: async (command) => {
+        invoke: async (command, args) => {
+          if (command === "open_export_file") {
+            window.__lastOpenedExportId = args.id;
+            return undefined;
+          }
           if (command === "state_load") return structuredClone(state);
           if (command === "receipt_archive") return structuredClone(archive);
           if (command === "choose_excel_directory") return "C:\\BANDO_CI_SELECTED";
@@ -103,6 +112,12 @@ try {
   );
   await page.goto(url);
   const nav = page.getByRole("navigation", { name: "업무 메뉴" });
+  await nav.getByRole("button", { name: "엑셀 관리" }).click();
+  await page.getByRole("button", { name: "엑셀 작성 이력" }).click();
+  const exportRow = page.getByRole("row").filter({ hasText: "BANDO-CI-EXCEL.xlsx" });
+  await exportRow.getByRole("button", { name: "파일 열기", exact: true }).click();
+  await page.waitForFunction(() => window.__lastOpenedExportId === "ci-open-export");
+  await exportRow.getByRole("button", { name: "파일 경로 복사" }).waitFor();
   await nav.getByRole("button", { name: "설정" }).click();
   await page.getByRole("button", { name: "폴더 선택", exact: true }).click();
   await page.getByText("C:\\BANDO_CI_SELECTED").waitFor();

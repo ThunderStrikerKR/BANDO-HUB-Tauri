@@ -134,12 +134,22 @@ export function WorkflowQueue({
                     </td>
                     <td>
                       {e.savedPath ? (
-                        <button onClick={() => void run(async () => {
-                          await window.bando!.copy(e.savedPath!);
-                          onNotice("저장 경로를 복사했습니다.", "success");
-                        })}>
-                          파일 경로 복사
-                        </button>
+                        <div className="actions">
+                          <button type="button" disabled={busy}
+                            onClick={() => void run(async () => {
+                              await window.bando!.openExportFile(e.id);
+                              onNotice("저장된 Excel 파일을 열었습니다.", "success");
+                            })}>
+                            파일 열기
+                          </button>
+                          <button type="button" disabled={busy}
+                            onClick={() => void run(async () => {
+                              await window.bando!.copy(e.savedPath!);
+                              onNotice("저장 경로를 복사했습니다.", "success");
+                            })}>
+                            파일 경로 복사
+                          </button>
+                        </div>
                       ) : <span className="muted">기존 파일 위치를 확인하세요.</span>}
                       <details>
                         <summary>관련 주문</summary>
