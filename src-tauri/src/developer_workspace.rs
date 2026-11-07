@@ -125,8 +125,14 @@ fn backup_test_and_reset(conn: &mut Connection, base: &Path, expected_revision: 
     if actual["revision"].as_u64().unwrap_or(0) != expected_revision {
         return Err("백업 중 데이터가 바뀌었습니다. 초기화를 취소했습니다.".into());
     }
+    let mut envelope = next.clone();
+    if relational_store::active(&tx)? {
+        // Test reset must clear the canonical order/recipient/item rows as well.
+        relational_store::store(&tx, &next)?;
+        relational_store::strip_core(&mut envelope);
+    }
     tx.execute("UPDATE app_state SET payload=?1 WHERE id=1",
-        [serde_json::to_string(&next).map_err(err)?]).map_err(err)?;
+        [serde_json::to_string(&envelope).map_err(err)?]).map_err(err)?;
     tx.execute("DELETE FROM order_index", []).map_err(err)?;
     tx.execute("DELETE FROM receipt_archive", []).map_err(err)?;
     tx.execute("DELETE FROM developer_test_runs", []).map_err(err)?;
