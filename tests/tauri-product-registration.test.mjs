@@ -42,8 +42,9 @@ test("Native download only accepts two fixed registration XLSX names", () => {
   const rust = read("src-tauri/src/lib.rs");
   assert.match(bridge, /saveRegistrationWorkbook: \(kind, bytes\)/);
   assert.match(rust, /fn save_registration_workbook/);
-  assert.match(rust, /"양식" => "상품등록양식"/);
-  assert.match(rust, /"결과" => "상품등록결과"/);
+  assert.match(rust, /if kind != "양식"/);
+  assert.match(rust, /WorkbookKind::ProductTemplate/);
+  assert.match(rust, /상품 등록 결과는 반도허브 화면에서 확인하세요/);
   assert.match(rust, /\.create_new\(true\)/);
   assert.match(rust, /save_product_workbook, save_registration_workbook/);
 });

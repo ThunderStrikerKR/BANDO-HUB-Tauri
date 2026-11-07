@@ -2,6 +2,7 @@ mod reception;
 mod factory_conflict;
 mod export_file;
 mod kakao_dock;
+use chrono::{Datelike, Local, DateTime};
 use rusqlite::{params, Connection, OptionalExtension};
 use serde_json::{json, Value};
 use std::{fs, path::{Path, PathBuf}, sync::Mutex};
@@ -457,17 +458,25 @@ fn canonical_excel_directory(path: &Path) -> Result<PathBuf, String> {
 async fn choose_excel_directory(app: tauri::AppHandle) -> Result<Option<String>, String> {
     tauri::async_runtime::spawn_blocking(move || {
         use tauri_plugin_dialog::DialogExt;
-        let selected = app.dialog().file().set_title("Excel 폴더 선택").blocking_pick_folder();
+        let selected = app.dialog().file().set_title("Excel 보관함 위치 선택").blocking_pick_folder();
         let Some(selected) = selected else { return Ok(None); };
         let picked = selected.into_path().map_err(err)?;
         let verified = canonical_excel_directory(&picked)?;
+        // Create the five top-level business folders under this one user-picked root.
+        for label in ["공장 발송", "매장 발송", "공장 회신", "상품 관리", "거래처 관리"] {
+            let child = verified.join(label);
+            fs::create_dir_all(&child).map_err(err)?;
+            if !fs::canonicalize(&child).map_err(err)?.starts_with(&verified) {
+                return Err("Excel 폴더가 선택한 보관함 밖을 가리킵니다.".into());
+            }
+        }
         Ok(Some(verified.to_string_lossy().to_string()))
     }).await.map_err(err)?
 }
 fn saved_excel_directory(settings: &Value) -> Result<PathBuf, String> {
     let chosen = settings.get("excelDirectory").and_then(Value::as_str)
         .map(str::trim).filter(|s| !s.is_empty())
-        .ok_or("엑셀 기본 저장 폴더를 먼저 지정하고 설정을 저장하세요.")?;
+        .ok_or("설정에서 Excel 보관함 위치를 먼저 지정하고 저장하세요.")?;
     canonical_excel_directory(Path::new(chosen))
 }
 #[tauri::command]
@@ -475,6 +484,90 @@ fn open_excel_directory(db: State<'_, Database>) -> Result<(), String> {
     let saved = get_snapshot(&*lock_db(&db)?)?;
     let directory = saved_excel_directory(&saved["settings"])?;
     open::that(directory).map_err(err)
+}
+
+
+#[derive(Debug, Clone, Copy)]
+enum WorkbookKind {
+    Factory,
+    Store,
+    FactoryReply,
+    Product,
+    ProductTemplate,
+    Client,
+    ProductPriceLegacy,
+}
+impl WorkbookKind {
+    fn folder(self) -> &'static str {
+        match self {
+            Self::Factory => "공장 발송",
+            Self::Store => "매장 발송",
+            Self::FactoryReply => "공장 회신",
+            Self::Product | Self::ProductTemplate | Self::ProductPriceLegacy => "상품 관리",
+            Self::Client => "거래처 관리",
+        }
+    }
+    fn stem(self) -> &'static str {
+        match self {
+            Self::Factory => "공장",
+            Self::Store => "매장",
+            Self::FactoryReply => "공장회신",
+            Self::Product => "상품전체",
+            Self::ProductTemplate => "상품등록양식",
+            Self::Client => "거래처전체",
+            Self::ProductPriceLegacy => "상품가격표",
+        }
+    }
+}
+fn archive_daily_directory(root: &Path, kind: WorkbookKind, date: DateTime<Local>) -> Result<PathBuf, String> {
+    let dir = root.join(kind.folder())
+        .join(format!("{}년", date.year()))
+        .join(format!("{:02}월", date.month()))
+        .join(format!("{:02}일", date.day()));
+    fs::create_dir_all(&dir).map_err(err)?;
+    let resolved = fs::canonicalize(&dir).map_err(err)?;
+    // Reject linked directories that escape the user-selected archive root.
+    if !resolved.starts_with(root) { return Err("Excel 보관함 경로가 설정한 폴더 밖을 가리킵니다.".into()); }
+    Ok(resolved)
+}
+fn archive_workbook_bytes(root: &Path, kind: WorkbookKind, date: DateTime<Local>, bytes: &[u8])
+    -> Result<PathBuf, String> {
+    use std::io::Write;
+    if bytes.len() < 4 || bytes.len() > 25 * 1024 * 1024 || !bytes.starts_with(b"PK") {
+        return Err("올바른 XLSX 데이터가 아니거나 파일 크기가 너무 큽니다.".into());
+    }
+    let dir = archive_daily_directory(root, kind, date)?;
+    let stamp = format!("{:04}{:02}{:02}", date.year(), date.month(), date.day());
+    // create_new guarantees atomic, no-overwrite numbering across concurrent workers.
+    for number in 1..=100_000u32 {
+        let path = dir.join(format!("{stamp}({}{number}).xlsx", kind.stem()));
+        let mut file = match fs::OpenOptions::new().write(true).create_new(true).open(&path) {
+            Ok(file) => file,
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(error) => return Err(err(error)),
+        };
+        if let Err(error) = file.write_all(bytes).and_then(|_| file.sync_all()) {
+            drop(file);
+            let _ = fs::remove_file(&path);
+            return Err(err(error));
+        }
+        return Ok(path);
+    }
+    Err("당일 Excel 파일 번호가 허용 범위를 초과했습니다.".into())
+}
+async fn save_xlsx_in_archive(
+    app: tauri::AppHandle, kind: WorkbookKind, bytes: Vec<u8>,
+) -> Result<Option<String>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let db = app.state::<Database>();
+        let root = {
+            let guard = db.connection.lock().map_err(|_| "데이터베이스 잠금 오류")?;
+            let state = get_snapshot(&guard)?;
+            saved_excel_directory(&state["settings"])?
+        };
+        let saved = archive_workbook_bytes(&root, kind, Local::now(), &bytes)?;
+        Ok(Some(saved.to_string_lossy().into_owned()))
+    }).await.map_err(err)?
 }
 
 // Only application-generated XLSX bytes are accepted; the destination is chosen
@@ -539,7 +632,7 @@ async fn save_xlsx_with_dialog(
 async fn save_product_workbook(
     app: tauri::AppHandle, bytes: Vec<u8>,
 ) -> Result<Option<String>, String> {
-    save_xlsx_with_dialog(app, "상품가격표", bytes).await
+    save_xlsx_in_archive(app, WorkbookKind::ProductPriceLegacy, bytes).await
 }
 
 // The renderer supplies only a SHA-256 ID. No path from JavaScript is trusted.
@@ -579,6 +672,14 @@ fn archive_factory_reply(db: State<'_, Database>, id: String, bytes: Vec<u8>) ->
             return Err(err(e));
         }
     }
+    // Preserve the digest-named original in private app data for audit and
+    // conflict review. The user-facing date-classified copy is not the audit authority.
+    let root = {
+        let guard = lock_db(&db)?;
+        let state = get_snapshot(&guard)?;
+        saved_excel_directory(&state["settings"])?
+    };
+    archive_workbook_bytes(&root, WorkbookKind::FactoryReply, Local::now(), &bytes)?;
     Ok(destination.to_string_lossy().into_owned())
 }
 
@@ -622,40 +723,38 @@ async fn save_order_history_workbook(
 async fn save_factory_workbook(
     app: tauri::AppHandle, bytes: Vec<u8>,
 ) -> Result<Option<String>, String> {
-    save_xlsx_with_dialog(app, "공장발송로젠", bytes).await
+    save_xlsx_in_archive(app, WorkbookKind::Factory, bytes).await
 }
 
 #[tauri::command]
 async fn save_store_workbook(
     app: tauri::AppHandle, bytes: Vec<u8>,
 ) -> Result<Option<String>, String> {
-    save_xlsx_with_dialog(app, "매장발송로젠", bytes).await
+    save_xlsx_in_archive(app, WorkbookKind::Store, bytes).await
 }
 
 #[tauri::command]
 async fn save_product_sync_workbook(
     app: tauri::AppHandle, bytes: Vec<u8>,
 ) -> Result<Option<String>, String> {
-    save_xlsx_with_dialog(app, "상품전체목록", bytes).await
+    save_xlsx_in_archive(app, WorkbookKind::Product, bytes).await
 }
 
 #[tauri::command]
 async fn save_client_workbook(
     app: tauri::AppHandle, bytes: Vec<u8>,
 ) -> Result<Option<String>, String> {
-    save_xlsx_with_dialog(app, "거래처전체목록", bytes).await
+    save_xlsx_in_archive(app, WorkbookKind::Client, bytes).await
 }
 
 #[tauri::command]
 async fn save_registration_workbook(
     app: tauri::AppHandle, kind: String, bytes: Vec<u8>,
 ) -> Result<Option<String>, String> {
-    let label = match kind.as_str() {
-        "양식" => "상품등록양식",
-        "결과" => "상품등록결과",
-        _ => return Err("허용되지 않은 상품 등록 파일 유형입니다.".into()),
-    };
-    save_xlsx_with_dialog(app, label, bytes).await
+    if kind != "양식" {
+        return Err("상품 등록 결과는 반도허브 화면에서 확인하세요.".into());
+    }
+    save_xlsx_in_archive(app, WorkbookKind::ProductTemplate, bytes).await
 }
 
 fn validate_official_product_url(target: &str) -> Result<url::Url, String> {
