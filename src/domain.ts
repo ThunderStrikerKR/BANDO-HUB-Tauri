@@ -196,7 +196,7 @@ export function itemFromProduct(
         !color
         ? ["기본 색상 확인 필요"]
         : (configurationIncomplete ? ["가방 또는 바퀴 포함 / 미포함 정보 확인 필요"] : [])
-      : ["등록되지 않은 색상 / 옵션 확인"],
+      : ["등록된 독립 상품을 다시 선택하세요"],
     url: v?.url ?? "",
     catalog: p.catalog,
   };
