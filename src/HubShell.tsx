@@ -25,7 +25,8 @@ export function HubShell({
     mainMinimum = 832 * viewportScale;
   const [live, setLive] = useState<number[]>(),
     region = useRef<HTMLDivElement>(null),
-    drag = useRef<{ x: number; width: number; r: number[] } | undefined>(undefined);
+    drag = useRef<{ x: number; width: number; r: number[] } | undefined>(undefined),
+    lastDragged = useRef<number[] | undefined>(undefined);
   const r = live ?? validPanels(ratios),
     total = r.reduce((a, b) => a + b, 0),
     stacked = dock.active && dock.mode === "STACK";
@@ -122,6 +123,7 @@ export function HubShell({
           }}
           onPointerDown={(e) => {
             if (e.button !== 0) return;
+            lastDragged.current = undefined;
             drag.current = {
               x: e.clientX,
               width: e.currentTarget.parentElement!.getBoundingClientRect().width - 6,
@@ -139,18 +141,30 @@ export function HubShell({
               ),
               first = (left / d.width) * sum,
               rest = sum - d.r[0];
-            setLive([first, ...d.r.slice(1).map((n) => (n / rest) * (sum - first))]);
+            const next = [first, ...d.r.slice(1).map((n) => (n / rest) * (sum - first))];
+            lastDragged.current = next;
+            setLive(next);
           }}
           onPointerUp={() => {
             if (!drag.current) return;
             const previous = drag.current.r;
             drag.current = undefined;
-            if (live && JSON.stringify(live) !== JSON.stringify(previous)) onSave(live);
+            const next = lastDragged.current;
+            lastDragged.current = undefined;
+            if (next && JSON.stringify(next) !== JSON.stringify(previous)) onSave(next);
             setLive(undefined);
           }}
           onPointerCancel={() => {
             drag.current = undefined;
+            lastDragged.current = undefined;
             setLive(undefined);
+          }}
+          onLostPointerCapture={() => {
+            if (drag.current) {
+              drag.current = undefined;
+              lastDragged.current = undefined;
+              setLive(undefined);
+            }
           }}
         />
         <div className="hub-main-content">{children}</div>
