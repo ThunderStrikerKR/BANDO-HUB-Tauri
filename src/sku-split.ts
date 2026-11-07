@@ -136,6 +136,9 @@ export function applySkuSplit(state: State, preview: SkuSplitPreview): {
     const product: Product = {
       ...structuredClone(source),
       id: skuId(source.id, variant.id),
+      // Each split SKU must retain the selected option in the shared name.
+      name: [source.name.trim(), (variant.option ?? "").trim() || variant.color.trim()]
+        .filter(Boolean).join(" / "),
       sourceProductId: source.id,
       saleUnit: true,
       familyKey: family,
