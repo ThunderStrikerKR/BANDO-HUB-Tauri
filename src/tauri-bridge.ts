@@ -66,8 +66,9 @@ const api: Api = {
   dockSelect: (handle) => invoke("dock_select_native", { handle }),
   dockWindows: () => invoke("dock_windows_native"),
   dockRegion: (region) => invoke("dock_region_native", { region }),
-  startupMetrics: async () => notReady("시작 성능 계측"),
-  retryStartup: async () => notReady("다시 시작"),
+  startupStatus: () => invoke("startup_status"),
+  startupMetrics: () => invoke("startup_metrics"),
+  retryStartup: () => invoke("retry_startup"),
   receiptArchive: () => invoke<{ id: string; orderId: string; record: Record<string, unknown> }[]>("receipt_archive"),
   // Confirmed receipts and corrections are written atomically by state_save.
   // The old Electron secondary-write IPC is intentionally not duplicated.
