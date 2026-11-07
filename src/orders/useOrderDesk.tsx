@@ -13,7 +13,7 @@ import {
 import type { StaffBlock } from "../hub-messages";
 import { hubMessages } from "../hub-messages";
 import { addressParts, mergeParsedItem, parseEvidence } from "../parser";
-import { registeredProducts, sortProducts, variantLabel } from "../product-models";
+import { registeredProducts, sortProducts } from "../product-models";
 import { billingSnapshot } from "../replies";
 import type { NoticeSink } from "../shared/notices";
 import { recommendShipping } from "../shipping";
@@ -352,15 +352,11 @@ export function useOrderDesk({
           (b.kind === "APPLIED" ? " × " + item?.quantity : "") +
           (item?.recognitionReason ? " / " + item.recognitionReason : ""),
         choices:
-          b.kind === "OPTION" && item
-            ? products
-                .find((p) => p.id === item.productId)
-                ?.variants.map((v) => ({ label: variantLabel(v), value: v.id }))
-            : b.kind.startsWith("CANDIDATE_")
-              ? r?.candidates
-                  ?.filter((c) => c.field === b.kind.slice(10))
-                  .map((c) => ({ label: c.label, value: c.value }))
-              : undefined,
+          b.kind.startsWith("CANDIDATE_")
+            ? r?.candidates
+                ?.filter((c) => c.field === b.kind.slice(10))
+                .map((c) => ({ label: c.label, value: c.value }))
+            : undefined,
       };
     });
   const question = (b: StaffBlock) => {
@@ -381,8 +377,9 @@ export function useOrderDesk({
       onManual?.();
       return;
     }
-    if (block.kind === "ITEM" && block.recipientId) {
-      setProductSearch({ rid: block.recipientId });
+    if ((block.kind === "ITEM" || block.kind === "OPTION") && block.recipientId) {
+      // A configuration is a standalone product, never a secondary dropdown selection.
+      setProductSearch({ rid: block.recipientId, iid: block.itemId });
       return;
     }
     if (exported && block.itemId) {
@@ -476,6 +473,10 @@ export function useOrderDesk({
     );
   }
   const chooseProduct = (rid: string, p: Product, iid?: string) => {
+    if (p.variants.length !== 1) {
+      onNotice("여러 판매 구성이 묶인 옛 상품은 선택할 수 없습니다. 개별 판매 상품을 선택하세요.", "error");
+      return;
+    }
     if (iid)
       itemEdit(rid, iid, (item) => {
         const proposal = !item.productId || !!item.modelProposal?.required;
