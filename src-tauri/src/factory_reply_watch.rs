@@ -521,6 +521,53 @@ mod tests {
     }
 
     #[test]
+    fn guarded_import_commits_original_and_review_record_to_real_sqlite() {
+        let base = fixture();
+        let inbox = base.join("incoming");
+        let archive = base.join("archive");
+        fs::create_dir_all(&inbox).unwrap();
+        fs::create_dir_all(&archive).unwrap();
+        let original_bytes = b"PK-invalid-workbook-for-review";
+        let filename = "invalid-response.xlsx";
+        let digest = file_id(original_bytes);
+        fs::write(inbox.join(filename), original_bytes).unwrap();
+        let mut conn = initialize_database(&base.join("live.sqlite")).unwrap();
+        let mut initial = get_snapshot(&conn).unwrap();
+        initial["settings"]["factoryReplyDirectory"] =
+            json!(fs::canonicalize(&inbox).unwrap().to_string_lossy().to_string());
+        initial["settings"]["excelDirectory"] =
+            json!(fs::canonicalize(&archive).unwrap().to_string_lossy().to_string());
+        write_snapshot(&mut conn, initial, 0, false).unwrap();
+        let before = get_snapshot(&conn).unwrap();
+        let revision = before["revision"].as_u64().unwrap();
+        let mut candidate = before.clone();
+        candidate["factoryReplies"] = json!([{
+            "id":digest, "filename":filename,"status":"REVIEW",
+            "businessDate":"2026-11-08","at":"2026-11-08T00:00:00Z",
+            "actor":"자동 감시","rows":[],"error":"Excel 양식 오류"
+        }]);
+        let result = commit_auto(
+            &mut conn, &base, false, filename, &digest, candidate, revision
+        ).unwrap();
+        assert!(!result.duplicate);
+        assert_eq!(result.applied,0);
+        assert_eq!(result.held,0);
+        let persisted = get_snapshot(&conn).unwrap();
+        assert_eq!(persisted["revision"].as_u64(),Some(revision + 1));
+        assert_eq!(persisted["factoryReplies"][0]["status"],"REVIEW");
+        let archived = persisted["factoryReplies"][0]["archivedPath"].as_str().unwrap();
+        assert_eq!(fs::read(archived).unwrap(),original_bytes);
+        assert_eq!(persisted["workflow"],before["workflow"]);
+        let duplicate = commit_auto(
+            &mut conn, &base, false, filename, &digest,
+            persisted.clone(), revision + 1
+        ).unwrap();
+        assert!(duplicate.duplicate);
+        drop(conn);
+        let _ = fs::remove_dir_all(base);
+    }
+
+    #[test]
     fn invalid_automatic_reply_cannot_modify_unrelated_database_fields() {
         let before = json!({
             "revision":4, "products":[], "orders":[], "settings":{},
