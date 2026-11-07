@@ -74,7 +74,10 @@ export function useAppModel() {
     setStartupBusy(true);
     setStartup((previous) => ({ ...previous, phase: "RETRYING", error: null }));
     try {
-      const next = await api.retryStartup();
+      // If only the frontend hydration failed while the native database is
+      // already READY, retry reading it instead of reopening SQLite.
+      const native = await api.startupStatus?.().catch(() => undefined);
+      const next = native?.phase === "READY" ? native : await api.retryStartup();
       setStartup(next);
       if (next.phase === "READY") {
         const loaded = await api.load();
@@ -133,7 +136,7 @@ export function useAppModel() {
     return () => clearInterval(timer);
   }, [dock.active]);
   useEffect(() => {
-    if (!window.bando) return;
+    if (!window.bando || startup.phase !== "READY") return;
     const timer = setInterval(() => {
       void window
         .bando!.load()
@@ -141,7 +144,7 @@ export function useAppModel() {
         .catch(() => {});
     }, 4000);
     return () => clearInterval(timer);
-  }, []);
+  }, [startup.phase]);
   const commitGuard = useRef(false);
   const refresh = async () => {
     setState(await window.bando!.load());
