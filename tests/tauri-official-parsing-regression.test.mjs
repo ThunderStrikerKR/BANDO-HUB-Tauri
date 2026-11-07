@@ -137,6 +137,10 @@ test("Dynamic unfilled select and multi-model titles are not silently approved",
   assert.equal(a.optionEvidence[0].values.length,0);
   const b=parseOfficialProductPage(url,html({title:"반도스탠드 BD 709 / 709-1"}),state());
   assert.equal(b.canApply,false);
+  const c=parseOfficialProductPage(url,html({
+    title:"반도스탠드 BD 709",model:"BD 709 / BD 709-1",
+  }),state());
+  assert.equal(c.canApply,false);
 });
 test("No model in the source means review, not a fake P-code model",()=>{
   const result=parseOfficialProductPage(url,html({
