@@ -185,12 +185,12 @@ export function orderIssues(o: Order): ValidationIssue[] {
         add(
           r,
           "OPTION",
-          "색상 / 옵션을 확인하세요",
+          "정확한 상품 구성을 확인하세요",
           "product",
           [i.variantId, i.color, i.issues],
           i,
           1,
-          who + " " + internalModel(i.name) + " 색상 / 옵션 확인 부탁드려요.",
+          who + " " + internalModel(i.name) + " 정확한 상품명을 확인 부탁드려요.",
         );
       if (i.modelProposal?.required)
         add(
