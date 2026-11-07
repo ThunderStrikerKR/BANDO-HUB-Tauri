@@ -85,6 +85,21 @@ fn value_to_status(test: bool, state: &StartupProgress) -> StartupStatus {
 /// Validation only reads the persisted snapshot. Never run VACUUM INTO,
 /// migration rollback, restore, DELETE, or a seed overwrite on startup failure.
 fn open_checked_sqlite(path: &Path) -> Result<Connection, String> {
+    // An existing file is user data, even if malformed. Do not accidentally
+    // treat it as an empty new database and insert a fresh seed.
+    if path.exists() {
+        let preview = Connection::open_with_flags(
+            path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY
+        ).map_err(|error| format!("기존 SQLite 파일을 읽을 수 없습니다: {error}"))?;
+        let has_table: Option<i64> = preview.query_row(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='app_state'",
+            [], |row| row.get(0),
+        ).optional().map_err(err)?;
+        if has_table.is_none() {
+            return Err("기존 SQLite 파일에 업무 데이터 테이블이 없습니다. 자동 초기화하지 않았습니다.".into());
+        }
+        valid_state(&get_snapshot(&preview)?)?;
+    }
     let connection = initialize_database(path)?;
     let verdict: String = connection
         .query_row("PRAGMA quick_check(1)", [], |row| row.get(0))
@@ -207,6 +222,29 @@ mod tests {
         ).unwrap();
         assert_eq!(saved, raw, "실패 중 기존 주문 데이터에 손대면 안 됩니다");
         drop(current);
+        fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn foreign_existing_sqlite_is_never_seeded() {
+        let root = unique_directory();
+        let path = root.join("other.sqlite");
+        let conn = Connection::open(&path).unwrap();
+        conn.execute_batch("CREATE TABLE unrelated(value TEXT);
+            INSERT INTO unrelated(value) VALUES ('preserve this record');").unwrap();
+        drop(conn);
+        let result = open_checked_sqlite(&path);
+        assert!(result.unwrap_err().contains("자동 초기화하지 않았습니다"));
+        let conn = Connection::open(&path).unwrap();
+        let table_count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='app_state'",
+            [], |row| row.get(0)
+        ).unwrap();
+        assert_eq!(table_count, 0);
+        let saved: String = conn.query_row(
+            "SELECT value FROM unrelated", [], |row| row.get(0)
+        ).unwrap();
+        assert_eq!(saved, "preserve this record");
+        drop(conn);
         fs::remove_dir_all(root).unwrap();
     }
     #[test]
