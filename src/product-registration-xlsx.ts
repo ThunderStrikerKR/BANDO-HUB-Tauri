@@ -57,6 +57,8 @@ function existingMatches(state: State, product: Product): string[] {
   const variant = product.variants[0];
   return state.products.filter((p) => {
     if ((p.catalog ?? "BANDOSTAND") !== product.catalog) return false;
+    // Full sale configuration name differentiates independent products that share a model and color.
+    if (registryKey(p.name) !== registryKey(product.name)) return false;
     if (product.registrationIdentity && p.registrationIdentity === product.registrationIdentity) return true;
     if (normalizeCode(p.code) !== normalizeCode(product.code)) return false;
     if (registryKey(p.specification ?? "") !== registryKey(product.specification ?? "")) return false;
@@ -176,7 +178,7 @@ export async function previewRegistrationWorkbook(state: State, file: File): Pro
     const color = normalizeColor(values["색상"] || "단일");
     const identity = (catalog ?? "UNKNOWN") + "|" +
       registryIdentity({ ...values, "제조사 모델코드": code, "색상": color }) +
-      "|" + registryKey(values["구성 구분"] ?? "");
+      "|" + registryKey(name);
     const at = new Date().toISOString();
     const product: Product | undefined = name && code && catalog && category && !errors.length ? {
       id: crypto.randomUUID(), code, name, manufacturerCode: code, catalog,
