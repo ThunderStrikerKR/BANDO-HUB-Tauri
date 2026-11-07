@@ -64,8 +64,13 @@ function resolveModel(product: Product): { title: string; reason: string } | nul
   return null;
 }
 
+function internalInventoryNotes(name: string): string {
+  return (name.match(/\[(?:단종|품절|재고|입고|판매중지)[^\]]*\]/g) ?? [])
+    .map((note) => spaces(note.slice(1, -1))).join(" / ");
+}
 function descriptionFromTitle(name: string, model: string): string {
-  const title = spaces(name.replace(PREFIX, ""));
+  const title = spaces(name.replace(PREFIX, ""))
+    .replace(/\[(?:단종|품절|재고|입고|판매중지)[^\]]*\]/g, " ");
   const flexibleModel = model.split(/\s+/).map(escapeRegex).join("\\s*");
   const matcher = new RegExp("(?<![A-Za-z0-9])" + flexibleModel + "(?![A-Za-z0-9])", "i");
   const remainder = title.replace(matcher, " ")
@@ -120,7 +125,9 @@ export function previewProductNameCleanup(state: State): ProductNameCleanupPrevi
     }
     const remainder = descriptionFromTitle(product.name, model.title);
     const usageOnly = isOnlyUsageDescription(remainder);
-    const description = combineDescription(usageOnly ? remainder : "", existing);
+    const description = combineDescription(
+      [usageOnly ? remainder : "", internalInventoryNotes(product.name)].filter(Boolean).join(" / "),
+      existing);
     const distinctFlags = [...new Set(qualifiers.map((flag) => flag.label))];
     const displayName = [model.title, ...(remainder && !usageOnly ? [remainder] : []),
       ...distinctFlags].join(" / ");
