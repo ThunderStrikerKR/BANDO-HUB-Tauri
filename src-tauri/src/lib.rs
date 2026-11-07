@@ -1,5 +1,6 @@
 mod reception;
 mod factory_conflict;
+mod factory_reply_watch;
 mod export_file;
 mod kakao_dock;
 mod developer_workspace;
@@ -877,6 +878,7 @@ pub fn run() {
     };
     tauri::Builder::default()
         .manage(kakao_dock::Dock::default())
+        .manage(factory_reply_watch::InboxWatch::default())
         .plugin(tauri_plugin_dialog::init())
         .setup(move |app| {
             #[cfg(target_os = "windows")]
@@ -914,7 +916,11 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             state_load, state_save, settings_patch, price_set, clipboard_write, clipboard_read,
-            product_open, catalog_report, catalog_approve, receipt_archive, backup_create, backup_list, backup_restore, choose_excel_directory, open_excel_directory, save_product_workbook, save_registration_workbook, save_client_workbook, save_product_sync_workbook, save_factory_workbook, save_store_workbook, save_settlement_workbook, save_order_history_workbook, archive_factory_reply, open_factory_reply_file, open_export_file, factory_conflict::approve_factory_conflict,
+            product_open, catalog_report, catalog_approve, receipt_archive, backup_create, backup_list, backup_restore, choose_excel_directory, open_excel_directory,
+            factory_reply_watch::choose_factory_reply_directory,
+            factory_reply_watch::factory_reply_watch_scan,
+            factory_reply_watch::factory_reply_watch_commit,
+            save_product_workbook, save_registration_workbook, save_client_workbook, save_product_sync_workbook, save_factory_workbook, save_store_workbook, save_settlement_workbook, save_order_history_workbook, archive_factory_reply, open_factory_reply_file, open_export_file, factory_conflict::approve_factory_conflict,
             fetch_official_product_html,
             kakao_dock::dock_windows_native, kakao_dock::dock_status_native,
             kakao_dock::dock_cycle_native, kakao_dock::dock_start_native,
