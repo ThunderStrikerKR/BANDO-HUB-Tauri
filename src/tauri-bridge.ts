@@ -95,6 +95,11 @@ const api: Api = {
   mobileStatus: async () => ({ running: false, urls: [] }),
   inbox: async () => [],
   archiveFactoryReply: (id, bytes) => invoke<string>("archive_factory_reply", { id, bytes }),
+  chooseFactoryReplyDirectory: async () =>
+    (await invoke<string | null>("choose_factory_reply_directory")) ?? undefined,
+  factoryReplyWatchScan: () => invoke("factory_reply_watch_scan"),
+  factoryReplyWatchCommit: (filename, id, candidate, expectedRevision) =>
+    invoke("factory_reply_watch_commit", { filename, id, candidate, expectedRevision }),
   openFactoryFile: (id) => invoke<void>("open_factory_reply_file", { id }),
   approveFactoryConflict: (id, row, expectedRevision) =>
     invoke<void>("approve_factory_conflict", { id, row, expectedRevision }),
