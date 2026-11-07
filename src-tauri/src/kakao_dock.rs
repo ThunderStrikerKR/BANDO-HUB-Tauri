@@ -301,6 +301,155 @@ mod native {
             assert!(!exe_is_kakao(unsafe{GetCurrentProcessId()}));
             assert!(parse("XYZ").is_err());
         }
+
+        // This test is run exclusively inside a temporary copied test binary named
+        // KakaoTalk.exe. It is not the real KakaoTalk application and has no account.
+        #[repr(C)]
+        struct WndClassW {
+            style:u32,
+            wnd_proc:Option<unsafe extern "system" fn(Hwnd,u32,usize,isize)->isize>,
+            cls_extra:i32,
+            wnd_extra:i32,
+            instance:Handle,
+            icon:Handle,
+            cursor:Handle,
+            brush:Handle,
+            menu:*const u16,
+            class:*const u16,
+        }
+        #[repr(C)]
+        #[derive(Default)]
+        struct Msg {
+            hwnd:Hwnd, message:u32, wparam:usize, lparam:isize,
+            time:u32, pt:Point, private:u32,
+        }
+        #[link(name="user32")]
+        unsafe extern "system" {
+            fn RegisterClassW(class:*const WndClassW)->u16;
+            fn CreateWindowExW(ex:u32, class:*const u16, title:*const u16,
+                style:u32, x:i32,y:i32,w:i32,h:i32,parent:Hwnd,menu:Handle,
+                instance:Handle,param:*mut std::ffi::c_void)->Hwnd;
+            fn DestroyWindow(hwnd:Hwnd)->i32;
+            fn DefWindowProcW(hwnd:Hwnd,msg:u32,wparam:usize,lparam:isize)->isize;
+            fn PeekMessageW(msg:*mut Msg,hwnd:Hwnd,min:u32,max:u32,remove:u32)->i32;
+            fn TranslateMessage(msg:*const Msg)->i32;
+            fn DispatchMessageW(msg:*const Msg)->isize;
+        }
+        #[link(name="kernel32")]
+        unsafe extern "system" {
+            fn GetModuleHandleW(name:*const u16)->Handle;
+        }
+        unsafe extern "system" fn simple_window_proc(
+            hwnd:Hwnd,msg:u32,wparam:usize,lparam:isize,
+        )->isize {
+            unsafe { DefWindowProcW(hwnd,msg,wparam,lparam) }
+        }
+        fn wide(s:&str)->Vec<u16> {
+            use std::os::windows::ffi::OsStrExt;
+            std::ffi::OsStr::new(s).encode_wide().chain(std::iter::once(0)).collect()
+        }
+        fn spawn_fixture_window(title:&str)->Hwnd {
+            let cls=wide("BandoSyntheticKakaoWin32CI");
+            let text=wide(title);
+            let instance=unsafe{GetModuleHandleW(std::ptr::null())};
+            let def=WndClassW {style:0,wnd_proc:Some(simple_window_proc),
+                cls_extra:0,wnd_extra:0,instance,icon:0,cursor:0,brush:0,
+                menu:std::ptr::null(),class:cls.as_ptr()};
+            let registered=unsafe{RegisterClassW(&def)};
+            assert_ne!(registered,0,"Cannot register synthetic Win32 window");
+            // WS_OVERLAPPEDWINDOW | WS_VISIBLE: real enumerated top-level GUI window.
+            let hwnd=unsafe{CreateWindowExW(0,cls.as_ptr(),text.as_ptr(),
+                0x00CF0000|0x10000000,100,100,450,630,0,0,instance,std::ptr::null_mut())};
+            assert_ne!(hwnd,0,"Cannot create synthetic Win32 window");
+            assert_eq!(unsafe{IsWindowVisible(hwnd)},1);
+            hwnd
+        }
+        #[test]
+        #[ignore = "Launched as a temporary KakaoTalk.exe synthetic process by a Windows CI test"]
+        fn synthetic_kakao_window_fixture() {
+            let ready=std::path::PathBuf::from(
+                std::env::var("BANDO_DOCK_SYNTHETIC_READY_FILE").expect("fixture marker env"));
+            let hwnd=spawn_fixture_window("카카오톡");
+            std::fs::write(&ready,format!("{:016X}",hwnd as usize)).expect("fixture marker write");
+            let started=std::time::Instant::now();
+            while ready.exists() && started.elapsed()<std::time::Duration::from_secs(45) {
+                unsafe {
+                    let mut msg=Msg::default();
+                    while PeekMessageW(&mut msg,0,0,0,1)!=0 {
+                        TranslateMessage(&msg);
+                        DispatchMessageW(&msg);
+                    }
+                }
+                std::thread::sleep(std::time::Duration::from_millis(15));
+            }
+            unsafe{DestroyWindow(hwnd);}
+        }
+        #[test]
+        fn synthetic_win32_kakao_window_is_moved_and_restored() {
+            use std::{process::Command, time::{Duration,Instant}};
+            let folder=std::env::temp_dir().join(
+                format!("bando-win32-dock-{}-{}",std::process::id(),
+                std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
+                    .unwrap().as_nanos()));
+            std::fs::create_dir_all(&folder).unwrap();
+            let binary=folder.join("KakaoTalk.exe");
+            std::fs::copy(std::env::current_exe().unwrap(),&binary).unwrap();
+            let ready=folder.join("ready.txt");
+            let child=Command::new(&binary)
+                .arg("--ignored").arg("--exact")
+                .arg("kakao_dock::native::tests::synthetic_kakao_window_fixture")
+                .arg("--nocapture")
+                .env("BANDO_DOCK_SYNTHETIC_READY_FILE",&ready)
+                .spawn().expect("launch synthetic KakaoTalk.exe test fixture");
+            struct Cleanup {
+                child:std::process::Child,
+                folder:std::path::PathBuf,
+                ready:std::path::PathBuf,
+            }
+            impl Drop for Cleanup {
+                fn drop(&mut self) {
+                    let _=std::fs::remove_file(&self.ready);
+                    for _ in 0..120 {
+                        if self.child.try_wait().ok().flatten().is_some(){break}
+                        std::thread::sleep(Duration::from_millis(20));
+                    }
+                    let _=self.child.kill();
+                    let _=self.child.wait();
+                    let _=std::fs::remove_dir_all(&self.folder);
+                }
+            }
+            let mut process=Cleanup{child,folder,ready:ready.clone()};
+            let started=Instant::now();
+            while !ready.exists() && started.elapsed()<Duration::from_secs(12) {
+                if let Some(result)=process.child.try_wait().unwrap() {
+                    panic!("synthetic window child terminated early: {result}");
+                }
+                std::thread::sleep(Duration::from_millis(40));
+            }
+            assert!(ready.exists(),"The synthetic KakaoTalk.exe did not create a visible window");
+            let handle=std::fs::read_to_string(&ready).unwrap();
+            let fixture_hwnd=parse(&handle).unwrap();
+            assert!(verified(fixture_hwnd).is_some(),"real exe-name/Win32 verification");
+            let matches=candidates();
+            assert!(matches.iter().any(|item|item.handle==handle&&item.kind=="MAIN"));
+            let main=spawn_fixture_window("BANDO HUB CI test window");
+            assert!(attach(main,&format!("{:016X}",main as usize)).is_err(),
+                "non-KakaoTalk.exe must not attach");
+            let old=rect(fixture_hwnd).unwrap();
+            let session=attach(main,&handle).unwrap();
+            assert!(live(&session));
+            let shifted=Rect{left:old.left+40,top:old.top+20,
+                right:old.right+40,bottom:old.bottom+20};
+            set_rect(fixture_hwnd,shifted,0).unwrap();
+            assert_eq!(rect(fixture_hwnd).unwrap(),shifted,
+                "SetWindowPos must move the actual top-level Win32 window");
+            restore(&session);
+            assert_eq!(rect(fixture_hwnd).unwrap(),old,
+                "SetWindowPlacement must restore the original window bounds");
+            unsafe{DestroyWindow(main);}
+            let _=&mut process;
+        }
+
         #[test] fn split_layout_reserves_main_minimum(){
             let area=Rect{left:0,top:0,right:1920,bottom:1040};
             let (left,right)=split_rect(area,420).unwrap();
