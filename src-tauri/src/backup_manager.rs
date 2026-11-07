@@ -158,9 +158,22 @@ fn restore_selected(conn: &mut Connection, base: &Path, filename: &str)
     }
     // Validate the selected backup BEFORE writing anything to the live DB.
     let backup = read_backup(&selected)?;
+    let active_revision = get_snapshot(conn)?["revision"].as_u64().ok_or("현재 DB 리비전 오류")?;
+    let selected_revision = get_snapshot(&backup)?["revision"].as_u64().ok_or("백업 DB 리비전 오류")?;
+    // Never reuse an old revision after restoring history: a stale editor must
+    // not accidentally overwrite the newly restored data.
+    let next_revision = active_revision.max(selected_revision)
+        .checked_add(1).ok_or("리비전 한도 초과로 복원할 수 없습니다.")?;
     // Save the current entire SQLite DB, not just the app_state JSON.
     let safety = write_backup(conn, base, "pre-restore", Local::now().date_naive())?;
-    let result = copy_entire_db(&backup, conn);
+    let result = (|| {
+        copy_entire_db(&backup, conn)?;
+        let mut restored = get_snapshot(conn)?;
+        restored["revision"] = json!(next_revision);
+        conn.execute("UPDATE app_state SET payload=?1 WHERE id=1",
+            [serde_json::to_string(&restored).map_err(err)?]).map_err(err)?;
+        validate_database(conn)
+    })();
     if let Err(primary_error) = result {
         // The SQLite backup API is transactional, but independently verify
         // the rollback path and retain the safety copy for manual recovery.
@@ -251,7 +264,9 @@ mod tests {
         write_snapshot(&mut conn,changed,1,false).unwrap();
         conn.execute("DELETE FROM receipt_archive",[]).unwrap();
         assert_eq!(restore_backup(&mut conn,&base,&original).is_ok(),true);
-        assert_eq!(get_snapshot(&conn).unwrap(),before);
+        let mut expected = before.clone();
+        expected["revision"] = json!(3);
+        assert_eq!(get_snapshot(&conn).unwrap(),expected);
         let restored_count: i64 = conn.query_row("SELECT COUNT(*) FROM receipt_archive",[],|row| row.get(0)).unwrap();
         assert_eq!(restored_count,archive_count);
         assert!(list_backups(&base).unwrap().iter().any(|f| f.contains("pre-restore-")));
