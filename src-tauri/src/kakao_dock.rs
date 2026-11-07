@@ -299,8 +299,15 @@ mod native {
             }
         }else if unsafe{IsIconic(s.main)}==0{
             let main=rect(s.main)?;
-            let target=Rect{left:main.left-s.width-8,top:main.top,
-                right:main.left-8,bottom:main.bottom};
+            let scale=app.get_webview_window("main")
+                .ok_or("반도허브 창을 찾지 못했습니다.")?
+                .scale_factor().map_err(|e|e.to_string())?;
+            if !scale.is_finite()||!(0.5..=8.0).contains(&scale) {
+                return Err("모니터 DPI 배율을 확인할 수 없습니다.".into())
+            }
+            let gap=(8.0*scale).ceil() as i32;
+            let target=Rect{left:main.left-s.width-gap,top:main.top,
+                right:main.left-gap,bottom:main.bottom};
             let work=monitor_work(s.main)?;
             if target.left>=work.left && target.right<=work.right
                 && target.top>=work.top && target.bottom<=work.bottom {
