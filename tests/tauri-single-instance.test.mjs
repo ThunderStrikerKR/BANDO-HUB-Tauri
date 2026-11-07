@@ -9,8 +9,11 @@ test("Windows startup acquires the instance guard before Tauri and SQLite", () =
   const acquire = lib.indexOf("single_instance::acquire(");
   const builder = lib.indexOf("tauri::Builder::default()", acquire);
   const setup = lib.indexOf(".setup(move |app|", builder);
-  const database = lib.indexOf("initialize_database(", setup);
-  assert.ok(acquire > 0 && builder > acquire && setup > builder && database > setup);
+  const startup = lib.indexOf("startup_recovery::initial_open(", setup);
+  const recovery = read("src-tauri/src/startup_recovery.rs");
+  assert.ok(acquire > 0 && builder > acquire && setup > builder && startup > setup);
+  assert.match(recovery, /fn open_database\(/);
+  assert.match(recovery, /initialize_database\(path\)/);
   assert.match(lib, /Acquisition::Existing\) => return/);
   assert.match(lib, /single_instance::listen\(instance, app\.handle\(\)\.clone\(\)\)/);
   assert.match(lib, /--bando-developer-test/);
