@@ -219,7 +219,14 @@ mod tests {
             .unwrap().contains("auto-20261204"));
         assert!(automatic_backup_if_needed(&conn,&base,date("20270105")).unwrap()
             .unwrap().contains("monthly-20270105"));
-        assert_eq!(list_backups(&base).unwrap().len(),3);
+        // January 5 is 32 days after the ordinary December 4 backup.
+        // The 30-day retention must remove that old daily backup, while
+        // December 3 and January 5 remain as permanent monthly snapshots.
+        let backups = list_backups(&base).unwrap();
+        assert_eq!(backups.len(), 2);
+        assert!(backups.iter().any(|name| name.contains("monthly-20261203")));
+        assert!(backups.iter().any(|name| name.contains("monthly-20270105")));
+        assert!(!backups.iter().any(|name| name.contains("auto-20261204")));
         drop(conn);
         fs::remove_dir_all(base).unwrap();
     }
