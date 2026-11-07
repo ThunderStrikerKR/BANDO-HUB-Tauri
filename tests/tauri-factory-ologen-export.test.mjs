@@ -131,3 +131,54 @@ test("Tauri native Save As wired; canceled dialog does not mark export in UI", (
   assert.match(queue,/await window\.bando!\.backup\(\)/);
   assert.match(queue,/실제 공장 전달은 별도로 확인/);
 });
+
+test("factory workbook requires explicit bag and wheel configurations on frozen item names",()=>{
+  const original=stateFixture();
+  const product={
+    id:"p-bag",code:"BD 700",name:"BD 700 / 가방 포함",catalog:"BANDOSTAND",
+    variants:[{id:"v-bag",option:"",color:"단일"}],
+  };
+  original.products.push(product);
+  const item=original.workflow.queue[0].snapshot.recipient.items[0];
+  item.productId=product.id;
+  item.variantId="v-bag";
+  item.name="BD 700";
+  assert.throws(()=>previewFactoryExport(original,["excel:s1:FACTORY"]),/가방 포함/);
+  item.name="BD 700 / 가방 포함";
+  let report=previewFactoryExport(original,["excel:s1:FACTORY"]);
+  assert.match(report.rows[0].values[8],/BD 700 \/ 가방 포함/);
+  product.name="BD 700 / 바퀴 미포함";
+  item.name="BD 700";
+  assert.throws(()=>previewFactoryExport(original,["excel:s1:FACTORY"]),/바퀴 포함/);
+  item.name="BD 700 / 바퀴 미포함";
+  report=previewFactoryExport(original,["excel:s1:FACTORY"]);
+  assert.match(report.rows[0].values[8],/바퀴 미포함/);
+});
+test("factory workbook blocks missing SKU identity or missing opposite-option wording",()=>{
+  const s=stateFixture();
+  s.products.push({
+    id:"p-multi",code:"BD 700",name:"BD 700",catalog:"BANDOSTAND",
+    variants:[
+      {id:"v-included",option:"가방 포함",color:"블랙"},
+      {id:"v-excluded",option:"가방 미포함",color:"블랙"},
+    ]
+  });
+  const item=s.workflow.queue[0].snapshot.recipient.items[0];
+  item.productId="p-multi";
+  item.variantId=null;
+  item.name="BD 700";
+  assert.throws(()=>previewFactoryExport(s,["excel:s1:FACTORY"]),/선택 옵션/);
+  item.variantId="v-excluded";
+  assert.throws(()=>previewFactoryExport(s,["excel:s1:FACTORY"]),/구분 표기/);
+  item.name="BD 700 / 가방 미포함";
+  const report=previewFactoryExport(s,["excel:s1:FACTORY"]);
+  assert.match(report.rows[0].values[8],/가방 미포함/);
+});
+test("order variant editor resolves by variant ID rather than just its color",()=>{
+  const domain=read("src/domain.ts");
+  const ui=read("src/OrderItemEditor.tsx");
+  assert.match(domain,/selectedVariantId\?: string/);
+  assert.match(domain,/const explicit = selectedVariantId/);
+  assert.match(domain,/eligible\.length === 1/);
+  assert.match(ui,/itemFromProduct\(p, client, v\.color, draft\.quantity, v\.id\)/);
+});
