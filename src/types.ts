@@ -522,11 +522,21 @@ export interface DockStatus {
   handle?: string;
   selectionRequired?: boolean;
 }
+export interface StartupStatus {
+  phase: "OPENING" | "ERROR" | "RETRYING" | "READY";
+  error?: string | null;
+  attempts: number;
+  databaseMs?: number | null;
+  readyMs?: number | null;
+  isTest: boolean;
+}
 export interface StartupMetrics {
-  windowShownMs: number;
-  databaseMs: number;
-  dataMs: number;
-  readyMs: number;
+  // The native startup layer can measure DB open and ready times. It cannot
+  // claim a browser paint/JS hydration time that was never measured.
+  windowShownMs: number | null;
+  databaseMs: number | null;
+  dataMs: number | null;
+  readyMs: number | null;
 }
 export interface DeveloperTestReport {
   scenario: string;
@@ -631,8 +641,9 @@ export interface Api {
   dockStart: (handle: string, ratio: number) => Promise<DockStatus>;
   dockStop: () => Promise<DockStatus>;
   dockStatus: () => Promise<DockStatus>;
+  startupStatus?: () => Promise<StartupStatus>;
   startupMetrics: () => Promise<StartupMetrics>;
-  retryStartup: () => Promise<void>;
+  retryStartup: () => Promise<StartupStatus>;
 }
 declare global {
   interface Window {
