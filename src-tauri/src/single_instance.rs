@@ -179,8 +179,8 @@ mod tests {
         let test = unique_namespace("DEVELOPER");
         let primary = acquire_namespace(&production).unwrap();
         let isolated = acquire_namespace(&test).unwrap();
-        assert!(matches!(primary, Acquisition::First(_)));
-        assert!(matches!(isolated, Acquisition::First(_)));
+        assert!(matches!(&primary, Acquisition::First(_)));
+        assert!(matches!(&isolated, Acquisition::First(_)));
         assert!(matches!(acquire_namespace(&production).unwrap(), Acquisition::Existing));
         assert!(matches!(acquire_namespace(&test).unwrap(), Acquisition::Existing));
     }
@@ -189,7 +189,7 @@ mod tests {
     fn concurrent_launches_only_allow_one_first_instance() {
         let namespace = unique_namespace("PARALLEL");
         let primary = acquire_namespace(&namespace).unwrap();
-        assert!(matches!(primary, Acquisition::First(_)));
+        assert!(matches!(&primary, Acquisition::First(_)));
         let threads: Vec<_> = (0..12).map(|_| {
             let name = namespace.clone();
             std::thread::spawn(move || matches!(
