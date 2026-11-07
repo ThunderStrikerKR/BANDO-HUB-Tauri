@@ -154,25 +154,20 @@ test("factory workbook requires explicit bag and wheel configurations on frozen 
   report=previewFactoryExport(original,["excel:s1:FACTORY"]);
   assert.match(report.rows[0].values[8],/바퀴 미포함/);
 });
-test("factory workbook blocks missing SKU identity or missing opposite-option wording",()=>{
-  const s=stateFixture();
-  s.products.push({
-    id:"p-multi",code:"BD 700",name:"BD 700",catalog:"BANDOSTAND",
-    variants:[
-      {id:"v-included",option:"가방 포함",color:"블랙"},
-      {id:"v-excluded",option:"가방 미포함",color:"블랙"},
-    ]
+test("factory workbook blocks a legacy multi-configuration item instead of selecting an option",()=> {
+  const state = stateFixture();
+  state.products.push({
+    id: "legacy-multi", name: "BD 700", code: "BD 700",
+    variants: [
+      { id: "v-included", option: "가방 포함", color: "블랙" },
+      { id: "v-excluded", option: "가방 미포함", color: "블랙" },
+    ],
   });
-  const item=s.workflow.queue[0].snapshot.recipient.items[0];
-  item.productId="p-multi";
-  item.variantId=null;
-  item.name="BD 700";
-  assert.throws(()=>previewFactoryExport(s,["excel:s1:FACTORY"]),/선택 옵션/);
-  item.variantId="v-excluded";
-  assert.throws(()=>previewFactoryExport(s,["excel:s1:FACTORY"]),/구분 표기/);
-  item.name="BD 700 / 가방 미포함";
-  const report=previewFactoryExport(s,["excel:s1:FACTORY"]);
-  assert.match(report.rows[0].values[8],/가방 미포함/);
+  const item = state.workflow.queue[0].snapshot.recipient.items[0];
+  item.productId = "legacy-multi";
+  item.variantId = "v-included";
+  item.name = "BD 700 / 가방 포함";
+  assert.throws(() => previewFactoryExport(state, ["excel:s1:FACTORY"]), /옛 상품은 공장 발송할 수 없습니다/);
 });
 test("Order editor chooses a complete standalone product rather than a variant dropdown", () => {
   const source = read("src/OrderItemEditor.tsx");
