@@ -490,6 +490,11 @@ mod native {
             let old=rect(fixture_hwnd).unwrap();
             let session=attach(main,&handle).unwrap();
             assert!(live(&session));
+            let original_ratio=measured_ratio(&session).unwrap();
+            let wider=Rect{right:old.right+80,..old};
+            set_rect(fixture_hwnd,wider,0).unwrap();
+            assert!(measured_ratio(&session).unwrap() < original_ratio,
+                "reported KakaoTalk ratio must follow actual window geometry");
             let shifted=Rect{left:old.left+40,top:old.top+20,
                 right:old.right+40,bottom:old.bottom+20};
             set_rect(fixture_hwnd,shifted,0).unwrap();
