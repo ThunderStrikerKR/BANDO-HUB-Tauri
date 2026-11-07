@@ -6,6 +6,7 @@ mod kakao_dock;
 mod developer_workspace;
 mod startup_recovery;
 mod backup_manager;
+mod relational_store;
 #[cfg(target_os = "windows")]
 mod single_instance;
 use chrono::{Datelike, Local, DateTime};
@@ -22,7 +23,9 @@ fn lock_db<'a>(db: &'a State<'_, Database>) -> Result<std::sync::MutexGuard<'a, 
 }
 fn get_snapshot(conn: &Connection) -> Result<Value, String> {
     let text: String = conn.query_row("SELECT payload FROM app_state WHERE id=1", [], |row| row.get(0)).map_err(err)?;
-    serde_json::from_str(&text).map_err(err)
+    let mut state: Value = serde_json::from_str(&text).map_err(err)?;
+    relational_store::hydrate(conn, &mut state)?;
+    Ok(state)
 }
 fn valid_state(s: &Value) -> Result<(), String> {
     for field in ["products", "orders", "clients", "aliases", "queue", "exports"] {
@@ -48,7 +51,15 @@ fn write_snapshot(conn: &mut Connection, mut state: Value, expected_revision: u6
     if validate_orders { reception::validate_reception(&current, &state)?; }
     let archive_entries = reception::new_archive_entries(&current, &state)?;
     state["revision"] = json!(current_revision + 1);
-    tx.execute("UPDATE app_state SET payload=?1 WHERE id=1", [serde_json::to_string(&state).map_err(err)?]).map_err(err)?;
+    // The constrained SQLite tables own products, clients and orders.
+    // Keep only non-core data in the compatibility envelope, atomically.
+    let mut envelope = state.clone();
+    if relational_store::active(&tx)? {
+        relational_store::store(&tx, &state)?;
+        relational_store::strip_core(&mut envelope);
+    }
+    tx.execute("UPDATE app_state SET payload=?1 WHERE id=1",
+        [serde_json::to_string(&envelope).map_err(err)?]).map_err(err)?;
     // Maintain searchable product index in SQLite alongside the canonical JSON document.
     tx.execute("DELETE FROM product_index", []).map_err(err)?;
     {
@@ -201,6 +212,7 @@ fn initialize_database(path: &Path) -> Result<Connection, String> {
     conn.execute_batch(r#"
         PRAGMA journal_mode=WAL;
         PRAGMA busy_timeout=5000;
+        PRAGMA foreign_keys=ON;
         CREATE TABLE IF NOT EXISTS app_state(
             id INTEGER PRIMARY KEY CHECK(id=1),payload TEXT NOT NULL
         );
@@ -269,6 +281,8 @@ fn initialize_database(path: &Path) -> Result<Connection, String> {
             }
         }
     }
+    relational_store::migrate(&mut conn)?;
+    relational_store::verify(&conn)?;
     Ok(conn)
 }
 #[tauri::command]
