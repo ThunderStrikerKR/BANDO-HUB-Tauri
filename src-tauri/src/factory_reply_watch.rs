@@ -272,15 +272,17 @@ fn validate_automatic_change(before: &Value, next: &Value, id: &str, name: &str)
             .is_some_and(|old| !old.is_empty() && old != tracking) {
             return Err("기존 운송장번호와 충돌합니다. 직원 승인이 필요합니다.".into());
         }
-        let original_freight = original["actualFreight"].as_object()
-            .and_then(|m| m.get("FACTORY")).and_then(Value::as_u64)
-            .or_else(|| {
-                before["orders"].as_array()?.iter()
-                    .find(|o| o["id"] == original["orderId"])?
-                    ["recipients"].as_array()?.iter()
-                    .find(|r| r["id"] == original["recipientId"])?
-                    ["actualFreight"].as_u64()
-            });
+        let original_freight = if let Some(saved) =
+            original["actualFreight"].as_object().and_then(|m| m.get("FACTORY")) {
+            saved.as_u64()
+        } else {
+            before["orders"].as_array().and_then(|orders| orders.iter()
+                .find(|order| order["id"] == original["orderId"]))
+                .and_then(|order| order["recipients"].as_array())
+                .and_then(|recipients| recipients.iter()
+                    .find(|recipient| recipient["id"] == original["recipientId"]))
+                .and_then(|recipient| recipient["actualFreight"].as_u64())
+        };
         if original_freight.is_some_and(|amount| amount != actual) {
             return Err("기존 실제 운임과 충돌합니다. 직원 승인이 필요합니다.".into());
         }
@@ -473,6 +475,51 @@ mod tests {
         assert!(inbox.ends_with(Path::new("Excel").join("공장 회신 수신")));
         fs::remove_dir_all(root).unwrap();
     }
+    #[test]
+    fn native_matching_rejects_wrong_recipient_and_existing_waybill_collision() {
+        let recipient = json!({
+            "id":"r1","name":"김수취","address":"서울 테스트로 1",
+            "phone":"010-2222-3333","mobile":"","actualFreight":null,
+            "items":[{"origin":"FACTORY"}]
+        });
+        let before = json!({
+            "revision":4,"products":[],"orders":[{"id":"order1","recipients":[recipient.clone()]}],
+            "settings":{},"factoryReplies":[],
+            "workflow":{
+                "queue":[{"shipmentId":"ship1","origin":"FACTORY","status":"EXPORTED",
+                    "snapshot":{"recipient":recipient}}],
+                "shipments":[{"id":"ship1","orderId":"order1","recipientId":"r1",
+                    "tracking":{},"actualFreight":{}}],
+                "events":[]
+            }
+        });
+        let mut next = before.clone();
+        next["factoryReplies"] = json!([{
+            "id":"factory-reply-synthetic","filename":"factory.xlsx","status":"APPLIED",
+            "rows":[{"row":2,"applied":true,"shipmentId":"ship1","orderId":"order1",
+                "name":"김수취","address":"서울 테스트로 1",
+                "contacts":["010-2222-3333"],"tracking":"001234567890","actual":4000}]
+        }]);
+        next["workflow"]["shipments"][0]["tracking"]["FACTORY"] = json!("001234567890");
+        next["workflow"]["shipments"][0]["actualFreight"]["FACTORY"] = json!(4000);
+        next["workflow"]["events"] = json!([{"action":"공장 회신 반영","shipmentIds":["ship1"]}]);
+        let validate = |old: &Value, updated: &Value| {
+            validate_automatic_change(old,updated,"factory-reply-synthetic","factory.xlsx")
+        };
+        assert_eq!(validate(&before,&next).unwrap(),(1,0));
+        let mut mismatched = next.clone();
+        mismatched["factoryReplies"][0]["rows"][0]["address"] = json!("다른 주소");
+        assert!(validate(&before,&mismatched).unwrap_err().contains("수취인"));
+        let mut conflicting = before.clone();
+        conflicting["workflow"]["shipments"][0]["tracking"]["FACTORY"] =
+            json!("009988776655");
+        assert!(validate(&conflicting,&next).unwrap_err().contains("기존 운송장"));
+        let mut freight_conflict = before.clone();
+        freight_conflict["workflow"]["shipments"][0]["actualFreight"]["FACTORY"] =
+            json!(5000);
+        assert!(validate(&freight_conflict,&next).unwrap_err().contains("기존 실제 운임"));
+    }
+
     #[test]
     fn invalid_automatic_reply_cannot_modify_unrelated_database_fields() {
         let before = json!({
