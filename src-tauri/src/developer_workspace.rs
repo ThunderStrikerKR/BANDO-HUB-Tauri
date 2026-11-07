@@ -29,7 +29,16 @@ fn clean_activity(mut snapshot: Value, test_base: &Path) -> Result<Value, String
     fs::create_dir_all(&excel).map_err(err)?;
     let excel = canonical_excel_directory(&excel)?;
     let settings = snapshot["settings"].as_object_mut().ok_or("테스트 기준 설정 오류")?;
-    settings.insert("excelDirectory".into(), json!(excel.to_string_lossy().to_string()));
+    // Preserve the stored spelling for an already-safe test folder on Windows:
+    // canonical paths can differ from their 8.3 path aliases while naming
+    // exactly the same directory.
+    let already_isolated = settings.get("excelDirectory")
+        .and_then(Value::as_str)
+        .and_then(|path| canonical_excel_directory(Path::new(path)).ok())
+        .is_some_and(|path| path == excel);
+    if !already_isolated {
+        settings.insert("excelDirectory".into(), json!(excel.to_string_lossy().to_string()));
+    }
     settings.remove("factoryReplyDirectory");
     snapshot["revision"] = json!(0);
     valid_state(&snapshot)?;
@@ -203,8 +212,9 @@ mod tests {
         assert!(test["clients"].as_array().unwrap().is_empty());
         assert_eq!(test["products"],before["products"]);
         assert_eq!(test["settings"]["operatorName"],"real-staff");
-        assert_eq!(test["settings"]["excelDirectory"],
-            test_base.join("Excel").to_string_lossy().as_ref());
+        let recorded = Path::new(test["settings"]["excelDirectory"].as_str().unwrap());
+        assert_eq!(canonical_excel_directory(recorded).unwrap(),
+            canonical_excel_directory(&test_base.join("Excel")).unwrap());
         assert_eq!(get_snapshot(&original).unwrap(),before);
         drop(test_conn);
         drop(original);

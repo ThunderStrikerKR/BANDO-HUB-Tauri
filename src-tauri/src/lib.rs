@@ -273,8 +273,9 @@ fn state_load(db: State<'_, Database>) -> Result<Value, String> { get_snapshot(&
 fn state_save(db: State<'_, Database>, state: Value) -> Result<(), String> {
     if db.is_test {
         let protected_root = canonical_excel_directory(&db.base.join("Excel"))?;
-        if state["settings"]["excelDirectory"].as_str()
-            != Some(protected_root.to_string_lossy().as_ref()) {
+        let submitted = state["settings"]["excelDirectory"].as_str()
+            .ok_or("테스트 Excel 보관함 정보가 누락되었습니다.")?;
+        if canonical_excel_directory(Path::new(submitted))? != protected_root {
             return Err("테스트 작업공간 Excel 보관함은 변경할 수 없습니다.".into());
         }
     }
