@@ -4,6 +4,7 @@ import { FactoryReplyWatcher } from "./FactoryReplyWatcher";
 import { lazy, Suspense, useState } from "react";
 import { AppHeader } from "./app/AppHeader";
 import { AppNotice } from "./app/AppNotice";
+import { StartupRecoveryPanel } from "./app/StartupRecoveryPanel";
 import { DailySettlement } from "./app/DailySettlement";
 import { OrderHistory } from "./app/OrderHistory";
 import { useAppModel } from "./app/useAppModel";
@@ -42,13 +43,23 @@ export function App() {
   const [notifications, setNotifications] = useState(false);
   const model = useAppModel(),
     { state, draft, tab } = model;
-  if (!state || !draft)
+  if (!state || !draft) {
+    if (model.startup.phase === "ERROR" || model.startup.phase === "RETRYING") {
+      return (
+        <StartupRecoveryPanel
+          startup={model.startup}
+          retrying={model.startupBusy}
+          onRetry={model.retryStartup}
+        />
+      );
+    }
     return (
-      <main className="loading">
+      <main className="loading" role="status">
         <h1>반도허브</h1>
-        <p>{model.notice?.message ?? "업무 화면 준비 중…"}</p>
+        <p>업무 데이터베이스를 안전하게 확인하는 중입니다.</p>
       </main>
     );
+  }
   return (
     <NoticeContext.Provider value={model.setNotice}>
       <div className="app-v03" aria-busy={model.busy}>
