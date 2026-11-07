@@ -198,12 +198,44 @@ pub(super) fn restore_backup(conn: &mut Connection, base: &Path, filename: &str)
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    // The Rust test runner executes cases in parallel. Windows system clock
+    // values alone are not a collision-proof temporary directory identifier.
+    // Reserve a fresh directory atomically instead of reusing an existing one.
+    static NEXT_TEST_DIRECTORY: AtomicU64 = AtomicU64::new(0);
 
     fn temporary() -> PathBuf {
-        let suffix = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
-        let dir = std::env::temp_dir().join(format!("bando-backup-{}-{suffix}",std::process::id()));
-        fs::create_dir_all(&dir).unwrap();
-        dir
+        for _ in 0..1_000 {
+            let timestamp = SystemTime::now().duration_since(UNIX_EPOCH)
+                .unwrap().as_nanos();
+            let unique = NEXT_TEST_DIRECTORY.fetch_add(1, Ordering::Relaxed);
+            let dir = std::env::temp_dir().join(format!(
+                "bando-backup-test-{}-{timestamp}-{unique}", std::process::id()
+            ));
+            match fs::create_dir(&dir) {
+                Ok(()) => return dir,
+                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                Err(error) => panic!("백업 시험용 독립 폴더 생성 실패: {error}"),
+            }
+        }
+        panic!("백업 시험용 독립 폴더 주소를 확보하지 못했습니다.")
+    }
+
+    #[test]
+    fn parallel_tests_never_share_backup_directories() {
+        let threads: Vec<_> = (0..16).map(|_| std::thread::spawn(temporary)).collect();
+        let mut seen = std::collections::HashSet::new();
+        let mut paths = Vec::new();
+        for thread in threads {
+            let path = thread.join().expect("시험용 폴더 생성 스레드 실패");
+            assert!(path.is_dir());
+            assert!(seen.insert(path.clone()), "다른 테스트와 폴더가 중복됐습니다");
+            paths.push(path);
+        }
+        for path in paths {
+            fs::remove_dir(path).unwrap();
+        }
     }
     fn date(ymd: &str) -> NaiveDate {
         NaiveDate::parse_from_str(ymd,"%Y%m%d").unwrap()
@@ -223,7 +255,7 @@ mod tests {
         // The 30-day retention must remove that old daily backup, while
         // December 3 and January 5 remain as permanent monthly snapshots.
         let backups = list_backups(&base).unwrap();
-        assert_eq!(backups.len(), 2);
+        assert_eq!(backups.len(), 2, "예상하지 못한 백업 파일: {backups:?}");
         assert!(backups.iter().any(|name| name.contains("monthly-20261203")));
         assert!(backups.iter().any(|name| name.contains("monthly-20270105")));
         assert!(!backups.iter().any(|name| name.contains("auto-20261204")));
