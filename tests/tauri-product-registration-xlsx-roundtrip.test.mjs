@@ -55,7 +55,7 @@ const state = ()=>({
   brands:[], registrationBatches:[], settings:{operatorName:"검증 직원"},
 });
 const makeRow = (model="BD123",name="반도스탠드 신규 보면대")=>[
-  name,model,"","블랙","기본","","개","반도스탠드","반도스탠드 / 보면대",
+  name + " / 블랙 / 기본",model,"","블랙","기본","","개","반도스탠드","반도스탠드 / 보면대",
   "10000","12000","15000","",""
 ];
 async function workbook(rows) {
