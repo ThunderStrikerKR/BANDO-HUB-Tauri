@@ -11,7 +11,9 @@ const bridge=read("src/tauri-bridge.ts");
 test("developer workspace can only launch a second process with a separate SQLite root",()=>{
   assert.match(rust,/mod developer_workspace/);
   assert.match(rust,/is_test: bool/);
-  assert.match(rust,/developer_workspace::open_isolated/);
+  const startup=read("src-tauri/src/startup_recovery.rs");
+  assert.match(startup,/developer_workspace::open_isolated/);
+  assert.match(startup,/preflight_existing_sqlite\(&base\.join\("developer-test"\)/);
   assert.match(native,/Command::new\(std::env::current_exe\(\)/);
   assert.match(native,/--bando-developer-test/);
   assert.match(native,/developer-test/);
