@@ -7,6 +7,7 @@ mod developer_workspace;
 mod startup_recovery;
 mod backup_manager;
 mod relational_store;
+mod sale_unit_migration;
 #[cfg(target_os = "windows")]
 mod single_instance;
 use chrono::{Datelike, Local, DateTime};
@@ -247,7 +248,7 @@ fn initialize_database(path: &Path) -> Result<Connection, String> {
     if exists.is_none() {
         let seed: Value = serde_json::from_str(include_str!("../resources/state-seed.json")).map_err(err)?;
         valid_state(&seed)?;
-        // New product-only seed. Do not open or migrate the Electron test database.
+        // Independent 360 sale-unit seed. Do not open or migrate the Electron test database.
         conn.execute("INSERT INTO app_state(id,payload) VALUES (1,?1)", [serde_json::to_string(&seed).map_err(err)?]).map_err(err)?;
         // Current revision starts at 0. Populate the same product index without creating fake test records.
         let transaction = conn.transaction().map_err(err)?;
