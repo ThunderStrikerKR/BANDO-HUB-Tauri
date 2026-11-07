@@ -155,21 +155,34 @@ export function itemFromProduct(
   client: Client,
   color?: string,
   quantity: number | null = 1,
+  selectedVariantId?: string,
 ): Item {
-  const c = normalizeColor(color ?? p.defaultColor);
-  const v =
-    p.requiresOption && !color ? undefined : p.variants.find((v) => normalizeColor(v.color) === c);
+  const explicit = selectedVariantId
+    ? p.variants.find((variant) => variant.id === selectedVariantId)
+    : undefined;
+  const c = normalizeColor(explicit?.color ?? color ?? p.defaultColor);
+  const eligible = p.variants.filter((variant) => normalizeColor(variant.color) === c);
+  // Color alone does not distinguish same-color options such as a bag
+  // included/excluded, wheels included/excluded or perforated top.
+  const v = explicit ?? ((!p.requiresOption || !!color) && eligible.length === 1
+    ? eligible[0] : undefined);
+  const technicalCode = /^(?:P[A-Z0-9]{6,}|BANDO-SITE-|SITE-)/i.test(p.code);
+  const basicName = (p.name || p.code).replace(/^반도스탠드\s*/i, "").trim();
+  const baseName = p.variants.length > 1 && !technicalCode ? p.code : basicName;
+  const detail = p.variants.length > 1 ? (v?.option ?? "").trim() : "";
+  const productName = [baseName, ...(detail ? [detail] : [])].join(" / ");
+  const configurationIncomplete = !!v && ["가방", "바퀴"].some((kind) => {
+    const pattern = new RegExp(kind + "\\s*(?:미포함|포함|미장착|장착|없음|있음)");
+    return p.variants.some((variant) => pattern.test(variant.option ?? "")) &&
+      !pattern.test(v.option ?? "");
+  });
   return {
     id: uid(),
     productId: p.id,
     variantId: v?.id ?? null,
     raw: p.code,
-    name:
-      p.catalog === "BANDOMALL"
-        ? p.name
-        : p.variants.some((v) => v.source === "DEMO")
-          ? "[가상] " + p.code
-          : p.code,
+    name: p.variants.some((variant) => variant.source === "DEMO")
+      ? "[가상] " + productName : productName,
     color: c,
     quantity,
     unitPrice: v ? resolvePrice(p, v.id, client) : null,
@@ -180,7 +193,7 @@ export function itemFromProduct(
           (!p.saleUnit && ["색상 미표기", "", undefined].includes(p.defaultColor))) &&
         !color
         ? ["기본 색상 확인 필요"]
-        : []
+        : (configurationIncomplete ? ["가방 또는 바퀴 포함 / 미포함 정보 확인 필요"] : [])
       : ["등록되지 않은 색상 / 옵션 확인"],
     url: v?.url ?? "",
     catalog: p.catalog,
