@@ -23,6 +23,7 @@ const api: Api = {
   workspaceMode: () => invoke<boolean>("workspace_mode"),
   testRecordRun: (report) => invoke<void>("test_record_run", { report }),
   testRunHistory: () => invoke("test_run_history"),
+  testReceptionBoundary: (candidate) => invoke("test_reception_boundary", { candidate }),
   saveProductWorkbook: (bytes) => invoke<string | null>("save_product_workbook", { bytes }),
   saveProductSyncWorkbook: (bytes) => invoke<string | null>("save_product_sync_workbook", { bytes }),
   saveFactoryWorkbook: (bytes) => invoke<string | null>("save_factory_workbook", { bytes }),
