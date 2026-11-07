@@ -269,6 +269,8 @@ mod native {
         // Restore to the user's layout immediately before entering split mode,
         // not the (possibly stale) position at the time KakaoTalk was attached.
         let before_split=placement(s.main)?;
+        let before_kakao=placement(s.hwnd)?;
+        let kakao_was_topmost=topmost(s.hwnd);
         unsafe{ShowWindow(s.main,SW_RESTORE);}
         if let Err(error)=set_rect(s.main,main,0) {
             unsafe{SetWindowPlacement(s.main,&before_split);}
@@ -277,7 +279,13 @@ mod native {
         set_z(s.hwnd,s.original_topmost);
         unsafe{ShowWindow(s.hwnd,SW_RESTORE);}
         if let Err(e)=set_rect(s.hwnd,kakao,0){
-            unsafe{SetWindowPlacement(s.main,&before_split);}
+            // A failed second move must not strand the app in split view or
+            // leave KakaoTalk at the wrong position / topmost state.
+            unsafe{
+                SetWindowPlacement(s.main,&before_split);
+                SetWindowPlacement(s.hwnd,&before_kakao);
+            }
+            set_z(s.hwnd,kakao_was_topmost);
             return Err(e)
         }
         s.main_original=before_split;
@@ -554,9 +562,21 @@ fn start(app:&AppHandle,inner:&mut Inner,handle:&str)->Result<Status,String>{
             }
         }
         let mut session=native::attach(native::main_window(app)?,handle)?;
-        if let Some(old)=inner.session.take(){native::restore(&old);}
+        let previous=inner.session.take();
+        if let Some(old)=previous { native::restore(&old); }
         if let Err(e)=native::overlap(&mut session,app,region){
-            native::restore(&session);return Err(e)
+            native::restore(&session);
+            // Best-effort rollback: a failed switch should not discard an
+            // otherwise healthy previous docking session.
+            if let Some(mut old)=previous {
+                let rollback=match old.mode {
+                    native::Mode::Overlap=>native::overlap(&mut old,app,region),
+                    native::Mode::Stack=>native::stack(&mut old,app),
+                };
+                if rollback.is_ok(){inner.session=Some(old);}
+                else{native::restore(&old);}
+            }
+            return Err(e)
         }
         inner.session=Some(session);
         return Ok(status(inner))
