@@ -133,12 +133,13 @@ fn payload(value: &Value, child: Option<&str>) -> Result<String, String> {
 
 fn sync_prune(tx: &Transaction<'_>, table: &str, retain: &HashSet<String>) -> Result<(), String> {
     // Only called with fixed compile-time table names; no user SQL identifiers.
-    let select = format!("SELECT id FROM {table}");
+    let key = if table=="core_product_prices" { "product_id" } else { "id" };
+    let select = format!("SELECT {key} FROM {table}");
     let mut read = tx.prepare(&select).map_err(err)?;
     let old = read.query_map([], |r| r.get::<_, String>(0)).map_err(err)?
         .collect::<Result<Vec<_>, _>>().map_err(err)?;
     drop(read);
-    let sql = format!("DELETE FROM {table} WHERE id=?1");
+    let sql = format!("DELETE FROM {table} WHERE {key}=?1");
     for id in old { if !retain.contains(&id) { tx.execute(&sql, [id]).map_err(err)?; } }
     Ok(())
 }
@@ -341,24 +342,28 @@ pub(super) fn hydrate(conn:&Connection,state:&mut Value)->Result<(),String>{
 
 pub(super) fn migrate(conn:&mut Connection)->Result<(),String>{
     sql_schema(conn)?;
-    if active(conn)? { return Ok(()); }
-    let tx=conn.transaction().map_err(err)?;
-    let raw:String=tx.query_row("SELECT payload FROM app_state WHERE id=1",[],|r|r.get(0)).map_err(err)?;
-    let state:Value=serde_json::from_str(&raw).map_err(err)?;
+    let prior=schema_version(conn)?;
+    if prior==2{return Ok(());}
+    if prior>2 {return Err("이 프로그램보다 새로운 DB 구조입니다. 자동으로 변경하지 않았습니다.".into());}
+    // Hydrate legacy v1 rows or v0.0.1 full JSON BEFORE converting.
+    // A verified SQLite pre-migration backup is created by initialize_database.
+    let old=super::get_snapshot(conn)?;
+    valid_state(&old)?;
+    let state=super::sale_unit_migration::transform(old)?;
     valid_state(&state)?;
+    let tx=conn.transaction().map_err(err)?;
     store(&tx,&state)?;
-    // Legacy v0.0.1 databases may lack search indexes. Rebuild their
-    // compatibility copies once while the migration is transactional.
+    // Legacy search indexes are non-authoritative copies and rebuilt after migration.
     tx.execute("DELETE FROM product_index",[]).map_err(err)?;
     {
         let mut insert=tx.prepare(
             "INSERT INTO product_index(id,code,name,payload) VALUES (?1,?2,?3,?4)"
         ).map_err(err)?;
-        for p in source_list(&state,"products")? {
-            insert.execute(params![
-                required_id(p,"상품")?,p["code"].as_str().ok_or("상품 코드 누락")?,
-                p["name"].as_str().ok_or("상품명 누락")?,payload(p,None)?
-            ]).map_err(err)?;
+        for p in source_list(&state,"products")?{
+            insert.execute(params![required_id(p,"상품")?,
+                p["code"].as_str().ok_or("상품 코드 누락")?,
+                p["name"].as_str().ok_or("상품명 누락")?,payload(p,None)?]
+            ).map_err(err)?;
         }
     }
     tx.execute("DELETE FROM order_index",[]).map_err(err)?;
@@ -367,17 +372,26 @@ pub(super) fn migrate(conn:&mut Connection)->Result<(),String>{
             "INSERT INTO order_index(id,client_id,created_at,confirmed_at,status)
              VALUES (?1,?2,?3,?4,?5)"
         ).map_err(err)?;
-        for o in source_list(&state,"orders")? {
-            insert.execute(params![required_id(o,"주문")?,o["clientId"].as_str().unwrap_or(""),
-                o["createdAt"].as_str().unwrap_or(""),o["confirmedAt"].as_str(),
-                o["status"].as_str().unwrap_or("REVIEW")]).map_err(err)?;
+        for o in source_list(&state,"orders")?{
+            insert.execute(params![required_id(o,"주문")?,
+                o["clientId"].as_str().unwrap_or(""),
+                o["createdAt"].as_str().unwrap_or(""),
+                o["confirmedAt"].as_str(),
+                o["status"].as_str().unwrap_or("REVIEW")]
+            ).map_err(err)?;
         }
     }
     let mut envelope=state;
     strip_core(&mut envelope);
     tx.execute("UPDATE app_state SET payload=?1 WHERE id=1",
         [serde_json::to_string(&envelope).map_err(err)?]).map_err(err)?;
-    tx.execute("INSERT INTO core_schema(key,version) VALUES ('business-core',1)",[]).map_err(err)?;
+    if prior==1 {
+        // An old physical option table must not remain part of the new schema.
+        tx.execute("DROP TABLE core_variants",[]).map_err(err)?;
+        tx.execute("UPDATE core_schema SET version=2 WHERE key='business-core'",[]).map_err(err)?;
+    }else{
+        tx.execute("INSERT INTO core_schema(key,version) VALUES ('business-core',2)",[]).map_err(err)?;
+    }
     tx.commit().map_err(err)
 }
 
@@ -405,14 +419,16 @@ mod tests {
     }
     fn close(path:&std::path::Path) { std::fs::remove_file(path).ok(); }
     #[test]
-    fn migrates_all_303_products_360_variants_without_changing_public_state() {
+    fn migrates_360_independent_products_from_the_site_catalog() {
         let path=temp();
         let conn=super::super::initialize_database(&path).unwrap();
         assert!(active(&conn).unwrap());
         let state=super::super::get_snapshot(&conn).unwrap();
-        assert_eq!(state["products"].as_array().unwrap().len(),303);
-        assert_eq!(state["products"].as_array().unwrap().iter()
-            .map(|p|p["variants"].as_array().unwrap().len()).sum::<usize>(),360);
+        assert_eq!(state["products"].as_array().unwrap().len(),360);
+        assert!(state["products"].as_array().unwrap().iter()
+            .all(|p|p["variants"].as_array().unwrap().len()==1));
+        assert_eq!(conn.query_row("SELECT COUNT(*) FROM core_product_prices",[],|r|r.get::<_,i64>(0)).unwrap(),360);
+        assert_eq!(schema_version(&conn).unwrap(),2);
         let raw:String=conn.query_row("SELECT payload FROM app_state WHERE id=1",[],|r|r.get(0)).unwrap();
         assert!(!raw.contains("\"products\""));
         assert_eq!(state["products"][0]["id"],"bando-site-358");
