@@ -2,94 +2,76 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, existsSync } from "node:fs";
 import { tsImport } from "tsx/esm/api";
-
 const read = (path) => JSON.parse(readFileSync(new URL("../" + path, import.meta.url), "utf8"));
-const state = read("src-tauri/resources/state-seed.json");
-const source = read("src-tauri/resources/catalog.json");
-const byId = new Map(source.products.map((p) => [p.id, p]));
-const product = (siteId) => {
-  const value = state.products.find((item) => item.siteId === siteId);
-  assert.ok(value, "Unknown site product " + siteId);
-  return value;
-};
+const seed = read("src-tauri/resources/state-seed.json");
+const old = read("src-tauri/resources/legacy-state-seed-303.json");
+const byOldId = new Map(old.products.map((p) => [p.id, p]));
+const byId = new Map(seed.products.map((p) => [p.id, p]));
+const byPriceId = new Map(seed.products.map((p) => [p.variants[0].id, p]));
+const siteProduct = (id) => seed.products.filter((p) => p.siteId === id);
 
-test("303 curated business names retain every official original and stable identity", () => {
-  assert.equal(state.products.length, 303);
-  assert.equal(source.products.length, 303);
-  assert.equal(new Set(state.products.map((p) => p.id)).size, 303);
-  assert.equal(new Set(state.products.map((p) => p.siteId)).size, 303);
-  assert.equal(state.products.filter((p) => p.originalName !== p.name).length, 303);
-  assert.ok(state.products.filter((p) => p.subtitle?.trim()).length >= 90);
-  assert.ok(state.products.every((p) => p.name.trim() && !/^반도스탠드\s/i.test(p.name)));
-  for (const p of state.products) {
-    const before = byId.get(p.id);
-    assert.ok(before, p.id);
-    assert.equal(p.siteId, before.siteId);
-    assert.equal(p.siteCode, before.siteCode);
-    assert.equal(p.code, before.code);
-    assert.equal(p.originalName, before.name);
-    assert.equal(p.variants.length, before.variants.length);
-    for (const variant of p.variants) {
-      const previous = before.variants.find((v) => v.id === variant.id);
-      assert.ok(previous, variant.id);
-      for (const field of ["id", "color", "wholesale", "semi", "retail", "siteOptionId", "url"]) {
-        assert.deepEqual(variant[field], previous[field], p.id + ":" + field);
-      }
+test("Every one of the 360 sale units is its own product, never an internal option selection", () => {
+  assert.equal(old.products.length, 303);
+  assert.equal(seed.products.length, 360);
+  assert.equal(new Set(seed.products.map((p) => p.id)).size, 360);
+  assert.equal(new Set(seed.products.map((p) => p.variants[0].id)).size, 360);
+  assert.ok(seed.products.every((p) => p.variants.length === 1 && p.saleUnit && !p.requiresOption));
+  assert.equal(seed.products.filter((p) => !/^반도스탠드\s/.test(p.name)).length, 360);
+  assert.ok(seed.products.filter((p) => p.subtitle?.trim()).length >= 90);
+});
+
+test("All original 360 price records, site references, and official IDs remain intact", () => {
+  const source = old.products.flatMap((p) => p.variants.map((v) => ({ p, v })));
+  assert.equal(source.length, 360);
+  for (const { p, v } of source) {
+    const target = byPriceId.get(v.id);
+    assert.ok(target, "Missing old source record " + v.id);
+    const unit = target.variants[0];
+    assert.equal(target.siteId, p.siteId);
+    assert.equal(target.siteCode, p.siteCode);
+    assert.equal(target.originalName, p.originalName);
+    for (const field of ["id", "color", "wholesale", "semi", "retail", "siteOptionId", "url"]) {
+      assert.deepEqual(unit[field], v[field], target.id + " / " + field);
     }
+    const expected = p.variants.length > 1 ? seed.productMappings[p.id + "|" + v.id] : p.id;
+    assert.equal(target.id, expected);
   }
 });
 
-test("Curated identifiers, contents, family distinctions and notes are preserved", () => {
-  assert.equal(product("259").name, "BD 700 / 가방 포함");
-  assert.equal(product("240").name, "BD 803");
-  assert.match(product("240").subtitle, /성악용/);
-  assert.equal(product("84").name, "Cart-20 / 보면대카트");
-  assert.match(product("84").subtitle, /단종예정/);
-  assert.match(product("329").name, /마이크홀더 미포함/);
-  assert.match(product("168").name, /일렉 및 베이스 전용/);
-  assert.match(product("167").name, /통기타 전용/);
-  assert.match(product("201").name, /A타입 상판/);
-  assert.match(product("356").name, /B타입 상판/);
-  assert.match(product("356").subtitle, /확인 필요/);
+test("Naming covers perforation, color, wheels, bag and distinct family use", () => {
+  assert.deepEqual(siteProduct("48").map((p) => p.name), [
+    "BD 709 / 블랙 / 타공 상판",
+    "BD 709-1 / 블랙 / 비타공 상판",
+  ]);
+  assert.deepEqual(siteProduct("136").map((p) => p.name), [
+    "BD Z-2 / 바퀴 미포함", "BD Z-2 / 바퀴 포함",
+  ]);
+  assert.equal(siteProduct("259")[0].name, "BD 700 / 가방 포함");
+  assert.match(siteProduct("329")[0].name, /마이크홀더 미포함/);
+  assert.match(siteProduct("168")[0].name, /일렉 및 베이스 전용/);
+  assert.match(siteProduct("167")[0].name, /통기타 전용/);
+  assert.equal(siteProduct("201")[0].name, "BD LP-WB / A타입 상판");
+  assert.equal(siteProduct("356")[0].name, "BD LP-WB / B타입 상판");
+  assert.match(siteProduct("84")[0].subtitle, /단종예정/);
 });
 
-test("Three observed wheel option families explicitly label both present and absent", () => {
-  for (const siteId of ["134", "135", "136"]) {
-    assert.deepEqual(new Set(product(siteId).variants.map((v) => v.option)),
-      new Set(["바퀴 포함", "바퀴 미포함"]));
-  }
-  // The original historical option labels remain in catalog.json.
-  assert.match(byId.get(product("136").id).variants[0].option, /추가 안함/);
+test("No employee-facing automatic cleanup or SKU splitting entry point remains", () => {
+  for (const path of [
+    "src/ProductNameCleanupPanel.tsx", "src/product-name-cleanup.ts",
+    "src/SkuSplitPanel.tsx", "src/sku-split.ts",
+  ]) assert.equal(existsSync(new URL("../" + path, import.meta.url)), false, path);
+  const management = readFileSync(new URL("../src/ProductManager.tsx", import.meta.url), "utf8");
+  const item = readFileSync(new URL("../src/OrderItemEditor.tsx", import.meta.url), "utf8");
+  assert.doesNotMatch(management, /판매 옵션 추가|SkuSplitPanel|manualOptionEditor/);
+  assert.doesNotMatch(item, /label="옵션"|\.variants\.map/);
+  assert.match(management, /상품설명 \(매장 내부 참고\)/);
 });
 
-test("Automatic name cleanup UI and bulk classifier are deleted", () => {
-  for (const path of ["src/product-name-cleanup.ts", "src/ProductNameCleanupPanel.tsx"]) {
-    assert.equal(existsSync(new URL("../" + path, import.meta.url)), false, path);
-  }
-  const ui = readFileSync(new URL("../src/ProductManager.tsx", import.meta.url), "utf8");
-  assert.doesNotMatch(ui, /ProductNameCleanupPanel/);
-  assert.match(ui, /상품설명 \(매장 내부 참고\)/);
-});
-
-test("Reception and SKU split retain the selected option and curated family identity", async () => {
+test("Order line names use the entire independently registered product name", async () => {
   const { itemFromProduct, unassignedClient } = await tsImport("../src/domain.ts", import.meta.url);
-  const { previewSkuSplit, applySkuSplit } = await tsImport("../src/sku-split.ts", import.meta.url);
-  const guitar = product("168");
-  const item = itemFromProduct(guitar, unassignedClient,
-    guitar.variants[0].color, 1, guitar.variants[0].id);
-  assert.match(item.name, /일렉 및 베이스 전용/);
-  assert.ok(item.name.includes(guitar.variants[0].option));
-  const acrylic = product("351");
-  const preview = previewSkuSplit(state, acrylic.id);
-  assert.deepEqual(preview.blockers, []);
-  const { next, created } = applySkuSplit(state, preview);
-  assert.equal(created, acrylic.variants.length);
-  const units = next.products.filter((p) => p.sourceProductId === acrylic.id);
-  assert.equal(units.length, acrylic.variants.length);
-  for (const unit of units) {
-    assert.ok(unit.name.includes(unit.variants[0].option));
-    const generated = itemFromProduct(unit, unassignedClient, unit.variants[0].color,
-      1, unit.variants[0].id);
-    assert.ok(generated.name.includes(unit.variants[0].option));
-  }
+  const stand = siteProduct("48")[1];
+  const orderLine = itemFromProduct(stand, unassignedClient, stand.variants[0].color, 1, stand.variants[0].id);
+  assert.equal(orderLine.productId, stand.id);
+  assert.equal(orderLine.variantId, stand.variants[0].id);
+  assert.equal(orderLine.name, stand.name);
 });
