@@ -343,6 +343,32 @@ pub(super) fn migrate(conn:&mut Connection)->Result<(),String>{
     let state:Value=serde_json::from_str(&raw).map_err(err)?;
     valid_state(&state)?;
     store(&tx,&state)?;
+    // Legacy v0.0.1 databases may lack search indexes. Rebuild their
+    // compatibility copies once while the migration is transactional.
+    tx.execute("DELETE FROM product_index",[]).map_err(err)?;
+    {
+        let mut insert=tx.prepare(
+            "INSERT INTO product_index(id,code,name,payload) VALUES (?1,?2,?3,?4)"
+        ).map_err(err)?;
+        for p in source_list(&state,"products")? {
+            insert.execute(params![
+                required_id(p,"상품")?,p["code"].as_str().ok_or("상품 코드 누락")?,
+                p["name"].as_str().ok_or("상품명 누락")?,payload(p,None)?
+            ]).map_err(err)?;
+        }
+    }
+    tx.execute("DELETE FROM order_index",[]).map_err(err)?;
+    {
+        let mut insert=tx.prepare(
+            "INSERT INTO order_index(id,client_id,created_at,confirmed_at,status)
+             VALUES (?1,?2,?3,?4,?5)"
+        ).map_err(err)?;
+        for o in source_list(&state,"orders")? {
+            insert.execute(params![required_id(o,"주문")?,o["clientId"].as_str().unwrap_or(""),
+                o["createdAt"].as_str().unwrap_or(""),o["confirmedAt"].as_str(),
+                o["status"].as_str().unwrap_or("REVIEW")]).map_err(err)?;
+        }
+    }
     let mut envelope=state;
     strip_core(&mut envelope);
     tx.execute("UPDATE app_state SET payload=?1 WHERE id=1",
