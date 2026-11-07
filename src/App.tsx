@@ -1,5 +1,6 @@
 import { replyNeedsReview } from "./factory-replies";
 import { FactoryNotifications } from "./FactoryNotifications";
+import { FactoryReplyWatcher } from "./FactoryReplyWatcher";
 import { lazy, Suspense, useState } from "react";
 import { AppHeader } from "./app/AppHeader";
 import { AppNotice } from "./app/AppNotice";
@@ -56,6 +57,12 @@ export function App() {
             TEST / 격리 DB / 외부 발송 금지
           </div>
         )}
+        <FactoryReplyWatcher
+          enabled={Boolean(state.settings.factoryReplyDirectory) || Boolean(window.bando?.isTestWorkspace)}
+          paused={model.dirty || model.busy}
+          onRefresh={model.refresh}
+          onNotice={model.setNotice}
+        />
         <AppHeader
           onNotifications={() => setNotifications(true)}
           notificationCount={
