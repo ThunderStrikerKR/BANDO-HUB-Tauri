@@ -35,7 +35,7 @@ test("React shows native failure status, guards retry and loads saved state only
   assert.match(bridge,/invoke\("startup_metrics"\)/);
   assert.match(bridge,/invoke\("retry_startup"\)/);
   assert.match(screen,/기존 업무 데이터베이스/);
-  assert.match(screen,/자동 복원하지 않았습니다/);
+  assert.match(screen,/백업 파일도 임의로 복원하지 않았습니다/);
   assert.match(screen,/안전하게 다시 시도/);
   assert.doesNotMatch(screen,/resetTestDatabase|backupRestore|removeItem|window\.location\.reload/);
 });
