@@ -6,7 +6,7 @@ const read = (file) => readFileSync(new URL('../' + file, import.meta.url), 'utf
 test('product price workbook preserves hidden product and variant identity', () => {
   const code = read('src/product-price-xlsx.ts');
   assert.match(code, /__상품ID/);
-  assert.match(code, /__옵션ID/);
+  assert.match(code, /__가격기록ID/);
   assert.match(code, /normalizeCode\(data\[8\]\)/);
   assert.match(code, /productMappings\?\.\[values\[6\] \+ "\|" \+ values\[7\]\]/);
   assert.match(code, /sheet\.columns\.forEach/);
