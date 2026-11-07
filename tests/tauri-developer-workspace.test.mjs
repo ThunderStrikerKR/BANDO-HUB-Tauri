@@ -45,20 +45,28 @@ test("native commands reject test-only operations on normal database and isolate
   assert.match(native,/200/);
 });
 
-test("developer modal laboratory uses the existing dialog component and does not write orders",()=>{
+test("developer UI laboratory mounts real business components and prevents writes",()=>{
   const lab=read("src/developer/DeveloperLab.tsx");
+  const workbench=read("src/developer/DeveloperModalWorkbench.tsx");
   const host=read("src/app/SettingsView.tsx");
   const entry=read("src/main.tsx");
-  assert.match(lab,/import \{ Modal \} from "\.\.\/ui"/);
-  assert.match(lab,/실제 공통 Modal/);
-  for(const mode of ["NORMAL","EMPTY","ERROR","BUSY","LONG","WARNING","SUCCESS"]){
-    assert.ok(lab.includes('"'+mode+'"'));
-  }
+  assert.match(lab,/DeveloperModalWorkbench/);
+  assert.match(workbench,/import \{ Modal \} from "\.\.\/ui"/);
+  for(const component of [
+    "WorkingRawDialog","ManualClassification","IssueResolver","RetailOrderDialog",
+    "ClientManager","ProductManager","ProductCategoryPicker","ProductSearchDialog",
+    "FactoryReplyImport","RegistrationManager","ReceiptArchive"
+  ]) assert.ok(workbench.includes("<"+component),component+" real component must mount");
+  for(const mode of ["NORMAL","EMPTY","ERROR","BUSY","LONG","WARNING","SUCCESS","FAILURE","CANCEL"])
+    assert.ok(workbench.includes('"'+mode+'"'));
+  assert.match(workbench,/const noProductionWrite/);
+  assert.match(workbench,/throw Error\("UI 검사에서는 저장을 차단합니다/);
+  assert.match(workbench,/onSave=\{noProductionWrite\}/);
+  assert.match(workbench,/testRecordRun/);
   assert.match(lab,/if \(!api\?\.isTestWorkspace/);
   assert.match(host,/window\.bando\?\.isTestWorkspace &&/);
   assert.match(entry,/workspaceMode/);
-  assert.match(lab,/testRecordRun/);
-  assert.doesNotMatch(lab,/\.save\(/);
+  assert.doesNotMatch(workbench,/window\.bando!\.save\(/);
 });
 
 test("real receipt parser and actual issue rules find missing contact without modifying state",async()=>{
@@ -75,8 +83,34 @@ test("real receipt parser and actual issue rules find missing contact without mo
   assert.equal(report.raw,raw);
   assert.equal(JSON.stringify(state),original);
   const repeat=inspectOrder(state,"duplicate-order",exampleRaw("duplicate-order",state));
-  assert.equal(repeat.passed,false,"No test orders means no duplicate can be asserted");
-  assert.ok(repeat.notes.some(x=>x.includes("동일 원문 주문이 격리 DB에 없습니다")));
+  assert.equal(repeat.passed,true,"An in-memory duplicate fixture must be detected");
+  assert.ok(repeat.notes.some(x=>x.includes("메모리에만 임시로 추가"))); 
+  const inDb=inspectOrder(state,"duplicate-db",exampleRaw("duplicate-db",state));
+  assert.equal(inDb.passed,false,"The separate DB-only scenario requires a persisted test order");
   assert.throws(()=>inspectOrder(state,"custom",""),/1자 이상/);
   assert.equal(JSON.stringify(state),original);
+});
+
+
+test("all structured order issue fixtures use the production issue validator without DB writes",async()=>{
+  const { inspectOrder, exampleRaw, developerCases, expectedOptions } =
+    await tsImport("../src/developer/scenarios.ts", import.meta.url);
+  const state=JSON.parse(read("src-tauri/resources/state-seed.json"));
+  const unchanged=JSON.stringify(state);
+  const ids=[
+    "no-client","no-recipient","quantity-invalid","price-missing",
+    "option-unconfirmed","alias-conflict","category-conflict","model-choice",
+    "quantity-link","candidate-name","candidate-address","candidate-phone",
+    "candidate-mobile","unassigned-evidence","model-confirm",
+  ];
+  for(const id of ids){
+    const report=inspectOrder(state,id,exampleRaw(id,state));
+    assert.equal(report.passed,true,
+      id+" expected "+report.expected.join(",")+" actual "+report.detected.join(","));
+    assert.ok(report.notes.some(note=>note.includes("복사된 주문의 검증 필드")),id);
+  }
+  assert.ok(developerCases.length>=25);
+  assert.ok(developerCases.some(entry=>entry.id==="duplicate-db"&&entry.batch===false));
+  assert.ok(expectedOptions.some(entry=>entry.value==="CANDIDATE_mobile"));
+  assert.equal(JSON.stringify(state),unchanged,"The real state must be unchanged");
 });
