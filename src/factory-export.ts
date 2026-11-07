@@ -75,9 +75,10 @@ function exportRow(state: State, entry: ExcelQueueEntry): FactoryExportRow {
       }
     }
   }
+  // The frozen business-facing product name already contains every identifying attribute.
+  // Do not append a second color label to factory Excel.
   const goods = recipient.items.map((item) =>
-    trim(item.name) + (trim(item.color) && item.color !== "단일" ? " " + trim(item.color) : "") +
-    " " + item.quantity + "개").join(" / ");
+    trim(item.name) + " " + item.quantity + "개").join(" / ");
   // The factory, not the store, calculates package count and actual postage.
   // Do not guess consignee or sender postal codes from raw addresses.
   const values = [
