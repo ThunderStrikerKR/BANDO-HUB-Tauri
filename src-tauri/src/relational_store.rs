@@ -3,7 +3,7 @@
 //! products, clients and orders from constrained rows. Other workflow modules
 //! continue to use the compatibility envelope until separately migrated.
 //!
-//! Version 1 is an atomic, one-time conversion of an existing JSON snapshot.
+//! Version 2 is an atomic, one-time conversion of an existing JSON snapshot.
 //! There is deliberately no automatic fallback to a new seed after failure.
 use super::{err, valid_state};
 use rusqlite::{params, Connection, OptionalExtension, Transaction};
@@ -22,7 +22,7 @@ pub(super) fn backup_legacy_if_needed(conn:&Connection,path:&std::path::Path)->R
         [],|r|r.get(0)).map_err(err)?;
     if !found { return Ok(()); }
     let previous:String=conn.query_row("SELECT payload FROM app_state WHERE id=1",[],|r|r.get(0)).map_err(err)?;
-    valid_state(&serde_json::from_str::<Value>(&previous).map_err(err)?)?;
+    valid_state(&super::get_snapshot(conn)?)?;
     let dir=path.parent().ok_or("DB 파일의 폴더가 없습니다.")?.join("backups");
     std::fs::create_dir_all(&dir).map_err(err)?;
     let nanos=std::time::SystemTime::now()
@@ -54,15 +54,15 @@ fn sql_schema(conn: &Connection) -> Result<(), String> {
         );
         CREATE INDEX IF NOT EXISTS idx_core_products_name ON core_products(name);
         CREATE INDEX IF NOT EXISTS idx_core_products_code ON core_products(code);
-        CREATE TABLE IF NOT EXISTS core_variants(
-            id TEXT PRIMARY KEY, product_id TEXT NOT NULL REFERENCES core_products(id) ON DELETE CASCADE,
-            position INTEGER NOT NULL, color TEXT NOT NULL,
+        CREATE TABLE IF NOT EXISTS core_product_prices(
+            product_id TEXT PRIMARY KEY REFERENCES core_products(id) ON DELETE CASCADE,
+            price_record_id TEXT NOT NULL UNIQUE,
+            color TEXT NOT NULL,
             wholesale INTEGER CHECK(wholesale IS NULL OR wholesale >= 0),
             semi INTEGER CHECK(semi IS NULL OR semi >= 0),
             retail INTEGER CHECK(retail IS NULL OR retail >= 0),
             payload TEXT NOT NULL CHECK(json_valid(payload))
         );
-        CREATE INDEX IF NOT EXISTS idx_core_variants_product ON core_variants(product_id,position);
         CREATE TABLE IF NOT EXISTS core_clients(
             id TEXT PRIMARY KEY, position INTEGER NOT NULL, name TEXT NOT NULL,
             tier TEXT NOT NULL, address TEXT NOT NULL, payload TEXT NOT NULL CHECK(json_valid(payload))
@@ -90,17 +90,16 @@ fn sql_schema(conn: &Connection) -> Result<(), String> {
     "#).map_err(err)
 }
 
-pub(super) fn active(conn: &Connection) -> Result<bool, String> {
-    let exists: bool = conn.query_row(
+fn schema_version(conn:&Connection)->Result<i64,String>{
+    let exists:bool=conn.query_row(
         "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='core_schema')",
-        [], |r| r.get(0),
-    ).map_err(err)?;
-    if !exists { return Ok(false); }
-    Ok(conn.query_row(
-        "SELECT version FROM core_schema WHERE key='business-core'", [],
-        |r| r.get::<_, i64>(0),
-    ).optional().map_err(err)? == Some(1))
+        [],|r|r.get(0)).map_err(err)?;
+    if !exists {return Ok(0);}
+    Ok(conn.query_row("SELECT version FROM core_schema WHERE key='business-core'",[],
+        |r|r.get::<_,i64>(0)).optional().map_err(err)?.unwrap_or(0))
 }
+pub(super) fn active(conn:&Connection)->Result<bool,String>{Ok(schema_version(conn)?==2)}
+
 
 pub(super) fn strip_core(state: &mut Value) {
     if let Some(map) = state.as_object_mut() {
@@ -149,7 +148,7 @@ fn sync_prune(tx: &Transaction<'_>, table: &str, retain: &HashSet<String>) -> Re
 pub(super) fn store(tx: &Transaction<'_>, state: &Value) -> Result<(), String> {
     valid_state(state)?;
     let mut product_ids = HashSet::new();
-    let mut variant_ids = HashSet::new();
+    let mut price_ids = HashSet::new();
     let mut client_ids = HashSet::new();
     let mut order_ids = HashSet::new();
     let mut recipient_ids = HashSet::new();
@@ -172,25 +171,26 @@ pub(super) fn store(tx: &Transaction<'_>, state: &Value) -> Result<(), String> {
     }
     {
         let mut statement = tx.prepare(
-            "INSERT INTO core_variants(id,product_id,position,color,wholesale,semi,retail,payload)
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8)
-             ON CONFLICT(id) DO UPDATE SET product_id=excluded.product_id,
-             position=excluded.position,color=excluded.color,wholesale=excluded.wholesale,
-             semi=excluded.semi,retail=excluded.retail,payload=excluded.payload
-             WHERE core_variants.product_id<>excluded.product_id OR
-             core_variants.position<>excluded.position OR core_variants.payload<>excluded.payload"
+            "INSERT INTO core_product_prices(product_id,price_record_id,color,wholesale,semi,retail,payload)
+             VALUES (?1,?2,?3,?4,?5,?6,?7)
+             ON CONFLICT(product_id) DO UPDATE SET price_record_id=excluded.price_record_id,
+             color=excluded.color,wholesale=excluded.wholesale,semi=excluded.semi,
+             retail=excluded.retail,payload=excluded.payload
+             WHERE core_product_prices.price_record_id<>excluded.price_record_id OR
+             core_product_prices.payload<>excluded.payload"
         ).map_err(err)?;
-        for p in source_list(state, "products")? {
-            let owner = required_id(p,"상품")?;
-            for (i,v) in source_list(p,"variants")?.iter().enumerate() {
-                let id=required_id(v,"판매 옵션")?;
-                require_unique(&mut variant_ids,id,"판매 옵션")?;
-                statement.execute(params![
-                    id,owner,i as i64,v["color"].as_str().unwrap_or(""),
-                    v["wholesale"].as_i64(),v["semi"].as_i64(),v["retail"].as_i64(),
-                    payload(v,None)?
-                ]).map_err(err)?;
+        for p in source_list(state,"products")? {
+            let owner=required_id(p,"상품")?;
+            let prices=source_list(p,"variants")?;
+            if prices.len()!=1 {
+                return Err(format!("독립 상품 {owner}에 가격 기록이 {}개입니다. 각 판매 구성을 개별 상품으로 등록하세요.",prices.len()));
             }
+            let v=&prices[0];
+            let id=required_id(v,"기존 가격 식별자")?;
+            require_unique(&mut price_ids,id,"가격 기록")?;
+            statement.execute(params![owner,id,v["color"].as_str().unwrap_or(""),
+                v["wholesale"].as_i64(),v["semi"].as_i64(),v["retail"].as_i64(),
+                payload(v,None)?]).map_err(err)?;
         }
     }
     {
@@ -269,7 +269,7 @@ pub(super) fn store(tx: &Transaction<'_>, state: &Value) -> Result<(), String> {
     sync_prune(tx,"core_items",&item_ids)?;
     sync_prune(tx,"core_recipients",&recipient_ids)?;
     sync_prune(tx,"core_orders",&order_ids)?;
-    sync_prune(tx,"core_variants",&variant_ids)?;
+    sync_prune(tx,"core_product_prices",&product_ids)?;
     sync_prune(tx,"core_products",&product_ids)?;
     sync_prune(tx,"core_clients",&client_ids)?;
     Ok(())
@@ -303,10 +303,14 @@ fn attach(parents:&mut [Value],key:&str,mut children:HashMap<String,Vec<Value>>)
 }
 
 pub(super) fn hydrate(conn:&Connection,state:&mut Value)->Result<(),String>{
-    if !active(conn)? { return Ok(()); }
+    let version=schema_version(conn)?;
+    if version==0 { return Ok(()); }
     let mut products=read_entities(conn,"SELECT payload FROM core_products ORDER BY position,id")?;
-    let variants=read_children(conn,
-        "SELECT product_id,payload FROM core_variants ORDER BY product_id,position,id")?;
+    let variants=read_children(conn,if version==1 {
+        "SELECT product_id,payload FROM core_variants ORDER BY product_id,position,id"
+    }else{
+        "SELECT product_id,payload FROM core_product_prices ORDER BY product_id"
+    })?;
     attach(&mut products,"variants",variants)?;
     let clients=read_entities(conn,"SELECT payload FROM core_clients ORDER BY position,id")?;
     let mut orders=read_entities(conn,"SELECT payload FROM core_orders ORDER BY position,id")?;
