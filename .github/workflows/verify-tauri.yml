@@ -9,6 +9,11 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+# A draft PR receives both push and pull_request events for the same commit.
+# Keep only the newest branch revision to avoid duplicate Windows CI queues.
+concurrency:
+  group: bando-tauri-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
 jobs:
   node-validation:
     runs-on: ubuntu-latest
