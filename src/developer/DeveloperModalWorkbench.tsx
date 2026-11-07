@@ -12,6 +12,7 @@ import { ManualClassification } from "../orders/ManualClassification";
 import { RetailOrderDialog } from "../orders/RetailOrderDialog";
 import type { NoticeSink } from "../shared/notices";
 import type { DeveloperTestReport, State } from "../types";
+import { orderIssues } from "../validation";
 import { Modal } from "../ui";
 import { diagnosticOrder, exampleRaw } from "./scenarios";
 
@@ -47,8 +48,9 @@ const noProductionWrite = async (): Promise<void> => {
   throw Error("UI 검사에서는 저장을 차단합니다. 실제 테스트 저장은 별도의 TEST 업무 화면에서 진행하세요.");
 };
 
-export function DeveloperModalWorkbench({ state, onNotice, onRecorded }: {
+export function DeveloperModalWorkbench({ state, raw, onNotice, onRecorded }: {
   state: State;
+  raw: string;
   onNotice: NoticeSink;
   onRecorded: () => Promise<void>;
 }) {
@@ -69,13 +71,17 @@ export function DeveloperModalWorkbench({ state, onNotice, onRecorded }: {
     // All business dialogs operate on a temporary, detached state clone.
     // Their save callbacks are rejected, never routed to state_save.
     const working = structuredClone(state);
-    const raw = diagnosticOrder(working, exampleRaw("missing-contact", working));
-    working.orders.push(raw);
+    const input = raw.trim() ? raw : exampleRaw("missing-contact", working);
+    const manual = diagnosticOrder(working, input);
+    const rawOrder = orderIssues(manual).some((issue) => issue.severity === "ACTION" &&
+      ["NAME","ADDRESS","CONTACT","MODEL","QUANTITY_MISSING","ITEM","UNASSIGNED_EVIDENCE"].includes(issue.kind))
+      ? manual : diagnosticOrder(working, exampleRaw("missing-contact", working));
+    working.orders.push(rawOrder);
     const uncertain = diagnosticOrder(working, exampleRaw("unknown-model", working));
     const recipient = uncertain.recipients[0];
     const item = recipient?.items[0];
-    return { working, raw, uncertain, recipient, item };
-  }, [state]);
+    return { working, raw: rawOrder, manual, uncertain, recipient, item };
+  }, [state, raw]);
 
   const record = async (passed: boolean) => {
     if (!window.bando?.isTestWorkspace || !window.bando.testRecordRun) return;
@@ -134,7 +140,7 @@ export function DeveloperModalWorkbench({ state, onNotice, onRecorded }: {
       return <WorkingRawDialog state={fixtures.working} order={fixtures.raw}
         onApply={noProductionWrite} onClose={close}/>;
     if (popup === "manual")
-      return <ManualClassification state={fixtures.working} order={fixtures.raw}
+      return <ManualClassification state={fixtures.working} order={fixtures.manual}
         onNotice={onNotice} onApply={() => { onNotice("수동 분류 화면을 확인했습니다. 테스트 저장은 수행하지 않았습니다.", "success"); close(); }}
         onClose={close} />;
     if (popup === "resolver")
@@ -172,7 +178,8 @@ export function DeveloperModalWorkbench({ state, onNotice, onRecorded }: {
       <h2>실제 업무 팝업 및 UI 상태 검사</h2>
       <p className="muted">
         공통 상태는 실제 Modal 컴포넌트로 재현합니다. 업무별 항목은 샘플 제목이 아니라
-        해당 React 업무 컴포넌트를 그대로 실행합니다. 저장은 이 미리보기에서 차단됩니다.
+        해당 React 업무 컴포넌트를 그대로 실행합니다. 원문 정정 및 수동 분류는 왼쪽 발주서 검사 입력을 사용하며,
+        주요 저장 콜백은 미리보기에서 차단됩니다.
       </p>
       <div className="developer-lab-field">
         <label htmlFor="dev-popup">검사 대상</label>
