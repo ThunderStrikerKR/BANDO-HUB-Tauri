@@ -7,6 +7,7 @@ import { chromium } from "playwright";
 const root = new URL("../", import.meta.url);
 const state = JSON.parse(readFileSync(new URL("../src-tauri/resources/state-seed.json", import.meta.url), "utf8"));
 // Synthetic audit records only. Business data in the repository is not changed.
+state.settings.excelDirectory = "C:\\BANDO_CI_EXPORTS";
 const archive = [
   {
     id: "receipt:ui-audit-test",
@@ -80,6 +81,8 @@ try {
         invoke: async (command) => {
           if (command === "state_load") return structuredClone(state);
           if (command === "receipt_archive") return structuredClone(archive);
+          if (command === "choose_excel_directory") return "C:\\BANDO_CI_SELECTED";
+          if (command === "open_excel_directory") return undefined;
           if (command === "dock_region_native") return undefined;
           if (command === "dock_status_native") return response();
           if (command === "dock_cycle_native") {
@@ -101,6 +104,9 @@ try {
   await page.goto(url);
   const nav = page.getByRole("navigation", { name: "업무 메뉴" });
   await nav.getByRole("button", { name: "설정" }).click();
+  await page.getByRole("button", { name: "폴더 선택", exact: true }).click();
+  await page.getByText("C:\\BANDO_CI_SELECTED").waitFor();
+  await page.getByRole("button", { name: "저장된 폴더 열기" }).click();
   await page.getByRole("button", { name: "감사 기록 열기" }).click();
   await page.getByText("3건 조회").waitFor();
   await page.locator("summary", { hasText: "ui-audit-test" }).first().click();

@@ -130,8 +130,8 @@ export function SettingsPanel({
         공장 회신 폴더 선택
       </button>
       <p className="muted">
-        공장N 파일을 감지하여 배송정보가 정확히 일치할 때만 송장 / 실제 운임을 반영합니다. 원본은
-        보존합니다.
+        공장 회신 폴더 지정은 가능하지만 자동 감지는 아직 지원하지 않습니다.
+        회신 파일은 공장 회신 가져오기에서 직접 선택해 주세요.
       </p>
       <h2>엑셀 기본 저장 폴더</h2>
       <p>{s.excelDirectory || "설정되지 않음"}</p>
@@ -145,6 +145,15 @@ export function SettingsPanel({
       >
         폴더 선택
       </button>
+      {state.settings.excelDirectory && (
+        <button
+          type="button"
+          disabled={saving}
+          onClick={() => void run(() => window.bando!.openExcelDirectory())}
+        >
+          저장된 폴더 열기
+        </button>
+      )}
       <h2>입금 계좌</h2>
       <p className="muted">
         반도스탠드 상품 및 혼합 주문은 반도스탠드 계좌, 반도몰 상품만 있는 주문은 반도몰 계좌를

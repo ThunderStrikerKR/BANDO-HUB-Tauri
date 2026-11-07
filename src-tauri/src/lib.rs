@@ -443,6 +443,38 @@ fn backup_restore(db: State<'_, Database>, filename: String) -> Result<(), Strin
     Ok(())
 }
 
+// The native picker returns the path. JavaScript cannot send an arbitrary
+// filesystem path to the command that opens the configured Excel directory.
+fn canonical_excel_directory(path: &Path) -> Result<PathBuf, String> {
+    let resolved = fs::canonicalize(path)
+        .map_err(|_| "선택한 폴더에 접근할 수 없습니다. 폴더가 존재하는지 확인하세요.".to_string())?;
+    if !resolved.is_dir() { return Err("폴더만 선택할 수 있습니다.".into()); }
+    Ok(resolved)
+}
+#[tauri::command]
+async fn choose_excel_directory(app: tauri::AppHandle) -> Result<Option<String>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        use tauri_plugin_dialog::DialogExt;
+        let selected = app.dialog().file().set_title("Excel 폴더 선택").blocking_pick_folder();
+        let Some(selected) = selected else { return Ok(None); };
+        let picked = selected.into_path().map_err(err)?;
+        let verified = canonical_excel_directory(&picked)?;
+        Ok(Some(verified.to_string_lossy().to_string()))
+    }).await.map_err(err)?
+}
+fn saved_excel_directory(settings: &Value) -> Result<PathBuf, String> {
+    let chosen = settings.get("excelDirectory").and_then(Value::as_str)
+        .map(str::trim).filter(|s| !s.is_empty())
+        .ok_or("엑셀 기본 저장 폴더를 먼저 지정하고 설정을 저장하세요.")?;
+    canonical_excel_directory(Path::new(chosen))
+}
+#[tauri::command]
+fn open_excel_directory(db: State<'_, Database>) -> Result<(), String> {
+    let saved = get_snapshot(&*lock_db(&db)?)?;
+    let directory = saved_excel_directory(&saved["settings"])?;
+    open::that(directory).map_err(err)
+}
+
 // Only application-generated XLSX bytes are accepted; the destination is chosen
 // in a native Save As dialog. No filesystem path is accepted from JavaScript.
 async fn save_xlsx_with_dialog(
@@ -710,7 +742,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             state_load, state_save, settings_patch, price_set, clipboard_write, clipboard_read,
-            product_open, catalog_report, catalog_approve, receipt_archive, backup_create, backup_list, backup_restore, save_product_workbook, save_registration_workbook, save_client_workbook, save_product_sync_workbook, save_factory_workbook, save_settlement_workbook, save_order_history_workbook, archive_factory_reply, open_factory_reply_file,
+            product_open, catalog_report, catalog_approve, receipt_archive, backup_create, backup_list, backup_restore, choose_excel_directory, open_excel_directory, save_product_workbook, save_registration_workbook, save_client_workbook, save_product_sync_workbook, save_factory_workbook, save_settlement_workbook, save_order_history_workbook, archive_factory_reply, open_factory_reply_file,
             fetch_official_product_html,
             kakao_dock::dock_windows_native, kakao_dock::dock_status_native,
             kakao_dock::dock_cycle_native, kakao_dock::dock_start_native,
@@ -917,5 +949,24 @@ mod receipt_sqlite_integration_tests {
         assert_eq!(count_archive(&conn), 1);
         drop(conn);
         std::fs::remove_file(path).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod excel_folder_tests {
+    use super::*;
+    #[test]
+    fn requires_saved_folder_and_rejects_files() {
+        assert!(saved_excel_directory(&json!({})).is_err());
+        assert!(saved_excel_directory(&json!({"excelDirectory": "  "})).is_err());
+        let cargo = Path::new(env!("CARGO_MANIFEST_DIR")).join("Cargo.toml");
+        assert!(canonical_excel_directory(&cargo).is_err());
+        assert!(canonical_excel_directory(&cargo.with_file_name("missing-folder-bando-2026")).is_err());
+    }
+    #[test]
+    fn resolves_saved_directory() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let dir = saved_excel_directory(&json!({"excelDirectory": root.to_string_lossy()})).unwrap();
+        assert_eq!(dir, fs::canonicalize(root).unwrap());
     }
 }
