@@ -46,7 +46,7 @@ function storeRow(state: State, entry: ExcelQueueEntry): StoreExportRow {
   }
   if (!recipient.items.length || recipient.items.some((item) =>
     item.origin !== "STORE" || !trim(item.name) ||
-    !Number.isSafeInteger(item.quantity) || item.quantity <= 0)) {
+    !Number.isSafeInteger(item.quantity) || (item.quantity ?? 0) <= 0)) {
     throw Error("매장 출고 품목명과 수량이 불명확합니다.");
   }
   const goods = recipient.items.map((item) =>
