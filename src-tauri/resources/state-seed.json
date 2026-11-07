@@ -6793,7 +6793,7 @@
       "siteCode": "P00000GR",
       "catalog": "BANDOSTAND",
       "code": "P00000GR",
-      "name": "BD 반도스피커스탠드 브라켓 PA-Braket (1개)",
+      "name": "PA-Braket / 스피커스탠드 브라켓 / 1개",
       "modelCodes": [],
       "category": "스피커 스탠드 > 벽걸이형 스탠드",
       "categories": [
@@ -6823,7 +6823,8 @@
       "updatedAt": "2026-11-01T17:28:23.620Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 BD 반도스피커스탠드 브라켓 PA-Braket (1개)"
+      "originalName": "반도스탠드 BD 반도스피커스탠드 브라켓 PA-Braket (1개)",
+      "subtitle": "원본 표기 PA-Braket 유지"
     },
     {
       "id": "bando-site-183",
@@ -6831,7 +6832,7 @@
       "siteCode": "P00000HA",
       "catalog": "BANDOSTAND",
       "code": "BD 1200-S",
-      "name": "BD 1200-S (상판각도조절)",
+      "name": "BD 1200-S / 상판 각도 조절형",
       "modelCodes": [
         "BD 1200-S"
       ],
@@ -6872,7 +6873,7 @@
       "siteCode": "P00000GQ",
       "catalog": "BANDOSTAND",
       "code": "P00000GQ",
-      "name": "BD 반도스피커스탠드 JBL (1개)",
+      "name": "JBL / 스피커스탠드 / 1개",
       "modelCodes": [],
       "category": "스피커 스탠드 > 벽걸이형 스탠드",
       "categories": [
@@ -6910,7 +6911,7 @@
       "siteCode": "P00000HK",
       "catalog": "BANDOSTAND",
       "code": "P00000HK",
-      "name": "SS-2 (1개 가격, 알루미늄, PA 용)",
+      "name": "SS-2 / 알루미늄 / PA용 / 1개",
       "modelCodes": [],
       "category": "스피커 스탠드 > 이동 & 고정형 스탠드",
       "categories": [
@@ -6948,7 +6949,7 @@
       "siteCode": "P00000GP",
       "catalog": "BANDOSTAND",
       "code": "P00000GP",
-      "name": "BD 반도스피커스탠드 AM-5 (1개)",
+      "name": "AM-5 / 스피커스탠드 / 1개",
       "modelCodes": [],
       "category": "스피커 스탠드 > 벽걸이형 스탠드",
       "categories": [
@@ -7026,7 +7027,7 @@
       "siteCode": "P00000KM",
       "catalog": "BANDOSTAND",
       "code": "BD  BL1500",
-      "name": "BD BL1500 스피커스탠드 파이프두께 약 250mm (1개 가격)",
+      "name": "BD BL1500 / 스피커스탠드 / 1개",
       "modelCodes": [
         "BD  BL1500"
       ],
@@ -7059,7 +7060,8 @@
       "updatedAt": "2026-11-01T17:28:30.829Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 BD  BL1500  스피커스탠드 파이프두께 약 250mm (1개 가격)"
+      "originalName": "반도스탠드 BD  BL1500  스피커스탠드 파이프두께 약 250mm (1개 가격)",
+      "subtitle": "원본에 파이프 두께 약 250mm로 표기. 치수 확인 필요"
     },
     {
       "id": "bando-site-182",
@@ -7067,7 +7069,7 @@
       "siteCode": "P00000GZ",
       "catalog": "BANDOSTAND",
       "code": "BD 1100",
-      "name": "BD 1100 (1개가격 알루미늄 서브하이, 5인치 8인치스피커용)",
+      "name": "BD 1100 / 알루미늄 / 1개",
       "modelCodes": [
         "BD 1100"
       ],
@@ -7099,7 +7101,8 @@
       "updatedAt": "2026-11-01T17:28:32.050Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 BD 1100  (1개가격 알루미늄 서브하이, 5인치 8인치스피커용)"
+      "originalName": "반도스탠드 BD 1100  (1개가격 알루미늄 서브하이, 5인치 8인치스피커용)",
+      "subtitle": "서브하이. 5인치 및 8인치 스피커용"
     },
     {
       "id": "bando-site-181",
@@ -7107,7 +7110,7 @@
       "siteCode": "P00000GY",
       "catalog": "BANDOSTAND",
       "code": "BD SS-1",
-      "name": "BD SS-1 (1조, 2개 가격 스틸 PA용)",
+      "name": "BD SS-1 / 스틸 / PA용 / 1조(2개)",
       "modelCodes": [
         "BD SS-1"
       ],
@@ -7147,7 +7150,7 @@
       "siteCode": "P00000GX",
       "catalog": "BANDOSTAND",
       "code": "BD SS1010",
-      "name": "BD SS1010 (1개 가격, 알루미늄 PA용)",
+      "name": "BD SS1010 / 알루미늄 / PA용 / 1개",
       "modelCodes": [
         "BD SS1010"
       ],
@@ -7227,7 +7230,7 @@
       "siteCode": "P00000HB",
       "catalog": "BANDOSTAND",
       "code": "BD 1200BP",
-      "name": "BD 1200BP (1200 제품, BLS, BX1000 하단파이프만 부착가능)",
+      "name": "BD 1200BP / 하단파이프",
       "modelCodes": [
         "BD 1200BP"
       ],
@@ -7260,7 +7263,8 @@
       "updatedAt": "2026-11-01T17:28:36.909Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 BD 1200BP (1200 제품, BLS, BX1000 하단파이프만 부착가능)"
+      "originalName": "반도스탠드 BD 1200BP (1200 제품, BLS, BX1000 하단파이프만 부착가능)",
+      "subtitle": "1200 제품, BLS, BX1000 하단파이프만 부착 가능"
     },
     {
       "id": "bando-site-185",
@@ -7268,7 +7272,7 @@
       "siteCode": "P00000HC",
       "catalog": "BANDOSTAND",
       "code": "P00000HC",
-      "name": "BD 스피커홀더-A형",
+      "name": "스피커홀더 / A형",
       "modelCodes": [],
       "category": "스피커 스탠드 > 악세사리",
       "categories": [
@@ -7306,7 +7310,7 @@
       "siteCode": "P00000HE",
       "catalog": "BANDOSTAND",
       "code": "P00000HE",
-      "name": "BD 스피커홀더-B형",
+      "name": "스피커홀더 / B형",
       "modelCodes": [],
       "category": "스피커 스탠드 > 악세사리",
       "categories": [
@@ -7344,7 +7348,7 @@
       "siteCode": "P00000HF",
       "catalog": "BANDOSTAND",
       "code": "P00000HF",
-      "name": "BD 스피커홀더-C형",
+      "name": "스피커홀더 / C형",
       "modelCodes": [],
       "category": "스피커 스탠드 > 악세사리",
       "categories": [
@@ -7382,7 +7386,7 @@
       "siteCode": "P00000KP",
       "catalog": "BANDOSTAND",
       "code": "P00000KP",
-      "name": "BD 반도스탠드용 바퀴 (4개 1set)",
+      "name": "반도스탠드용 바퀴 / 4개 1세트",
       "modelCodes": [],
       "category": "스피커 스탠드 > 악세사리",
       "categories": [
@@ -7420,7 +7424,7 @@
       "siteCode": "P00000MC",
       "catalog": "BANDOSTAND",
       "code": "BD SS-B",
-      "name": "BD SS-B_스피커 스탠드 케이스(다용도가방)",
+      "name": "BD SS-B / 스피커스탠드 케이스",
       "modelCodes": [
         "BD SS-B"
       ],
@@ -7452,7 +7456,8 @@
       "updatedAt": "2026-11-01T17:28:42.911Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 BD SS-B_스피커 스탠드 케이스(다용도가방)"
+      "originalName": "반도스탠드 BD SS-B_스피커 스탠드 케이스(다용도가방)",
+      "subtitle": "다용도 가방"
     },
     {
       "id": "bando-site-356",
@@ -7460,7 +7465,7 @@
       "siteCode": "P00000NS",
       "catalog": "BANDOSTAND",
       "code": "BD LP-WB",
-      "name": "BD LP-WB (B타입 상판)",
+      "name": "BD LP-WB / B타입 상판",
       "modelCodes": [
         "BD LP-WB"
       ],
@@ -7491,7 +7496,8 @@
       "updatedAt": "2026-11-01T17:28:44.131Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 BD LP-WB (B타입 상판)"
+      "originalName": "반도스탠드 BD LP-WB (B타입 상판)",
+      "subtitle": "동일 모델코드의 다른 상품번호에는 A타입 상판 표기가 있어 확인 필요"
     },
     {
       "id": "bando-site-355",
@@ -7499,7 +7505,7 @@
       "siteCode": "P00000NR",
       "catalog": "BANDOSTAND",
       "code": "BD LP-WA",
-      "name": "BD LP-WA (B타입 상판)",
+      "name": "BD LP-WA / B타입 상판",
       "modelCodes": [
         "BD LP-WA"
       ],
@@ -7530,7 +7536,8 @@
       "updatedAt": "2026-11-01T17:28:45.306Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 BD LP-WA (B타입 상판)"
+      "originalName": "반도스탠드 BD LP-WA (B타입 상판)",
+      "subtitle": "동일 모델코드의 다른 상품번호에는 A타입 상판 표기가 있어 확인 필요"
     },
     {
       "id": "bando-site-332",
@@ -7616,7 +7623,7 @@
       "siteCode": "P00000KN",
       "catalog": "BANDOSTAND",
       "code": "P00000KN",
-      "name": "BD 노트북스탠드 가방",
+      "name": "노트북스탠드 가방",
       "modelCodes": [],
       "category": "미디어 스탠드",
       "categories": [
@@ -7653,7 +7660,7 @@
       "siteCode": "P00000IE",
       "catalog": "BANDOSTAND",
       "code": "BD Notebook - A",
-      "name": "BD Notebook - A노트북 (마우스홀더포함)",
+      "name": "BD Notebook - A / 마우스홀더 포함 / 상판 선택",
       "modelCodes": [
         "BD Notebook - A"
       ],
@@ -7698,7 +7705,8 @@
       "updatedAt": "2026-11-01T17:28:50.177Z",
       "priceHistory": [],
       "requiresOption": true,
-      "originalName": "반도스탠드 BD Notebook - A노트북 (마우스홀더포함)"
+      "originalName": "반도스탠드 BD Notebook - A노트북 (마우스홀더포함)",
+      "subtitle": "A타입 35×26, B타입 35×30"
     },
     {
       "id": "bando-site-210",
@@ -7706,7 +7714,7 @@
       "siteCode": "P00000IB",
       "catalog": "BANDOSTAND",
       "code": "BD Notebook - B",
-      "name": "BD Notebook - B 노트북 (마우스홀더포함)",
+      "name": "BD Notebook - B / 마우스홀더 포함 / 상판 선택",
       "modelCodes": [
         "BD Notebook - B"
       ],
@@ -7751,7 +7759,8 @@
       "updatedAt": "2026-11-01T17:28:51.359Z",
       "priceHistory": [],
       "requiresOption": true,
-      "originalName": "반도스탠드 BD Notebook - B 노트북 (마우스홀더포함)"
+      "originalName": "반도스탠드 BD Notebook - B 노트북 (마우스홀더포함)",
+      "subtitle": "A타입 35×26, B타입 35×30"
     },
     {
       "id": "bando-site-209",
@@ -7759,7 +7768,7 @@
       "siteCode": "P00000IA",
       "catalog": "BANDOSTAND",
       "code": "BD Notebook - W",
-      "name": "BD Notebook - W노트북 (마우스홀더포함)",
+      "name": "BD Notebook - W / 마우스홀더 포함 / 상판 선택",
       "modelCodes": [
         "BD Notebook - W"
       ],
@@ -7804,7 +7813,8 @@
       "updatedAt": "2026-11-01T17:28:52.600Z",
       "priceHistory": [],
       "requiresOption": true,
-      "originalName": "반도스탠드 BD Notebook - W노트북 (마우스홀더포함)"
+      "originalName": "반도스탠드 BD Notebook - W노트북 (마우스홀더포함)",
+      "subtitle": "A타입 41×30, B타입 41×33"
     },
     {
       "id": "bando-site-212",
@@ -7812,7 +7822,7 @@
       "siteCode": "P00000ID",
       "catalog": "BANDOSTAND",
       "code": "BD Notebook - WB",
-      "name": "BD Notebook - WB 노트북 (마우스홀더포함)",
+      "name": "BD Notebook - WB / 마우스홀더 포함 / 상판 선택",
       "modelCodes": [
         "BD Notebook - WB"
       ],
@@ -7857,7 +7867,8 @@
       "updatedAt": "2026-11-01T17:28:53.779Z",
       "priceHistory": [],
       "requiresOption": true,
-      "originalName": "반도스탠드 BD Notebook - WB 노트북 (마우스홀더포함)"
+      "originalName": "반도스탠드 BD Notebook - WB 노트북 (마우스홀더포함)",
+      "subtitle": "A타입 41×30, B타입 41×33"
     },
     {
       "id": "bando-site-208",
@@ -7943,7 +7954,7 @@
       "siteCode": "P00000HW",
       "catalog": "BANDOSTAND",
       "code": "BD BLS",
-      "name": "BD BLS 반도 모니터스탠드",
+      "name": "BD BLS",
       "modelCodes": [
         "BD BLS"
       ],
@@ -7974,7 +7985,8 @@
       "updatedAt": "2026-11-01T17:28:57.408Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 BD BLS 반도 모니터스탠드"
+      "originalName": "반도스탠드 BD BLS 반도 모니터스탠드",
+      "subtitle": "모니터 스탠드"
     },
     {
       "id": "bando-site-204",
@@ -7982,7 +7994,7 @@
       "siteCode": "P00000HV",
       "catalog": "BANDOSTAND",
       "code": "BD LP-A",
-      "name": "BD LP-A",
+      "name": "BD LP-A / 상판 타입 선택",
       "modelCodes": [
         "BD LP-A"
       ],
@@ -8027,7 +8039,8 @@
       "updatedAt": "2026-11-01T17:28:58.632Z",
       "priceHistory": [],
       "requiresOption": true,
-      "originalName": "반도스탠드 BD LP-A"
+      "originalName": "반도스탠드 BD LP-A",
+      "subtitle": "A타입 펜 거치대 표기, B타입 선택 가능"
     },
     {
       "id": "bando-site-203",
@@ -8035,7 +8048,7 @@
       "siteCode": "P00000HU",
       "catalog": "BANDOSTAND",
       "code": "BD LP-B",
-      "name": "BD LP-B",
+      "name": "BD LP-B / 상판 타입 선택",
       "modelCodes": [
         "BD LP-B"
       ],
@@ -8080,7 +8093,8 @@
       "updatedAt": "2026-11-01T17:28:59.946Z",
       "priceHistory": [],
       "requiresOption": true,
-      "originalName": "반도스탠드 BD LP-B"
+      "originalName": "반도스탠드 BD LP-B",
+      "subtitle": "A타입 펜 거치대 표기, B타입 선택 가능"
     },
     {
       "id": "bando-site-202",
@@ -8088,7 +8102,7 @@
       "siteCode": "P00000HT",
       "catalog": "BANDOSTAND",
       "code": "BD LP-WA",
-      "name": "BD LP-WA (A타입 상판)",
+      "name": "BD LP-WA / A타입 상판",
       "modelCodes": [
         "BD LP-WA"
       ],
@@ -8119,7 +8133,8 @@
       "updatedAt": "2026-11-01T17:29:01.047Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 BD LP-WA (A타입 상판)"
+      "originalName": "반도스탠드 BD LP-WA (A타입 상판)",
+      "subtitle": "동일 모델코드의 다른 상품번호에는 B타입 상판 표기가 있어 확인 필요"
     },
     {
       "id": "bando-site-201",
@@ -8127,7 +8142,7 @@
       "siteCode": "P00000HS",
       "catalog": "BANDOSTAND",
       "code": "BD LP-WB",
-      "name": "BD LP-WB (A타입 상판)",
+      "name": "BD LP-WB / A타입 상판",
       "modelCodes": [
         "BD LP-WB"
       ],
@@ -8158,7 +8173,8 @@
       "updatedAt": "2026-11-01T17:29:02.260Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 BD LP-WB (A타입 상판)"
+      "originalName": "반도스탠드 BD LP-WB (A타입 상판)",
+      "subtitle": "동일 모델코드의 다른 상품번호에는 B타입 상판 표기가 있어 확인 필요"
     },
     {
       "id": "bando-site-200",
@@ -8244,7 +8260,7 @@
       "siteCode": "P00000HX",
       "catalog": "BANDOSTAND",
       "code": "P00000HX",
-      "name": "BD 반도 마우스 트레이",
+      "name": "마우스 트레이",
       "modelCodes": [],
       "category": "미디어 스탠드",
       "categories": [
@@ -8281,7 +8297,7 @@
       "siteCode": "P00000II",
       "catalog": "BANDOSTAND",
       "code": "P00000II",
-      "name": "BD 마이크물림쇠SET (구즈넥 길이선택)",
+      "name": "마이크물림쇠 세트 / 길이 및 색상 선택",
       "modelCodes": [],
       "category": "마이크 스탠드 > 악세서리",
       "categories": [
@@ -8390,7 +8406,8 @@
       "updatedAt": "2026-11-01T17:29:07.066Z",
       "priceHistory": [],
       "requiresOption": true,
-      "originalName": "반도스탠드 BD 마이크물림쇠SET (구즈넥 길이선택)"
+      "originalName": "반도스탠드 BD 마이크물림쇠SET (구즈넥 길이선택)",
+      "subtitle": "구즈넥 길이 25, 35, 43, 60cm와 크롬/검정 옵션"
     },
     {
       "id": "bando-site-316",
@@ -8437,7 +8454,7 @@
       "siteCode": "P00000MA",
       "catalog": "BANDOSTAND",
       "code": "BD  BL1500",
-      "name": "BD BL1500 스피커,조명스탠드 파이프두께약 250mm (1개 가격)",
+      "name": "BD BL1500 / 스피커 및 조명 스탠드 / 1개",
       "modelCodes": [
         "BD  BL1500"
       ],
@@ -8468,7 +8485,8 @@
       "updatedAt": "2026-11-01T17:29:09.441Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 BD  BL1500  스피커,조명스탠드 파이프두께약 250mm (1개 가격)"
+      "originalName": "반도스탠드 BD  BL1500  스피커,조명스탠드 파이프두께약 250mm (1개 가격)",
+      "subtitle": "원본에 파이프 두께 약 250mm로 표기. 치수 확인 필요"
     },
     {
       "id": "bando-site-308",
@@ -8476,7 +8494,7 @@
       "siteCode": "P00000LV",
       "catalog": "BANDOSTAND",
       "code": "BD AC-1",
-      "name": "BD AC-1 반도 퍼커션&악세사리 테이블",
+      "name": "BD AC-1",
       "modelCodes": [
         "BD AC-1"
       ],
@@ -8507,7 +8525,8 @@
       "updatedAt": "2026-11-01T17:29:10.681Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 BD AC-1 반도 퍼커션&악세사리 테이블"
+      "originalName": "반도스탠드 BD AC-1 반도 퍼커션&악세사리 테이블",
+      "subtitle": "퍼커션 및 악세사리 테이블"
     },
     {
       "id": "bando-site-302",
@@ -8515,7 +8534,7 @@
       "siteCode": "P00000LP",
       "catalog": "BANDOSTAND",
       "code": "P00000LP",
-      "name": "마이티브라이트 보면대등라이트 LED-3N Nuflex (건전지,아답터)",
+      "name": "Mighty Bright LED-3N Nuflex / 보면대등",
       "modelCodes": [],
       "category": "연주의자 용품",
       "categories": [
@@ -8544,7 +8563,8 @@
       "updatedAt": "2026-11-01T17:29:11.856Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 마이티브라이트 보면대등라이트 LED-3N Nuflex (건전지,아답터)"
+      "originalName": "반도스탠드 마이티브라이트 보면대등라이트 LED-3N Nuflex (건전지,아답터)",
+      "subtitle": "건전지 및 어댑터 방식"
     },
     {
       "id": "bando-site-301",
@@ -8552,7 +8572,7 @@
       "siteCode": "P00000LO",
       "catalog": "BANDOSTAND",
       "code": "P00000LO",
-      "name": "마이티브라이트 보면대등라이트 LED-2W Wonderflex (건전지,아답터)",
+      "name": "Mighty Bright LED-2W Wonderflex / 보면대등",
       "modelCodes": [],
       "category": "연주의자 용품",
       "categories": [
@@ -8581,7 +8601,8 @@
       "updatedAt": "2026-11-01T17:29:13.074Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 마이티브라이트 보면대등라이트 LED-2W Wonderflex (건전지,아답터)"
+      "originalName": "반도스탠드 마이티브라이트 보면대등라이트 LED-2W Wonderflex (건전지,아답터)",
+      "subtitle": "건전지 및 어댑터 방식"
     },
     {
       "id": "bando-site-297",
@@ -8628,7 +8649,7 @@
       "siteCode": "P00000IU",
       "catalog": "BANDOSTAND",
       "code": "BD LED-2s",
-      "name": "BD LED-2s (Mighty Bright Light)",
+      "name": "BD LED-2s",
       "modelCodes": [
         "BD LED-2s"
       ],
@@ -8659,7 +8680,8 @@
       "updatedAt": "2026-11-01T17:29:15.475Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 BD LED-2s (Mighty Bright Light)"
+      "originalName": "반도스탠드 BD LED-2s (Mighty Bright Light)",
+      "subtitle": "Mighty Bright Light"
     },
     {
       "id": "bando-site-228",
@@ -8667,7 +8689,7 @@
       "siteCode": "P00000IT",
       "catalog": "BANDOSTAND",
       "code": "BD LED-3",
-      "name": "BD LED-3 (Mighty Bright Light)",
+      "name": "BD LED-3",
       "modelCodes": [
         "BD LED-3"
       ],
@@ -8698,7 +8720,8 @@
       "updatedAt": "2026-11-01T17:29:16.707Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 BD LED-3 (Mighty Bright Light)"
+      "originalName": "반도스탠드 BD LED-3 (Mighty Bright Light)",
+      "subtitle": "Mighty Bright Light"
     },
     {
       "id": "bando-site-234",
@@ -8706,7 +8729,7 @@
       "siteCode": "P00000IZ",
       "catalog": "BANDOSTAND",
       "code": "BD BL-1500",
-      "name": "BD BL-1500용 조명 홀더(조명 8개 가능)",
+      "name": "BD BL-1500용 조명 홀더 / 조명 8개 설치 가능",
       "modelCodes": [
         "BD BL-1500"
       ],
@@ -8745,7 +8768,7 @@
       "siteCode": "P00000IY",
       "catalog": "BANDOSTAND",
       "code": "BDBL-1500",
-      "name": "BDBL-1500용 조명홀더 (조명 4개 가능)",
+      "name": "BDBL-1500용 조명 홀더 / 조명 4개 설치 가능",
       "modelCodes": [
         "BDBL-1500"
       ],
@@ -8784,7 +8807,7 @@
       "siteCode": "P00000IX",
       "catalog": "BANDOSTAND",
       "code": "BD BL-1500",
-      "name": "BD BL-1500용 조명 홀더 (조명 1개 가능)",
+      "name": "BD BL-1500용 조명 홀더 / 조명 1개 설치 가능",
       "modelCodes": [
         "BD BL-1500"
       ],
@@ -8940,7 +8963,7 @@
       "siteCode": "P00000IJ",
       "catalog": "BANDOSTAND",
       "code": "BD PERFORMANCE",
-      "name": "BD PERFORMANCE (BB-30)",
+      "name": "BD PERFORMANCE / BB-30",
       "modelCodes": [
         "BD PERFORMANCE"
       ],
@@ -8979,7 +9002,7 @@
       "siteCode": "P00000NP",
       "catalog": "BANDOSTAND",
       "code": "BD IS-HG",
-      "name": "BD IS-HG (IS-헤비그레이)",
+      "name": "BD IS-HG / 헤비 / 그레이",
       "modelCodes": [
         "BD IS-HG"
       ],
@@ -9018,7 +9041,7 @@
       "siteCode": "P00000NO",
       "catalog": "BANDOSTAND",
       "code": "BD IS-HBK",
-      "name": "BD IS-HBK (IS-헤비블랙)",
+      "name": "BD IS-HBK / 헤비 / 블랙",
       "modelCodes": [
         "BD IS-HBK"
       ],
@@ -9293,7 +9316,7 @@
       "siteCode": "P00000LY",
       "catalog": "BANDOSTAND",
       "code": "BD 959",
-      "name": "반도 마이크스탠드 BD 959 (높이 참고하세요)",
+      "name": "BD 959",
       "modelCodes": [
         "BD 959"
       ],
@@ -9325,7 +9348,8 @@
       "updatedAt": "2026-11-01T17:29:36.262Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 반도 마이크스탠드 BD 959 (높이 참고하세요)"
+      "originalName": "반도스탠드 반도 마이크스탠드 BD 959 (높이 참고하세요)",
+      "subtitle": "마이크스탠드. 높이 확인 필요"
     },
     {
       "id": "bando-site-293",
@@ -9333,7 +9357,7 @@
       "siteCode": "P00000LG",
       "catalog": "BANDOSTAND",
       "code": "BD TS3000BK",
-      "name": "반도 마이크 스탠드 BD TS3000BK 검정",
+      "name": "BD TS3000BK / 블랙",
       "modelCodes": [
         "BD TS3000BK"
       ],
@@ -9364,7 +9388,8 @@
       "updatedAt": "2026-11-01T17:29:37.309Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 반도 마이크 스탠드  BD TS3000BK 검정"
+      "originalName": "반도스탠드 반도 마이크 스탠드  BD TS3000BK 검정",
+      "subtitle": "마이크스탠드"
     },
     {
       "id": "bando-site-290",
@@ -9372,7 +9397,7 @@
       "siteCode": "P00000LD",
       "catalog": "BANDOSTAND",
       "code": "BD 950",
-      "name": "반도 마이크스탠드 BD 950 (높이 참고하세요)",
+      "name": "BD 950",
       "modelCodes": [
         "BD 950"
       ],
@@ -9404,7 +9429,8 @@
       "updatedAt": "2026-11-01T17:29:38.693Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 반도 마이크스탠드 BD 950 (높이 참고하세요)"
+      "originalName": "반도스탠드 반도 마이크스탠드 BD 950 (높이 참고하세요)",
+      "subtitle": "마이크스탠드. 높이 확인 필요"
     },
     {
       "id": "bando-site-106",
@@ -9412,7 +9438,7 @@
       "siteCode": "P00000EB",
       "catalog": "BANDOSTAND",
       "code": "BD TS3000C",
-      "name": "반도 마이크 스탠드 BD TS3000C 크롬",
+      "name": "BD TS3000C / 크롬",
       "modelCodes": [
         "BD TS3000C"
       ],
@@ -9443,7 +9469,8 @@
       "updatedAt": "2026-11-01T17:29:39.736Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 반도 마이크 스탠드 BD TS3000C 크롬"
+      "originalName": "반도스탠드 반도 마이크 스탠드 BD TS3000C 크롬",
+      "subtitle": "마이크스탠드"
     },
     {
       "id": "bando-site-109",
@@ -9451,7 +9478,7 @@
       "siteCode": "P00000EE",
       "catalog": "BANDOSTAND",
       "code": "BD 960C",
-      "name": "반도 마이크스탠드 BD 960C 크롬",
+      "name": "BD 960C / 크롬",
       "modelCodes": [
         "BD 960C"
       ],
@@ -9482,7 +9509,8 @@
       "updatedAt": "2026-11-01T17:29:40.930Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 반도 마이크스탠드 BD 960C 크롬"
+      "originalName": "반도스탠드 반도 마이크스탠드 BD 960C 크롬",
+      "subtitle": "마이크스탠드"
     },
     {
       "id": "bando-site-108",
@@ -9490,7 +9518,7 @@
       "siteCode": "P00000ED",
       "catalog": "BANDOSTAND",
       "code": "BD 960BK",
-      "name": "반도 마이크스탠드 BD 960BK 검정",
+      "name": "BD 960BK / 블랙",
       "modelCodes": [
         "BD 960BK"
       ],
@@ -9521,7 +9549,8 @@
       "updatedAt": "2026-11-01T17:29:42.164Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 반도 마이크스탠드  BD 960BK 검정"
+      "originalName": "반도스탠드 반도 마이크스탠드  BD 960BK 검정",
+      "subtitle": "마이크스탠드"
     },
     {
       "id": "bando-site-305",
@@ -9529,7 +9558,7 @@
       "siteCode": "P00000LS",
       "catalog": "BANDOSTAND",
       "code": "BD 940White",
-      "name": "BD 940White",
+      "name": "BD 940White / 화이트",
       "modelCodes": [
         "BD 940White"
       ],
@@ -9568,7 +9597,7 @@
       "siteCode": "P00000EH",
       "catalog": "BANDOSTAND",
       "code": "BD 940Blue",
-      "name": "BD 940Blue",
+      "name": "BD 940Blue / 블루",
       "modelCodes": [
         "BD 940Blue"
       ],
@@ -9607,7 +9636,7 @@
       "siteCode": "P00000EI",
       "catalog": "BANDOSTAND",
       "code": "BD 940Red",
-      "name": "BD 940Red",
+      "name": "BD 940Red / 레드",
       "modelCodes": [
         "BD 940Red"
       ],
@@ -9646,7 +9675,7 @@
       "siteCode": "P00000EG",
       "catalog": "BANDOSTAND",
       "code": "BD 940Yellow",
-      "name": "BD 940Yellow",
+      "name": "BD 940Yellow / 옐로",
       "modelCodes": [
         "BD 940Yellow"
       ],
@@ -9685,7 +9714,7 @@
       "siteCode": "P00000EF",
       "catalog": "BANDOSTAND",
       "code": "BD 940Black",
-      "name": "BD 940Black",
+      "name": "BD 940Black / 블랙",
       "modelCodes": [
         "BD 940Black"
       ],
@@ -9724,7 +9753,7 @@
       "siteCode": "P00000EC",
       "catalog": "BANDOSTAND",
       "code": "BD 270",
-      "name": "BD 270 (높낮이 고정)",
+      "name": "BD 270 / 높낮이 고정형",
       "modelCodes": [
         "BD 270"
       ],
@@ -9763,7 +9792,7 @@
       "siteCode": "P00000EA",
       "catalog": "BANDOSTAND",
       "code": "BD 911C",
-      "name": "반도 마이크스탠드 BD 911C 크롬",
+      "name": "BD 911C / 크롬",
       "modelCodes": [
         "BD 911C"
       ],
@@ -9794,7 +9823,8 @@
       "updatedAt": "2026-11-01T17:29:50.587Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 반도 마이크스탠드  BD 911C 크롬"
+      "originalName": "반도스탠드 반도 마이크스탠드  BD 911C 크롬",
+      "subtitle": "마이크스탠드"
     },
     {
       "id": "bando-site-104",
@@ -9802,7 +9832,7 @@
       "siteCode": "P00000DZ",
       "catalog": "BANDOSTAND",
       "code": "BD 911R",
-      "name": "반도 마이크스탠드 BD 911R 레드",
+      "name": "BD 911R / 레드",
       "modelCodes": [
         "BD 911R"
       ],
@@ -9833,7 +9863,8 @@
       "updatedAt": "2026-11-01T17:29:51.789Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 반도 마이크스탠드 BD 911R 레드"
+      "originalName": "반도스탠드 반도 마이크스탠드 BD 911R 레드",
+      "subtitle": "마이크스탠드"
     },
     {
       "id": "bando-site-99",
@@ -9841,7 +9872,7 @@
       "siteCode": "P00000DU",
       "catalog": "BANDOSTAND",
       "code": "BD 911B",
-      "name": "반도 마이크스탠드 BD 911B 검정",
+      "name": "BD 911B / 블랙",
       "modelCodes": [
         "BD 911B"
       ],
@@ -9872,7 +9903,8 @@
       "updatedAt": "2026-11-01T17:29:52.996Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 반도 마이크스탠드 BD 911B 검정"
+      "originalName": "반도스탠드 반도 마이크스탠드 BD 911B 검정",
+      "subtitle": "마이크스탠드"
     },
     {
       "id": "bando-site-100",
@@ -9880,7 +9912,7 @@
       "siteCode": "P00000DV",
       "catalog": "BANDOSTAND",
       "code": "BD 919G",
-      "name": "반도 마이크스탠드 BD 919G Gray 그레이",
+      "name": "BD 919G / 그레이",
       "modelCodes": [
         "BD 919G"
       ],
@@ -9911,7 +9943,8 @@
       "updatedAt": "2026-11-01T17:29:54.195Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 반도 마이크스탠드 BD 919G Gray 그레이"
+      "originalName": "반도스탠드 반도 마이크스탠드 BD 919G Gray 그레이",
+      "subtitle": "마이크스탠드"
     },
     {
       "id": "bando-site-103",
@@ -9919,7 +9952,7 @@
       "siteCode": "P00000DY",
       "catalog": "BANDOSTAND",
       "code": "BD 919B",
-      "name": "반도 마이크스탠드 BD 919B Black 블랙",
+      "name": "BD 919B / 블랙",
       "modelCodes": [
         "BD 919B"
       ],
@@ -9950,7 +9983,8 @@
       "updatedAt": "2026-11-01T17:29:55.425Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 반도 마이크스탠드 BD 919B Black 블랙"
+      "originalName": "반도스탠드 반도 마이크스탠드 BD 919B Black 블랙",
+      "subtitle": "마이크스탠드"
     },
     {
       "id": "bando-site-102",
@@ -9958,7 +9992,7 @@
       "siteCode": "P00000DX",
       "catalog": "BANDOSTAND",
       "code": "BD 919W",
-      "name": "반도 마이크스탠드 BD 919W white 화이트",
+      "name": "BD 919W / 화이트",
       "modelCodes": [
         "BD 919W"
       ],
@@ -9989,7 +10023,8 @@
       "updatedAt": "2026-11-01T17:29:56.604Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 반도 마이크스탠드 BD 919W white 화이트"
+      "originalName": "반도스탠드 반도 마이크스탠드 BD 919W white 화이트",
+      "subtitle": "마이크스탠드"
     },
     {
       "id": "bando-site-101",
@@ -9997,7 +10032,7 @@
       "siteCode": "P00000DW",
       "catalog": "BANDOSTAND",
       "code": "BD 919C",
-      "name": "반도 마이크스탠드 BD 919C Chrome 크롬",
+      "name": "BD 919C / 크롬",
       "modelCodes": [
         "BD 919C"
       ],
@@ -10028,7 +10063,8 @@
       "updatedAt": "2026-11-01T17:29:57.861Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 반도 마이크스탠드 BD 919C Chrome 크롬"
+      "originalName": "반도스탠드 반도 마이크스탠드 BD 919C Chrome 크롬",
+      "subtitle": "마이크스탠드"
     },
     {
       "id": "bando-site-364",
