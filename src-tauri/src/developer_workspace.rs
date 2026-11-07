@@ -75,7 +75,9 @@ pub(super) fn open_isolated(app_root: &Path) -> Result<(PathBuf, Connection), St
     Ok((root, conn))
 }
 #[tauri::command]
-pub fn workspace_mode(db: State<'_, Database>) -> bool { db.is_test }
+pub fn workspace_mode(startup: State<'_, startup_recovery::StartupRecovery>) -> bool {
+    startup.is_test
+}
 
 #[tauri::command]
 pub fn open_test_workspace(db: State<'_, Database>) -> Result<(), String> {
