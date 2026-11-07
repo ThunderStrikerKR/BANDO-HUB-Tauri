@@ -104,10 +104,10 @@ export function previewProductNameCleanup(state: State): ProductNameCleanupPrevi
     const otherVariants = registeredProducts(state.products).filter((other) =>
       other.id !== product.id && (other.catalog ?? "BANDOSTAND") === (product.catalog ?? "BANDOSTAND") &&
       other.code.replace(/\s/g, "").toUpperCase() === product.code.replace(/\s/g, "").toUpperCase());
-    const ambiguousSibling = otherVariants.some((other) =>
-      ["가방", "바퀴"].some((kind) =>
-        contentsOf(other.name).some((item) => item.kind === kind) &&
-        !qualifiers.some((item) => item.kind === kind)));
+    const groupFlags = [qualifiers, ...otherVariants.map((other) => contentsOf(other.name))];
+    const ambiguousSibling = ["가방", "바퀴"].some((kind) =>
+      groupFlags.some((flags) => flags.some((item) => item.kind === kind)) &&
+      groupFlags.some((flags) => !flags.some((item) => item.kind === kind)));
     if (!model || !variantContentsAreUnambiguous(product) ||
         ambiguousSibling || hasUnresolvedAlternatives(product.name)) {
       rows.push({
