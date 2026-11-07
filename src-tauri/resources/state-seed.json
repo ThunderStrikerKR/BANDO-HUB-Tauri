@@ -10226,7 +10226,7 @@
       "siteCode": "P00000MO",
       "catalog": "BANDOSTAND",
       "code": "BD 102M",
-      "name": "BD 102M(무선마이크용)",
+      "name": "BD 102M / 무선마이크용",
       "modelCodes": [
         "BD 102M"
       ],
@@ -10265,7 +10265,7 @@
       "siteCode": "P00000MN",
       "catalog": "BANDOSTAND",
       "code": "BD 102Y",
-      "name": "BD 102Y(유선마이크용)",
+      "name": "BD 102Y / 유선마이크용",
       "modelCodes": [
         "BD 102Y"
       ],
@@ -10304,7 +10304,7 @@
       "siteCode": "P00000MM",
       "catalog": "BANDOSTAND",
       "code": "BD floor TS-3",
-      "name": "BD floor TS-3",
+      "name": "BD Floor TS-3",
       "modelCodes": [
         "BD floor TS-3"
       ],
@@ -10538,7 +10538,7 @@
       "siteCode": "P00000LX",
       "catalog": "BANDOSTAND",
       "code": "BD Desk JS-4",
-      "name": "BD Desk JS-4 Black 검정 (자바라 길이 60cm)",
+      "name": "BD Desk JS-4 / 블랙 / 자바라 길이 60cm",
       "modelCodes": [
         "BD Desk JS-4"
       ],
@@ -10577,7 +10577,7 @@
       "siteCode": "P00000KY",
       "catalog": "BANDOSTAND",
       "code": "BD Desk 101M",
-      "name": "BD Desk 101M (무선)",
+      "name": "BD Desk 101M / 무선마이크용",
       "modelCodes": [
         "BD Desk 101M"
       ],
@@ -10616,7 +10616,7 @@
       "siteCode": "P00000KX",
       "catalog": "BANDOSTAND",
       "code": "BD Desk 101Y",
-      "name": "BD Desk 101Y (유선)",
+      "name": "BD Desk 101Y / 유선마이크용",
       "modelCodes": [
         "BD Desk 101Y"
       ],
@@ -10655,7 +10655,7 @@
       "siteCode": "P00000JV",
       "catalog": "BANDOSTAND",
       "code": "BD Desk JS-4",
-      "name": "BD Desk JS-4 Silver (자바라길이 60cm)",
+      "name": "BD Desk JS-4 / 실버 / 자바라 길이 60cm",
       "modelCodes": [
         "BD Desk JS-4"
       ],
@@ -10694,7 +10694,7 @@
       "siteCode": "P00000JU",
       "catalog": "BANDOSTAND",
       "code": "BD Desk JS-3",
-      "name": "BD Desk JS-3 Silver (자바라길이 43cm)",
+      "name": "BD Desk JS-3 / 실버 / 자바라 길이 43cm",
       "modelCodes": [
         "BD Desk JS-3"
       ],
@@ -10733,7 +10733,7 @@
       "siteCode": "P00000JT",
       "catalog": "BANDOSTAND",
       "code": "BD Desk JS-2",
-      "name": "BD Desk JS-2 Silver (자바라길이 35cm)",
+      "name": "BD Desk JS-2 / 실버 / 자바라 길이 35cm",
       "modelCodes": [
         "BD Desk JS-2"
       ],
@@ -10772,7 +10772,7 @@
       "siteCode": "P00000JS",
       "catalog": "BANDOSTAND",
       "code": "BD Desk JS-1",
-      "name": "BD Desk JS-1 Silver (자바라길이 25cm)",
+      "name": "BD Desk JS-1 / 실버 / 자바라 길이 25cm",
       "modelCodes": [
         "BD Desk JS-1"
       ],
@@ -10811,7 +10811,7 @@
       "siteCode": "P00000JR",
       "catalog": "BANDOSTAND",
       "code": "BD Desk IS-1",
-      "name": "BD Desk IS-1 (Bar 길이 10cm)",
+      "name": "BD Desk IS-1 / 바 길이 10cm",
       "modelCodes": [
         "BD Desk IS-1"
       ],
@@ -10850,7 +10850,7 @@
       "siteCode": "P00000JQ",
       "catalog": "BANDOSTAND",
       "code": "BD Desk IS-2",
-      "name": "BD Desk IS-2 (Bar 길이 15cm)",
+      "name": "BD Desk IS-2 / 바 길이 15cm",
       "modelCodes": [
         "BD Desk IS-2"
       ],
@@ -10889,7 +10889,7 @@
       "siteCode": "P00000JP",
       "catalog": "BANDOSTAND",
       "code": "BD Desk IS-3",
-      "name": "BD Desk IS-3 (Bar 길이 26cm)",
+      "name": "BD Desk IS-3 / 바 길이 26cm",
       "modelCodes": [
         "BD Desk IS-3"
       ],
@@ -10928,7 +10928,7 @@
       "siteCode": "P00000JO",
       "catalog": "BANDOSTAND",
       "code": "BD Desk TS-3",
-      "name": "BD Desk TS-3 (길이 참고)",
+      "name": "BD Desk TS-3",
       "modelCodes": [
         "BD Desk TS-3"
       ],
@@ -10959,7 +10959,8 @@
       "updatedAt": "2026-11-01T17:30:26.400Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 BD Desk TS-3 (길이 참고)"
+      "originalName": "반도스탠드 BD Desk TS-3 (길이 참고)",
+      "subtitle": "길이 확인 필요"
     },
     {
       "id": "bando-site-248",
@@ -10967,7 +10968,7 @@
       "siteCode": "P00000JN",
       "catalog": "BANDOSTAND",
       "code": "BD Desk TS-2",
-      "name": "BD Desk TS-2 (길이 참고)",
+      "name": "BD Desk TS-2",
       "modelCodes": [
         "BD Desk TS-2"
       ],
@@ -10998,7 +10999,8 @@
       "updatedAt": "2026-11-01T17:30:27.600Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 BD Desk TS-2 (길이 참고)"
+      "originalName": "반도스탠드 BD Desk TS-2 (길이 참고)",
+      "subtitle": "길이 확인 필요"
     },
     {
       "id": "bando-site-247",
@@ -11006,7 +11008,7 @@
       "siteCode": "P00000JM",
       "catalog": "BANDOSTAND",
       "code": "BD Desk TS-1",
-      "name": "BD Desk TS-1 (길이 참고)",
+      "name": "BD Desk TS-1",
       "modelCodes": [
         "BD Desk TS-1"
       ],
@@ -11037,7 +11039,8 @@
       "updatedAt": "2026-11-01T17:30:28.814Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 BD Desk TS-1 (길이 참고)"
+      "originalName": "반도스탠드 BD Desk TS-1 (길이 참고)",
+      "subtitle": "길이 확인 필요"
     },
     {
       "id": "bando-site-246",
@@ -11045,7 +11048,7 @@
       "siteCode": "P00000JL",
       "catalog": "BANDOSTAND",
       "code": "BD Desk JS-3",
-      "name": "BD Desk JS-3 Black 검정 (자바라 길이 43cm)",
+      "name": "BD Desk JS-3 / 블랙 / 자바라 길이 43cm",
       "modelCodes": [
         "BD Desk JS-3"
       ],
@@ -11084,7 +11087,7 @@
       "siteCode": "P00000JK",
       "catalog": "BANDOSTAND",
       "code": "BD Desk JS-2",
-      "name": "BD Desk JS-2 Black 검정 (자바라 길이 35cm)",
+      "name": "BD Desk JS-2 / 블랙 / 자바라 길이 35cm",
       "modelCodes": [
         "BD Desk JS-2"
       ],
@@ -11123,7 +11126,7 @@
       "siteCode": "P00000JJ",
       "catalog": "BANDOSTAND",
       "code": "BD Desk-MISpeech",
-      "name": "BD Desk-MISpeech (연설용스탠드)",
+      "name": "BD Desk-MISpeech / 연설용 / 길이 및 색상 선택",
       "modelCodes": [
         "BD Desk-MISpeech"
       ],
@@ -11233,7 +11236,8 @@
       "updatedAt": "2026-11-01T17:30:32.450Z",
       "priceHistory": [],
       "requiresOption": true,
-      "originalName": "반도스탠드 BD Desk-MISpeech (연설용스탠드)"
+      "originalName": "반도스탠드 BD Desk-MISpeech (연설용스탠드)",
+      "subtitle": "크롬과 블랙 구성, 길이 25, 35, 43, 60cm 옵션. 옵션별 2개 표기"
     },
     {
       "id": "bando-site-264",
@@ -11241,7 +11245,7 @@
       "siteCode": "P00000KD",
       "catalog": "BANDOSTAND",
       "code": "BD 970",
-      "name": "BD 970 Silver (자동)",
+      "name": "BD 970 / 실버 / 자동형",
       "modelCodes": [
         "BD 970"
       ],
@@ -11280,7 +11284,7 @@
       "siteCode": "P00000KC",
       "catalog": "BANDOSTAND",
       "code": "BD 970",
-      "name": "BD 970 Red (자동)",
+      "name": "BD 970 / 레드 / 자동형",
       "modelCodes": [
         "BD 970"
       ],
@@ -11319,7 +11323,7 @@
       "siteCode": "P00000KB",
       "catalog": "BANDOSTAND",
       "code": "BD 970",
-      "name": "BD 970 Blue (자동)",
+      "name": "BD 970 / 블루 / 자동형",
       "modelCodes": [
         "BD 970"
       ],
@@ -11358,7 +11362,7 @@
       "siteCode": "P00000KA",
       "catalog": "BANDOSTAND",
       "code": "BD 970",
-      "name": "BD 970 Black (자동)",
+      "name": "BD 970 / 블랙 / 자동형",
       "modelCodes": [
         "BD 970"
       ],
@@ -11397,7 +11401,7 @@
       "siteCode": "P00000OB",
       "catalog": "BANDOSTAND",
       "code": "BD MA-01",
-      "name": "매직암 BD MA-01",
+      "name": "BD MA-01",
       "modelCodes": [
         "BD MA-01"
       ],
@@ -11428,7 +11432,8 @@
       "updatedAt": "2026-11-01T17:30:38.305Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 매직암 BD MA-01"
+      "originalName": "반도스탠드 매직암 BD MA-01",
+      "subtitle": "매직암"
     },
     {
       "id": "bando-site-361",
@@ -11436,7 +11441,7 @@
       "siteCode": "P00000NX",
       "catalog": "BANDOSTAND",
       "code": "P00000NX",
-      "name": "마이크 스테레오바 듀얼 ORCA OC-MSB-D",
+      "name": "ORCA OC-MSB-D / 마이크 스테레오바 / 듀얼",
       "modelCodes": [],
       "category": "마이크 스탠드 > 악세서리",
       "categories": [
@@ -11473,7 +11478,7 @@
       "siteCode": "P00000NW",
       "catalog": "BANDOSTAND",
       "code": "P00000NW",
-      "name": "마이크 스테레오바 싱글 ORCA OC-MSB-S",
+      "name": "ORCA OC-MSB-S / 마이크 스테레오바 / 싱글",
       "modelCodes": [],
       "category": "마이크 스탠드 > 악세서리",
       "categories": [
@@ -11510,7 +11515,7 @@
       "siteCode": "P00000NV",
       "catalog": "BANDOSTAND",
       "code": "P00000NV",
-      "name": "마이크 멀티 트레이 거치대 오르카 ORCA OC-Mic6tray",
+      "name": "ORCA OC-Mic6tray / 마이크 멀티 트레이 거치대",
       "modelCodes": [],
       "category": "마이크 스탠드 > 악세서리",
       "categories": [
@@ -11547,7 +11552,7 @@
       "siteCode": "P00000MY",
       "catalog": "BANDOSTAND",
       "code": "BD C-Clip",
-      "name": "BD C-Clip 전용 마이크홀더 아답터 (C-clip 전용상품입니다)",
+      "name": "BD C-Clip 전용 마이크홀더 어댑터",
       "modelCodes": [
         "BD C-Clip"
       ],
@@ -11578,7 +11583,8 @@
       "updatedAt": "2026-11-01T17:30:43.079Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 BD C-Clip 전용 마이크홀더 아답터 (C-clip 전용상품입니다)"
+      "originalName": "반도스탠드 BD C-Clip 전용 마이크홀더 아답터 (C-clip 전용상품입니다)",
+      "subtitle": "C-Clip 전용 상품"
     },
     {
       "id": "bando-site-335",
@@ -11586,7 +11592,7 @@
       "siteCode": "P00000MX",
       "catalog": "BANDOSTAND",
       "code": "BD BTS",
-      "name": "BD BTS (연결용 T)",
+      "name": "BD BTS / 연결용 T",
       "modelCodes": [
         "BD BTS"
       ],
@@ -11625,7 +11631,7 @@
       "siteCode": "P00000MR",
       "catalog": "BANDOSTAND",
       "code": "BD C-Clip",
-      "name": "BD C-Clip (C클립멀티마운트) 마이크홀더 불포함 상품입니다.",
+      "name": "BD C-Clip / C클립 멀티마운트 / 마이크홀더 미포함",
       "modelCodes": [
         "BD C-Clip"
       ],
@@ -11664,7 +11670,7 @@
       "siteCode": "P00000LT",
       "catalog": "BANDOSTAND",
       "code": "BD CM-01",
-      "name": "BD CM-01 마이크 홀더 아답터_Camera type (Female:1/4inch - Male:5/8inch) 상세페이지참조",
+      "name": "BD CM-01 / 카메라 타입 마이크홀더 어댑터",
       "modelCodes": [
         "BD CM-01"
       ],
@@ -11695,7 +11701,8 @@
       "updatedAt": "2026-11-01T17:30:46.706Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 BD CM-01  마이크 홀더 아답터_Camera type (Female:1/4inch -  Male:5/8inch) 상세페이지참조"
+      "originalName": "반도스탠드 BD CM-01  마이크 홀더 아답터_Camera type (Female:1/4inch -  Male:5/8inch) 상세페이지참조",
+      "subtitle": "암나사 1/4인치, 수나사 5/8인치. 상세페이지 확인"
     },
     {
       "id": "bando-site-304",
@@ -11703,7 +11710,7 @@
       "siteCode": "P00000LR",
       "catalog": "BANDOSTAND",
       "code": "BD CM-02",
-      "name": "BD CM-02 카메라 아답터(Male:6.35mm/Female:15.9mm)",
+      "name": "BD CM-02 / 카메라 어댑터",
       "modelCodes": [
         "BD CM-02"
       ],
@@ -11734,7 +11741,8 @@
       "updatedAt": "2026-11-01T17:30:47.903Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 BD CM-02  카메라 아답터(Male:6.35mm/Female:15.9mm)"
+      "originalName": "반도스탠드 BD CM-02  카메라 아답터(Male:6.35mm/Female:15.9mm)",
+      "subtitle": "수나사 6.35mm, 암나사 15.9mm"
     },
     {
       "id": "bando-site-298",
@@ -11818,7 +11826,7 @@
       "siteCode": "P00000EJ",
       "catalog": "BANDOSTAND",
       "code": "BD MC-01",
-      "name": "BD MC-01 마이크홀더 아답터 (암 Female)",
+      "name": "BD MC-01 / 마이크홀더 어댑터",
       "modelCodes": [
         "BD MC-01"
       ],
@@ -11849,7 +11857,8 @@
       "updatedAt": "2026-11-01T17:30:51.517Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 BD MC-01 마이크홀더 아답터 (암 Female)"
+      "originalName": "반도스탠드 BD MC-01 마이크홀더 아답터 (암 Female)",
+      "subtitle": "암나사 규격은 원본 상세에서 확인"
     },
     {
       "id": "bando-site-123",
@@ -11857,7 +11866,7 @@
       "siteCode": "P00000ES",
       "catalog": "BANDOSTAND",
       "code": "BD MC-02",
-      "name": "BD MC-02 마이크홀더 아답터(Male:9.5mm/Female:15.9mm)",
+      "name": "BD MC-02 / 마이크홀더 어댑터",
       "modelCodes": [
         "BD MC-02"
       ],
@@ -11888,7 +11897,8 @@
       "updatedAt": "2026-11-01T17:30:52.753Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 BD MC-02 마이크홀더 아답터(Male:9.5mm/Female:15.9mm)"
+      "originalName": "반도스탠드 BD MC-02 마이크홀더 아답터(Male:9.5mm/Female:15.9mm)",
+      "subtitle": "수나사 9.5mm, 암나사 15.9mm"
     },
     {
       "id": "bando-site-280",
@@ -11896,7 +11906,7 @@
       "siteCode": "P00000KT",
       "catalog": "BANDOSTAND",
       "code": "P00000KT",
-      "name": "BD 팝필터 PF-A",
+      "name": "PF-A / 팝필터",
       "modelCodes": [],
       "category": "마이크 스탠드 > 악세서리",
       "categories": [
@@ -11933,7 +11943,7 @@
       "siteCode": "P00000KV",
       "catalog": "BANDOSTAND",
       "code": "P00000KV",
-      "name": "BD 팝필터 PF-B",
+      "name": "PF-B / 팝필터",
       "modelCodes": [],
       "category": "마이크 스탠드 > 악세서리",
       "categories": [
@@ -11970,7 +11980,7 @@
       "siteCode": "P00000JX",
       "catalog": "BANDOSTAND",
       "code": "BD MIC-B",
-      "name": "BD MIC-B (마이크스탠드 가방)",
+      "name": "BD MIC-B / 마이크스탠드 가방",
       "modelCodes": [
         "BD MIC-B"
       ],
@@ -12009,7 +12019,7 @@
       "siteCode": "P00000JW",
       "catalog": "BANDOSTAND",
       "code": "BD MIC-S",
-      "name": "BD MIC-S (마이크스탠드 950, 959 전용가방)",
+      "name": "BD MIC-S / 마이크스탠드 가방",
       "modelCodes": [
         "BD MIC-S"
       ],
@@ -12040,7 +12050,8 @@
       "updatedAt": "2026-11-01T17:30:57.552Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 BD MIC-S (마이크스탠드 950, 959 전용가방)"
+      "originalName": "반도스탠드 BD MIC-S (마이크스탠드 950, 959 전용가방)",
+      "subtitle": "BD 950 및 959 전용"
     },
     {
       "id": "bando-site-122",
@@ -12048,7 +12059,7 @@
       "siteCode": "P00000ER",
       "catalog": "BANDOSTAND",
       "code": "P00000ER",
-      "name": "BD 반도스탠드 케이블홀더 (4종류)",
+      "name": "케이블홀더 / 규격 선택",
       "modelCodes": [],
       "category": "마이크 스탠드 > 악세서리",
       "categories": [
@@ -12117,7 +12128,8 @@
       "updatedAt": "2026-11-01T17:30:59.094Z",
       "priceHistory": [],
       "requiresOption": true,
-      "originalName": "반도스탠드 BD 반도스탠드 케이블홀더 (4종류)"
+      "originalName": "반도스탠드 BD 반도스탠드 케이블홀더 (4종류)",
+      "subtitle": "1번 15mm, 2번 18mm, 3번 23mm, 4번 25.5mm"
     },
     {
       "id": "bando-site-243",
@@ -12125,7 +12137,7 @@
       "siteCode": "P00000JI",
       "catalog": "BANDOSTAND",
       "code": "P00000JI",
-      "name": "BD 무선마이크홀더",
+      "name": "무선마이크홀더",
       "modelCodes": [],
       "category": "마이크 스탠드 > 악세서리",
       "categories": [
@@ -12162,7 +12174,7 @@
       "siteCode": "P00000KS",
       "catalog": "BANDOSTAND",
       "code": "P00000KS",
-      "name": "BD 집게홀더",
+      "name": "집게홀더",
       "modelCodes": [],
       "category": "마이크 스탠드 > 악세서리",
       "categories": [
@@ -12199,7 +12211,7 @@
       "siteCode": "P00000LB",
       "catalog": "BANDOSTAND",
       "code": "P00000LB",
-      "name": "BD 유선마이크홀더",
+      "name": "유선마이크홀더",
       "modelCodes": [],
       "category": "마이크 스탠드 > 악세서리",
       "categories": [
@@ -12236,7 +12248,7 @@
       "siteCode": "P00000EV",
       "catalog": "BANDOSTAND",
       "code": "P00000EV",
-      "name": "BD 마이크 스테레오바 (2개 꽂이)",
+      "name": "마이크 스테레오바 / 2개 거치",
       "modelCodes": [],
       "category": "마이크 스탠드 > 악세서리",
       "categories": [
@@ -12273,7 +12285,7 @@
       "siteCode": "P00000EU",
       "catalog": "BANDOSTAND",
       "code": "BD Mic",
-      "name": "BD Mic 벽걸이 홀더 (Red)",
+      "name": "BD Mic / 마이크 벽걸이 홀더 / 레드",
       "modelCodes": [
         "BD Mic"
       ],
@@ -12312,7 +12324,7 @@
       "siteCode": "P00000KO",
       "catalog": "BANDOSTAND",
       "code": "BD Mic",
-      "name": "BD Mic 벽걸이 홀더 (야광)",
+      "name": "BD Mic / 마이크 벽걸이 홀더 / 야광",
       "modelCodes": [
         "BD Mic"
       ],
@@ -12351,7 +12363,7 @@
       "siteCode": "P00000ET",
       "catalog": "BANDOSTAND",
       "code": "BD Mic",
-      "name": "BD Mic 벽걸이 홀더 (Black)",
+      "name": "BD Mic / 마이크 벽걸이 홀더 / 블랙",
       "modelCodes": [
         "BD Mic"
       ],
@@ -12390,7 +12402,7 @@
       "siteCode": "P00000EQ",
       "catalog": "BANDOSTAND",
       "code": "BD BAR-1",
-      "name": "BD BAR-1 마이크스탠드 연장용 바 10cm (Support Bar 10cm)",
+      "name": "BD BAR-1 / 마이크스탠드 연장바 / 길이 10cm",
       "modelCodes": [
         "BD BAR-1"
       ],
@@ -12429,7 +12441,7 @@
       "siteCode": "P00000EP",
       "catalog": "BANDOSTAND",
       "code": "BD BAR-2",
-      "name": "BD BAR-2 마이크스탠드 연장용 바 15cm (Support Bar 15cm)",
+      "name": "BD BAR-2 / 마이크스탠드 연장바 / 길이 15cm",
       "modelCodes": [
         "BD BAR-2"
       ],
@@ -12468,7 +12480,7 @@
       "siteCode": "P00000EO",
       "catalog": "BANDOSTAND",
       "code": "BD BAR-3",
-      "name": "BD BAR-3 마이크스탠드 연장용 바 25cm (Support Bar 25cm)",
+      "name": "BD BAR-3 / 마이크스탠드 연장바 / 길이 25cm",
       "modelCodes": [
         "BD BAR-3"
       ],
@@ -12507,7 +12519,7 @@
       "siteCode": "P00000LW",
       "catalog": "BANDOSTAND",
       "code": "BD Gooseneck-4",
-      "name": "반도 자바라 약 60cm BD Gooseneck-4 검정",
+      "name": "BD Gooseneck-4 / 자바라 길이 약 60cm / 블랙",
       "modelCodes": [
         "BD Gooseneck-4"
       ],
@@ -12546,7 +12558,7 @@
       "siteCode": "P00000KH",
       "catalog": "BANDOSTAND",
       "code": "BD Gooseneck-3",
-      "name": "반도 자바라 약 43cm BD Gooseneck-3 검정",
+      "name": "BD Gooseneck-3 / 자바라 길이 약 43cm / 블랙",
       "modelCodes": [
         "BD Gooseneck-3"
       ],
@@ -12585,7 +12597,7 @@
       "siteCode": "P00000KG",
       "catalog": "BANDOSTAND",
       "code": "BD Gooseneck-2",
-      "name": "반도 자바라 약 35cm BD Gooseneck-2 검정",
+      "name": "BD Gooseneck-2 / 자바라 길이 약 35cm / 블랙",
       "modelCodes": [
         "BD Gooseneck-2"
       ],
@@ -12624,7 +12636,7 @@
       "siteCode": "P00000NT",
       "catalog": "BANDOSTAND",
       "code": "BD Gooseneck-1",
-      "name": "반도 자바라 약 25cm BD Gooseneck-1 블랙",
+      "name": "BD Gooseneck-1 / 자바라 길이 약 25cm / 블랙",
       "modelCodes": [
         "BD Gooseneck-1"
       ],
@@ -12663,7 +12675,7 @@
       "siteCode": "P00000EL",
       "catalog": "BANDOSTAND",
       "code": "BD Gooseneck-1",
-      "name": "반도 자바라 약 25cm BD Gooseneck-1 크롬",
+      "name": "BD Gooseneck-1 / 자바라 길이 약 25cm / 크롬",
       "modelCodes": [
         "BD Gooseneck-1"
       ],
@@ -12702,7 +12714,7 @@
       "siteCode": "P00000EN",
       "catalog": "BANDOSTAND",
       "code": "BD Gooseneck-2",
-      "name": "반도 자바라 35cm BD Gooseneck-2 크롬",
+      "name": "BD Gooseneck-2 / 자바라 길이 약 35cm / 크롬",
       "modelCodes": [
         "BD Gooseneck-2"
       ],
@@ -12741,7 +12753,7 @@
       "siteCode": "P00000EK",
       "catalog": "BANDOSTAND",
       "code": "BD Gooseneck-3",
-      "name": "반도 자바라 약 43cm BD Gooseneck-3 크롬",
+      "name": "BD Gooseneck-3 / 자바라 길이 약 43cm / 크롬",
       "modelCodes": [
         "BD Gooseneck-3"
       ],
@@ -12780,7 +12792,7 @@
       "siteCode": "P00000EM",
       "catalog": "BANDOSTAND",
       "code": "BD Gooseneck-4",
-      "name": "반도 자바라 약 60cm BD Gooseneck-4 크롬",
+      "name": "BD Gooseneck-4 / 자바라 길이 약 60cm / 크롬",
       "modelCodes": [
         "BD Gooseneck-4"
       ],
