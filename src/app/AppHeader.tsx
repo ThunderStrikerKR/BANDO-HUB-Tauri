@@ -21,6 +21,7 @@ export function AppHeader({
 }) {
   return (
     <header
+      data-tauri-drag-region
       className="app-header"
       onDoubleClick={(event) => {
         if (event.target === event.currentTarget) onWindow("maximize");
@@ -30,7 +31,7 @@ export function AppHeader({
         <img src="./branding/bando-symbol.svg" alt="반도 로고" />
         <span>BANDO HUB{window.bando?.isTestWorkspace ? " / 테스트" : ""}</span>
       </button>
-      <nav aria-label="업무 메뉴">
+      <nav data-tauri-drag-region aria-label="업무 메뉴">
         {navigation.map((item) => (
           <button
             className={page === item.id ? "current" : ""}

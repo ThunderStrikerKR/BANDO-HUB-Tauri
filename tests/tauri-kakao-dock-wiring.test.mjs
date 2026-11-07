@@ -35,6 +35,8 @@ test("screen supports choosing among multiple KakaoTalk windows and three view m
   const shell=read("src/HubShell.tsx");
   const app=read("src/App.tsx");
   const model=read("src/app/useAppModel.ts");
+  assert.match(header,/data-tauri-drag-region/);
+  assert.match(read("src-tauri/capabilities/default.json"),/core:window:allow-start-dragging/);
   assert.match(header,/dock\.mode === "OVERLAP"/);
   assert.match(header,/dock\.mode === "STACK"/);
   assert.match(shell,/stacked = dock\.active && dock\.mode === "STACK"/);
