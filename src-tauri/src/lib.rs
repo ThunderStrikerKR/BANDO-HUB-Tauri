@@ -3,6 +3,7 @@ mod factory_conflict;
 mod export_file;
 mod kakao_dock;
 mod developer_workspace;
+mod backup_manager;
 use chrono::{Datelike, Local, DateTime};
 use rusqlite::{params, Connection, OptionalExtension};
 use serde_json::{json, Value};
@@ -423,38 +424,17 @@ fn receipt_archive(db: State<'_, Database>) -> Result<Value, String> {
 
 #[tauri::command]
 fn backup_create(db: State<'_, Database>) -> Result<String, String> {
-    let backups = db.base.join("backups");
-    fs::create_dir_all(&backups).map_err(err)?;
-    let filename = format!("bando-hub-{}-{}.sqlite", std::process::id(),
-        std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_err(err)?.as_millis());
-    let target = backups.join(&filename);
-    if target.exists() { return Err("백업 파일이 이미 존재합니다.".into()); }
-    // SQLite VACUUM INTO creates a consistent copy even when the live DB uses WAL.
-    lock_db(&db)?.execute("VACUUM INTO ?1", [target.to_string_lossy().to_string()]).map_err(err)?;
-    Ok(target.to_string_lossy().to_string())
+    backup_manager::manual_backup(&lock_db(&db)?, &db.base)
 }
 #[tauri::command]
 fn backup_list(db: State<'_, Database>) -> Result<Vec<String>, String> {
-    let folder = db.base.join("backups");
-    if !folder.exists() { return Ok(vec![]); }
-    let mut names = fs::read_dir(folder).map_err(err)?.filter_map(|entry| entry.ok())
-        .filter(|e| e.path().extension().is_some_and(|ext| ext == "sqlite"))
-        .map(|e| e.path().to_string_lossy().to_string()).collect::<Vec<_>>();
-    names.sort(); names.reverse(); Ok(names)
+    backup_manager::list_backups(&db.base)
 }
 #[tauri::command]
 fn backup_restore(db: State<'_, Database>, filename: String) -> Result<(), String> {
-    let allowed = fs::canonicalize(db.base.join("backups")).map_err(err)?;
-    let selected = fs::canonicalize(&filename).map_err(err)?;
-    if !selected.starts_with(allowed) || selected.extension().is_none_or(|x| x != "sqlite") {
-        return Err("백업 폴더에 있는 SQLite 파일만 복원할 수 있습니다.".into());
-    }
-    let backup = Connection::open_with_flags(selected, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY).map_err(err)?;
-    let mut state = get_snapshot(&backup)?;
-    let mut conn = lock_db(&db)?;
-    let current = get_snapshot(&conn)?;
-    state["revision"] = current["revision"].clone();
-    write_snapshot(&mut conn, state, current["revision"].as_u64().unwrap_or(0), false)?;
+    // Hold the live DB mutex for the full preflight, safety copy, and restore.
+    // Another app command cannot mutate the DB between those operations.
+    backup_manager::restore_backup(&mut lock_db(&db)?, &db.base, &filename)?;
     Ok(())
 }
 
@@ -896,6 +876,20 @@ pub fn run() {
                 (base, conn)
             };
             app.manage(Database { connection: Mutex::new(conn), base: active_base, is_test });
+            // Automatic backup is attempted at every start and periodically
+            // thereafter, including a calendar-month change during a long run.
+            // TEST and production modes use separate AppData roots.
+            let handle = app.handle().clone();
+            std::thread::spawn(move || loop {
+                let db = handle.state::<Database>();
+                if let Ok(conn) = db.connection.lock() {
+                    if let Err(reason) = backup_manager::automatic_backup_if_needed(
+                        &conn, &db.base, Local::now().date_naive()) {
+                        eprintln!("반도허브 자동 백업 실패 (재시도 예정): {reason}");
+                    }
+                }
+                std::thread::sleep(std::time::Duration::from_secs(1800));
+            });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
