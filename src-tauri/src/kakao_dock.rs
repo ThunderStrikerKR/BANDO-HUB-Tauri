@@ -241,18 +241,19 @@ mod native {
         s.mode=Mode::Overlap;
         Ok(())
     }
+    fn kakao_width(desired:i32,scale:f64)->i32 {
+        desired.clamp((392.0*scale).ceil() as i32,(620.0*scale).ceil() as i32)
+    }
     fn split_rect(work:Rect,desired:i32,scale:f64)->Result<(Rect,Rect),String>{
         if !scale.is_finite()||!(0.5..=8.0).contains(&scale){
             return Err("모니터 DPI 배율을 확인할 수 없습니다.".into())
         }
         // Windows desktop work areas use physical pixels; Tauri minWidth/
         // minHeight and the CSS layout use logical units.
-        let minimum_kakao=(392.0*scale).ceil() as i32;
-        let maximum_kakao=(620.0*scale).ceil() as i32;
         let minimum_main=(1024.0*scale).ceil() as i32;
         let minimum_height=(700.0*scale).ceil() as i32;
         let gap=(8.0*scale).ceil() as i32;
-        let k=desired.clamp(minimum_kakao,maximum_kakao);
+        let k=kakao_width(desired,scale);
         if work.width()<k+gap+minimum_main||work.height()<minimum_height{
             return Err("나누어 보기는 모니터 공간이 부족합니다. 겹쳐 보기를 이용하세요.".into())
         }
@@ -306,7 +307,8 @@ mod native {
                 return Err("모니터 DPI 배율을 확인할 수 없습니다.".into())
             }
             let gap=(8.0*scale).ceil() as i32;
-            let target=Rect{left:main.left-s.width-gap,top:main.top,
+            let width=kakao_width(s.width,scale);
+            let target=Rect{left:main.left-width-gap,top:main.top,
                 right:main.left-gap,bottom:main.bottom};
             let work=monitor_work(s.main)?;
             if target.left>=work.left && target.right<=work.right
@@ -491,6 +493,8 @@ mod native {
             assert_eq!(kakao.left,-2560);
             assert_eq!(kakao.width(),588);
             assert_eq!(main.left-kakao.right,12);
+            assert_eq!(kakao_width(420,1.5),588);
+            assert_eq!(kakao_width(900,1.0),620);
             assert!(main.width()>=1536);
             assert_eq!(main.right,0);
             assert!(split_rect(Rect{left:0,top:0,right:1920,bottom:1080},
