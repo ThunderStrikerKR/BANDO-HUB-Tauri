@@ -232,8 +232,11 @@ mod tests {
         conn.execute_batch("CREATE TABLE unrelated(value TEXT);
             INSERT INTO unrelated(value) VALUES ('preserve this record');").unwrap();
         drop(conn);
-        let result = open_checked_sqlite(&path);
-        assert!(result.unwrap_err().contains("자동 초기화하지 않았습니다"));
+        let message = match open_checked_sqlite(&path) {
+            Ok(_) => panic!("기존 DB를 새로 초기화하면 안 됩니다"),
+            Err(error) => error,
+        };
+        assert!(message.contains("자동 초기화하지 않았습니다"));
         let conn = Connection::open(&path).unwrap();
         let table_count: i64 = conn.query_row(
             "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='app_state'",
