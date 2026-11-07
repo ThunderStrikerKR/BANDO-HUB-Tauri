@@ -168,11 +168,11 @@ export function itemFromProduct(
     ((p.variants.length === 1 && !p.requiresOption) ||
     (p.variants.length > 1 && !!color && !p.requiresOption && eligible.length === 1)
       ? eligible[0] : undefined);
-  const technicalCode = /^(?:P[A-Z0-9]{6,}|BANDO-SITE-|SITE-)/i.test(p.code);
+  // Preserve the curated business-facing product label for every order line.
+  // Distinct products can share a model code (e.g. instrument/fixture variants).
   const basicName = (p.name || p.code).replace(/^반도스탠드\s*/i, "").trim();
-  const baseName = p.variants.length > 1 && !technicalCode ? p.code : basicName;
   const detail = p.variants.length > 1 ? (v?.option ?? "").trim() : "";
-  const productName = [baseName, ...(detail ? [detail] : [])].join(" / ");
+  const productName = [basicName, ...(detail ? [detail] : [])].join(" / ");
   const configurationIncomplete = !!v && ["가방", "바퀴"].some((kind) => {
     const pattern = new RegExp(kind + "\\s*(?:미포함|포함|미장착|장착|없음|있음)");
     return p.variants.some((variant) => pattern.test(variant.option ?? "")) &&
