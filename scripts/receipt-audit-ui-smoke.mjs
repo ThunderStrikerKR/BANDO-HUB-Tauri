@@ -130,6 +130,15 @@ try {
             window.__lastOpenedExportId = args.id;
             return undefined;
           }
+          if (command === "catalog_report") return {
+            collectedAt: "2026-11-01T17:42:45.411Z", categories: [], failures: [],
+            products: [
+              { siteId: "704", name: "검증용 보면대 704",
+                variants: [{ url: "https://bandostand.com/product/detail.html?product_no=704" }] },
+              { siteId: "705", name: "검증용 스피커 705",
+                variants: [{ url: "https://bandostand.com/product/detail.html?product_no=705" }] },
+            ],
+          };
           if (command === "state_load") return structuredClone(state);
           if (command === "backup_create") return "CI-SQLITE-BACKUP";
           if (command === "save_store_workbook") {
@@ -227,8 +236,19 @@ try {
   await page.getByRole("dialog", { name: "작업 확인" })
     .getByRole("button", { name: "확인", exact: true }).click();
   await page.waitForFunction(() => window.__storeCommit?.status === "STORE_SENT");
+  // Cached product discovery must only populate the URL. No price or DB
+  // update may occur until the separate live detail review is approved.
+  await nav.getByRole("button", { name: "상품 관리" }).click();
+  await page.getByRole("button", { name: "상품 추가" }).click();
+  await page.getByRole("button", { name: "내장 수집본에서 상품 찾기" }).click();
+  await page.getByText("2026년 11월 1일에 저장된 카탈로그의 상품 링크 2개입니다.", { exact: false }).waitFor();
+  await page.getByRole("textbox", { name: "수집본 상품 검색" }).fill("704");
+  await page.getByText("검색 결과 1개 / 최대 40개 표시").waitFor();
+  await page.getByRole("button", { name: "검증용 보면대 704" }).click();
+  assert.equal(await page.locator('input[placeholder^="https://bandostand.com/product/"]').inputValue(),
+    "https://bandostand.com/product/detail.html?product_no=704");
   assert.deepEqual(pageErrors, [], "React runtime errors: " + pageErrors.join("\n"));
-  console.log("PASS: audit UI, KakaoTalk docking, STORE Excel Save As and separate shipping confirmation (mock native IPC)");
+  console.log("PASS: audit UI, KakaoTalk docking, STORE shipping, cached official URL picker (mock native IPC)");
 } finally {
   if (browser) await browser.close();
   server.kill("SIGTERM");
