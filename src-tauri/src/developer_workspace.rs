@@ -140,6 +140,28 @@ pub fn reset_test_database(db: State<'_, Database>, revision: u64) -> Result<Val
     Ok(json!({"backup":backup}))
 }
 
+// Evaluate the same Rust reception boundary that state_save uses, but never
+// open a transaction for writing. A passing verdict is not a committed order.
+fn dry_run_reception_boundary(conn: &Connection, candidate: Value) -> Result<Value, String> {
+    let before = get_snapshot(conn)?;
+    let mut next = before.clone();
+    let orders = next["orders"].as_array_mut().ok_or("시험 주문 목록 형식 오류")?;
+    orders.push(candidate);
+    let verdict = reception::validate_reception(&before, &next);
+    Ok(match verdict {
+        Ok(()) => json!({"accepted":true,"reason":null}),
+        Err(reason) => json!({"accepted":false,"reason":reason}),
+    })
+}
+#[tauri::command]
+pub fn test_reception_boundary(db: State<'_, Database>, candidate: Value) -> Result<Value, String> {
+    if !db.is_test {
+        return Err("정식 업무 데이터베이스에서 저장 경계 모의 검사를 실행할 수 없습니다.".into());
+    }
+    let conn = lock_db(&db)?;
+    dry_run_reception_boundary(&conn, candidate)
+}
+
 #[tauri::command]
 pub fn test_record_run(db: State<'_, Database>, report: Value) -> Result<(), String> {
     if !db.is_test { return Err("시험 결과는 격리된 작업공간에서만 저장합니다.".into()); }
@@ -218,6 +240,22 @@ mod tests {
         assert_eq!(get_snapshot(&original).unwrap(),before);
         drop(test_conn);
         drop(original);
+        fs::remove_dir_all(base).unwrap();
+    }
+    #[test]
+    fn native_reception_probe_rejects_unconfirmed_order_without_writing() {
+        let base = temp_base();
+        let path = base.join("boundary-test.sqlite");
+        let conn = initialize_database(&path).unwrap();
+        let before = get_snapshot(&conn).unwrap();
+        let result = dry_run_reception_boundary(&conn, json!({
+            "id":"synthetic-not-confirmed","receptionVersion":1,
+            "clientId":"fake","raw":"709 3개","recipients":[]
+        })).unwrap();
+        assert_eq!(result["accepted"],false);
+        assert!(result["reason"].as_str().unwrap().contains("주문 확인 완료"));
+        assert_eq!(get_snapshot(&conn).unwrap(),before);
+        drop(conn);
         fs::remove_dir_all(base).unwrap();
     }
     #[test]
