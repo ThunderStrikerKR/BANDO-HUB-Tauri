@@ -168,7 +168,7 @@ export function DeveloperModalWorkbench({ state, raw, onNotice, onRecorded }: {
       return <RegistrationManager state={fixtures.working} onNotice={onNotice}
         onSave={noProductionWrite} onRefresh={async () => {}}/>;
     if (popup === "reply")
-      return <FactoryReplyImport onNotice={onNotice}
+      return <FactoryReplyImport previewOnly onNotice={onNotice}
         onSave={noProductionWrite} onRefresh={async () => {}}/>;
     return <ReceiptArchive/>;
   };
