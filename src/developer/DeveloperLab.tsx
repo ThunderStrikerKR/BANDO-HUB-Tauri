@@ -3,7 +3,7 @@ import { useAsyncTask } from "../shared/useAsyncTask";
 import type { NoticeSink } from "../shared/notices";
 import type { DeveloperRunHistory, DeveloperTestReport, State } from "../types";
 import { DeveloperModalWorkbench } from "./DeveloperModalWorkbench";
-import { developerCases, exampleRaw, expectedOptions, inspectOrder, type CaseId } from "./scenarios";
+import { developerCases, diagnosticOrder, exampleRaw, expectedOptions, inspectOrder, type CaseId } from "./scenarios";
 
 export function DeveloperLab({ state, onNotice, revision }: {
   state: State;
@@ -43,14 +43,55 @@ export function DeveloperLab({ state, onNotice, revision }: {
       "기대 조건과 실제 결과가 다릅니다. 세부 이슈를 확인하세요.",
       report.passed ? "success" : "error");
   });
+  const inspectNativeBoundary = () => void run(async () => {
+    const api = window.bando;
+    if (!api?.isTestWorkspace || !api.testReceptionBoundary || !api.testRecordRun ||
+      !api.testRunHistory) {
+      throw Error("Rust 저장 경계 검증은 격리 테스트 작업공간에서만 실행할 수 있습니다.");
+    }
+    const live = await api.load();
+    const candidate = diagnosticOrder(live, raw, clientId);
+    // This is intentionally an unconfirmed draft; native save must block it.
+    // No Tauri state_save or SQLite write is issued by this inspection.
+    const result = await api.testReceptionBoundary(candidate);
+    const report: DeveloperTestReport = {
+      scenario: "Rust 저장 경계 / 접수 미확정 차단",
+      raw, passed: !result.accepted,
+      expected: ["주문 확인 완료 전 저장 거부"],
+      detected: [result.accepted ? "저장 경계 통과 (오류)" : "저장 경계 차단 (정상)"],
+      recipients: candidate.recipients.map((r) => ({
+        name: r.name, address: r.address, contact: r.mobile || r.phone,
+        items: r.items.map((i) => i.name || i.raw),
+      })),
+      notes: [result.reason || "검증 경계가 주문을 허용했습니다.",
+        "저장하지 않는 Rust 검증 함수만 호출했습니다. DB에 주문을 생성하지 않았습니다.",
+        "각 발주서 오류의 SQLite 트랜잭션 통합 시험과는 구분해야 합니다."],
+    };
+    await api.testRecordRun(report);
+    setLatest(report);
+    setHistory(await api.testRunHistory());
+    onNotice(report.passed ? "Rust 저장 경계에서 미확정 주문을 차단했습니다." :
+      "미확정 주문을 차단하지 못했습니다. 즉시 확인이 필요합니다.",
+      report.passed ? "success" : "error");
+  });
   const executeAll = () => void run(async () => {
     const api = window.bando;
     if (!api?.isTestWorkspace || !api.testRecordRun || !api.testRunHistory) {
       throw Error("격리 테스트 작업공간이 아닙니다.");
     }
     const live = await api.load();
-    const reports = developerCases.filter((item) => item.batch !== false).map((item) =>
-      inspectOrder(live, item.id, exampleRaw(item.id, live)));
+    const reports = developerCases.filter((item) => item.batch !== false).map((item) => {
+      const input = exampleRaw(item.id, live);
+      try {
+        return inspectOrder(live, item.id, input);
+      } catch (error) {
+        return {
+          scenario: item.label, raw: input, passed: false,
+          expected: ["시나리오 정상 실행"], detected: ["시나리오 실행 예외"],
+          recipients: [], notes: [String(error)],
+        } satisfies DeveloperTestReport;
+      }
+    });
     for (const report of reports) await api.testRecordRun(report);
     setHistory(await api.testRunHistory());
     setBatchResults(reports);
@@ -100,6 +141,7 @@ export function DeveloperLab({ state, onNotice, revision }: {
         <div className="actions">
           <button disabled={busy} className="primary" onClick={execute}>현재 발주서 검사</button>
           <button disabled={busy} onClick={executeAll}>기본 시나리오 전체 검사</button>
+          <button disabled={busy} onClick={inspectNativeBoundary}>Rust 저장 차단 검사</button>
         </div>
         {batchResults.length > 0 && (
           <section className="developer-test-result" aria-label="일괄 발주서 검증 결과">
