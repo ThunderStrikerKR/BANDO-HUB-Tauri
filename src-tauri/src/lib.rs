@@ -4,6 +4,7 @@ mod factory_reply_watch;
 mod export_file;
 mod kakao_dock;
 mod developer_workspace;
+mod startup_recovery;
 mod backup_manager;
 #[cfg(target_os = "windows")]
 mod single_instance;
@@ -864,6 +865,22 @@ async fn fetch_official_product_html(target: String) -> Result<String, String> {
 }
 
 
+fn start_automatic_backup(app: tauri::AppHandle) {
+    let handle = app;
+            std::thread::spawn(move || {
+                let db = handle.state::<Database>();
+                match db.connection.lock() {
+                    Ok(conn) => {
+                        if let Err(reason) = backup_manager::automatic_backup_if_needed(
+                            &conn, &db.base, Local::now().date_naive()) {
+                            eprintln!("반도허브 자동 백업 실패 (다음 실행 시 재시도): {reason}");
+                        }
+                    }
+                    Err(reason) => eprintln!("반도허브 자동 백업 DB 잠금 실패: {reason}"),
+                };
+            });
+}
+
 pub fn run() {
     // Acquire before Tauri constructs any window or connects to SQLite.
     // The isolated developer TEST process uses a separate named guard so
@@ -884,34 +901,14 @@ pub fn run() {
             #[cfg(target_os = "windows")]
             single_instance::listen(instance, app.handle().clone())
                 .map_err(std::io::Error::other)?;
-            let base = app.path().app_data_dir()?;
-            fs::create_dir_all(&base)?;
+            // Keep the native window alive on initialization failures. The
+            // managed StartupRecovery owns the diagnosis until a guarded retry
+            // successfully registers a Database; no failed database is managed.
             let is_test = std::env::args().skip(1)
                 .any(|argument| argument == "--bando-developer-test");
-            let (active_base, conn) = if is_test {
-                developer_workspace::open_isolated(&base).map_err(std::io::Error::other)?
-            } else {
-                let conn = initialize_database(&base.join("bando-hub-v001.sqlite"))
-                    .map_err(std::io::Error::other)?;
-                (base, conn)
-            };
-            app.manage(Database { connection: Mutex::new(conn), base: active_base, is_test });
-            // Attempt one automatic backup per app launch, not periodically.
-            // A second launch on the same date does not create another backup.
-            // TEST and production modes use separate AppData roots.
-            let handle = app.handle().clone();
-            std::thread::spawn(move || {
-                let db = handle.state::<Database>();
-                match db.connection.lock() {
-                    Ok(conn) => {
-                        if let Err(reason) = backup_manager::automatic_backup_if_needed(
-                            &conn, &db.base, Local::now().date_naive()) {
-                            eprintln!("반도허브 자동 백업 실패 (다음 실행 시 재시도): {reason}");
-                        }
-                    }
-                    Err(reason) => eprintln!("반도허브 자동 백업 DB 잠금 실패: {reason}"),
-                };
-            });
+            let startup = startup_recovery::StartupRecovery::new(is_test);
+            startup_recovery::initial_open(app.handle(), &startup);
+            app.manage(startup);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -926,6 +923,9 @@ pub fn run() {
             kakao_dock::dock_cycle_native, kakao_dock::dock_start_native,
             kakao_dock::dock_select_native, kakao_dock::dock_stop_native,
             kakao_dock::dock_region_native,
+            startup_recovery::startup_status,
+            startup_recovery::startup_metrics,
+            startup_recovery::retry_startup,
             developer_workspace::workspace_mode,
             developer_workspace::open_test_workspace,
             developer_workspace::test_database_preview,
