@@ -86,9 +86,9 @@ test("real XLSX: store queue produces 15 Logen columns without guessing parcel c
   const row = sheet.getRow(2);
   assert.equal(row.getCell(1).value, "김수취");
   assert.equal(row.getCell(5).value, "010-0011-2233");
-  assert.equal(row.getCell(2).value, null); // Never guess consignee postcodes.
-  assert.equal(row.getCell(6).value, null); // Parcel count is staff-entered.
-  assert.equal(row.getCell(7).value, null); // Billed shipping != actual postage.
+  assert.equal(row.getCell(2).value, ""); // Never guess consignee postcodes.
+  assert.equal(row.getCell(6).value, ""); // Parcel count is staff-entered.
+  assert.equal(row.getCell(7).value, ""); // Billed shipping != actual postage.
   assert.equal(row.getCell(8).value, "010");
   assert.equal(row.getCell(9).value, "기타줄 블랙 3개");
   assert.equal(row.getCell(10).value, "문 앞");

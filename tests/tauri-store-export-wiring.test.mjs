@@ -23,7 +23,7 @@ test("a printed store workbook stays pending until a separately confirmed shipme
  assert.match(ui,/q!\.origin === "STORE"/);
  assert.match(ui,/매장 발송 확인/);
  assert.match(ui,/markStoreSent\(state, q!\.id\)/);
- assert.match(work,/!\\["QUEUED", "EXPORTED"\\]\.includes\(q\.status\)/);
+ assert.ok(work.includes('!["QUEUED", "EXPORTED"].includes(q.status)'));
  assert.match(work,/q\.fileOnly = false/);
  assert.match(model,/entry\.status = "EXPORTED"/);
  assert.match(model,/entry\.fileOnly = true/);
