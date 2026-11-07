@@ -424,7 +424,8 @@ fn receipt_archive(db: State<'_, Database>) -> Result<Value, String> {
 
 #[tauri::command]
 fn backup_create(db: State<'_, Database>) -> Result<String, String> {
-    backup_manager::manual_backup(&lock_db(&db)?, &db.base)
+    let conn = lock_db(&db)?;
+    backup_manager::manual_backup(&conn, &db.base)
 }
 #[tauri::command]
 fn backup_list(db: State<'_, Database>) -> Result<Vec<String>, String> {
@@ -434,7 +435,8 @@ fn backup_list(db: State<'_, Database>) -> Result<Vec<String>, String> {
 fn backup_restore(db: State<'_, Database>, filename: String) -> Result<(), String> {
     // Hold the live DB mutex for the full preflight, safety copy, and restore.
     // Another app command cannot mutate the DB between those operations.
-    backup_manager::restore_backup(&mut lock_db(&db)?, &db.base, &filename)?;
+    let mut conn = lock_db(&db)?;
+    backup_manager::restore_backup(&mut conn, &db.base, &filename)?;
     Ok(())
 }
 
@@ -890,7 +892,7 @@ pub fn run() {
                         }
                     }
                     Err(reason) => eprintln!("반도허브 자동 백업 DB 잠금 실패: {reason}"),
-                }
+                };
             });
             Ok(())
         })
