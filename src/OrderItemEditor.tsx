@@ -29,6 +29,7 @@ export function OrderItemEditor({
     [search, setSearch] = useState(false);
   const p = state.products.find((p) => p.id === draft.productId),
     change = (p: Product) => {
+      if (p.variants.length !== 1) throw Error("이 항목은 판매 구성이 여러 개이므로 독립 상품으로 전환 후 선택해야 합니다.");
       setDraft({
         ...itemFromProduct(p, client,
           p.variants.length === 1 && !p.requiresOption ? p.variants[0]?.color : undefined,
@@ -59,31 +60,6 @@ export function OrderItemEditor({
         <button disabled={locked} onClick={() => setSearch(true)}>
           상품 변경
         </button>
-        <Field label="옵션">
-          <select
-            disabled={locked || !p}
-            value={draft.variantId ?? ""}
-            onChange={(e) => {
-              const v = p?.variants.find((v) => v.id === e.target.value);
-              if (p && v)
-                setDraft({
-                  ...draft,
-                  ...itemFromProduct(p, client, v.color, draft.quantity, v.id),
-                  id: item.id,
-                  raw: item.raw,
-                  sources: item.sources,
-                  quantityConfirmed: draft.quantityConfirmed,
-                  manuallyConfirmed: true,
-                });
-            }}
-          >
-            {p?.variants.map((v) => (
-              <option key={v.id} value={v.id}>
-                {v.color} {v.option}
-              </option>
-            ))}
-          </select>
-        </Field>
         <Field label="수량">
           <input
             disabled={locked}
