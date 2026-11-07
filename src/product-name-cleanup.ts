@@ -23,6 +23,28 @@ export interface ProductNameCleanupPreview {
 const PREFIX = /^\s*(?:반도스탠드|bandostand)\s*/i;
 const SITE_CODE = /^(?:P[A-Z0-9]{5,}|SITE-|BANDO-SITE-)/i;
 const KNOWN_MODEL = /\b(?:Cart[-\s]?\d+|Boss[-\s]?\d+|GT-\d+|LP-[A-Za-z0-9-]+|BL-\d+|1200A|MISpeech|Cupholder|Sheet\s+magnetic|MusicTray[A-Za-z0-9]*)\b/gi;
+// When two sellable configurations differ by contents, neither side may
+// rely on an implicit default. In particular, "미포함" is never omitted.
+// This function only labels explicit evidence; it never invents a missing SKU.
+const BINARY_CONTENT = /(가방|바퀴)\s*(미포함|포함|미장착|장착|없음|있음)/g;
+function contentsOf(text: string): { label: string; kind: string; negative: boolean; raw: string }[] {
+  const found: { label: string; kind: string; negative: boolean; raw: string }[] = [];
+  for (const match of text.matchAll(BINARY_CONTENT)) {
+    const negative = /^(?:미포함|미장착|없음)$/.test(match[2]);
+    found.push({ label: match[1] + " " + (negative ? "미포함" : "포함"),
+      kind: match[1], negative, raw: match[0] });
+  }
+  return found;
+}
+function variantContentsAreUnambiguous(product: Product): boolean {
+  if (product.variants.length <= 1) return true;
+  for (const kind of ["가방", "바퀴"]) {
+    const labels = product.variants.map((v) => contentsOf((v.option ?? "") + " " + v.color)
+      .find((tag) => tag.kind === kind));
+    if (labels.some(Boolean) && labels.some((value) => !value)) return false;
+  }
+  return true;
+}
 const escapeRegex = (value: string) => value.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&");
 const spaces = (value: string) => value.replace(/\s+/g, " ").trim();
 
@@ -49,6 +71,7 @@ function descriptionFromTitle(name: string, model: string): string {
   const flexibleModel = model.split(/\s+/).map(escapeRegex).join("\\s*");
   const matcher = new RegExp("(?<![A-Za-z0-9])" + flexibleModel + "(?![A-Za-z0-9])", "i");
   const remainder = title.replace(matcher, " ")
+    .replace(BINARY_CONTENT, " ")
     .replace(/^\s*(?:BD\s+)?반도스탠드\s*/i, "")
     .replace(/^\s*BD\s+(?=[가-힣])/, "")
     .replace(/\(\s*\)/g, "")
@@ -71,18 +94,29 @@ export function previewProductNameCleanup(state: State): ProductNameCleanupPrevi
     if (product.catalog === "BANDOMALL" || !PREFIX.test(product.name)) continue;
     const existing = product.subtitle ?? "";
     const model = resolveModel(product);
-    if (!model) {
+    const qualifiers = contentsOf(product.name);
+    const otherVariants = registeredProducts(state.products).filter((other) =>
+      other.id !== product.id && (other.catalog ?? "BANDOSTAND") === (product.catalog ?? "BANDOSTAND") &&
+      other.code.replace(/\s/g, "").toUpperCase() === product.code.replace(/\s/g, "").toUpperCase());
+    const ambiguousSibling = otherVariants.some((other) =>
+      ["가방", "바퀴"].some((kind) =>
+        contentsOf(other.name).some((item) => item.kind === kind) &&
+        !qualifiers.some((item) => item.kind === kind)));
+    if (!model || !variantContentsAreUnambiguous(product) || ambiguousSibling) {
       rows.push({
         productId: product.id, code: product.code, oldName: product.name, newName: product.name,
         oldDescription: existing, newDescription: existing,
-        status: "HOLD", reason: "모델명을 확정할 수 없습니다. 상세관리에서 수동으로 확인하세요.",
+        status: "HOLD", reason: !model ? "모델명을 확정할 수 없습니다. 상세관리에서 수동으로 확인하세요." :
+          "가방 또는 바퀴의 포함 / 미포함 구분이 누락됐습니다. 실제 상품 구성을 확인하세요.",
       });
       continue;
     }
     const description = combineDescription(descriptionFromTitle(product.name, model.title), existing);
-    if (model.title === product.name && description === existing) continue;
+    const distinctFlags = [...new Set(qualifiers.map((flag) => flag.label))];
+    const displayName = [model.title, ...distinctFlags].join(" / ");
+    if (displayName === product.name && description === existing) continue;
     rows.push({
-      productId: product.id, code: product.code, oldName: product.name, newName: model.title,
+      productId: product.id, code: product.code, oldName: product.name, newName: displayName,
       oldDescription: existing, newDescription: description,
       status: "READY", reason: model.reason,
     });
