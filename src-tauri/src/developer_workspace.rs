@@ -126,7 +126,8 @@ fn backup_test_and_reset(conn: &mut Connection, base: &Path, expected_revision: 
 #[tauri::command]
 pub fn reset_test_database(db: State<'_, Database>, revision: u64) -> Result<Value, String> {
     if !db.is_test { return Err("정식 업무 데이터베이스는 개발자 모드에서 초기화할 수 없습니다.".into()); }
-    let backup = backup_test_and_reset(&mut lock_db(&db)?, &db.base, revision)?;
+    let mut conn = lock_db(&db)?;
+    let backup = backup_test_and_reset(&mut *conn, &db.base, revision)?;
     Ok(json!({"backup":backup}))
 }
 

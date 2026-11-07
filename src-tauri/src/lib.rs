@@ -271,9 +271,12 @@ fn state_load(db: State<'_, Database>) -> Result<Value, String> { get_snapshot(&
 
 #[tauri::command]
 fn state_save(db: State<'_, Database>, state: Value) -> Result<(), String> {
-    if db.is_test && state["settings"]["excelDirectory"].as_str()
-        != Some(db.base.join("Excel").to_string_lossy().as_ref()) {
-        return Err("테스트 작업공간 Excel 보관함은 변경할 수 없습니다.".into());
+    if db.is_test {
+        let protected_root = canonical_excel_directory(&db.base.join("Excel"))?;
+        if state["settings"]["excelDirectory"].as_str()
+            != Some(protected_root.to_string_lossy().as_ref()) {
+            return Err("테스트 작업공간 Excel 보관함은 변경할 수 없습니다.".into());
+        }
     }
     let revision = state["revision"].as_u64().ok_or("변경 이력이 없는 데이터를 저장할 수 없습니다.")?;
     write_snapshot(&mut *lock_db(&db)?, state, revision, true)?;
