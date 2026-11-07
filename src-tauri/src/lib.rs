@@ -209,6 +209,7 @@ fn validate_accounts(state: &Value) -> Result<(), String> {
 }
 fn initialize_database(path: &Path) -> Result<Connection, String> {
     let mut conn = Connection::open(path).map_err(err)?;
+    relational_store::backup_legacy_if_needed(&conn,path)?;
     conn.execute_batch(r#"
         PRAGMA journal_mode=WAL;
         PRAGMA busy_timeout=5000;
