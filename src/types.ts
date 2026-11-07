@@ -561,6 +561,7 @@ export interface Api {
   workspaceMode?: () => Promise<boolean>;
   testRecordRun?: (report: DeveloperTestReport) => Promise<void>;
   testRunHistory?: () => Promise<DeveloperRunHistory[]>;
+  testReceptionBoundary?: (candidate: Order) => Promise<{ accepted: boolean; reason: string | null }>;
   openTestWorkspace?: () => Promise<void>;
   testDatabasePreview?: () => Promise<
     | { enabled: false }
