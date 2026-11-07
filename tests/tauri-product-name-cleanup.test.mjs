@@ -146,6 +146,8 @@ test("Missing opposite configuration is not silently assumed or auto-created", (
   const row=preview.rows.find((r)=>r.productId===sibling.id);
   assert.equal(row.status,"HOLD");
   assert.match(row.reason,/색상|구성품|선택 옵션/);
+  assert.equal(preview.rows.find((r)=>r.productId===parent.id).status,"HOLD",
+    "Entire unresolved option family must remain on review");
   const applied=applyProductNameCleanup(fixture,preview);
   assert.equal(applied.next.products.length,fixture.products.length);
   assert.equal(applied.next.products.find((p)=>p.id===sibling.id).name,sibling.name);
