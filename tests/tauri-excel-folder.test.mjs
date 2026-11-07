@@ -10,7 +10,9 @@ test("one native Excel archive directory for all five business categories",()=>{
     assert.match(rust,new RegExp("fn "+cmd+"\\("));
   }
   for(const cat of ["공장 발송","매장 발송","공장 회신","상품 관리","거래처 관리"]) assert.ok(rust.includes('"'+cat+'"'));
-  assert.match(rust,/saved_excel_directory\(&state\["settings"\]\)\?/);
+  assert.match(rust,/workspace_excel_directory\(&db, &state\["settings"\]\)\?/);
+  assert.match(rust,/if db\.is_test/);
+  assert.match(rust,/saved_excel_directory\(settings\)/);
   assert.match(rust,/fn archive_daily_directory/);
   assert.match(rust,/create_new\(true\)/);
   assert.match(rust,/archive_workbook_bytes\(&root, WorkbookKind::FactoryReply/);
