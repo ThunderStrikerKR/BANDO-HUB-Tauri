@@ -3724,7 +3724,7 @@
       "siteCode": "P00000DG",
       "catalog": "BANDOSTAND",
       "code": "BD IS-SG",
-      "name": "BD IS-SG (Gray)",
+      "name": "BD IS-SG / 그레이",
       "modelCodes": [
         "BD IS-SG"
       ],
@@ -3764,7 +3764,7 @@
       "siteCode": "P00000DH",
       "catalog": "BANDOSTAND",
       "code": "BD IS-SBK",
-      "name": "BD IS-SBK(Black)",
+      "name": "BD IS-SBK / 블랙",
       "modelCodes": [
         "BD IS-SBK"
       ],
@@ -3804,7 +3804,7 @@
       "siteCode": "P00000DI",
       "catalog": "BANDOSTAND",
       "code": "BD 250CC",
-      "name": "BD 250CC (250원형크롬)",
+      "name": "BD 250CC / 원형 / 크롬",
       "modelCodes": [
         "BD 250CC"
       ],
@@ -3844,7 +3844,7 @@
       "siteCode": "P00000DJ",
       "catalog": "BANDOSTAND",
       "code": "BD 250HC",
-      "name": "BD 250HC (250헤비크롬)",
+      "name": "BD 250HC / 헤비 / 크롬",
       "modelCodes": [
         "BD 250HC"
       ],
@@ -3884,7 +3884,7 @@
       "siteCode": "P00000DK",
       "catalog": "BANDOSTAND",
       "code": "BD 250SC",
-      "name": "BD 250SC (250스타크롬)",
+      "name": "BD 250SC / 스타 / 크롬",
       "modelCodes": [
         "BD 250SC"
       ],
@@ -3924,7 +3924,7 @@
       "siteCode": "P00000DL",
       "catalog": "BANDOSTAND",
       "code": "BD 250CBK",
-      "name": "BD 250CBK (250원형블랙)",
+      "name": "BD 250CBK / 원형 / 블랙",
       "modelCodes": [
         "BD 250CBK"
       ],
@@ -3964,7 +3964,7 @@
       "siteCode": "P00000DM",
       "catalog": "BANDOSTAND",
       "code": "BD IS-CC",
-      "name": "BD IS-CC (IS-원형크롬)",
+      "name": "BD IS-CC / 원형 / 크롬",
       "modelCodes": [
         "BD IS-CC"
       ],
@@ -4004,7 +4004,7 @@
       "siteCode": "P00000DN",
       "catalog": "BANDOSTAND",
       "code": "BD 250HBK",
-      "name": "BD 250HBK (250헤비블랙)",
+      "name": "BD 250HBK / 헤비 / 블랙",
       "modelCodes": [
         "BD 250HBK"
       ],
@@ -4044,7 +4044,7 @@
       "siteCode": "P00000DO",
       "catalog": "BANDOSTAND",
       "code": "BD IS-HC",
-      "name": "BD IS-HC (IS-헤비크롬)",
+      "name": "BD IS-HC / 헤비 / 크롬",
       "modelCodes": [
         "BD IS-HC"
       ],
@@ -4084,7 +4084,7 @@
       "siteCode": "P00000DP",
       "catalog": "BANDOSTAND",
       "code": "BD IS-SC",
-      "name": "BD IS-SC (IS-스타크롬)",
+      "name": "BD IS-SC / 스타 / 크롬",
       "modelCodes": [
         "BD IS-SC"
       ],
@@ -4124,7 +4124,7 @@
       "siteCode": "P00000DQ",
       "catalog": "BANDOSTAND",
       "code": "BD 250SBK",
-      "name": "BD 250SBK (250스타블랙)",
+      "name": "BD 250SBK / 스타 / 블랙",
       "modelCodes": [
         "BD 250SBK"
       ],
@@ -4244,7 +4244,7 @@
       "siteCode": "P00000DT",
       "catalog": "BANDOSTAND",
       "code": "BD Drum",
-      "name": "BD Drum.IS (접이 IS)",
+      "name": "BD Drum.IS / 접이식",
       "modelCodes": [
         "BD Drum"
       ],
@@ -4276,7 +4276,8 @@
       "updatedAt": "2026-11-01T17:27:12.578Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 BD Drum.IS (접이 IS)"
+      "originalName": "반도스탠드 BD Drum.IS (접이 IS)",
+      "subtitle": "원본 표기: 접이 IS"
     },
     {
       "id": "bando-site-339",
@@ -4324,7 +4325,7 @@
       "siteCode": "P00000FK",
       "catalog": "BANDOSTAND",
       "code": "BD ROOM",
-      "name": "BD ROOM 스탠드",
+      "name": "BD ROOM",
       "modelCodes": [
         "BD ROOM"
       ],
@@ -4356,7 +4357,8 @@
       "updatedAt": "2026-11-01T17:27:14.847Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 BD ROOM 스탠드"
+      "originalName": "반도스탠드 BD ROOM 스탠드",
+      "subtitle": "스탠드"
     },
     {
       "id": "bando-site-140",
@@ -4364,7 +4366,7 @@
       "siteCode": "P00000FJ",
       "catalog": "BANDOSTAND",
       "code": "BD BX-1000C",
-      "name": "BD BX-1000C_(바퀴장착형)",
+      "name": "BD BX-1000C / 바퀴 장착형",
       "modelCodes": [
         "BD BX-1000C"
       ],
@@ -4444,7 +4446,7 @@
       "siteCode": "P00000FH",
       "catalog": "BANDOSTAND",
       "code": "BD Z-4",
-      "name": "BD Z-4",
+      "name": "BD Z-4 / 상판 규격 선택",
       "modelCodes": [
         "BD Z-4"
       ],
@@ -4516,7 +4518,8 @@
       "updatedAt": "2026-11-01T17:27:18.487Z",
       "priceHistory": [],
       "requiresOption": true,
-      "originalName": "반도스탠드 BD Z-4"
+      "originalName": "반도스탠드 BD Z-4",
+      "subtitle": "상판 두 개의 규격 조합 선택"
     },
     {
       "id": "bando-site-137",
@@ -4524,7 +4527,7 @@
       "siteCode": "P00000FG",
       "catalog": "BANDOSTAND",
       "code": "BD Z-3",
-      "name": "BD Z-3",
+      "name": "BD Z-3 / 상판 규격 선택",
       "modelCodes": [
         "BD Z-3"
       ],
@@ -4570,7 +4573,8 @@
       "updatedAt": "2026-11-01T17:27:19.682Z",
       "priceHistory": [],
       "requiresOption": true,
-      "originalName": "반도스탠드 BD Z-3"
+      "originalName": "반도스탠드 BD Z-3",
+      "subtitle": "37×29cm와 42×34cm 옵션. 후자는 추가금 표기"
     },
     {
       "id": "bando-site-136",
@@ -4578,7 +4582,7 @@
       "siteCode": "P00000FF",
       "catalog": "BANDOSTAND",
       "code": "BD Z-2",
-      "name": "BD Z-2",
+      "name": "BD Z-2 / 바퀴 선택",
       "modelCodes": [
         "BD Z-2"
       ],
@@ -4624,7 +4628,8 @@
       "updatedAt": "2026-11-01T17:27:20.907Z",
       "priceHistory": [],
       "requiresOption": true,
-      "originalName": "반도스탠드 BD Z-2"
+      "originalName": "반도스탠드 BD Z-2",
+      "subtitle": "바퀴 추가 여부는 옵션에서 확인"
     },
     {
       "id": "bando-site-135",
@@ -4632,7 +4637,7 @@
       "siteCode": "P00000FE",
       "catalog": "BANDOSTAND",
       "code": "BD Z-S",
-      "name": "BD Z-S",
+      "name": "BD Z-S / 바퀴 선택",
       "modelCodes": [
         "BD Z-S"
       ],
@@ -4678,7 +4683,8 @@
       "updatedAt": "2026-11-01T17:27:22.102Z",
       "priceHistory": [],
       "requiresOption": true,
-      "originalName": "반도스탠드 BD Z-S"
+      "originalName": "반도스탠드 BD Z-S",
+      "subtitle": "바퀴 추가 여부는 옵션에서 확인"
     },
     {
       "id": "bando-site-134",
@@ -4686,7 +4692,7 @@
       "siteCode": "P00000FD",
       "catalog": "BANDOSTAND",
       "code": "BD Z",
-      "name": "BD Z",
+      "name": "BD Z / 바퀴 선택",
       "modelCodes": [
         "BD Z"
       ],
@@ -4732,7 +4738,8 @@
       "updatedAt": "2026-11-01T17:27:23.307Z",
       "priceHistory": [],
       "requiresOption": true,
-      "originalName": "반도스탠드 BD Z"
+      "originalName": "반도스탠드 BD Z",
+      "subtitle": "바퀴 추가 여부는 옵션에서 확인"
     },
     {
       "id": "bando-site-133",
@@ -5020,7 +5027,7 @@
       "siteCode": "P00000LM",
       "catalog": "BANDOSTAND",
       "code": "P00000LM",
-      "name": "반도 기타 연주 발판",
+      "name": "기타 연주 발판 / 색상 선택",
       "modelCodes": [],
       "category": "악기 스탠드 > 기타스탠드",
       "categories": [
@@ -5064,7 +5071,8 @@
       "updatedAt": "2026-11-01T17:27:32.927Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 반도 기타 연주 발판"
+      "originalName": "반도스탠드 반도 기타 연주 발판",
+      "subtitle": "블랙 및 실버 옵션"
     },
     {
       "id": "bando-site-296",
@@ -5112,7 +5120,7 @@
       "siteCode": "P00000LF",
       "catalog": "BANDOSTAND",
       "code": "BD BS-100B",
-      "name": "BD BS-100B 색소폰스탠드 (알토,테너 겸용)",
+      "name": "BD BS-100B",
       "modelCodes": [
         "BD BS-100B"
       ],
@@ -5144,7 +5152,8 @@
       "updatedAt": "2026-11-01T17:27:35.332Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 BD BS-100B 색소폰스탠드 (알토,테너 겸용)"
+      "originalName": "반도스탠드 BD BS-100B 색소폰스탠드 (알토,테너 겸용)",
+      "subtitle": "알토 및 테너 겸용 색소폰 스탠드"
     },
     {
       "id": "bando-site-291",
@@ -5152,7 +5161,7 @@
       "siteCode": "P00000LE",
       "catalog": "BANDOSTAND",
       "code": "BD BS-100C",
-      "name": "BD BS-100C 색소폰스탠드 (알토,테너 겸용)",
+      "name": "BD BS-100C",
       "modelCodes": [
         "BD BS-100C"
       ],
@@ -5184,7 +5193,8 @@
       "updatedAt": "2026-11-01T17:27:36.531Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 BD BS-100C 색소폰스탠드 (알토,테너 겸용)"
+      "originalName": "반도스탠드 BD BS-100C 색소폰스탠드 (알토,테너 겸용)",
+      "subtitle": "알토 및 테너 겸용 색소폰 스탠드"
     },
     {
       "id": "bando-site-295",
@@ -5232,7 +5242,7 @@
       "siteCode": "P00000FT",
       "catalog": "BANDOSTAND",
       "code": "BD BC-105",
-      "name": "BD BC-105 (첼로)",
+      "name": "BD BC-105",
       "modelCodes": [
         "BD BC-105"
       ],
@@ -5264,7 +5274,8 @@
       "updatedAt": "2026-11-01T17:27:38.969Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 BD BC-105 (첼로)"
+      "originalName": "반도스탠드 BD BC-105 (첼로)",
+      "subtitle": "첼로용"
     },
     {
       "id": "bando-site-161",
@@ -5272,7 +5283,7 @@
       "siteCode": "P00000GE",
       "catalog": "BANDOSTAND",
       "code": "BD BS-SORP",
-      "name": "BD BS-SORP (소프라노용)",
+      "name": "BD BS-SORP",
       "modelCodes": [
         "BD BS-SORP"
       ],
@@ -5304,7 +5315,8 @@
       "updatedAt": "2026-11-01T17:27:40.163Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 BD BS-SORP (소프라노용)"
+      "originalName": "반도스탠드 BD BS-SORP (소프라노용)",
+      "subtitle": "소프라노용"
     },
     {
       "id": "bando-site-169",
@@ -5352,7 +5364,7 @@
       "siteCode": "P00000LC",
       "catalog": "BANDOSTAND",
       "code": "BD BS-FLUTE",
-      "name": "BD BS-FLUTE (플룻용)",
+      "name": "BD BS-FLUTE",
       "modelCodes": [
         "BD BS-FLUTE"
       ],
@@ -5384,7 +5396,8 @@
       "updatedAt": "2026-11-01T17:27:42.585Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 BD BS-FLUTE (플룻용)"
+      "originalName": "반도스탠드 BD BS-FLUTE (플룻용)",
+      "subtitle": "플루트용"
     },
     {
       "id": "bando-site-148",
@@ -5392,7 +5405,7 @@
       "siteCode": "P00000FR",
       "catalog": "BANDOSTAND",
       "code": "BD BS-107",
-      "name": "BD BS-107 (바이올린)",
+      "name": "BD BS-107",
       "modelCodes": [
         "BD BS-107"
       ],
@@ -5424,7 +5437,8 @@
       "updatedAt": "2026-11-01T17:27:43.781Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 BD BS-107 (바이올린)"
+      "originalName": "반도스탠드 BD BS-107 (바이올린)",
+      "subtitle": "바이올린용"
     },
     {
       "id": "bando-site-160",
@@ -5432,7 +5446,7 @@
       "siteCode": "P00000GD",
       "catalog": "BANDOSTAND",
       "code": "BD BS-Trumpet",
-      "name": "BD BS-Trumpet (트럼펫)",
+      "name": "BD BS-Trumpet",
       "modelCodes": [
         "BD BS-Trumpet"
       ],
@@ -5464,7 +5478,8 @@
       "updatedAt": "2026-11-01T17:27:45.002Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 BD BS-Trumpet (트럼펫)"
+      "originalName": "반도스탠드 BD BS-Trumpet (트럼펫)",
+      "subtitle": "트럼펫용"
     },
     {
       "id": "bando-site-144",
@@ -5472,7 +5487,7 @@
       "siteCode": "P00000FN",
       "catalog": "BANDOSTAND",
       "code": "BD GS",
-      "name": "BD GS (기타스탠드)",
+      "name": "BD GS",
       "modelCodes": [
         "BD GS"
       ],
@@ -5504,7 +5519,8 @@
       "updatedAt": "2026-11-01T17:27:46.227Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 BD GS (기타스탠드)"
+      "originalName": "반도스탠드 BD GS (기타스탠드)",
+      "subtitle": "기타 스탠드"
     },
     {
       "id": "bando-site-145",
@@ -5512,7 +5528,7 @@
       "siteCode": "P00000FO",
       "catalog": "BANDOSTAND",
       "code": "BD GT-100",
-      "name": "BD GT-100(기타, 비올라)",
+      "name": "BD GT-100",
       "modelCodes": [
         "BD GT-100"
       ],
@@ -5545,7 +5561,8 @@
       "updatedAt": "2026-11-01T17:27:47.419Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 BD GT-100(기타, 비올라)"
+      "originalName": "반도스탠드 BD GT-100(기타, 비올라)",
+      "subtitle": "기타 및 비올라용"
     },
     {
       "id": "bando-site-159",
@@ -5553,7 +5570,7 @@
       "siteCode": "P00000GC",
       "catalog": "BANDOSTAND",
       "code": "BD BS-Clarinet",
-      "name": "BD BS-Clarinet (클라리넷)",
+      "name": "BD BS-Clarinet",
       "modelCodes": [
         "BD BS-Clarinet"
       ],
@@ -5585,7 +5602,8 @@
       "updatedAt": "2026-11-01T17:27:48.661Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 BD BS-Clarinet (클라리넷)"
+      "originalName": "반도스탠드 BD BS-Clarinet (클라리넷)",
+      "subtitle": "클라리넷용"
     },
     {
       "id": "bando-site-143",
@@ -5593,7 +5611,7 @@
       "siteCode": "P00000FM",
       "catalog": "BANDOSTAND",
       "code": "BD 109",
-      "name": "BD 109 콘트라베이스",
+      "name": "BD 109",
       "modelCodes": [
         "BD 109"
       ],
@@ -5625,7 +5643,8 @@
       "updatedAt": "2026-11-01T17:27:49.870Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 BD 109 콘트라베이스"
+      "originalName": "반도스탠드 BD 109 콘트라베이스",
+      "subtitle": "콘트라베이스용"
     },
     {
       "id": "bando-site-147",
@@ -5673,7 +5692,7 @@
       "siteCode": "P00000FS",
       "catalog": "BANDOSTAND",
       "code": "BD BS-300T",
-      "name": "BD BS-300T (테너용)",
+      "name": "BD BS-300T",
       "modelCodes": [
         "BD BS-300T"
       ],
@@ -5705,7 +5724,8 @@
       "updatedAt": "2026-11-01T17:27:52.234Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 BD BS-300T (테너용)"
+      "originalName": "반도스탠드 BD BS-300T (테너용)",
+      "subtitle": "테너용"
     },
     {
       "id": "bando-site-142",
@@ -5713,7 +5733,7 @@
       "siteCode": "P00000FL",
       "catalog": "BANDOSTAND",
       "code": "BD BS-300R",
-      "name": "BD BS-300R (알토용)",
+      "name": "BD BS-300R",
       "modelCodes": [
         "BD BS-300R"
       ],
@@ -5745,7 +5765,8 @@
       "updatedAt": "2026-11-01T17:27:53.446Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 BD BS-300R (알토용)"
+      "originalName": "반도스탠드 BD BS-300R (알토용)",
+      "subtitle": "알토용"
     },
     {
       "id": "bando-site-146",
@@ -5793,7 +5814,7 @@
       "siteCode": "P00000GL",
       "catalog": "BANDOSTAND",
       "code": "BD GT-10",
-      "name": "BD GT-10 기타벽걸이(일렉,베이스전용) 옵션 선택",
+      "name": "BD GT-10 / 기타 벽걸이 / 일렉 및 베이스 전용",
       "modelCodes": [
         "BD GT-10"
       ],
@@ -5839,7 +5860,8 @@
       "updatedAt": "2026-11-01T17:27:55.855Z",
       "priceHistory": [],
       "requiresOption": true,
-      "originalName": "반도스탠드 BD GT-10 기타벽걸이(일렉,베이스전용) 옵션 선택"
+      "originalName": "반도스탠드 BD GT-10 기타벽걸이(일렉,베이스전용) 옵션 선택",
+      "subtitle": "평평한 벽 및 스페이스 벽 옵션"
     },
     {
       "id": "bando-site-167",
@@ -5847,7 +5869,7 @@
       "siteCode": "P00000GK",
       "catalog": "BANDOSTAND",
       "code": "BD GT-10",
-      "name": "BD GT-10 기타벽걸이(통기타전용) 옵션 선택",
+      "name": "BD GT-10 / 기타 벽걸이 / 통기타 전용",
       "modelCodes": [
         "BD GT-10"
       ],
@@ -5893,7 +5915,8 @@
       "updatedAt": "2026-11-01T17:27:57.110Z",
       "priceHistory": [],
       "requiresOption": true,
-      "originalName": "반도스탠드 BD GT-10 기타벽걸이(통기타전용) 옵션 선택"
+      "originalName": "반도스탠드 BD GT-10 기타벽걸이(통기타전용) 옵션 선택",
+      "subtitle": "평평한 벽 및 스페이스 벽 옵션"
     },
     {
       "id": "bando-site-166",
@@ -5901,7 +5924,7 @@
       "siteCode": "P00000GJ",
       "catalog": "BANDOSTAND",
       "code": "BD GT-U",
-      "name": "BD GT-U (총길이 7cm)-G",
+      "name": "BD GT-U / G형 / 총길이 7cm",
       "modelCodes": [
         "BD GT-U"
       ],
@@ -5933,7 +5956,8 @@
       "updatedAt": "2026-11-01T17:27:58.273Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 BD GT-U (총길이 7cm)-G"
+      "originalName": "반도스탠드 BD GT-U (총길이 7cm)-G",
+      "subtitle": "원본에 -G 구분 표기"
     },
     {
       "id": "bando-site-165",
@@ -5941,7 +5965,7 @@
       "siteCode": "P00000GI",
       "catalog": "BANDOSTAND",
       "code": "BD GT-U",
-      "name": "BD GT-U (총길이 7cm)-P",
+      "name": "BD GT-U / P형 / 총길이 7cm",
       "modelCodes": [
         "BD GT-U"
       ],
@@ -5973,7 +5997,8 @@
       "updatedAt": "2026-11-01T17:27:59.603Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 BD GT-U (총길이 7cm)-P"
+      "originalName": "반도스탠드 BD GT-U (총길이 7cm)-P",
+      "subtitle": "원본에 -P 구분 표기"
     },
     {
       "id": "bando-site-164",
@@ -5981,7 +6006,7 @@
       "siteCode": "P00000GH",
       "catalog": "BANDOSTAND",
       "code": "BD GT-700",
-      "name": "BD GT-700 (기타스탠드)",
+      "name": "BD GT-700",
       "modelCodes": [
         "BD GT-700"
       ],
@@ -6013,7 +6038,8 @@
       "updatedAt": "2026-11-01T17:28:00.688Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 BD GT-700 (기타스탠드)"
+      "originalName": "반도스탠드 BD GT-700 (기타스탠드)",
+      "subtitle": "기타 스탠드"
     },
     {
       "id": "bando-site-163",
@@ -6021,7 +6047,7 @@
       "siteCode": "P00000GG",
       "catalog": "BANDOSTAND",
       "code": "BD GT-500",
-      "name": "BD GT-500 (기타스탠드)",
+      "name": "BD GT-500",
       "modelCodes": [
         "BD GT-500"
       ],
@@ -6053,7 +6079,8 @@
       "updatedAt": "2026-11-01T17:28:01.882Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 BD GT-500 (기타스탠드)"
+      "originalName": "반도스탠드 BD GT-500 (기타스탠드)",
+      "subtitle": "기타 스탠드"
     },
     {
       "id": "bando-site-162",
@@ -6061,7 +6088,7 @@
       "siteCode": "P00000GF",
       "catalog": "BANDOSTAND",
       "code": "BD GT-300",
-      "name": "BD GT-300 (기타스탠드)",
+      "name": "BD GT-300",
       "modelCodes": [
         "BD GT-300"
       ],
@@ -6093,7 +6120,8 @@
       "updatedAt": "2026-11-01T17:28:03.097Z",
       "priceHistory": [],
       "requiresOption": false,
-      "originalName": "반도스탠드 BD GT-300 (기타스탠드)"
+      "originalName": "반도스탠드 BD GT-300 (기타스탠드)",
+      "subtitle": "기타 스탠드"
     },
     {
       "id": "bando-site-158",
@@ -6101,7 +6129,7 @@
       "siteCode": "P00000GB",
       "catalog": "BANDOSTAND",
       "code": "BD GT-W",
-      "name": "BD GT-W (평평한 벽)",
+      "name": "BD GT-W / 평평한 벽용",
       "modelCodes": [
         "BD GT-W"
       ],
@@ -6141,7 +6169,7 @@
       "siteCode": "P00000GA",
       "catalog": "BANDOSTAND",
       "code": "BD GT-WA",
-      "name": "BD GT-WA (스페이스월)",
+      "name": "BD GT-WA / 스페이스월용",
       "modelCodes": [
         "BD GT-WA"
       ],
@@ -6181,7 +6209,7 @@
       "siteCode": "P00000FZ",
       "catalog": "BANDOSTAND",
       "code": "BD GT-1",
-      "name": "BD GT-1 (총길이 14cm) - 평평한 벽",
+      "name": "BD GT-1 / 길이 14cm / 평평한 벽용",
       "modelCodes": [
         "BD GT-1"
       ],
@@ -6221,7 +6249,7 @@
       "siteCode": "P00000FY",
       "catalog": "BANDOSTAND",
       "code": "BD GT-2",
-      "name": "BD GT-2 (총길이 18cm) - 평평한 벽",
+      "name": "BD GT-2 / 길이 18cm / 평평한 벽용",
       "modelCodes": [
         "BD GT-2"
       ],
@@ -6261,7 +6289,7 @@
       "siteCode": "P00000FX",
       "catalog": "BANDOSTAND",
       "code": "BD GT-3",
-      "name": "BD GT-3 (총길이 24cm) - 평평한 벽",
+      "name": "BD GT-3 / 길이 24cm / 평평한 벽용",
       "modelCodes": [
         "BD GT-3"
       ],
@@ -6301,7 +6329,7 @@
       "siteCode": "P00000FW",
       "catalog": "BANDOSTAND",
       "code": "BD GT-1A",
-      "name": "BD GT-1A (총길이 14cm)",
+      "name": "BD GT-1A / 길이 14cm",
       "modelCodes": [
         "BD GT-1A"
       ],
@@ -6341,7 +6369,7 @@
       "siteCode": "P00000FV",
       "catalog": "BANDOSTAND",
       "code": "BD GT-2A",
-      "name": "BD GT-2A (총길이 18cm)",
+      "name": "BD GT-2A / 길이 18cm",
       "modelCodes": [
         "BD GT-2A"
       ],
@@ -6381,7 +6409,7 @@
       "siteCode": "P00000FU",
       "catalog": "BANDOSTAND",
       "code": "BD GT-3A",
-      "name": "BD GT-3A (총길이 24cm)",
+      "name": "BD GT-3A / 길이 24cm",
       "modelCodes": [
         "BD GT-3A"
       ],
@@ -6421,7 +6449,7 @@
       "siteCode": "P00000GV",
       "catalog": "BANDOSTAND",
       "code": "P00000GV",
-      "name": "BD 반도스피커스탠드 Boss301 (1개)",
+      "name": "Boss301 / 스피커스탠드 / 1개",
       "modelCodes": [],
       "category": "스피커 스탠드 > 벽걸이형 스탠드",
       "categories": [
@@ -6459,7 +6487,7 @@
       "siteCode": "P00000HJ",
       "catalog": "BANDOSTAND",
       "code": "BD AMP-1",
-      "name": "BD AMP-1 (1개 구매 가격, 스파이크 포함)",
+      "name": "BD AMP-1 / 1개 / 스파이크 포함",
       "modelCodes": [
         "BD AMP-1"
       ],
@@ -6499,7 +6527,7 @@
       "siteCode": "P00000GU",
       "catalog": "BANDOSTAND",
       "code": "P00000GU",
-      "name": "BD 반도스피커스탠드 Boss302 (1개)",
+      "name": "Boss302 / 스피커스탠드 / 1개",
       "modelCodes": [],
       "category": "스피커 스탠드 > 벽걸이형 스탠드",
       "categories": [
@@ -6537,7 +6565,7 @@
       "siteCode": "P00000HI",
       "catalog": "BANDOSTAND",
       "code": "BD AMP-2",
-      "name": "BD AMP-2 (1개 구매 가격, 스파이크 포함)",
+      "name": "BD AMP-2 / 1개 / 스파이크 포함",
       "modelCodes": [
         "BD AMP-2"
       ],
@@ -6577,7 +6605,7 @@
       "siteCode": "P00000GS",
       "catalog": "BANDOSTAND",
       "code": "P00000GS",
-      "name": "BD 반도스피커스탠드 Boss303 (1개)",
+      "name": "Boss303 / 스피커스탠드 / 1개",
       "modelCodes": [],
       "category": "스피커 스탠드 > 벽걸이형 스탠드",
       "categories": [
@@ -6615,7 +6643,7 @@
       "siteCode": "P00000JB",
       "catalog": "BANDOSTAND",
       "code": "BD 1200AB",
-      "name": "BD 1200AB",
+      "name": "BD 1200AB / 상판 크기 선택",
       "modelCodes": [
         "BD 1200AB"
       ],
@@ -6662,7 +6690,8 @@
       "updatedAt": "2026-11-01T17:28:20.017Z",
       "priceHistory": [],
       "requiresOption": true,
-      "originalName": "반도스탠드 BD 1200AB"
+      "originalName": "반도스탠드 BD 1200AB",
+      "subtitle": "상판 37×29cm 또는 42×34cm"
     },
     {
       "id": "bando-site-176",
@@ -6670,7 +6699,7 @@
       "siteCode": "P00000GT",
       "catalog": "BANDOSTAND",
       "code": "P00000GT",
-      "name": "BD 반도스피커스탠드 Boss101 (1개)",
+      "name": "Boss101 / 스피커스탠드 / 1개",
       "modelCodes": [],
       "category": "스피커 스탠드 > 벽걸이형 스탠드",
       "categories": [
@@ -6708,7 +6737,7 @@
       "siteCode": "P00000HG",
       "catalog": "BANDOSTAND",
       "code": "BD 1200A",
-      "name": "BD 1200A (1개)",
+      "name": "BD 1200A / 1개 / 상판 크기 선택",
       "modelCodes": [
         "BD 1200A"
       ],
@@ -6755,7 +6784,8 @@
       "updatedAt": "2026-11-01T17:28:22.437Z",
       "priceHistory": [],
       "requiresOption": true,
-      "originalName": "반도스탠드 BD 1200A (1개)"
+      "originalName": "반도스탠드 BD 1200A (1개)",
+      "subtitle": "상판 37×29cm 또는 42×34cm"
     },
     {
       "id": "bando-site-174",
