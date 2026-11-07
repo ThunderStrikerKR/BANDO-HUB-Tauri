@@ -1113,14 +1113,14 @@ mod dated_archive_tests {
         let day1 = Local.with_ymd_and_hms(2026, 11, 7, 12, 0, 0).single().unwrap();
         let day2 = Local.with_ymd_and_hms(2026, 11, 8, 12, 0, 0).single().unwrap();
         let bytes = b"PK\x03\x04synthetic-test-workbook";
-        let first = archive_workbook_bytes(&root, WorkbookKind::Factory, day1, bytes).unwrap();
-        let second = archive_workbook_bytes(&root, WorkbookKind::Factory, day1, bytes).unwrap();
-        let store = archive_workbook_bytes(&root, WorkbookKind::Store, day1, bytes).unwrap();
+        let first = archive_workbook_bytes(&root, WorkbookKind::Factory, day1.clone(), bytes).unwrap();
+        let second = archive_workbook_bytes(&root, WorkbookKind::Factory, day1.clone(), bytes).unwrap();
+        let store = archive_workbook_bytes(&root, WorkbookKind::Store, day1.clone(), bytes).unwrap();
         let next_day = archive_workbook_bytes(&root, WorkbookKind::Factory, day2, bytes).unwrap();
-        assert_eq!(first.file_name().unwrap(), "20261107(공장1).xlsx");
-        assert_eq!(second.file_name().unwrap(), "20261107(공장2).xlsx");
-        assert_eq!(store.file_name().unwrap(), "20261107(매장1).xlsx");
-        assert_eq!(next_day.file_name().unwrap(), "20261108(공장1).xlsx");
+        assert_eq!(first.file_name().unwrap().to_str(), Some("20261107(공장1).xlsx"));
+        assert_eq!(second.file_name().unwrap().to_str(), Some("20261107(공장2).xlsx"));
+        assert_eq!(store.file_name().unwrap().to_str(), Some("20261107(매장1).xlsx"));
+        assert_eq!(next_day.file_name().unwrap().to_str(), Some("20261108(공장1).xlsx"));
         assert!(first.to_string_lossy().contains("공장 발송"));
         assert!(first.to_string_lossy().contains("2026년"));
         assert!(first.to_string_lossy().contains("11월"));
@@ -1146,8 +1146,8 @@ mod dated_archive_tests {
             (WorkbookKind::FactoryReply, "20261107(공장회신1).xlsx"),
             (WorkbookKind::Client, "20261107(거래처전체1).xlsx"),
         ] {
-            let path = archive_workbook_bytes(&root, kind, date, bytes).unwrap();
-            assert_eq!(path.file_name().unwrap(), expected);
+            let path = archive_workbook_bytes(&root, kind, date.clone(), bytes).unwrap();
+            assert_eq!(path.file_name().unwrap().to_str(), Some(expected));
             assert!(path.starts_with(&root));
         }
         fs::remove_dir_all(&folder).unwrap();
