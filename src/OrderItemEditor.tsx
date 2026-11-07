@@ -30,7 +30,10 @@ export function OrderItemEditor({
   const p = state.products.find((p) => p.id === draft.productId),
     change = (p: Product) => {
       setDraft({
-        ...itemFromProduct(p, client, p.variants[0]?.color, draft.quantity),
+        ...itemFromProduct(p, client,
+          p.variants.length === 1 && !p.requiresOption ? p.variants[0]?.color : undefined,
+          draft.quantity,
+          p.variants.length === 1 && !p.requiresOption ? p.variants[0]?.id : undefined),
         id: item.id,
         raw: item.raw,
         sources: item.sources,
@@ -65,7 +68,7 @@ export function OrderItemEditor({
               if (p && v)
                 setDraft({
                   ...draft,
-                  ...itemFromProduct(p, client, v.color, draft.quantity),
+                  ...itemFromProduct(p, client, v.color, draft.quantity, v.id),
                   id: item.id,
                   raw: item.raw,
                   sources: item.sources,
