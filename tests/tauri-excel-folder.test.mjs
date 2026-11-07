@@ -22,5 +22,10 @@ test("one native Excel archive directory for all five business categories",()=>{
   assert.match(rust,/WorkbookKind::Client, bytes/);
   assert.match(rust,/WorkbookKind::ProductTemplate, bytes/);
   assert.match(ui,/Excel 보관함 위치/);
-  assert.doesNotMatch(ui,/공장 회신 수신 폴더/);
+  assert.match(ui,/공장 회신 자동 수신 폴더/);
+  assert.match(ui,/수신 폴더 선택/);
+  // Source monitoring is separate from the five-category output archive.
+  const monitor=read("src-tauri/src/factory_reply_watch.rs");
+  assert.match(monitor,/공장 회신 수신/);
+  assert.match(monitor,/factoryReplyDirectory/);
 });
