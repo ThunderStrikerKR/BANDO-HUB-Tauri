@@ -9,11 +9,11 @@ export const PRODUCT_SYNC_HEADERS = [
   "규격", "판매 단위", "기본 색상", "거래 상태", "__보관 상태",
 ] as const;
 export const OPTION_SYNC_HEADERS = [
-  "__상품ID", "신규등록키", "__옵션ID", "색상", "옵션명",
-  "도매가", "반도매가", "소매가", "__가격 원본", "__홈페이지 옵션 ID",
+  "__상품ID", "신규등록키", "__가격기록ID", "색상", "공식 원본 구성(읽기 전용)",
+  "도매가", "반도매가", "소매가", "__가격 원본", "__공식 사이트 옵션 ID",
 ] as const;
 
-const FORMAT = "BANDO-HUB-PRODUCTS-V1";
+const FORMAT = "BANDO-HUB-PRODUCTS-V2";
 const MAX_BYTES = 20 * 1024 * 1024;
 const MAX_ROWS = 20000;
 const EMPTY = "[비우기]";
@@ -70,7 +70,7 @@ const rowOption = (p: Product, v: Variant) => [
 
 export type ProductRowStatus = "ADD" | "UPDATE" | "UNCHANGED" | "HOLD" | "ERROR";
 export interface ProductSyncRow {
-  sheet: "상품 목록" | "판매 옵션 및 가격";
+  sheet: "상품 목록" | "상품별 가격";
   row: number;
   id: string;
   name: string;
@@ -100,7 +100,7 @@ export async function exportProductSyncWorkbook(state: State): Promise<number[]>
   const book = new Excel.Workbook();
   const products = book.addWorksheet("상품 목록");
   products.addRow([...PRODUCT_SYNC_HEADERS]);
-  const options = book.addWorksheet("판매 옵션 및 가격");
+  const options = book.addWorksheet("상품별 가격");
   options.addRow([...OPTION_SYNC_HEADERS]);
   for (const p of state.products) {
     products.addRow(rowProduct(p));
@@ -224,7 +224,7 @@ function createProduct(state: State, cells: string[]): Product {
     id: crypto.randomUUID(), name: cells[2], code, manufacturerCode: code,
     catalog: group, origin: group === "BANDOMALL" ? "STORE" : "FACTORY",
     category: "", defaultColor: cells[11], active: yesNo(cells[12], true),
-    variants: [], createdAt: at, updatedAt: at, saleUnit: false,
+    variants: [], createdAt: at, updatedAt: at, saleUnit: true,
     modelCodes: [code], colorStatus: "KNOWN", verificationStatus: "REGISTERED",
   };
   if (!p.name.trim()) throw Error("신규 상품명을 입력하세요.");
@@ -242,10 +242,10 @@ function createProduct(state: State, cells: string[]): Product {
 }
 function newVariant(cells: string[]): Variant {
   const color = cells[3];
-  if (!color || color === EMPTY) throw Error("옵션 색상을 입력하세요. 색상 구분이 없으면 단일로 입력하세요.");
-  if (cells[8] || cells[9]) throw Error("신규 옵션에는 홈페이지 원본 ID나 가격 원본을 지정하지 않습니다.");
+  if (!color || color === EMPTY) throw Error("독립 상품의 색상을 입력하세요. 색상 구분이 없으면 단일로 입력하세요.");
+  if (cells[8] || cells[9] || cells[4]) throw Error("신규 상품의 가격 기록에는 옵션명이나 외부 식별자를 직접 입력하지 않습니다. 구분 정보는 상품명에 기재하세요.");
   return {
-    id: crypto.randomUUID(), color, option: optional(cells[4]),
+    id: crypto.randomUUID(), color, option: "",
     wholesale: parsePrice(cells[5], null),
     semi: parsePrice(cells[6], null),
     retail: parsePrice(cells[7], null),
@@ -253,13 +253,12 @@ function newVariant(cells: string[]): Variant {
   };
 }
 function editVariant(original: Variant, cells: string[], p: Product): Variant {
-  if (cells[8] && cells[8] !== original.source) throw Error("옵션 가격 원본은 변경할 수 없습니다.");
-  if (cells[9] && cells[9] !== (original.siteOptionId ?? "")) throw Error("홈페이지 옵션 ID는 변경할 수 없습니다.");
+  if (cells[8] && cells[8] !== original.source) throw Error("가격 원본은 변경할 수 없습니다.");
+  if (cells[9] && cells[9] !== (original.siteOptionId ?? "")) throw Error("공식 사이트 식별자는 변경할 수 없습니다.");
   const v = structuredClone(original);
   v.color = optional(cells[3], v.color);
-  if (cells[4]) {
-    if (cells[4] === EMPTY) delete v.option;
-    else v.option = cells[4];
+  if (cells[4] && cells[4] !== (original.option ?? "")) {
+    throw Error("공식 원본 구성 표기는 수정할 수 없습니다. 상품 구분은 상품명에서 수정하세요.");
   }
   const at = new Date().toISOString();
   for (const [index, field] of [[5, "wholesale"], [6, "semi"], [7, "retail"]] as const) {
@@ -337,7 +336,7 @@ export function previewProductSyncRows(state: State, source: WorkbookSource): Pr
           JSON.stringify(cells.map(String))) {
           throw Error("보관된 상품과 옵션은 Excel에서 수정할 수 없습니다.");
         }
-        addRow("판매 옵션 및 가격", row, productId + "|" + optionId,
+        addRow("상품별 가격", row, productId + "|" + optionId,
           product.name + " / " + archivedOption.color, "UNCHANGED");
         seenOptions.add(productId + "|" + optionId);
         continue;
@@ -349,6 +348,7 @@ export function previewProductSyncRows(state: State, source: WorkbookSource): Pr
         ?.variants.find((v) => v.id === optionId) : undefined;
       if (optionId && !original) throw Error("옵션 ID가 존재하지 않습니다. 기존 옵션 ID를 변경하지 마세요.");
       if (key && optionId) throw Error("새 상품은 옵션 ID를 비워야 합니다.");
+      if (!original && product.variants.length !== 0) throw Error("기존 상품에 두 번째 가격 구성은 추가할 수 없습니다. 별도 상품을 등록하세요.");
       const candidate = original ? editVariant(original, cells, product) : newVariant(cells);
       const at = product.variants.findIndex((v) => v.id === candidate.id);
       if (at >= 0) product.variants[at] = candidate;
@@ -357,11 +357,11 @@ export function previewProductSyncRows(state: State, source: WorkbookSource): Pr
       if (changed) product.updatedAt = new Date().toISOString();
       if (!original) createdOptions++;
       else if (changed) updatedOptions++;
-      addRow("판매 옵션 및 가격", row, productId + "|" + candidate.id,
+      addRow("상품별 가격", row, productId + "|" + candidate.id,
         product.name + " / " + candidate.color, !original ? "ADD" : changed ? "UPDATE" : "UNCHANGED",
         !original ? ["신규 옵션 등록"] : changed ? ["옵션 또는 가격 수정"] : []);
     } catch (error) {
-      addRow("판매 옵션 및 가격", row, locator + "|" + optionId, cells[3], "ERROR", [],
+      addRow("상품별 가격", row, locator + "|" + optionId, cells[3], "ERROR", [],
         [error instanceof Error ? error.message : String(error)]);
     }
   }
@@ -369,7 +369,7 @@ export function previewProductSyncRows(state: State, source: WorkbookSource): Pr
     const original = state.products.find((p) => p.id === product.id);
     if (original && JSON.stringify(original) === JSON.stringify(product)) continue;
     try {
-      if (product.variants.length < 1) throw Error("판매 옵션을 하나 이상 입력하세요.");
+      if (product.variants.length !== 1) throw Error("독립 상품에는 가격 기록이 정확히 하나 있어야 합니다.");
       const optionKeys = product.variants.map((v) => normalizeColor(v.color) + "|" + (v.option ?? "").trim().toLowerCase());
       if (new Set(optionKeys).size !== optionKeys.length) throw Error("색상과 옵션명 조합이 중복되었습니다.");
       if (!product.variants.some((v) => normalizeColor(v.color) === normalizeColor(product.defaultColor))) {
@@ -381,11 +381,11 @@ export function previewProductSyncRows(state: State, source: WorkbookSource): Pr
       }
       if (!original) {
         const duplicates = next.filter((p) =>
-          p.id !== product.id && !isArchived(p) && identity(p) === identity(product));
-        if (duplicates.length) throw Error("동일 모델코드의 기존 상품이 있습니다. 기존 상품 ID로 수정하세요.");
+          p.id !== product.id && !isArchived(p) && identity(p) === identity(product) && p.name.trim() === product.name.trim());
+        if (duplicates.length) throw Error("같은 모델코드와 상품명을 가진 기존 상품이 있습니다.");
         validateProduct(product, registeredProducts(state.products));
       }
-      product.saleUnit = product.variants.length === 1;
+      product.saleUnit = true;
       product.updatedAt = new Date().toISOString();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -412,7 +412,7 @@ export async function previewProductSyncWorkbook(state: State, file: File): Prom
   const book = new Excel.Workbook();
   await book.xlsx.load(new Uint8Array(await file.arrayBuffer()) as unknown as Parameters<typeof book.xlsx.load>[0]);
   const products = book.getWorksheet("상품 목록");
-  const options = book.getWorksheet("판매 옵션 및 가격");
+  const options = book.getWorksheet("상품별 가격");
   const meta = book.getWorksheet("__반도허브_관리정보");
   if (!products || !options || !meta || textValue(meta.getCell("B1")) !== FORMAT) {
     throw Error("반도허브에서 내려받은 상품 전체 목록 Excel만 업로드할 수 있습니다.");
