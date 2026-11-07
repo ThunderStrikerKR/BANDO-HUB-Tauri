@@ -99,7 +99,14 @@ export function ProductImports({
       {preview && (
         <div className="official-product-preview">
           <h4>{preview.product.name}</h4>
-          <p>모델코드: {preview.product.code}</p>
+          <p>상품명: {preview.product.name}</p>
+          <p>상품설명 (매장 참고): {preview.product.subtitle || "별도 설명 없음"}</p>
+          <p>모델코드: {preview.product.code || "확인 필요"}</p>
+          <p>모델 판정 근거: {preview.modelSource === "MODEL_FIELD" ? "공식 모델명" :
+            preview.modelSource === "CUSTOM_CODE" ? "자체 상품코드" :
+            preview.modelSource === "TITLE" ? "공식 상품명에서 추출 (확인 권장)" : "미확정"}</p>
+          <p>공식 원본 상품명: {preview.product.originalName || "없음"}</p>
+          <p>카페24 상품코드: {preview.product.siteCode || "확인되지 않음"}</p>
           <p>원본 상품번호: {preview.product.siteId}</p>
           <p>공식 소매가: {won(preview.product.variants[0]?.retail ?? null)}</p>
           <p>
@@ -110,6 +117,26 @@ export function ProductImports({
           {preview.warnings.map((warning, index) => (
             <p key={index} className={preview.canApply ? "muted" : "warnings"}>{warning}</p>
           ))}
+          {!!preview.optionEvidence?.length && (
+            <section className="official-option-evidence" aria-label="원본 선택 옵션 검토">
+              <h5>공식 페이지에 표시된 선택 옵션</h5>
+              <p className="muted">
+                가방이나 바퀴의 포함 여부를 양쪽 모두 명시해야 합니다.
+                아래 선택값은 판매 SKU 식별자 또는 확정된 옵션별 가격이 아닙니다.
+                직접 확인 전까지 자동 반영하지 않습니다.
+              </p>
+              {preview.optionEvidence.map((group, index) => (
+                <div key={index}>
+                  <strong>{group.group} ({group.kind})</strong>
+                  {group.values.length ? (
+                    <ul>{group.values.map((option, optionIndex) => (
+                      <li key={optionIndex}>{option.label || "표시명 확인 필요"}</li>
+                    ))}</ul>
+                  ) : <p className="warnings">동적으로 입력되는 옵션입니다. 홈페이지에서 직접 확인하세요.</p>}
+                </div>
+              ))}
+            </section>
+          )}
           {preview.canApply && !preview.existingId && (
             <Field label="등록할 카테고리">
               <select value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
