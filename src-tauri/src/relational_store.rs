@@ -454,7 +454,7 @@ mod tests {
     }
 
     #[test]
-    fn duplicate_option_id_rolls_back_every_relation_and_revision() {
+    fn duplicate_price_record_id_rolls_back_every_relation_and_revision() {
         let path=temp();
         let mut conn=super::super::initialize_database(&path).unwrap();
         let before=super::super::get_snapshot(&conn).unwrap();
@@ -462,7 +462,7 @@ mod tests {
         let existing=before["products"][0]["variants"][0]["id"].clone();
         tampered["products"][1]["variants"][0]["id"]=existing;
         let result=super::super::write_snapshot(&mut conn,tampered,0,false);
-        assert!(result.unwrap_err().contains("판매 옵션 ID 중복"));
+        assert!(result.unwrap_err().contains("가격 기록 ID 중복"));
         assert_eq!(super::super::get_snapshot(&conn).unwrap(),before);
         verify(&conn).unwrap();
         drop(conn);close(&path);
