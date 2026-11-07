@@ -404,7 +404,8 @@ mod tests {
         let root = fixture();
         let settings = json!({"factoryReplyDirectory":"C:\\real-company-orders"});
         let inbox = inbox_directory(&root, true, &settings).unwrap().unwrap();
-        assert!(inbox.starts_with(&root));
+        let canonical_root = fs::canonicalize(&root).unwrap();
+        assert!(inbox.starts_with(&canonical_root));
         assert!(inbox.ends_with(Path::new("Excel").join("공장 회신 수신")));
         fs::remove_dir_all(root).unwrap();
     }
