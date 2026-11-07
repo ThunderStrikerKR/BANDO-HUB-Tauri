@@ -442,10 +442,10 @@ export function ProductManager({
                 </div>
               </div>
               <div className="product-detail-wide-fields">
-                <Field label="상품명 (모델명)">
+                <Field label="상품명 (거래처 / 매장 / 공장 공통)">
                   <input value={edit.name} onChange={(event) => setEdit({ ...edit, name: event.target.value })} />
                 </Field>
-                <Field label="상품 설명">
+                <Field label="상품설명 (매장 내부 참고)">
                   <input value={edit.subtitle ?? ""} onChange={(event) => setEdit({ ...edit, subtitle: event.target.value })} />
                 </Field>
                 <div className="field">
