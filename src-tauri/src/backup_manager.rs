@@ -22,6 +22,7 @@ fn validate_database(conn: &Connection) -> Result<(), String> {
     if integrity != "ok" { return Err(format!("SQLite 데이터 무결성 오류: {integrity}")); }
     let state = get_snapshot(conn)?;
     valid_state(&state)?;
+    relational_store::verify(conn)?;
     for table in ["app_state", "product_index", "order_index", "receipt_archive"] {
         let sql = format!("SELECT COUNT(*) FROM {table}");
         conn.query_row(&sql, [], |row| row.get::<_, i64>(0)).map_err(|e|
@@ -169,8 +170,12 @@ fn restore_selected(conn: &mut Connection, base: &Path, filename: &str)
     let safety = write_backup(conn, base, "pre-restore", Local::now().date_naive())?;
     let result = (|| {
         copy_entire_db(&backup, conn)?;
+        // Backups made before the split still contain legacy JSON. Convert
+        // them transactionally after the entire backup is restored.
+        relational_store::migrate(conn)?;
         let mut restored = get_snapshot(conn)?;
         restored["revision"] = json!(next_revision);
+        relational_store::strip_core(&mut restored);
         conn.execute("UPDATE app_state SET payload=?1 WHERE id=1",
             [serde_json::to_string(&restored).map_err(err)?]).map_err(err)?;
         validate_database(conn)
