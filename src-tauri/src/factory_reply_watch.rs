@@ -10,7 +10,7 @@ use std::io::Write;
 use std::time::SystemTime;
 
 const MAX_REPLY_BYTES: u64 = 10 * 1024 * 1024;
-const MAX_FILES_PER_SCAN: usize = 4;
+const MAX_FILES_PER_SCAN: usize = 2;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 struct Stamp {
@@ -42,7 +42,7 @@ fn file_id(bytes: &[u8]) -> String {
 }
 fn valid_filename(name: &str) -> bool {
     name.len() <= 240 && !name.is_empty() && !name.starts_with("~$")
-        && !name.contains(['/', '\\', '\0'])
+        && !name.chars().any(|c| matches!(c, '/' | '\\' | '\0'))
         && name.to_ascii_lowercase().ends_with(".xlsx")
         && name != "." && name != ".."
 }
@@ -344,10 +344,12 @@ fn commit_auto(
     write_snapshot(conn, candidate, expected_revision, true)?;
     // The user-facing dated copy is not the audit authority; failure here
     // cannot undo a transaction already committed with its private original.
-    let archive_warning = match workspace_excel_directory(
-        &Database { connection: Mutex::new(Connection::open_in_memory().map_err(err)?),
-            base: base.to_path_buf(), is_test }, &previous["settings"]
-    ) {
+    let archive_root = if is_test {
+        canonical_excel_directory(&base.join("Excel"))
+    } else {
+        saved_excel_directory(&previous["settings"])
+    };
+    let archive_warning = match archive_root {
         Ok(root) => archive_workbook_bytes(&root, WorkbookKind::FactoryReply, Local::now(), &bytes)
             .err(),
         Err(error) => Some(error),
@@ -368,7 +370,7 @@ pub(super) fn factory_reply_watch_commit(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::{Duration, UNIX_EPOCH};
+    use std::time::UNIX_EPOCH;
 
     fn fixture() -> PathBuf {
         let root = std::env::temp_dir().join(format!(
