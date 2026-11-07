@@ -34,7 +34,7 @@ export function SettingsView({
             <p>현재 버전: v{__BANDO_VERSION__}</p>
             <p>빌드 ID: {__BANDO_BUILD_ID__}</p>
           </section>
-          <TestDatabasePanel onReset={onRestored} />
+          <TestDatabasePanel state={state} onReset={onRestored} />
           <ReceiptArchive />
           <BackupPanel onError={onNotice} onRefresh={onRestored} />
           <section className="card">
