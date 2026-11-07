@@ -8,6 +8,10 @@ test("Registration UI is connected to the real preview and version-checked state
   assert.match(ui, /previewRegistrationWorkbook\(current, file\)/);
   assert.match(ui, /prepareRegistrationCommit\(current, preview,/);
   assert.match(ui, /await onSave\(result\.next\)/);
+  assert.match(ui, /await window\.bando!\.backup\(\)/);
+  assert.ok(ui.indexOf("await window.bando!.backup()") < ui.indexOf("await onSave(result.next)"));
+  assert.match(ui, /confirmAction\(/);
+  assert.match(ui, /current\.registrationBatches\?\.at\(-1\)/);
   assert.match(ui, /await onRefresh\(\)/);
   assert.doesNotMatch(ui, /window\.bando!\.registrationCommit/);
 });

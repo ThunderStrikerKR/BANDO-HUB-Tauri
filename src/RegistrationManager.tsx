@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import type { RegistrationBatch } from "./product-registry";
+import { confirmAction } from "./dialogs";
 import {
   exportRegistrationResults, exportRegistrationTemplate,
   prepareRegistrationCommit, previewRegistrationWorkbook,
@@ -23,7 +23,7 @@ export function RegistrationManager({
   const [open, setOpen] = useState(false);
   const [preview, setPreview] = useState<RegistrationWorkbookPreview>();
   const [approved, setApproved] = useState(false);
-  const [lastBatch, setLastBatch] = useState<RegistrationBatch>();
+  const lastBatch = state.registrationBatches?.at(-1);
   const [source, setSource] = useState("");
   const close = () => { if (!busy) { setOpen(false); setPreview(undefined); setApproved(false); } };
   const download = (kind: "양식" | "결과", bytes: number[]) =>
@@ -44,19 +44,30 @@ export function RegistrationManager({
   };
   const commit = () => void run(async () => {
     if (!preview || !approved) return;
+    const count = preview.rows.filter((row) => row.status === "READY").length;
+    if (!count) return;
+    if (!(await confirmAction(
+      "검증한 신규 상품 " + count +
+      "개를 등록할까요? 먼저 DB를 백업하고 기존 상품과 가격은 유지합니다."
+    ))) return;
     const current = await window.bando!.load();
     const result = prepareRegistrationCommit(current, preview, current.settings.operatorName ?? "관리자");
+    // Abort the registration if a consistent SQLite backup cannot be created.
+    await window.bando!.backup();
     // Existing revision-checked application save performs SQLite validation atomically.
     await onSave(result.next);
     await onRefresh();
-    setLastBatch(result.batch);
     setPreview(undefined);
     setApproved(false);
     onNotice("신규 상품 " + result.created + "개 등록, 미등록 " + result.skipped + "행. 기존 가격은 유지했습니다.", "success");
   });
   const saveResults = () => void run(async () => {
-    if (!lastBatch) return;
-    const path = await download("결과", await exportRegistrationResults(lastBatch));
+    // Load the persisted record rather than relying on transient React state:
+    // the result workbook remains available after restarting the app.
+    const current = await window.bando!.load();
+    const saved = current.registrationBatches?.at(-1);
+    if (!saved) throw Error("저장된 상품 등록 결과가 없습니다.");
+    const path = await download("결과", await exportRegistrationResults(saved));
     if (path) onNotice("상품 등록 결과를 저장했습니다: " + path, "success");
   });
   return <>
