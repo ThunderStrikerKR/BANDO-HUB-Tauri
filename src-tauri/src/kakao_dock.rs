@@ -33,7 +33,7 @@ mod native {
     use std::path::Path;
     type Hwnd = isize;
     type Handle = isize;
-    #[derive(Clone, Copy, Default, PartialEq, Eq)]
+    #[derive(Clone, Copy, Default, PartialEq, Eq, Debug)]
     #[repr(C)]
     pub struct Rect {left:i32, top:i32, right:i32, bottom:i32}
     impl Rect {
