@@ -55,6 +55,26 @@ function exportRow(state: State, entry: ExcelQueueEntry): FactoryExportRow {
     !Number.isSafeInteger(item.quantity) || (item.quantity ?? 0) <= 0)) {
     throw Error("공장 출고 품목명과 수량이 불명확합니다.");
   }
+  // A frozen export must already contain the selected SKU's distinguishing
+  // information. Never silently fill it from the *current* mutable catalogue,
+  // since the catalogue may have changed after the order was approved.
+  for (const item of recipient.items) {
+    const product = state.products.find((p) => p.id === item.productId);
+    if (!product) continue;
+    if (product.variants.length > 1) {
+      const chosen = product.variants.find((v) => v.id === item.variantId);
+      if (!chosen || !trim(chosen.option) ||
+          !trim(item.name).includes(trim(chosen.option))) {
+        throw Error("공장 출고 품목에 선택 옵션의 구분 표기가 없습니다. 주문 내역을 확인하세요.");
+      }
+    }
+    for (const kind of ["가방", "바퀴"]) {
+      const pattern = new RegExp(kind + "\\s*(?:미포함|포함|미장착|장착|없음|있음)");
+      if (pattern.test(product.name) && !pattern.test(item.name)) {
+        throw Error(kind + " 포함 / 미포함 정보가 출고 품목명에 없습니다. 주문을 확인하세요.");
+      }
+    }
+  }
   const goods = recipient.items.map((item) =>
     trim(item.name) + (trim(item.color) && item.color !== "단일" ? " " + trim(item.color) : "") +
     " " + item.quantity + "개").join(" / ");
