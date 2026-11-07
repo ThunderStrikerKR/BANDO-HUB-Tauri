@@ -145,7 +145,7 @@ test("Missing opposite configuration is not silently assumed or auto-created", (
   const preview=previewProductNameCleanup(fixture);
   const row=preview.rows.find((r)=>r.productId===sibling.id);
   assert.equal(row.status,"HOLD");
-  assert.match(row.reason,/미포함/);
+  assert.match(row.reason,/색상|구성품|선택 옵션/);
   const applied=applyProductNameCleanup(fixture,preview);
   assert.equal(applied.next.products.length,fixture.products.length);
   assert.equal(applied.next.products.find((p)=>p.id===sibling.id).name,sibling.name);
@@ -160,4 +160,25 @@ test("One unlabeled variant in a bag or wheel option group is held for review", 
   const report=previewProductNameCleanup(fixture).rows.find((r)=>r.productId===p.id);
   assert.equal(report.status,"HOLD");
   assert.match(report.reason,/포함/);
+});
+
+test("Material, size and color stay in product names rather than descriptions",()=>{
+  const fixture=structuredClone(seed);
+  const p=fixture.products.find((p)=>p.siteId==="259");
+  p.name="반도스탠드 BD 700 아크릴 25cm 블랙 가방포함";
+  const preview=previewProductNameCleanup(fixture);
+  const row=preview.rows.find((r)=>r.productId===p.id);
+  assert.equal(row.status,"READY");
+  assert.equal(row.newName,"BD 700 / 아크릴 25cm 블랙 / 가방 포함");
+  assert.doesNotMatch(row.newDescription,/아크릴|25cm|블랙|가방/);
+});
+test("Multi-option parent with variant-specific models is not auto-condensed",()=>{
+  const fixture=structuredClone(seed);
+  const p=fixture.products.find((p)=>p.siteId==="48");
+  assert.ok(p);
+  const preview=previewProductNameCleanup(fixture);
+  const row=preview.rows.find((r)=>r.productId===p.id);
+  assert.equal(row.status,"HOLD");
+  const result=applyProductNameCleanup(fixture,preview);
+  assert.equal(result.next.products.find((v)=>v.id===p.id).name,p.name);
 });
