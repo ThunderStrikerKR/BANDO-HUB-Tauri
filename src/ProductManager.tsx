@@ -9,7 +9,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AliasManager } from "./AliasManager";
 import { ClassificationFilters, RegistrySettings } from "./Classification";
 import { confirmAction } from "./dialogs";
-import { normalizeColor, uid, validateProduct, won } from "./domain";
+import { normalizeColor, uid, validateProduct } from "./domain";
 import { CatalogPanel } from "./ManagementUI";
 import { PriceCell } from "./PriceCell";
 import {
@@ -411,9 +411,6 @@ export function ProductManager({
                       {detailPriceMode ? "가격 수정 잠금" : "가격 수정"}
                     </button>
                   </div>
-                  {edit.variants.length !== 1 && (
-                    <small className="product-detail-multi-note">기존 상품에 옵션이 여러 개 있습니다. 세부 가격은 고급 정보에서 확인하세요.</small>
-                  )}
                   {edit.variants[0] && (["wholesale", "semi", "retail"] as const).map((tier) => (
                     <div className="product-detail-fieldline" key={tier}>
                       <label htmlFor={"product-price-" + tier}>{({ wholesale: "도매가", semi: "반도매가", retail: "소매가" })[tier]}</label>
@@ -481,17 +478,20 @@ export function ProductManager({
                     ))}
                   </select>
                 </Field>
-                {edit.variants.map((variant, index) => (
-                  <div key={variant.id} className="product-detail-variant-extra">
-                    <Field label={"홈페이지 상품 연결 (선택) " + (index + 1)}>
+                {edit.variants.length === 1 && (
+                  <div className="product-detail-variant-extra">
+                    <Field label="홈페이지 상품 연결 (선택)">
                       <input
-                        value={variant.url}
-                        onChange={(event) => setEdit({ ...edit, variants: edit.variants.map((v) => v.id === variant.id ? { ...v, url: event.target.value } : v) })}
+                        value={edit.variants[0].url}
+                        onChange={(event) => setEdit({
+                          ...edit,
+                          variants: edit.variants.map((v, index) =>
+                            index === 0 ? { ...v, url: event.target.value } : v),
+                        })}
                       />
                     </Field>
-                    {edit.variants.length > 1 && <p className="muted">{variantLabel(variant)}: 도매 {won(variant.wholesale)}, 반도매 {won(variant.semi)}, 소매 {won(variant.retail)}</p>}
                   </div>
-                ))}
+                )}
                 <p className="muted">원래 모델: {edit.originalCode || "없음"} / 홈페이지 상품 ID: {edit.siteRefs?.join(", ") || edit.siteId || "없음"}</p>
                 {edit.priceHistory?.slice().reverse().map((history, index) => (
                   <p className="muted" key={index}>{history.at} / {history.field} / {String(history.before)} → {String(history.after)}</p>
