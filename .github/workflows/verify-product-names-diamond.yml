@@ -1,0 +1,33 @@
+name: Verify curated names and factory Excel markers (isolated)
+on:
+  push:
+    branches:
+      - test/product-names-diamond-20261109
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  node-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install JavaScript dependencies
+        run: npm install --no-audit --no-fund --ignore-scripts
+      - name: TypeScript type check
+        run: npm run check:types
+      - name: Full regression and naming tests
+        run: npm test
+      - name: Factory workbook explicit marker tests
+        run: node --test tests/tauri-factory-ologen-export.test.mjs tests/tauri-product-name-enrichment.test.mjs
+  windows-rust:
+    runs-on: windows-latest
+    timeout-minutes: 38
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Test Rust SQLite data-preserving name migration
+        run: cargo test --manifest-path src-tauri/Cargo.toml --lib -- --nocapture
