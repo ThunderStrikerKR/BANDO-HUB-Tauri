@@ -154,6 +154,56 @@ pub(super) fn apply_to_state(state: &mut Value) -> Result<usize, String> {
         changed += 1;
     }
 
+    // Exact-model label corrections for the Mighty Bright LED family.
+    // Previous releases already wrote brand-first names to SQLite; matching
+    // only an official source title would not update those installed records.
+    // Preserve any custom employee wording and the original website title.
+    let led_old_names = [
+        ("bando-site-229", "BD LED-2s / Mighty Bright Light"),
+        ("bando-site-301", "Mighty Bright LED-2W Wonderflex / 보면대등"),
+        ("bando-site-302", "Mighty Bright LED-3N Nuflex / 보면대등"),
+    ];
+    for (id, old_name) in led_old_names {
+        let Some(reference) = catalog_by_id.get(id) else {
+            return Err(format!("LED 기준 상품 누락: {id}"));
+        };
+        let Some(product) = products.iter_mut().find(|p| p["id"] == id) else {
+            continue;
+        };
+        if product["name"].as_str() != Some(old_name)
+            || product["variants"].as_array().is_none_or(|v| v.len() != 1)
+            || product["variants"][0]["id"] != reference["variants"][0]["id"]
+            || product["deletedAt"].as_str().is_some()
+            || product["supersededBy"].as_str().is_some()
+        {
+            continue;
+        }
+        let Some(new_name) = reference["name"].as_str() else {
+            return Err(format!("LED 정리 이름 누락: {id}"));
+        };
+        if !new_name.starts_with("BD LED-") || new_name.contains('◆') {
+            return Err(format!("LED 상품명 규칙 위반: {id}"));
+        }
+        product["name"] = Value::String(new_name.to_string());
+        changed += 1;
+    }
+    // "Mighty Bright Light" is already in the title of these two
+    // independent products. Do not duplicate it as an internal subtitle.
+    for id in ["bando-site-228", "bando-site-229"] {
+        let Some(product) = products.iter_mut().find(|p| p["id"] == id) else {
+            continue;
+        };
+        if product["subtitle"].as_str() == Some("Mighty Bright Light")
+            && product["deletedAt"].as_str().is_none()
+            && product["supersededBy"].as_str().is_none()
+        {
+            if let Some(fields) = product.as_object_mut() {
+                fields.remove("subtitle");
+                changed += 1;
+            }
+        }
+    }
+
     // These are physically duplicate sale configurations, not separate
     // options. Keep both original IDs and frozen order references in SQLite,
     // but retire the redundant standalone site listings from all new sales.
