@@ -186,12 +186,14 @@ try {
             const entry = testBackups.get(args.filename);
             if (!entry) throw Error("The selected mock backup does not exist");
             const previousRevision = state.revision ?? 0;
+            const undoState = structuredClone(state);
+            const undoAudit = structuredClone(auditRecords);
             state = structuredClone(entry.state);
             state.revision = Math.max(previousRevision, state.revision ?? 0) + 1;
             auditRecords = structuredClone(entry.audit);
             const undo = "C:\\BANDO_TEST\\developer-test\\backups\\pre-restore-ui-" +
               (++testBackupSequence) + ".sqlite";
-            testBackups.set(undo, { state: structuredClone(args.__previousState ?? entry.state), audit: [] });
+            testBackups.set(undo, { state: undoState, audit: undoAudit });
             window.__testRestoreCount = (window.__testRestoreCount ?? 0) + 1;
             return undefined;
           }
