@@ -26,10 +26,17 @@ export function OrderItemEditor({
 }) {
   const { run: openLink } = useAsyncTask();
   const [draft, setDraft] = useState(() => structuredClone(item)),
-    [search, setSearch] = useState(false);
+    [search, setSearch] = useState(false),
+    [selectionError, setSelectionError] = useState("");
   const p = state.products.find((p) => p.id === draft.productId),
     change = (p: Product) => {
-      if (p.variants.length !== 1) throw Error("이 항목은 판매 구성이 여러 개이므로 독립 상품으로 전환 후 선택해야 합니다.");
+      if (p.variants.length !== 1 || p.requiresOption) {
+        setSelectionError(p.requiresOption
+          ? "상품 구성이 미확정입니다. 실제 판매 구성을 확인한 뒤 독립 상품으로 등록하세요."
+          : "가격 기록이 한 개가 아닙니다. 해당 상품의 데이터를 확인하세요.");
+        return;
+      }
+      setSelectionError("");
       setDraft({
         ...itemFromProduct(p, client,
           p.variants.length === 1 && !p.requiresOption ? p.variants[0]?.color : undefined,
@@ -60,6 +67,7 @@ export function OrderItemEditor({
         <button disabled={locked} onClick={() => setSearch(true)}>
           상품 변경
         </button>
+        {selectionError && <p className="warnings" role="alert">{selectionError}</p>}
         <Field label="수량">
           <input
             disabled={locked}
