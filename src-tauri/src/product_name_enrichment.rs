@@ -569,6 +569,77 @@ mod tests {
     }
 
     #[test]
+    fn persisted_mighty_bright_names_upgrade_once_without_touching_price_or_original_title() {
+        let salt = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let base = std::env::temp_dir().join(format!(
+            "bando-led-correction-{}-{salt}", std::process::id()
+        ));
+        std::fs::create_dir_all(&base).unwrap();
+        let mut db = initialize_database(&base.join("state.sqlite")).unwrap();
+        let mut prior = get_snapshot(&db).unwrap();
+        let old_names = [
+            ("229", "BD LED-2s / Mighty Bright Light"),
+            ("301", "Mighty Bright LED-2W Wonderflex / 보면대등"),
+            ("302", "Mighty Bright LED-3N Nuflex / 보면대등"),
+        ];
+        for p in prior["products"].as_array_mut().unwrap() {
+            let site = p["siteId"].as_str().unwrap_or("").to_string();
+            if let Some((_, old_name))=old_names.iter().find(|(id,_)| *id==site) {
+                p["name"]=json!(old_name);
+            }
+            if site=="228" || site=="229" {
+                p["subtitle"]=json!("Mighty Bright Light");
+            }
+        }
+        let original = prior.clone();
+        let rev = prior["revision"].as_u64().unwrap();
+        write_snapshot(&mut db, prior, rev, false).unwrap();
+        assert_eq!(apply(&mut db, &base).unwrap(), 5);
+        let after=get_snapshot(&db).unwrap();
+        let cases = [
+            ("228", "BD LED-3 / Mighty Bright Light", 31000),
+            ("229", "BD LED-2S / Mighty Bright Light", 31000),
+            ("301", "BD LED-2W / Mighty Bright Wonderflex / 보면대등", 38000),
+            ("302", "BD LED-3N / Mighty Bright Nuflex / 보면대등", 45000),
+        ];
+        for (site,name,price) in cases {
+            let old=original["products"].as_array().unwrap().iter()
+                .find(|p|p["siteId"].as_str()==Some(site)).unwrap();
+            let updated=after["products"].as_array().unwrap().iter()
+                .find(|p|p["siteId"].as_str()==Some(site)).unwrap();
+            assert_eq!(updated["name"],name, "{site}");
+            assert_eq!(updated["variants"],old["variants"], "{site}");
+            assert_eq!(updated["variants"][0]["retail"],price,"{site}");
+            assert_eq!(updated["originalName"],old["originalName"], "{site}");
+            if site=="228" || site=="229" {
+                assert!(updated["subtitle"].as_str().unwrap_or("").is_empty());
+            } else {
+                assert_eq!(updated["subtitle"],"건전지 및 어댑터 방식");
+            }
+        }
+        assert_eq!(after["orders"],original["orders"]);
+        assert_eq!(after["clients"],original["clients"]);
+        assert_eq!(apply(&mut db,&base).unwrap(),0);
+        assert_eq!(backup_manager::list_backups(&base).unwrap().len(),1);
+        drop(db);
+        std::fs::remove_dir_all(base).unwrap();
+    }
+
+    #[test]
+    fn employee_custom_mighty_bright_name_is_not_replaced() {
+        let mut state: Value = serde_json::from_str(include_str!(
+            "../resources/state-seed.json"
+        )).unwrap();
+        let item=state["products"].as_array_mut().unwrap().iter_mut()
+            .find(|p|p["siteId"]=="301").unwrap();
+        item["name"]=json!("BD LED-2W / 직원이 직접 수정한 상품명");
+        assert_eq!(apply_to_state(&mut state).unwrap(),0);
+        let updated=state["products"].as_array().unwrap().iter()
+            .find(|p|p["siteId"]=="301").unwrap();
+        assert_eq!(updated["name"],"BD LED-2W / 직원이 직접 수정한 상품명");
+    }
+
+    #[test]
     fn curated_seed_names_are_idempotent_and_do_not_create_a_backup() {
         let salt = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
         let base = std::env::temp_dir().join(format!(
