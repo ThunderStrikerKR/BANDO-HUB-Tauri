@@ -234,25 +234,29 @@ test("nonstandard Logen headers, filled J column, or extra R data reject entire 
     [9, "메시지"], [10, "송하인명"], [16, "송장번호"]]) {
     const bad = [...headers];
     bad[column] = wrong;
+    const invalidFile = await workbookFile([goodRow()], "bad.xlsx", bad);
     await assert.rejects(
-      () => parseFactoryReplyWorkbook(state, await workbookFile([goodRow()], "bad.xlsx", bad)),
+      () => parseFactoryReplyWorkbook(state, invalidFile),
       /양식 불일치/,
     );
   }
   const nonblankJ = goodRow();
   nonblankJ[9] = "임의 데이터";
+  const invalidJ = await workbookFile([nonblankJ]);
   await assert.rejects(
-    () => parseFactoryReplyWorkbook(state, await workbookFile([nonblankJ])),
+    () => parseFactoryReplyWorkbook(state, invalidJ),
     /J열은 공백/,
   );
   const extraHeaders = [...headers, "추가 열"];
+  const invalidHeaders = await workbookFile([goodRow()], "extra.xlsx", extraHeaders);
   await assert.rejects(
-    () => parseFactoryReplyWorkbook(state, await workbookFile([goodRow()], "extra.xlsx", extraHeaders)),
+    () => parseFactoryReplyWorkbook(state, invalidHeaders),
     /추가 열 제목/,
   );
   const extraData = [...goodRow(), "추가 데이터"];
+  const invalidData = await workbookFile([extraData]);
   await assert.rejects(
-    () => parseFactoryReplyWorkbook(state, await workbookFile([extraData])),
+    () => parseFactoryReplyWorkbook(state, invalidData),
     /추가 데이터/,
   );
 });
