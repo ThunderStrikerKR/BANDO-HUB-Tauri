@@ -461,7 +461,7 @@ mod tests {
         assert_eq!(by_site("246")["name"], "BD Desk JS-3 / 블랙 / 자바라 길이 43cm");
         assert_eq!(by_site("255")["name"], "BD Desk JS-3 / 실버 / 자바라 길이 43cm");
         assert_eq!(by_site("254")["name"], "BD Desk JS-2 / 실버 / 자바라 길이 35cm");
-        assert_eq!(by_site("249")["name"], "BD Desk TS-3 / Bar 길이 32cm");
+        assert_eq!(by_site("249")["name"], "BD Desk TS-3 / 실버 / Bar 길이 32cm");
         assert_eq!(by_site("310")["name"],
             "BD Desk JS-4 Black 검정 / 직원 직접 수정");
         assert_eq!(by_site("245")["name"],
@@ -599,7 +599,7 @@ mod tests {
         let revision = before["revision"].as_u64().unwrap();
         write_snapshot(&mut db, before, revision, false).unwrap();
 
-        assert_eq!(apply(&mut db, &base).unwrap(), 11);
+        assert_eq!(apply(&mut db, &base).unwrap(), 14);
         let after = get_snapshot(&db).unwrap();
         let products = after["products"].as_array().unwrap();
         assert_eq!(products.len(), 360);
@@ -607,12 +607,12 @@ mod tests {
             && p["supersededBy"].as_str().is_none()
             && p["deletedAt"].as_str().is_none()).count(), 358);
         for (site, expected) in [
-            ("247", "BD Desk TS-1 / Bar 길이 15cm"),
-            ("248", "BD Desk TS-2 / Bar 길이 22cm"),
-            ("249", "BD Desk TS-3 / Bar 길이 32cm"),
-            ("250", "BD Desk IS-3 / Bar 길이 26cm"),
-            ("251", "BD Desk IS-2 / Bar 길이 15cm"),
-            ("252", "BD Desk IS-1 / Bar 길이 10cm"),
+            ("247", "BD Desk TS-1 / 실버 / Bar 길이 15cm"),
+            ("248", "BD Desk TS-2 / 실버 / Bar 길이 22cm"),
+            ("249", "BD Desk TS-3 / 실버 / Bar 길이 32cm"),
+            ("250", "BD Desk IS-3 / 블랙 / Bar 길이 26cm"),
+            ("251", "BD Desk IS-2 / 블랙 / Bar 길이 15cm"),
+            ("252", "BD Desk IS-1 / 블랙 / Bar 길이 10cm"),
         ] {
             let p = products.iter().find(|p| p["siteId"].as_str() == Some(site)).unwrap();
             assert_eq!(p["name"], expected);
