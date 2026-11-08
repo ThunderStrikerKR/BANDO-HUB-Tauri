@@ -19,12 +19,12 @@ const bySite = site => {
 
 test("TS and IS Desk specification labels reflect each independently sold length",()=>{
   const expected = [
-    ["247","BD Desk TS-1 / Bar 길이 15cm"],
-    ["248","BD Desk TS-2 / Bar 길이 22cm"],
-    ["249","BD Desk TS-3 / Bar 길이 32cm"],
-    ["252","BD Desk IS-1 / Bar 길이 10cm"],
-    ["251","BD Desk IS-2 / Bar 길이 15cm"],
-    ["250","BD Desk IS-3 / Bar 길이 26cm"],
+    ["247","BD Desk TS-1 / 실버 / Bar 길이 15cm"],
+    ["248","BD Desk TS-2 / 실버 / Bar 길이 22cm"],
+    ["249","BD Desk TS-3 / 실버 / Bar 길이 32cm"],
+    ["252","BD Desk IS-1 / 블랙 / Bar 길이 10cm"],
+    ["251","BD Desk IS-2 / 블랙 / Bar 길이 15cm"],
+    ["250","BD Desk IS-3 / 블랙 / Bar 길이 26cm"],
   ];
   const historic=new Map(legacy.products.map(p=>[p.id,p]));
   for(const [site,name] of expected){

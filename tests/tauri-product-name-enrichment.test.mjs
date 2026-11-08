@@ -7,6 +7,7 @@ const current = load("src-tauri/resources/state-seed.json");
 const historic = load("src-tauri/resources/legacy-state-seed-303.json");
 const plan = load("src-tauri/resources/product-name-enrichment-20261109.json");
 const byId = new Map(current.products.map(p => [p.id,p]));
+const normalizedStands = new Map(load("src-tauri/resources/microphone-stand-specifications-20261109.json").items.map(p=>[p.id,p]));
 
 test("360 independent products retain original historical identity and price data", () => {
   assert.equal(current.products.length,360);
@@ -33,7 +34,7 @@ test("92 exact mapped names have source-grounded change records; no unproven des
     assert.ok(!ids.has(row.id),row.id); ids.add(row.id);
     const target=byId.get(row.id);
     assert.ok(target);
-    assert.equal(target.name,row.newName,row.id);
+    assert.equal(target.name,normalizedStands.get(row.id)?.name ?? row.newName,row.id);
     assert.equal(target.code,row.oldName,row.id);
     assert.equal(target.originalName,row.originalName,row.id);
     assert.equal(target.variants[0].id,row.priceRecordId,row.id);
@@ -44,7 +45,7 @@ test("92 exact mapped names have source-grounded change records; no unproven des
   assert.deepEqual(held.map(p=>p.name).sort(),[
     "BD BB-1","BD BB-2","BD BB-3","BD BB-4","BD BB-5","BD Desk 101"
   ].sort());
-  assert.equal(current.products.filter(p=>p.name.includes(" / ")).length,340);
+  assert.equal(current.products.filter(p=>p.name.includes(" / ")).length,341);
   assert.equal(current.products.find(p=>p.siteId==="312").name,"BD 777 / 고정형 보면대");
   assert.equal(current.products.find(p=>p.siteId==="241").name,"BD 803-1 / 성악 및 녹음용 보면대");
 });
