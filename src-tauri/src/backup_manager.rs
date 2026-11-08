@@ -535,6 +535,9 @@ mod tests {
         ]);
         let frozen=legacy["orders"][1].clone();
         legacy["revision"]=json!(7);
+        // Unlike manual_backup, a hand-crafted historical fixture must create
+        // its target directory before Connection::open on Windows.
+        fs::create_dir_all(base.join("backups")).unwrap();
         let backup_file=base.join("backups").join("manual-legacy-v0.sqlite");
         let create_legacy=|destination:&Path,data:&Value|{
             let conn=Connection::open(destination).unwrap();
