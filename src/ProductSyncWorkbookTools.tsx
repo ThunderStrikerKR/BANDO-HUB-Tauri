@@ -1,11 +1,11 @@
 import { useRef, useState } from "react";
 import { confirmAction } from "./dialogs";
 import {
-  applyProductSyncWorkbook,
-  exportProductSyncWorkbook,
-  previewProductSyncWorkbook,
-  type ProductSyncPreview,
-} from "./product-sync-workbook";
+  applyUnifiedProductWorkbook,
+  exportUnifiedProductWorkbook,
+  previewUnifiedProductWorkbook,
+} from "./product-unified-workbook";
+import type { ProductSyncPreview } from "./product-sync-workbook";
 import type { NoticeSink } from "./shared/notices";
 import { useAsyncTask } from "./shared/useAsyncTask";
 import type { State } from "./types";
@@ -35,7 +35,7 @@ export function ProductSyncWorkbookTools({
   const download = () => void run(async () => {
     if (!window.bando?.saveProductSyncWorkbook) throw Error("상품 전체 Excel 저장 기능이 준비되지 않았습니다.");
     const state = await window.bando.load();
-    const bytes = await exportProductSyncWorkbook(state);
+    const bytes = await exportUnifiedProductWorkbook(state);
     const destination = await window.bando.saveProductSyncWorkbook(bytes);
     if (destination) onNotice("독립 상품 및 가격 전체 목록을 저장했습니다: " + destination, "success");
   });
@@ -45,7 +45,7 @@ export function ProductSyncWorkbookTools({
       setApproved(false);
       setReview(undefined);
       const state = await window.bando!.load();
-      const result = await previewProductSyncWorkbook(state, file);
+      const result = await previewUnifiedProductWorkbook(state, file);
       setReview(result);
       setFilename(file.name);
       setFilter("ALL");
@@ -54,12 +54,11 @@ export function ProductSyncWorkbookTools({
   const commit = () => void run(async () => {
     if (!review || !approved || counts.error || counts.hold || (!counts.add && !counts.update)) return;
     if (!(await confirmAction(
-      "상품 정보 수정 " + review.updatedProducts + "개, 신규 상품 " + review.createdProducts +
-      "개, 옵션 신규 " + review.createdOptions + "개, 수정 " + review.updatedOptions +
-      "개를 반영할까요? Excel에서 누락된 항목은 유지합니다."
+      "신규 상품 " + counts.add + "개, 상품 정보 및 가격 수정 " + counts.update +
+      "개를 반영할까요? Excel에서 누락된 상품은 그대로 유지합니다."
     ))) return;
     const state = await window.bando!.load();
-    const result = applyProductSyncWorkbook(state, review);
+    const result = applyUnifiedProductWorkbook(state, review);
     await window.bando!.backup();
     await onSave(result.next);
     await onRefresh();
@@ -92,9 +91,9 @@ export function ProductSyncWorkbookTools({
             <b>보류 {counts.hold}건</b>
             <b>오류 {counts.error}건</b>
           </div>
-          {(review.missingProducts > 0 || review.missingOptions > 0) && (
+          {review.missingProducts > 0 && (
             <p className="warnings">
-              Excel에서 누락된 기존 상품 {review.missingProducts}개와 옵션 {review.missingOptions}개는
+              Excel에서 누락된 기존 상품 {review.missingProducts}개는
               삭제하거나 판매중지하지 않고 그대로 유지합니다.
             </p>
           )}
@@ -108,7 +107,7 @@ export function ProductSyncWorkbookTools({
           </div>
           <div className="bulk-diff product-full-workbook-review">
             <table>
-              <thead><tr><th>시트</th><th>행</th><th>상품 또는 옵션</th><th>판정</th><th>변경 및 사유</th></tr></thead>
+              <thead><tr><th>시트</th><th>행</th><th>독립 상품</th><th>판정</th><th>변경 및 사유</th></tr></thead>
               <tbody>{review.rows.filter((r) => filter === "ALL" ||
                 (filter === "ERROR" ? r.status === "HOLD" || r.status === "ERROR" : r.status === filter))
                 .slice(0, 500).map((row, i) => (
@@ -127,7 +126,7 @@ export function ProductSyncWorkbookTools({
           {review.rows.length > 500 && <p className="muted">표에는 최대 500행을 표시하며 모든 행을 검증합니다.</p>}
           <p className="muted">
             홈페이지 등록 여부와 관계없이 신규 등록 및 수정할 수 있습니다.
-            상품 ID, 옵션 ID, 기존 주문, 이미지와 홈페이지 연결 정보는 보호됩니다.
+            기존 상품 ID와 내부 가격 기록 ID, 주문 이력, 이미지 및 홈페이지 연결 정보는 보존됩니다.
           </p>
           <label className="check">
             <input type="checkbox" checked={approved}

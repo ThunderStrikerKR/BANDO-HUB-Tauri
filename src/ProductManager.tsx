@@ -244,7 +244,7 @@ export function ProductManager({
             <section className="card">
               <h3>상품 Excel 관리</h3>
               <p className="muted">
-                상품 전체 Excel로 상품 정보, 옵션, 가격을 조회하고 수정합니다.
+                독립 상품 1개를 Excel 1행에 표시합니다. 상품명, 상품설명, 색상 및 가격을 한 행에서 조회하고 수정합니다.
                 신규 상품만 대량 등록할 때는 같은 화면의 등록 양식을 이용하세요.
                 등록 성공, 중복, 오류 결과는 반도허브에서 확인합니다.
               </p>
