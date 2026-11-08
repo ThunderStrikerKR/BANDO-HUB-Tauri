@@ -457,7 +457,7 @@ mod tests {
                     }
                 }
             }
-            let id = product["id"].as_str().unwrap_or("");
+            let id = product["id"].as_str().unwrap_or("").to_string();
             if id == "bando-site-77" || id == "bando-site-78" {
                 product["active"] = json!(true);
                 product.as_object_mut().unwrap().remove("supersededBy");
