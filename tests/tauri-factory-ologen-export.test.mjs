@@ -29,14 +29,20 @@ function stateFixture() {
     active:true, identifiers:"", contact:"", shippingFeeExcluded:false, overrides:{} };
   const recipient = { id:"r1", name:"김수취", address:"서울 서초구 123", phone:"02-2222-3333",
     mobile:"010-1234-0000", note:"문 앞 배송 요청", items:[
-      { id:"item1", name:"BD 709", color:"블랙", quantity:3, origin:"FACTORY" },
-      { id:"item2", name:"BD 900", color:"화이트", quantity:1, origin:"FACTORY" },
+      { id:"item1", productId:"product-709", variantId:"price-709",
+        name:"BD 709", color:"블랙", quantity:3, origin:"FACTORY" },
+      { id:"item2", productId:"product-900", variantId:"price-900",
+        name:"BD 900", color:"화이트", quantity:1, origin:"FACTORY" },
     ] };
   const snap = { recipient, sender, freightCode:"010", total:120000, shipping:4000, vat:0, subtotal:116000 };
   const q = { id:"excel:s1:FACTORY", shipmentId:"s1", origin:"FACTORY", at:"2026-11-07T01:33:00+09:00",
     actor:"직원", status:"QUEUED", snapshot:snap };
   return {
-    revision:13, clients:[sender], products:[], aliases:[], orders:[
+    revision:13, clients:[sender],
+    products:[
+      {id:"product-709",name:"BD 709",code:"BD 709",variants:[{id:"price-709",color:"블랙"}]},
+      {id:"product-900",name:"BD 900",code:"BD 900",variants:[{id:"price-900",color:"화이트"}]},
+    ], aliases:[], orders:[
       { id:"order1", clientId:"client1", orderType:"AGENCY", recipients:[recipient] },
     ],
     exports:[], queue:[], settings:{operatorName:"매장 직원"},
@@ -289,4 +295,14 @@ test("legacy mapped product refuses missing frozen color rather than inventing a
   assert.throws(()=>previewFactoryExport(state,["excel:s1:FACTORY"]),/색상 구분/);
   item.name="BD 707A / 클리어";
   assert.doesNotThrow(()=>previewFactoryExport(state,["excel:s1:FACTORY"]));
+});
+
+test("frozen factory queue blocks items with no confirmed product or price-record identity",()=>{
+  const state=stateFixture();
+  const item=state.workflow.queue[0].snapshot.recipient.items[0];
+  delete item.productId;
+  assert.throws(()=>previewFactoryExport(state,["excel:s1:FACTORY"]),/상품 또는 가격 기록 ID/);
+  item.productId="product-709";
+  delete item.variantId;
+  assert.throws(()=>previewFactoryExport(state,["excel:s1:FACTORY"]),/상품 또는 가격 기록 ID/);
 });
