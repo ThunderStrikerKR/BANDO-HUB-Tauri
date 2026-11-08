@@ -79,3 +79,15 @@ test("looking up historical references never mutates frozen orders or the catalo
   assert.equal(JSON.stringify(state),before);
   assert.equal(item.unitPrice,123456);
 });
+
+test("historical references do not appear falsely discontinued in sale-status reviews",async()=>{
+  const { saleIssues } = await tsImport("../src/sale-status.ts", import.meta.url);
+  const old="bando-site-351",price="bando-351-P00000NN000B";
+  const order={recipients:[{name:"가상 수취인",items:[{
+    id:"historic",productId:old,variantId:price,name:"과거의 상품명",
+  }]}]};
+  assert.deepEqual(saleIssues(seed,order),[]);
+  order.recipients[0].items[0].variantId="unverified-price";
+  assert.match(saleIssues(seed,order)[0],/상품 연결 확인 필요/);
+  assert.doesNotMatch(saleIssues(seed,order)[0],/판매중지/);
+});
