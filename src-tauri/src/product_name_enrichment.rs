@@ -432,6 +432,90 @@ mod tests {
     }
 
     #[test]
+    fn actual_sqlite_reopens_old_desk_labels_and_duplicate_trays_without_data_loss() {
+        let salt = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let base = std::env::temp_dir().join(format!(
+            "bando-desk-tray-dedupe-{}-{salt}", std::process::id()
+        ));
+        std::fs::create_dir_all(&base).unwrap();
+        let mut db = initialize_database(&base.join("state.sqlite")).unwrap();
+        let mut before = get_snapshot(&db).unwrap();
+        let old_desk = [
+            ("247", "BD Desk TS-1 / 미니형 마이크 스탠드"),
+            ("248", "BD Desk TS-2 / 미니형 마이크 스탠드"),
+            ("249", "BD Desk TS-3 / 미니형 마이크 스탠드"),
+            ("250", "BD Desk IS-3 / 바 길이 26cm"),
+            ("251", "BD Desk IS-2 / 바 길이 15cm"),
+            ("252", "BD Desk IS-1 / 바 길이 10cm"),
+        ];
+        for product in before["products"].as_array_mut().unwrap() {
+            for (site, old_name) in old_desk {
+                if product["siteId"].as_str() == Some(site) {
+                    product["name"] = json!(old_name);
+                    if ["247", "248", "249"].contains(&site) {
+                        product["subtitle"] = json!("길이 확인 필요");
+                    }
+                }
+            }
+            let id = product["id"].as_str().unwrap_or("");
+            if id == "bando-site-77" || id == "bando-site-78" {
+                product["active"] = json!(true);
+                product.as_object_mut().unwrap().remove("supersededBy");
+            }
+            if id.starts_with("sku:bando-site-237:") {
+                product["subtitle"] = json!("다크그린, 와인, 그레이 옵션");
+            }
+        }
+        let prices = before["products"].as_array().unwrap().iter()
+            .map(|p| p["variants"].clone()).collect::<Vec<_>>();
+        let orders = before["orders"].clone();
+        let clients = before["clients"].clone();
+        let revision = before["revision"].as_u64().unwrap();
+        write_snapshot(&mut db, before, revision, false).unwrap();
+
+        assert_eq!(apply(&mut db, &base).unwrap(), 11);
+        let after = get_snapshot(&db).unwrap();
+        let products = after["products"].as_array().unwrap();
+        assert_eq!(products.len(), 360);
+        assert_eq!(products.iter().filter(|p| p["active"] != false
+            && p["supersededBy"].as_str().is_none()
+            && p["deletedAt"].as_str().is_none()).count(), 358);
+        for (site, expected) in [
+            ("247", "BD Desk TS-1 / Bar 길이 15cm"),
+            ("248", "BD Desk TS-2 / Bar 길이 22cm"),
+            ("249", "BD Desk TS-3 / Bar 길이 32cm"),
+            ("250", "BD Desk IS-3 / Bar 길이 26cm"),
+            ("251", "BD Desk IS-2 / Bar 길이 15cm"),
+            ("252", "BD Desk IS-1 / Bar 길이 10cm"),
+        ] {
+            let p = products.iter().find(|p| p["siteId"].as_str() == Some(site)).unwrap();
+            assert_eq!(p["name"], expected);
+            assert!(p["subtitle"].as_str().unwrap_or("").is_empty());
+        }
+        for (id, successor) in [
+            ("bando-site-77", "sku:bando-site-237:bando-237-P00000JC000H"),
+            ("bando-site-78", "sku:bando-site-237:bando-237-P00000JC000I"),
+        ] {
+            let duplicate = products.iter().find(|p| p["id"] == id).unwrap();
+            assert_eq!(duplicate["active"], false);
+            assert_eq!(duplicate["supersededBy"], successor);
+            assert_eq!(duplicate["variants"][0]["retail"], 32000);
+        }
+        for p in products.iter().filter(|p| p["id"].as_str()
+            .is_some_and(|id| id.starts_with("sku:bando-site-237:"))) {
+            assert!(p["subtitle"].as_str().unwrap_or("").is_empty());
+        }
+        assert_eq!(prices, products.iter().map(|p| p["variants"].clone())
+            .collect::<Vec<_>>());
+        assert_eq!(after["orders"], orders);
+        assert_eq!(after["clients"], clients);
+        assert_eq!(apply(&mut db, &base).unwrap(), 0);
+        assert_eq!(backup_manager::list_backups(&base).unwrap().len(), 1);
+        drop(db);
+        std::fs::remove_dir_all(base).unwrap();
+    }
+
+    #[test]
     fn curated_seed_names_are_idempotent_and_do_not_create_a_backup() {
         let salt = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
         let base = std::env::temp_dir().join(format!(
