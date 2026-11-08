@@ -8,6 +8,7 @@ mod startup_recovery;
 mod backup_manager;
 mod relational_store;
 mod sale_unit_migration;
+mod product_name_enrichment;
 #[cfg(target_os = "windows")]
 mod single_instance;
 use chrono::{Datelike, Local, DateTime};
@@ -294,6 +295,8 @@ fn initialize_database(path: &Path) -> Result<Connection, String> {
         }
     }
     relational_store::migrate(&mut conn)?;
+    let data_root = path.parent().ok_or("상품명 변경 백업 경로를 확인할 수 없습니다.")?;
+    product_name_enrichment::apply(&mut conn, data_root)?;
     relational_store::verify(&conn)?;
     Ok(conn)
 }
