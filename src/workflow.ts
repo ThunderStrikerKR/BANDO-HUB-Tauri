@@ -1,4 +1,5 @@
 import { saleIssues, saleProblem } from "./sale-status.js";
+import { resolveHistoricalProductReference } from "./historical-product-reference.js";
 import { actualFreightOf } from "./actual-freight.js";
 import { orderParty, senderFor } from "./order-types.js";
 import { parseOrder, recommendAccount, totals, uid, unassignedClient, won } from "./domain.js";
@@ -721,7 +722,8 @@ export function workflowIssues(state: State, id: string) {
   for (const row of order.recipients)
     for (const item of row.items)
       if (item.productId) {
-        const problem = saleProblem(state.products.find((p) => p.id === item.productId));
+        const linked = resolveHistoricalProductReference(state, item.productId, item.variantId);
+        const problem = linked ? saleProblem(linked.product) : "상품 연결 확인 필요";
         if (problem)
           add(
             row,
@@ -1373,7 +1375,8 @@ export function completeDelivery(
         productId: i.productId!,
         variantId: i.variantId!,
         quantity: i.quantity!,
-        shippingGroupId: state.products.find((p) => p.id === i.productId)?.shippingGroupId,
+        shippingGroupId: resolveHistoricalProductReference(state, i.productId, i.variantId)
+          ?.product.shippingGroupId,
       })),
       bundles: null,
       charge: charged,
