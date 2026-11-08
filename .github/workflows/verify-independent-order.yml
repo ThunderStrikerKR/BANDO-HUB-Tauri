@@ -17,6 +17,10 @@ jobs:
           node-version: '22'
       - name: Install dependencies
         run: npm install --no-audit --no-fund --ignore-scripts
+      - name: TypeScript type check
+        run: npm run check:types
+      - name: Full Node regression suite
+        run: npm test
       - name: Check existing product and historical-order baseline
         run: node --test tests/tauri-curated-products.test.mjs tests/tauri-historical-product-reference.test.mjs
       - name: Run T01-T15 targeted order regression
