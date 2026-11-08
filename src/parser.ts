@@ -695,15 +695,18 @@ function parseLegacy(raw: string, selectedClient: Client | undefined, state: Sta
     if (explicit && ["대형", "소형"].includes(explicit)) explicit = undefined;
     const q = qs.length === 1 ? qs[0].value : qs.length ? null : 1;
     const confirmed = qs.length === 1;
-    const optionProof = [...line.matchAll(/[AB]\s*타입|\d+(?:\.\d+)?\s*cm/gi)].map((m) =>
-      m[0].replace(/\s/g, "").toLowerCase(),
-    );
-    if (optionProof.length) {
-      const proven = choices.filter((p) =>
-        optionProof.every((token) =>
-          p.variants.some((v) => (v.option ?? "").replace(/\s/g, "").toLowerCase().includes(token)),
-        ),
-      );
+    // A product's full registered name, not a nested sale option, identifies its
+    // configuration. Keep "미포함" distinct from the substring "포함".
+    const qualifiers = (value: string) =>
+      [...new Set((value.replace(/\s+/g, "").toLowerCase()
+        .match(/(?:가방|바퀴)(?:미포함|포함|미장착|장착)|[ab]타입|비타공상판|타공상판|\d+(?:\.\d+)?cm/g) ?? []))];
+    const configurationProof = qualifiers(line);
+    if (configurationProof.length) {
+      const proven = choices.filter((candidate) => {
+        const named = qualifiers(candidate.name);
+        return configurationProof.every((token) => named.includes(token));
+      });
+      // Zero or multiple matches are unresolved; never pick a different item.
       if (proven.length) choices = proven;
     }
     choices.sort(
@@ -782,7 +785,7 @@ function parseLegacy(raw: string, selectedClient: Client | undefined, state: Sta
     let item: Item;
     if (p) {
       item = itemFromProduct(p, client, explicit, q);
-      if (!explicit && p.saleUnit) {
+      if (!explicit && p.saleUnit && !p.requiresOption && p.variants.length === 1) {
         const v = p.variants[0];
         item.variantId = v.id;
         item.color = v.color;
@@ -846,7 +849,8 @@ function parseLegacy(raw: string, selectedClient: Client | undefined, state: Sta
       item.issues = ["상품 종류와 모델이 상충합니다."];
       item.recognitionReason = "모델 코드와 상품 종류의 일치 여부를 직원이 확인해야 합니다.";
     }
-    if (p && alias?.productId === p.id && alias.variantId) {
+    if (p && !p.requiresOption && p.variants.length === 1 &&
+        alias?.productId === p.id && alias.variantId) {
       const v = p.variants.find((v) => v.id === alias.variantId);
       if (v) {
         item.variantId = v.id;

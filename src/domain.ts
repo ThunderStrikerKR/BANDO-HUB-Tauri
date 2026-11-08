@@ -163,10 +163,10 @@ export function itemFromProduct(
   const eligible = p.variants.filter((variant) => normalizeColor(variant.color) === c);
   // Color alone does not distinguish same-color options such as a bag
   // included/excluded, wheels included/excluded or perforated top.
-  const v = selectedVariantId ? explicit :
-    ((p.variants.length === 1 && !p.requiresOption) ||
-    (p.variants.length > 1 && !!color && !p.requiresOption && eligible.length === 1)
-      ? eligible[0] : undefined);
+  // Even an explicitly supplied price ID cannot override unresolved source
+  // configurations. New orders require one validated independent sale product.
+  const selectable = p.variants.length === 1 && !p.requiresOption;
+  const v = !selectable ? undefined : selectedVariantId ? explicit : eligible[0];
   // Preserve the curated business-facing product label for every order line.
   // Distinct products can share a model code (e.g. instrument/fixture variants).
   const basicName = (p.name || p.code).replace(/^반도스탠드\s*/i, "").trim();
@@ -196,7 +196,9 @@ export function itemFromProduct(
         !color
         ? ["기본 색상 확인 필요"]
         : (configurationIncomplete ? ["가방 또는 바퀴 포함 / 미포함 정보 확인 필요"] : [])
-      : ["등록된 독립 상품을 다시 선택하세요"],
+      : p.requiresOption
+        ? ["상품 구성 미확정 / 판매 구성을 확인하세요"]
+        : ["등록된 독립 상품을 다시 선택하세요"],
     url: v?.url ?? "",
     catalog: p.catalog,
   };
@@ -350,7 +352,8 @@ export function parseLegacy(raw: string, client: Client, state: State): Recipien
       quantity,
     );
     it.raw = line;
-    if (alias?.variantId && !explicitColor && !variantWord && !unknownColor && !unknownWord) {
+    if (!p.requiresOption && p.variants.length === 1 &&
+        alias?.variantId && !explicitColor && !variantWord && !unknownColor && !unknownWord) {
       const v = p.variants.find((v) => v.id === alias.variantId);
       if (v) {
         it.variantId = v.id;
@@ -366,7 +369,7 @@ export function parseLegacy(raw: string, client: Client, state: State): Recipien
           codePattern(code).test(line) || codePattern(code.replace(/^BD\s*/, "")).test(line),
       ),
     );
-    if (exactOptions.length === 1) {
+    if (exactOptions.length === 1 && !p.requiresOption && p.variants.length === 1) {
       const v = exactOptions[0];
       it.variantId = v.id;
       it.color = v.color;
