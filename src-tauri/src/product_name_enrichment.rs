@@ -338,7 +338,7 @@ mod tests {
         assert_eq!(by_site("246")["name"], "BD Desk JS-3 / 블랙 / 자바라 길이 43cm");
         assert_eq!(by_site("255")["name"], "BD Desk JS-3 / 실버 / 자바라 길이 43cm");
         assert_eq!(by_site("254")["name"], "BD Desk JS-2 / 실버 / 자바라 길이 35cm");
-        assert_eq!(by_site("249")["name"], "BD Desk TS-3 / 미니형 마이크 스탠드");
+        assert_eq!(by_site("249")["name"], "BD Desk TS-3 / Bar 길이 32cm");
         assert_eq!(by_site("310")["name"],
             "BD Desk JS-4 Black 검정 / 직원 직접 수정");
         assert_eq!(by_site("245")["name"],
@@ -418,14 +418,17 @@ mod tests {
         let mut outdated = curated.clone();
         let mut official = 0;
         for product in outdated["products"].as_array_mut().unwrap() {
-            if product["originalName"].as_str().is_some_and(
-                |name| name.starts_with("반도스탠드 ")
-            ) {
+            if product["supersededBy"].as_str().is_none()
+                && product["originalName"].as_str().is_some_and(
+                    |name| name.starts_with("반도스탠드 ")
+                )
+            {
                 product["name"] = product["originalName"].clone();
                 official += 1;
             }
         }
-        assert_eq!(official, 357);
+        // The other two source records are retained only for historical use.
+        assert_eq!(official, 355);
         assert_eq!(apply_to_state(&mut outdated).unwrap(), official);
         assert_eq!(outdated["products"], curated["products"]);
         assert_eq!(apply_to_state(&mut outdated).unwrap(), 0);
