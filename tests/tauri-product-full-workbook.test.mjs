@@ -193,7 +193,7 @@ test("safe approvals are backed up, revision-checked and wired to Tauri native S
   assert.match(bridge,/saveProductSyncWorkbook: \(bytes\)/);
   assert.match(manager,/<ProductSyncWorkbookTools onSave=\{onSave\}/);
   assert.match(ui,/await window\.bando!\.backup\(\)/);
-  assert.match(ui,/applyProductSyncWorkbook\(state, review\)/);
+  assert.match(ui,/applyUnifiedProductWorkbook\(state, review\)/);
   assert.match(ui,/await onSave\(result\.next\)/);
 });
 
