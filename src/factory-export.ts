@@ -1,5 +1,6 @@
 import type ExcelJS from "exceljs";
 import type { State } from "./types";
+import { resolveHistoricalProductReference } from "./historical-product-reference.js";
 import type { ExcelQueueEntry } from "./workflow-types";
 
 export const LOGEN_HEADERS = [
@@ -59,7 +60,17 @@ function exportRow(state: State, entry: ExcelQueueEntry): FactoryExportRow {
   // information. Never silently fill it from the *current* mutable catalogue,
   // since the catalogue may have changed after the order was approved.
   for (const item of recipient.items) {
-    const product = state.products.find((p) => p.id === item.productId);
+    const linked = resolveHistoricalProductReference(state, item.productId, item.variantId);
+    // The recorded original ID is immutable, but the matching current product
+    // must be identified by BOTH the former product ID and price-record ID.
+    if (item.productId && !linked) {
+      const older = state.products.find((p) => p.id === item.productId);
+      if (older && older.variants.length !== 1) {
+        throw Error("복수 판매 구성이 묶인 옛 상품은 공장 발송할 수 없습니다. 독립 상품을 확인하세요.");
+      }
+      throw Error("과거 주문의 상품 ID와 가격 기록 ID가 현재 독립 상품에 연결되지 않습니다. 발송 전 확인하세요.");
+    }
+    const product = linked?.product;
     if (!product) continue;
     if (product.variants.length !== 1) {
       throw Error("복수 판매 구성이 묶인 옛 상품은 공장 발송할 수 없습니다. 독립 상품을 확인하세요.");
