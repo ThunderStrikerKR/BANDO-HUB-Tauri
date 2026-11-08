@@ -79,9 +79,35 @@ function exportRow(state: State, entry: ExcelQueueEntry): FactoryExportRow {
       throw Error("공장 출고 상품과 가격 기록의 식별자가 다릅니다.");
     }
     for (const kind of ["가방", "바퀴"]) {
-      const pattern = new RegExp(kind + "\\s*(?:미포함|포함|미장착|장착|없음|있음)");
-      if (pattern.test(product.name) && !pattern.test(item.name)) {
-        throw Error(kind + " 포함 / 미포함 정보가 출고 품목명에 없습니다. 주문을 확인하세요.");
+      const pattern = new RegExp(kind + "\\s*(미포함|포함|미장착|장착|없음|있음)");
+      const expected = pattern.exec(product.name)?.[1];
+      if (!expected) continue;
+      const actual = pattern.exec(item.name)?.[1];
+      const group = (s: string | undefined) =>
+        ["미포함", "미장착", "없음"].includes(s ?? "") ? "EXCLUDED" :
+        ["포함", "장착", "있음"].includes(s ?? "") ? "INCLUDED" : "UNKNOWN";
+      if (group(expected) !== group(actual)) {
+        throw Error(kind + " 포함 / 미포함 정보가 실제 출고 구성과 다릅니다. 주문을 확인하세요.");
+      }
+    }
+    // Never fill missing distinguishing attributes from a mutable catalogue.
+    const topType = (text: string) =>
+      /비타공\s*상판|무타공\s*상판/.test(text) ? "NONPERFORATED" :
+      /타공\s*상판/.test(text) ? "PERFORATED" : null;
+    const registeredTop = topType(product.name);
+    if (registeredTop && topType(item.name) !== registeredTop) {
+      throw Error("상판 타공 / 비타공 구분이 확정된 출고 품목명과 다릅니다.");
+    }
+    const topStyle = (text: string) => /([AB])타입\s*상판/.exec(text)?.[1] ?? null;
+    const expectedStyle = topStyle(product.name);
+    if (expectedStyle && topStyle(item.name) !== expectedStyle) {
+      throw Error("상판 A/B타입 구분이 확정된 출고 품목명과 다릅니다.");
+    }
+    if (linked?.via === "HISTORICAL") {
+      const color = product.variants[0].color.trim();
+      if (color && !["단일", "색상 미표기"].includes(color) &&
+          product.name.includes(color) && !item.name.includes(color)) {
+        throw Error("과거 주문의 색상 구분이 독립 상품 기록과 일치하는지 확인하세요.");
       }
     }
   }
