@@ -4,7 +4,7 @@ import { clientCandidates, suggestClient, won } from "./domain";
 import { applyCatalogPriceSync, previewCatalogPriceSync, type CatalogPricePreview } from "./catalog-price-sync";
 import type { NoticeSink } from "./shared/notices";
 import { useAsyncTask } from "./shared/useAsyncTask";
-import type { BulkPreview, CatalogReport, Client, State } from "./types";
+import type { CatalogReport, Client, State } from "./types";
 import { Modal } from "./ui";
 export const tierText = {
   wholesale: "도매",
@@ -130,81 +130,6 @@ export function ClientPicker({
         </Modal>
       )}
     </div>
-  );
-}
-export function BulkTools({
-  kind,
-  onRefresh,
-  onError,
-  locked = false,
-}: {
-  locked?: boolean;
-  kind: "prices" | "clients";
-  onRefresh: () => Promise<void>;
-  onError: NoticeSink;
-}) {
-  const { busy, run } = useAsyncTask(onError);
-  const [preview, setPreview] = useState<BulkPreview | null>(null),
-    [ack, setAck] = useState(false);
-  return (
-    <>
-      <div className="actions">
-        <button disabled={busy} onClick={() => run(async () => window.bando!.downloadSheet(kind))}>
-          현재 목록 .xlsx 다운로드
-        </button>
-        <button
-          disabled={busy || locked}
-          onClick={() =>
-            run(async () => {
-              setPreview(await window.bando!.previewSheet(kind));
-              setAck(false);
-            })
-          }
-        >
-          .xlsx 업로드 / 미리보기
-        </button>
-      </div>
-      {preview && (
-        <Modal title="엑셀 변경 미리보기" onClose={() => setPreview(null)}>
-          <h3>변경 미리보기 / {preview.changes.length}건</h3>
-          <p className="muted">빈칸은 기존 값을 유지합니다. 승인 시 먼저 DB를 백업합니다.</p>
-          {preview.errors.map((e) => (
-            <p className="warnings" key={e}>
-              {e}
-            </p>
-          ))}
-          <div className="bulk-diff">
-            {preview.changes.map((c, i) => (
-              <div className="diff-row" key={i}>
-                <b>{c.label}</b>
-                <p>
-                  {c.before} → {c.after}
-                </p>
-                {c.warning && <p className="warnings">{c.warning}</p>}
-              </div>
-            ))}
-          </div>
-          <label className="check">
-            <input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} /> 변경
-            내용과 중복 후보 / 공식 소매가 차이 경고를 확인했습니다.
-          </label>
-          <button
-            disabled={busy || locked || !ack || !!preview.errors.length || !preview.changes.length}
-            className="primary"
-            onClick={() =>
-              run(async () => {
-                await window.bando!.approveSheet();
-                await onRefresh();
-                setPreview(null);
-                onError("승인한 엑셀 변경을 저장했습니다.", "success");
-              })
-            }
-          >
-            백업 후 변경 승인
-          </button>
-        </Modal>
-      )}
-    </>
   );
 }
 export function CatalogPanel({
