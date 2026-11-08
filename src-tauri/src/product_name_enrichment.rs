@@ -1,6 +1,7 @@
 //! One-time, conservative catalog name enrichment for independent sale units.
 //! The mapping records the pre-update stock name and exact price-record ID.
-//! Employee-renamed items, order snapshots, prices, and other records are untouched.
+//! The branded prefix alone is removed from active employee-edited names;
+//! all other wording, order snapshots, prices and records remain untouched.
 use super::*;
 use serde_json::Value;
 
@@ -38,7 +39,7 @@ pub(super) fn apply_to_state(state: &mut Value) -> Result<usize, String> {
 
     // Older SQLite databases can still contain official website titles such as
     // "반도스탠드 BD Desk JS-3 Black 검정 (자바라 길이 43cm)".
-    // Do NOT replace every prefixed name: staff may have intentionally edited it.
+    // Only use the full curated name when the source text matches exactly.
     // The complete, independently curated 360-item catalog is authoritative
     // only when the stored name is exactly the unedited official original.
     let catalog: Value = serde_json::from_str(include_str!("../resources/state-seed.json"))
@@ -55,7 +56,7 @@ pub(super) fn apply_to_state(state: &mut Value) -> Result<usize, String> {
     }
     // Source importers sometimes collapse spaces in expressions such as
     // "자바라 길이" -> "자바라길이". Compare only whitespace-insensitively,
-    // never by prefix alone, so employee-added wording remains protected.
+    // never by prefix alone; fallback below keeps all employee-added wording.
     let same_official_text = |a: &Value, b: &Value| -> bool {
         match (a.as_str(), b.as_str()) {
             (Some(left), Some(right)) =>
@@ -69,11 +70,7 @@ pub(super) fn apply_to_state(state: &mut Value) -> Result<usize, String> {
         let Some(reference) = catalog_by_id.get(id) else { continue };
         let Some(existing_name) = product["name"].as_str() else { continue };
         if !existing_name.starts_with("반도스탠드 ")
-            || !same_official_text(&product["name"], &product["originalName"])
-            || !same_official_text(&product["originalName"], &reference["originalName"])
-            || product["siteId"] != reference["siteId"]
-            || product["siteCode"] != reference["siteCode"]
-            || product["catalog"] != reference["catalog"]
+            || !same_official_text(&product["name"], &reference["originalName"])
             || product["variants"].as_array().is_none_or(|v| v.len() != 1)
             || product["variants"][0]["id"] != reference["variants"][0]["id"]
             || product["deletedAt"].as_str().is_some()
@@ -94,6 +91,41 @@ pub(super) fn apply_to_state(state: &mut Value) -> Result<usize, String> {
         }
         product["name"] = Value::String(curated.to_string());
         changed += 1;
+    }
+
+    // Guaranteed display cleanup: preexisting DB rows may lack siteCode,
+    // catalog or source metadata, or contain genuine employee-edited names.
+    // The strict mapping above cannot identify all such rows. Remove ONLY
+    // the unwanted leading brand token; never change the remaining product
+    // wording, identity, price, description, or historical snapshots.
+    for product in products.iter_mut() {
+        if product["deletedAt"].as_str().is_some()
+            || product["supersededBy"].as_str().is_some()
+        {
+            continue;
+        }
+        let Some(existing) = product["name"].as_str() else { continue };
+        let Some(tail) = existing.strip_prefix("반도스탠드 ") else { continue };
+        let clean = tail.trim_start();
+        if clean.is_empty() {
+            return Err("상품명에서 브랜드명을 제거하면 이름이 비어 갱신할 수 없습니다.".into());
+        }
+        product["name"] = Value::String(clean.to_string());
+        changed += 1;
+    }
+
+    // Never silently claim completion while a visible active product still
+    // carries the same unwanted prefix. All writes happen only after this.
+    if let Some(product) = products.iter().find(|p| {
+        p["active"] != false
+            && p["deletedAt"].as_str().is_none()
+            && p["supersededBy"].as_str().is_none()
+            && p["name"].as_str().is_some_and(|name| name.starts_with("반도스탠드 "))
+    }) {
+        return Err(format!(
+            "상품명 브랜드 접두어 정리 실패: {}",
+            product["id"].as_str().unwrap_or("ID 없음")
+        ));
     }
     Ok(changed)
 }
