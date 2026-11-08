@@ -246,3 +246,47 @@ test("legacy wheel configuration mapping does not invent a missing distinction i
   item.name="BD Z-2 / 바퀴 미포함";
   assert.doesNotThrow(()=>previewFactoryExport(state,["excel:s1:FACTORY"]));
 });
+
+test("factory export blocks opposite included/excluded packaging even when both mention the item",()=>{
+  const state=stateFixture();
+  const product={id:"bag-safe",name:"BD 700 / 가방 포함",code:"BD 700",
+    variants:[{id:"price-bag",color:"단일"}]};
+  state.products.push(product);
+  const item=state.workflow.queue[0].snapshot.recipient.items[0];
+  item.productId=product.id;item.variantId="price-bag";item.name="BD 700 / 가방 미포함";
+  assert.throws(()=>previewFactoryExport(state,["excel:s1:FACTORY"]),/가방 포함 \/ 미포함/);
+  item.name="BD 700 / 가방 포함";
+  assert.doesNotThrow(()=>previewFactoryExport(state,["excel:s1:FACTORY"]));
+  product.name="BD Z-2 / 바퀴 미포함";
+  item.name="BD Z-2 / 바퀴 포함";
+  assert.throws(()=>previewFactoryExport(state,["excel:s1:FACTORY"]),/바퀴 포함 \/ 미포함/);
+});
+
+test("confirmed frozen factory items must match tabletop construction and type, not just the source ID",()=>{
+  const state=stateFixture();
+  const product={id:"top-safe",name:"BD 709-1 / 블랙 / 비타공 상판",code:"BD 709-1",
+    variants:[{id:"price-top",color:"블랙"}]};
+  state.products.push(product);
+  const item=state.workflow.queue[0].snapshot.recipient.items[0];
+  item.productId=product.id;item.variantId="price-top";
+  item.name="BD 709 / 블랙 / 타공 상판";
+  assert.throws(()=>previewFactoryExport(state,["excel:s1:FACTORY"]),/타공 \/ 비타공/);
+  item.name="BD 709-1 / 블랙 / 비타공 상판";
+  assert.doesNotThrow(()=>previewFactoryExport(state,["excel:s1:FACTORY"]));
+  product.name="BD LP-WB / B타입 상판";
+  item.name="BD LP-WB / A타입 상판";
+  assert.throws(()=>previewFactoryExport(state,["excel:s1:FACTORY"]),/A\/B타입/);
+});
+
+test("legacy mapped product refuses missing frozen color rather than inventing an attribute",()=>{
+  const state=stateFixture();
+  const seed=JSON.parse(read("src-tauri/resources/state-seed.json"));
+  const old="bando-site-351",price="bando-351-P00000NN000B",target=seed.productMappings[old+"|"+price];
+  const product=seed.products.find((p)=>p.id===target);
+  state.products=[structuredClone(product)];state.productMappings={[old+"|"+price]:target};
+  const item=state.workflow.queue[0].snapshot.recipient.items[0];
+  item.productId=old;item.variantId=price;item.name="BD 707A";
+  assert.throws(()=>previewFactoryExport(state,["excel:s1:FACTORY"]),/색상 구분/);
+  item.name="BD 707A / 클리어";
+  assert.doesNotThrow(()=>previewFactoryExport(state,["excel:s1:FACTORY"]));
+});
