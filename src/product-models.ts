@@ -23,7 +23,7 @@ const colorAliases: Record<string, string> = {
   silver: "실버",
   blue: "블루",
   red: "레드",
-  "색상 미표기": "색상 확인 필요",
+  "색상 미표기": "",
 };
 export const colorLabel = (value: string) => colorAliases[value.trim().toLowerCase()] ?? value;
 export const normalizeModel = (value: string) =>
