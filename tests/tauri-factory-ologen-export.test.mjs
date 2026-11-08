@@ -201,7 +201,7 @@ test("frozen legacy confirmed orders resolve to a precise sale product without r
   const matchedId=reference.productMappings[oldId+"|"+priceId];
   const linked=reference.products.find((p)=>p.id===matchedId);
   assert.ok(linked);
-  state.products=[structuredClone(linked)];
+  state.products.push(structuredClone(linked));
   state.productMappings={ [oldId+"|"+priceId]:matchedId };
   state.orders[0].confirmedAt="2026-11-07T01:00:00+09:00";
   const item=state.workflow.queue[0].snapshot.recipient.items[0];
@@ -225,7 +225,7 @@ test("an unresolved or forged legacy product map blocks factory export, never gu
   assert.throws(()=>previewFactoryExport(state,["excel:s1:FACTORY"]),/상품 ID와 가격 기록 ID/);
   const linkedId=seed.productMappings[legacyId+"|"+goodPrice];
   const linked=seed.products.find((p)=>p.id===linkedId);
-  state.products=[structuredClone(linked)];
+  state.products.push(structuredClone(linked));
   state.productMappings={[legacyId+"|"+goodPrice]:linkedId};
   assert.doesNotThrow(()=>previewFactoryExport(state,["excel:s1:FACTORY"]));
   item.variantId="INVALID";
@@ -234,7 +234,7 @@ test("an unresolved or forged legacy product map blocks factory export, never gu
   state.productMappings={[legacyId+"|"+goodPrice]:"other-product"};
   assert.throws(()=>previewFactoryExport(state,["excel:s1:FACTORY"]),/상품 ID와 가격 기록 ID/);
   state.productMappings={[legacyId+"|"+goodPrice]:linkedId};
-  state.products[0].sourceProductId="not-the-original-parent";
+  state.products.find((p)=>p.id===linkedId).sourceProductId="not-the-original-parent";
   assert.throws(()=>previewFactoryExport(state,["excel:s1:FACTORY"]),/상품 ID와 가격 기록 ID/);
 });
 
@@ -244,7 +244,7 @@ test("legacy wheel configuration mapping does not invent a missing distinction i
   const oldId="bando-site-136";
   const mapped=seed.products.find((p)=>p.siteId==="136" && /바퀴 미포함/.test(p.name));
   assert.ok(mapped);
-  state.products=[structuredClone(mapped)];
+  state.products.push(structuredClone(mapped));
   state.productMappings={[oldId+"|"+mapped.variants[0].id]:mapped.id};
   const item=state.workflow.queue[0].snapshot.recipient.items[0];
   item.productId=oldId;item.variantId=mapped.variants[0].id;item.name="BD Z-2";
@@ -289,7 +289,7 @@ test("legacy mapped product refuses missing frozen color rather than inventing a
   const seed=JSON.parse(read("src-tauri/resources/state-seed.json"));
   const old="bando-site-351",price="bando-351-P00000NN000B",target=seed.productMappings[old+"|"+price];
   const product=seed.products.find((p)=>p.id===target);
-  state.products=[structuredClone(product)];state.productMappings={[old+"|"+price]:target};
+  state.products.push(structuredClone(product));state.productMappings={[old+"|"+price]:target};
   const item=state.workflow.queue[0].snapshot.recipient.items[0];
   item.productId=old;item.variantId=price;item.name="BD 707A";
   assert.throws(()=>previewFactoryExport(state,["excel:s1:FACTORY"]),/색상 구분/);
