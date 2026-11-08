@@ -73,7 +73,6 @@
 .product-detail-money span { color: #a6b0ba; font-size: 12px; }
 .product-detail-money input { text-align: right; font-variant-numeric: tabular-nums; }
 .product-detail-money input:disabled { color: #c4cad2; opacity: .75; }
-.product-detail-multi-note { color: #b3bfcb; font-size: 11px; }
 .product-brand-combobox { position: relative; min-width: 0; }
 .product-brand-results {
   position: absolute; z-index: 25; top: calc(100% + 5px); left: 0; right: 0;
