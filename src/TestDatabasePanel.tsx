@@ -12,7 +12,7 @@ export function TestDatabasePanel({ state, onReset }: { state: State; onReset: (
       ?.testDatabasePreview?.()
       .then(setPreview)
       .catch((e) => setError(String(e)));
-  }, []);
+  }, [state.revision]);
   if (!preview?.enabled)
     return (
       <details className="card">
