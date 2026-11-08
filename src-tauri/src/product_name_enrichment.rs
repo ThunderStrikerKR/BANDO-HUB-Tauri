@@ -53,13 +53,24 @@ pub(super) fn apply_to_state(state: &mut Value) -> Result<usize, String> {
             return Err(format!("공식 상품명 기준표의 상품 ID가 중복됐습니다: {id}"));
         }
     }
+    // Source importers sometimes collapse spaces in expressions such as
+    // "자바라 길이" -> "자바라길이". Compare only whitespace-insensitively,
+    // never by prefix alone, so employee-added wording remains protected.
+    let same_official_text = |a: &Value, b: &Value| -> bool {
+        match (a.as_str(), b.as_str()) {
+            (Some(left), Some(right)) =>
+                left.chars().filter(|ch| !ch.is_whitespace())
+                    .eq(right.chars().filter(|ch| !ch.is_whitespace())),
+            _ => false,
+        }
+    };
     for product in products.iter_mut() {
         let Some(id) = product["id"].as_str() else { continue };
         let Some(reference) = catalog_by_id.get(id) else { continue };
         let Some(existing_name) = product["name"].as_str() else { continue };
         if !existing_name.starts_with("반도스탠드 ")
-            || product["name"] != product["originalName"]
-            || product["originalName"] != reference["originalName"]
+            || !same_official_text(&product["name"], &product["originalName"])
+            || !same_official_text(&product["originalName"], &reference["originalName"])
             || product["siteId"] != reference["siteId"]
             || product["siteCode"] != reference["siteCode"]
             || product["catalog"] != reference["catalog"]
@@ -154,7 +165,13 @@ mod tests {
         let mut changed_ids = Vec::new();
         for product in state["products"].as_array_mut().unwrap() {
             if sites.iter().any(|site| product["siteId"].as_str() == Some(site)) {
-                product["name"] = product["originalName"].clone();
+                product["name"] = if product["siteId"] == "246" {
+                    // A real screen used "자바라길이", while the reference
+                    // contains "자바라 길이": both are the same source title.
+                    json!("반도스탠드 BD Desk JS-3 Black 검정 (자바라길이 43cm)")
+                } else {
+                    product["originalName"].clone()
+                };
                 changed_ids.push(product["id"].as_str().unwrap().to_string());
             }
             // An employee-edited, still prefixed name must never be overwritten.
