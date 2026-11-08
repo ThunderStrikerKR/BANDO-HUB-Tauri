@@ -60,6 +60,9 @@ function exportRow(state: State, entry: ExcelQueueEntry): FactoryExportRow {
   // information. Never silently fill it from the *current* mutable catalogue,
   // since the catalogue may have changed after the order was approved.
   for (const item of recipient.items) {
+    if (!item.productId || !item.variantId) {
+      throw Error("과거 주문의 상품 또는 가격 기록 ID가 없습니다. 발송 전 품목을 확인하세요.");
+    }
     const linked = resolveHistoricalProductReference(state, item.productId, item.variantId);
     // The recorded original ID is immutable, but the matching current product
     // must be identified by BOTH the former product ID and price-record ID.
