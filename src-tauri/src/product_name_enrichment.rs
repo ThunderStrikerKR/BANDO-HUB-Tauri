@@ -114,6 +114,89 @@ pub(super) fn apply_to_state(state: &mut Value) -> Result<usize, String> {
         changed += 1;
     }
 
+    // Update the exact previously seeded Desk labels only. Every visible
+    // selling configuration remains an independent item with one price ID.
+    // Employee-specific product labels are never overwritten.
+    let desk_old_names = [
+        ("bando-site-247", "BD Desk TS-1 / 미니형 마이크 스탠드"),
+        ("bando-site-248", "BD Desk TS-2 / 미니형 마이크 스탠드"),
+        ("bando-site-249", "BD Desk TS-3 / 미니형 마이크 스탠드"),
+        ("bando-site-250", "BD Desk IS-3 / 바 길이 26cm"),
+        ("bando-site-251", "BD Desk IS-2 / 바 길이 15cm"),
+        ("bando-site-252", "BD Desk IS-1 / 바 길이 10cm"),
+    ];
+    for (id, old_name) in desk_old_names {
+        let Some(reference) = catalog_by_id.get(id) else {
+            return Err(format!("Desk 제품 기준표 누락: {id}"));
+        };
+        let Some(product) = products.iter_mut().find(|p| p["id"] == id) else {
+            continue;
+        };
+        if product["name"].as_str() != Some(old_name)
+            || product["variants"].as_array().is_none_or(|v| v.len() != 1)
+            || product["variants"][0]["id"] != reference["variants"][0]["id"]
+            || product["deletedAt"].as_str().is_some()
+            || product["supersededBy"].as_str().is_some()
+        {
+            continue;
+        }
+        let Some(new_name) = reference["name"].as_str() else {
+            return Err(format!("Desk 제품 새 이름 누락: {id}"));
+        };
+        if new_name.contains('◆') || new_name.trim().is_empty() {
+            return Err(format!("Desk 제품명 규칙 위반: {id}"));
+        }
+        product["name"] = Value::String(new_name.to_string());
+        // "길이 확인 필요" was an old placeholder, not an actual specification.
+        if product["subtitle"].as_str() == Some("길이 확인 필요") {
+            product["subtitle"] = Value::String(String::new());
+        }
+        changed += 1;
+    }
+
+    // These are physically duplicate sale configurations, not separate
+    // options. Keep both original IDs and frozen order references in SQLite,
+    // but retire the redundant standalone site listings from all new sales.
+    let retired_music_trays = [
+        ("bando-site-77", "bando-77-single",
+         "sku:bando-site-237:bando-237-P00000JC000H",
+         "bando-237-P00000JC000H"),
+        ("bando-site-78", "bando-78-single",
+         "sku:bando-site-237:bando-237-P00000JC000I",
+         "bando-237-P00000JC000I"),
+    ];
+    for (duplicate_id, old_variant_id, canonical_id, canonical_variant_id)
+        in retired_music_trays
+    {
+        let Some(canonical) = products.iter().find(|p| p["id"] == canonical_id) else {
+            return Err(format!("중복 뮤직 트레이의 정본 상품을 찾을 수 없습니다: {canonical_id}"));
+        };
+        if canonical["variants"].as_array().is_none_or(|v| v.len() != 1)
+            || canonical["variants"][0]["id"] != canonical_variant_id
+            || canonical["deletedAt"].as_str().is_some()
+            || canonical["supersededBy"].as_str().is_some()
+        {
+            return Err(format!("중복 뮤직 트레이 정본 식별자가 변경됐습니다: {canonical_id}"));
+        }
+        let Some(duplicate) = products.iter_mut().find(|p| p["id"] == duplicate_id) else {
+            continue;
+        };
+        if duplicate["variants"].as_array().is_none_or(|v| v.len() != 1)
+            || duplicate["variants"][0]["id"] != old_variant_id
+            || duplicate["deletedAt"].as_str().is_some()
+            || duplicate["supersededBy"].as_str().is_some_and(|to| to != canonical_id)
+        {
+            continue;
+        }
+        if duplicate["supersededBy"].as_str() != Some(canonical_id)
+            || duplicate["active"] != false
+        {
+            duplicate["supersededBy"] = Value::String(canonical_id.to_string());
+            duplicate["active"] = Value::Bool(false);
+            changed += 1;
+        }
+    }
+
     // Never silently claim completion while a visible active product still
     // carries the same unwanted prefix. All writes happen only after this.
     if let Some(product) = products.iter().find(|p| {
