@@ -314,29 +314,39 @@ mod tests {
         let now="2026-11-08T11:00:00.000Z";
         let raw="TEST 전용 가상 발주서";
         let recipients=json!([recipient.clone()]);
-        let order=json!({
-            "id":"backup-drill-order","clientId":"backup-drill-synthetic-client",
-            "orderType":"DEALER","clientSnapshot":client,"senderSnapshot":client,
-            "raw":raw,"channel":"TEST","recipients":recipients,
-            "shippingFee":0,"applyVat":false,"vatAmount":0,
-            "status":"STATEMENT","notified":false,"paid":false,"postpaidApproved":false,
-            "freightCode":"010","createdAt":now,"updatedAt":now,
-            "receptionVersion":1,"confirmedAt":now,
-            "receipt":{
-                "original":raw,"at":now,"actor":"TEST 검증",
-                "clientId":"backup-drill-synthetic-client","legacy":false
-            },
-            "confirmationSnapshot":{
-                "at":now,"raw":raw,"client":client,"recipients":recipients,
-                "data":{
-                    "id":"backup-drill-order","clientId":"backup-drill-synthetic-client",
-                    "raw":raw,"channel":"TEST","recipients":recipients,"orderType":"DEALER",
-                    "shippingFee":0,"applyVat":false,"vatAmount":0,"status":"STATEMENT",
-                    "notified":false,"paid":false,"postpaidApproved":false,"freightCode":"010",
-                    "createdAt":now,"updatedAt":now
-                }
-            }
+        let receipt=json!({
+            "original":raw,"at":now,"actor":"TEST 검증",
+            "clientId":"backup-drill-synthetic-client","legacy":false
         });
+        let snapshot_data=json!({
+            "id":"backup-drill-order","clientId":"backup-drill-synthetic-client",
+            "raw":raw,"channel":"TEST","recipients":recipients,"orderType":"DEALER",
+            "shippingFee":0,"applyVat":false,"vatAmount":0,"status":"STATEMENT",
+            "notified":false,"paid":false,"postpaidApproved":false,"freightCode":"010",
+            "createdAt":now,"updatedAt":now
+        });
+        let confirmation=json!({
+            "at":now,"raw":raw,"client":client,
+            "recipients":recipients,"data":snapshot_data
+        });
+        let mut order=json!({
+            "id":"backup-drill-order","clientId":"backup-drill-synthetic-client",
+            "orderType":"DEALER","clientSnapshot":client,
+            "senderSnapshot":client,"raw":raw,"channel":"TEST",
+            "recipients":recipients,"receipt":receipt,"confirmationSnapshot":confirmation
+        });
+        order["shippingFee"]=json!(0);
+        order["applyVat"]=json!(false);
+        order["vatAmount"]=json!(0);
+        order["status"]=json!("STATEMENT");
+        order["notified"]=json!(false);
+        order["paid"]=json!(false);
+        order["postpaidApproved"]=json!(false);
+        order["freightCode"]=json!("010");
+        order["createdAt"]=json!(now);
+        order["updatedAt"]=json!(now);
+        order["receptionVersion"]=json!(1);
+        order["confirmedAt"]=json!(now);
         candidate["orders"].as_array_mut().unwrap().push(order);
         candidate["workflow"]["shipments"].as_array_mut().unwrap().push(json!({
             "id":"backup-drill-shipment","orderId":"backup-drill-order",
