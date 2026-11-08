@@ -1,0 +1,25 @@
+name: Order product React UI click test (isolated)
+on:
+  push:
+    branches:
+      - test/order-ui-click-20261109
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  order-product-ui:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install application dependencies
+        run: npm install --no-audit --no-fund --ignore-scripts
+      - name: Install Playwright
+        run: npm install --no-save --no-package-lock --no-audit --no-fund playwright@1.55.1
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Click-test order product editing and invalid selection
+        run: node scripts/order-product-ui-smoke.mjs
