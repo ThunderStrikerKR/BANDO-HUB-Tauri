@@ -351,10 +351,12 @@ mod tests {
         original["products"][0]["variants"][0]["wholesale"]=json!(31870);
         original["products"][0]["variants"][0]["semi"]=json!(41870);
         original["products"][0]["variants"][0]["retail"]=json!(51870);
+        let mut special_overrides=serde_json::Map::new();
+        special_overrides.insert(price_id.clone(),json!(27630));
         original["clients"]=json!([{
             "id":"company-1","name":"가상 특수 거래처","tier":"special",
             "address":"가상 발송지","phone":"010-0000-0000",
-            "overrides":{price_id.clone():27630}
+            "overrides":special_overrides
         }]);
         original["aliases"]=json!([{
             "id":"dealer-alias","clientId":"company-1","text":"특수거래처 지정 상품",
