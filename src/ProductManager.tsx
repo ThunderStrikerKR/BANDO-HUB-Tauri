@@ -214,7 +214,7 @@ export function ProductManager({
             <div className="manager-bar">
               <div>
                 <h2>
-                  상품 가격표 <span>{products.length}개 모델</span>
+                  상품 가격표 <span>{products.length}개 상품</span>
                 </h2>
                 <small>
                   {priceMode
