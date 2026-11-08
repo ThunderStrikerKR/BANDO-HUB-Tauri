@@ -154,6 +154,56 @@ pub(super) fn apply_to_state(state: &mut Value) -> Result<usize, String> {
         changed += 1;
     }
 
+    // Exact-model label corrections for the Mighty Bright LED family.
+    // Previous releases already wrote brand-first names to SQLite; matching
+    // only an official source title would not update those installed records.
+    // Preserve any custom employee wording and the original website title.
+    let led_old_names = [
+        ("bando-site-229", "BD LED-2s / Mighty Bright Light"),
+        ("bando-site-301", "Mighty Bright LED-2W Wonderflex / 보면대등"),
+        ("bando-site-302", "Mighty Bright LED-3N Nuflex / 보면대등"),
+    ];
+    for (id, old_name) in led_old_names {
+        let Some(reference) = catalog_by_id.get(id) else {
+            return Err(format!("LED 기준 상품 누락: {id}"));
+        };
+        let Some(product) = products.iter_mut().find(|p| p["id"] == id) else {
+            continue;
+        };
+        if product["name"].as_str() != Some(old_name)
+            || product["variants"].as_array().is_none_or(|v| v.len() != 1)
+            || product["variants"][0]["id"] != reference["variants"][0]["id"]
+            || product["deletedAt"].as_str().is_some()
+            || product["supersededBy"].as_str().is_some()
+        {
+            continue;
+        }
+        let Some(new_name) = reference["name"].as_str() else {
+            return Err(format!("LED 정리 이름 누락: {id}"));
+        };
+        if !new_name.starts_with("BD LED-") || new_name.contains('◆') {
+            return Err(format!("LED 상품명 규칙 위반: {id}"));
+        }
+        product["name"] = Value::String(new_name.to_string());
+        changed += 1;
+    }
+    // "Mighty Bright Light" is already in the title of these two
+    // independent products. Do not duplicate it as an internal subtitle.
+    for id in ["bando-site-228", "bando-site-229"] {
+        let Some(product) = products.iter_mut().find(|p| p["id"] == id) else {
+            continue;
+        };
+        if product["subtitle"].as_str() == Some("Mighty Bright Light")
+            && product["deletedAt"].as_str().is_none()
+            && product["supersededBy"].as_str().is_none()
+        {
+            if let Some(fields) = product.as_object_mut() {
+                fields.remove("subtitle");
+                changed += 1;
+            }
+        }
+    }
+
     // These are physically duplicate sale configurations, not separate
     // options. Keep both original IDs and frozen order references in SQLite,
     // but retire the redundant standalone site listings from all new sales.
@@ -516,6 +566,77 @@ mod tests {
         assert_eq!(backup_manager::list_backups(&base).unwrap().len(), 1);
         drop(db);
         std::fs::remove_dir_all(base).unwrap();
+    }
+
+    #[test]
+    fn persisted_mighty_bright_names_upgrade_once_without_touching_price_or_original_title() {
+        let salt = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let base = std::env::temp_dir().join(format!(
+            "bando-led-correction-{}-{salt}", std::process::id()
+        ));
+        std::fs::create_dir_all(&base).unwrap();
+        let mut db = initialize_database(&base.join("state.sqlite")).unwrap();
+        let mut prior = get_snapshot(&db).unwrap();
+        let old_names = [
+            ("229", "BD LED-2s / Mighty Bright Light"),
+            ("301", "Mighty Bright LED-2W Wonderflex / 보면대등"),
+            ("302", "Mighty Bright LED-3N Nuflex / 보면대등"),
+        ];
+        for p in prior["products"].as_array_mut().unwrap() {
+            let site = p["siteId"].as_str().unwrap_or("").to_string();
+            if let Some((_, old_name))=old_names.iter().find(|(id,_)| *id==site) {
+                p["name"]=json!(old_name);
+            }
+            if site=="228" || site=="229" {
+                p["subtitle"]=json!("Mighty Bright Light");
+            }
+        }
+        let original = prior.clone();
+        let rev = prior["revision"].as_u64().unwrap();
+        write_snapshot(&mut db, prior, rev, false).unwrap();
+        assert_eq!(apply(&mut db, &base).unwrap(), 5);
+        let after=get_snapshot(&db).unwrap();
+        let cases = [
+            ("228", "BD LED-3 / Mighty Bright Light", 31000),
+            ("229", "BD LED-2S / Mighty Bright Light", 31000),
+            ("301", "BD LED-2W / Mighty Bright Wonderflex / 보면대등", 38000),
+            ("302", "BD LED-3N / Mighty Bright Nuflex / 보면대등", 45000),
+        ];
+        for (site,name,price) in cases {
+            let old=original["products"].as_array().unwrap().iter()
+                .find(|p|p["siteId"].as_str()==Some(site)).unwrap();
+            let updated=after["products"].as_array().unwrap().iter()
+                .find(|p|p["siteId"].as_str()==Some(site)).unwrap();
+            assert_eq!(updated["name"],name, "{site}");
+            assert_eq!(updated["variants"],old["variants"], "{site}");
+            assert_eq!(updated["variants"][0]["retail"],price,"{site}");
+            assert_eq!(updated["originalName"],old["originalName"], "{site}");
+            if site=="228" || site=="229" {
+                assert!(updated["subtitle"].as_str().unwrap_or("").is_empty());
+            } else {
+                assert_eq!(updated["subtitle"],"건전지 및 어댑터 방식");
+            }
+        }
+        assert_eq!(after["orders"],original["orders"]);
+        assert_eq!(after["clients"],original["clients"]);
+        assert_eq!(apply(&mut db,&base).unwrap(),0);
+        assert_eq!(backup_manager::list_backups(&base).unwrap().len(),1);
+        drop(db);
+        std::fs::remove_dir_all(base).unwrap();
+    }
+
+    #[test]
+    fn employee_custom_mighty_bright_name_is_not_replaced() {
+        let mut state: Value = serde_json::from_str(include_str!(
+            "../resources/state-seed.json"
+        )).unwrap();
+        let item=state["products"].as_array_mut().unwrap().iter_mut()
+            .find(|p|p["siteId"]=="301").unwrap();
+        item["name"]=json!("BD LED-2W / 직원이 직접 수정한 상품명");
+        assert_eq!(apply_to_state(&mut state).unwrap(),0);
+        let updated=state["products"].as_array().unwrap().iter()
+            .find(|p|p["siteId"]=="301").unwrap();
+        assert_eq!(updated["name"],"BD LED-2W / 직원이 직접 수정한 상품명");
     }
 
     #[test]

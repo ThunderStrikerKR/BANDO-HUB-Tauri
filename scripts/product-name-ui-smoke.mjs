@@ -98,6 +98,27 @@ try {
   assert.ok(!tableText.includes("색상 확인 필요"));
   console.log("PASS UI: three separate music-tray colors and no duplicate dark-green/wine listings");
 
+  await page.getByRole("textbox",{name:"상품 검색"}).fill("LED");
+  const ledTitles=[
+    ["BD LED-2S / Mighty Bright Light","31,000"],
+    ["BD LED-3 / Mighty Bright Light","31,000"],
+    ["BD LED-2W / Mighty Bright Wonderflex / 보면대등","38,000"],
+    ["BD LED-3N / Mighty Bright Nuflex / 보면대등","45,000"],
+  ];
+  for (const [name,price] of ledTitles) {
+    const row=rows.filter({hasText:name}).first();
+    await row.waitFor();
+    const label=await row.locator(".product-title-line b").innerText();
+    assert.equal(label.trim(),name);
+    assert.equal(await row.locator('input[data-price-cell]').last().inputValue(),price,name);
+    assert.ok(!(await row.innerText()).includes("색상 확인 필요"),name);
+  }
+  const ledText=await table.innerText();
+  assert.ok(!ledText.includes("Mighty Bright LED-2W Wonderflex"));
+  assert.ok(!ledText.includes("Mighty Bright LED-3N Nuflex"));
+  assert.ok(!ledText.includes("BD LED-2s"));
+  console.log("PASS UI: four BD LED model-first names, correct retail price and no invented colors");
+
   assert.deepEqual(errors, []);
   assert.ok(!await page.evaluate(() => window.__ciCalls.includes("state_save")));
   console.log("PASS UI: product manager shows curated names and preserves read-only state");

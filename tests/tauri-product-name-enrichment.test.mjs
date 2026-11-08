@@ -37,7 +37,7 @@ test("92 exact mapped names have source-grounded change records; no unproven des
     assert.equal(target.code,row.oldName,row.id);
     assert.equal(target.originalName,row.originalName,row.id);
     assert.equal(target.variants[0].id,row.priceRecordId,row.id);
-    assert.ok(row.newName.startsWith(row.oldName+" / "),row.id);
+    assert.ok(row.newName.toLowerCase().startsWith((row.oldName+" / ").toLowerCase()),row.id);
     assert.ok(!row.newName.includes("◆"),row.id);
   }
   const held = current.products.filter(p=>p.name===p.code);
