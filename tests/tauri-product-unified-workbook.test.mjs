@@ -12,7 +12,7 @@ const require = createRequire(import.meta.url);
 const read = (p) => readFileSync(new URL("../" + p, import.meta.url), "utf8");
 const normalizeColor = (v) => ({ 검정: "Black", 블랙: "Black" }[v] ?? v).trim();
 const domain = {
-  normalizeCode: (v) => v.toUpperCase().replace(/\\s/g, ""),
+  normalizeCode: (v) => v.toUpperCase().replace(/\s/g, ""),
   normalizeColor,
   validateProduct: (p) => {
     if (!p.id || !p.name || !p.code || p.variants.length !== 1) throw Error("상품 검증 실패");
@@ -24,8 +24,8 @@ const load = (path, imports) => {
   const compiled = ts.transpileModule(read(path), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
   }).outputText;
-  vm.runInThisContext("(function(exports, require, crypto, structuredClone) {\\n" +
-    compiled + "\\n})", { filename: path })(target,
+  vm.runInThisContext("(function(exports, require, crypto, structuredClone) {\n" +
+    compiled + "\n})", { filename: path })(target,
     (name) => imports[name] ?? require(name), webcrypto, structuredClone);
   return target;
 };
