@@ -167,6 +167,7 @@ pub(super) fn transform(mut state:Value)->Result<Value,String>{
         state["productMappings"]=Value::Object(map);
     }
     state["products"]=json!(products);
+    super::product_name_enrichment::apply_to_state(&mut state)?;
     Ok(state)
 }
 
