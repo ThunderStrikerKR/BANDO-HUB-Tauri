@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
 const read = (path) => readFileSync(new URL("../" + path, import.meta.url), "utf8");
 
@@ -54,17 +54,13 @@ test("actively used product, dealer and freight workbook paths remain available"
   }
 });
 
-test("planned mobile bridge stays explicit; unsafe legacy catalog approval remains rejected natively", () => {
-  const bridge = read("src/tauri-bridge.ts");
-  const api = read("src/types.ts");
-  const mobile = read("src/app/MobilePanel.tsx");
+test("removed unused settings surface stays absent; unsafe legacy catalog approval remains rejected natively", () => {
+  const settings = read("src/app/SettingsView.tsx");
+  const app = read("src/App.tsx");
   const native = read("src-tauri/src/lib.rs");
-  for (const method of ["mobileStart", "mobileStop", "mobileStatus", "inbox"]) {
-    assert.match(bridge, new RegExp("\\b" + method + ":"));
-    assert.match(api, new RegExp("\\b" + method + ":"));
-  }
-  assert.match(mobile, /window\.bando!\.mobileStart\(\)/);
-  assert.match(bridge, /notReady\("스마트폰 연동"\)/);
+  assert.doesNotMatch(settings, /MobilePanel|onReceive|mobileStart|mobileStop/);
+  assert.doesNotMatch(app, /onReceive=\{model\.receive\}/);
+  assert.equal(existsSync(new URL("../src/app/MobilePanel.tsx", import.meta.url)), false);
   assert.match(native, /fn catalog_approve\(_db: State<'_, Database>\)/);
   assert.match(native, /이전 방식의 일괄 승인은 안전하지 않아 중지/);
 });
