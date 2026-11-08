@@ -517,6 +517,81 @@ mod tests {
     }
 
     #[test]
+    fn upgrades_existing_v1_relational_database_to_v2_without_losing_original_options() {
+        let folder=temp().with_extension("v1-migration-test");
+        std::fs::create_dir_all(&folder).unwrap();
+        let path=folder.join("v1.sqlite");
+        let mut legacy_db=Connection::open(&path).unwrap();
+        legacy_db.execute_batch(r#"
+            PRAGMA foreign_keys=ON;
+            CREATE TABLE app_state(id INTEGER PRIMARY KEY,payload TEXT NOT NULL);
+            CREATE TABLE core_schema(key TEXT PRIMARY KEY,version INTEGER NOT NULL);
+            CREATE TABLE core_products(
+                id TEXT PRIMARY KEY,position INTEGER NOT NULL,
+                code TEXT NOT NULL,name TEXT NOT NULL,payload TEXT NOT NULL);
+            CREATE TABLE core_variants(
+                id TEXT PRIMARY KEY,product_id TEXT NOT NULL REFERENCES core_products(id) ON DELETE CASCADE,
+                position INTEGER NOT NULL,color TEXT NOT NULL,
+                wholesale INTEGER,semi INTEGER,retail INTEGER,payload TEXT NOT NULL);
+            CREATE TABLE core_clients(id TEXT PRIMARY KEY,position INTEGER NOT NULL,payload TEXT NOT NULL);
+            CREATE TABLE core_orders(id TEXT PRIMARY KEY,position INTEGER NOT NULL,payload TEXT NOT NULL);
+            CREATE TABLE core_recipients(id TEXT PRIMARY KEY,order_id TEXT NOT NULL,position INTEGER NOT NULL,payload TEXT NOT NULL);
+            CREATE TABLE core_items(id TEXT PRIMARY KEY,recipient_id TEXT NOT NULL,position INTEGER NOT NULL,payload TEXT NOT NULL);
+            INSERT INTO core_schema(key,version) VALUES ('business-core',1);
+        "#).unwrap();
+        let old:Value=serde_json::from_str(include_str!("../resources/legacy-state-seed-303.json")).unwrap();
+        let mut envelope=old.clone();
+        strip_core(&mut envelope);
+        let tx=legacy_db.transaction().unwrap();
+        tx.execute("INSERT INTO app_state(id,payload) VALUES (1,?1)",
+            [serde_json::to_string(&envelope).unwrap()]).unwrap();
+        for (position,p) in old["products"].as_array().unwrap().iter().enumerate(){
+            tx.execute("INSERT INTO core_products(id,position,code,name,payload) VALUES (?1,?2,?3,?4,?5)",
+                params![p["id"].as_str().unwrap(),position as i64,
+                    p["code"].as_str().unwrap(),p["name"].as_str().unwrap(),
+                    payload(p,Some("variants")).unwrap()]).unwrap();
+            for (vpos,v) in p["variants"].as_array().unwrap().iter().enumerate(){
+                tx.execute("INSERT INTO core_variants(id,product_id,position,color,wholesale,semi,retail,payload)
+                    VALUES (?1,?2,?3,?4,?5,?6,?7,?8)",
+                    params![v["id"].as_str().unwrap(),p["id"].as_str().unwrap(),vpos as i64,
+                        v["color"].as_str().unwrap_or(""),v["wholesale"].as_i64(),
+                        v["semi"].as_i64(),v["retail"].as_i64(),payload(v,None).unwrap()]).unwrap();
+            }
+        }
+        tx.commit().unwrap();
+        assert_eq!(legacy_db.query_row("SELECT COUNT(*) FROM core_variants",[],
+            |r|r.get::<_,i64>(0)).unwrap(),360);
+        drop(legacy_db);
+
+        let conn=super::super::initialize_database(&path).unwrap();
+        assert_eq!(schema_version(&conn).unwrap(),2);
+        let restored=super::super::get_snapshot(&conn).unwrap();
+        assert_eq!(restored["products"].as_array().unwrap().len(),360);
+        assert!(restored["products"].as_array().unwrap().iter()
+            .all(|p|p["variants"].as_array().unwrap().len()==1));
+        assert_eq!(conn.query_row("SELECT COUNT(*) FROM core_product_prices",[],
+            |r|r.get::<_,i64>(0)).unwrap(),360);
+        assert_eq!(conn.query_row("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='core_variants'",[],
+            |r|r.get::<_,i64>(0)).unwrap(),0);
+        verify(&conn).unwrap();
+
+        let backups=std::fs::read_dir(folder.join("backups")).unwrap()
+            .map(|entry|entry.unwrap().path()).collect::<Vec<_>>();
+        assert_eq!(backups.len(),1);
+        let backup=Connection::open_with_flags(&backups[0],
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY).unwrap();
+        assert_eq!(backup.query_row("SELECT version FROM core_schema WHERE key='business-core'",[],
+            |r|r.get::<_,i64>(0)).unwrap(),1);
+        assert_eq!(backup.query_row("SELECT COUNT(*) FROM core_products",[],
+            |r|r.get::<_,i64>(0)).unwrap(),303);
+        assert_eq!(backup.query_row("SELECT COUNT(*) FROM core_variants",[],
+            |r|r.get::<_,i64>(0)).unwrap(),360);
+        drop(backup);
+        drop(conn);
+        std::fs::remove_dir_all(folder).unwrap();
+    }
+
+    #[test]
     fn client_order_recipient_and_item_have_reversible_foreign_keys() {
         let path=temp();
         let mut conn=super::super::initialize_database(&path).unwrap();
