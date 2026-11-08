@@ -473,8 +473,10 @@ export function useOrderDesk({
     );
   }
   const chooseProduct = (rid: string, p: Product, iid?: string) => {
-    if (p.variants.length !== 1) {
-      onNotice("여러 판매 구성이 묶인 옛 상품은 선택할 수 없습니다. 개별 판매 상품을 선택하세요.", "error");
+    if (p.variants.length !== 1 || p.requiresOption) {
+      onNotice(p.requiresOption
+        ? "상품 구성이 미확정입니다. 판매 구성을 확인한 뒤 독립 상품으로 등록하세요."
+        : "상품 가격 기록이 정확히 하나가 아닙니다. 상품 데이터를 확인하세요.", "error");
       return;
     }
     if (iid)
