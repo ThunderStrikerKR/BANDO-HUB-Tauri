@@ -468,21 +468,50 @@ mod tests {
         drop(conn);close(&path);
     }
     #[test]
-    fn upgrades_legacy_json_in_place_with_a_verified_original_backup() {
+    fn upgrades_legacy_303_site_groups_to_360_units_with_verified_original_backup() {
         let folder=temp().with_extension("dir");
         std::fs::create_dir_all(&folder).unwrap();
         let path=folder.join("old.sqlite");
         let legacy=Connection::open(&path).unwrap();
         legacy.execute_batch("CREATE TABLE app_state(id INTEGER PRIMARY KEY,payload TEXT NOT NULL)").unwrap();
-        let original=include_str!("../resources/state-seed.json");
+        // Exercise the *real prior 303-group layout*, not the new 360-unit seed.
+        let original=include_str!("../resources/legacy-state-seed-303.json");
+        let previous:Value=serde_json::from_str(original).unwrap();
+        assert_eq!(previous["products"].as_array().unwrap().len(),303);
+        let previous_prices=previous["products"].as_array().unwrap().iter()
+            .flat_map(|p|p["variants"].as_array().unwrap())
+            .map(|v|(v["id"].clone(),v["retail"].clone())).collect::<Vec<_>>();
+        assert_eq!(previous_prices.len(),360);
         legacy.execute("INSERT INTO app_state(id,payload) VALUES (1,?1)",[original]).unwrap();
         drop(legacy);
+
         let conn=super::super::initialize_database(&path).unwrap();
         assert!(active(&conn).unwrap());
-        assert_eq!(super::super::get_snapshot(&conn).unwrap()["products"].as_array().unwrap().len(),303);
+        assert_eq!(schema_version(&conn).unwrap(),2);
+        let snapshot=super::super::get_snapshot(&conn).unwrap();
+        assert_eq!(snapshot["products"].as_array().unwrap().len(),360);
+        assert!(snapshot["products"].as_array().unwrap().iter()
+            .all(|p|p["variants"].as_array().unwrap().len()==1));
+        let prices=snapshot["products"].as_array().unwrap().iter()
+            .map(|p|(&p["variants"][0]["id"],&p["variants"][0]["retail"]))
+            .map(|(id,retail)|(id.clone(),retail.clone())).collect::<Vec<_>>();
+        assert_eq!(prices,previous_prices);
+        assert_eq!(conn.query_row("SELECT COUNT(*) FROM core_product_prices",[],
+            |r|r.get::<_,i64>(0)).unwrap(),360);
         verify(&conn).unwrap();
-        let copies=std::fs::read_dir(folder.join("backups")).unwrap().count();
-        assert_eq!(copies,1);
+
+        // The original on-disk business snapshot must be retrievable *unchanged*.
+        let backups=std::fs::read_dir(folder.join("backups")).unwrap()
+            .map(|entry|entry.unwrap().path()).collect::<Vec<_>>();
+        assert_eq!(backups.len(),1);
+        let backup=Connection::open_with_flags(&backups[0],
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY).unwrap();
+        let backed_up:String=backup.query_row("SELECT payload FROM app_state WHERE id=1",[],
+            |r|r.get(0)).unwrap();
+        assert_eq!(backed_up,original);
+        assert_eq!(backup.query_row("PRAGMA integrity_check",[],
+            |r|r.get::<_,String>(0)).unwrap(),"ok");
+        drop(backup);
         drop(conn);
         std::fs::remove_dir_all(folder).unwrap();
     }
