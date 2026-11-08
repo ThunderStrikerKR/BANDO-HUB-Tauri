@@ -1,0 +1,23 @@
+name: Independent product order regression (isolated)
+on:
+  push:
+    branches:
+      - test/order-independent-products-20261109
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  order-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund --ignore-scripts
+      - name: Check existing product and historical-order baseline
+        run: node --test tests/tauri-curated-products.test.mjs tests/tauri-historical-product-reference.test.mjs
+      - name: Run T01-T15 targeted order regression
+        run: node --test tests/tauri-independent-order-regression.test.mjs
