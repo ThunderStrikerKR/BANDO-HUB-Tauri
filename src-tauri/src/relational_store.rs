@@ -600,6 +600,102 @@ mod tests {
     }
 
     #[test]
+    fn legacy_db_round_trip_preserves_prices_aliases_drafts_frozen_orders_and_receipt_audit(){
+        let folder=temp().with_extension("legacy-business-roundtrip");
+        std::fs::create_dir_all(&folder).unwrap();
+        let path=folder.join("business.sqlite");
+        let mut old:Value=serde_json::from_str(
+            include_str!("../resources/legacy-state-seed-303.json")).unwrap();
+        let product=old["products"].as_array().unwrap().iter()
+            .position(|p|p["id"]=="bando-site-351").unwrap();
+        let a=old["products"][product]["variants"][0]["id"].as_str().unwrap().to_owned();
+        let b=old["products"][product]["variants"][1]["id"].as_str().unwrap().to_owned();
+        old["products"][product]["variants"][0]["wholesale"]=json!(31731);
+        old["products"][product]["variants"][0]["semi"]=json!(43731);
+        old["products"][product]["variants"][0]["retail"]=json!(123457);
+        old["products"][product]["variants"][1]["wholesale"]=json!(31732);
+        old["products"][product]["variants"][1]["semi"]=json!(43732);
+        old["products"][product]["variants"][1]["retail"]=json!(123458);
+        let mut overrides=serde_json::Map::new();
+        overrides.insert(a.clone(),json!(29817));
+        old["clients"]=json!([{"id":"dealer-1","name":"가상거래처","tier":"special",
+            "address":"가상 주소","phone":"010-0000-0000","overrides":overrides}]);
+        old["aliases"]=json!([{"id":"scoped-1","clientId":"dealer-1",
+            "text":"가상아크릴","productId":"bando-site-351","variantId":a}]);
+        let frozen_item=json!({"id":"sold-1","productId":"bando-site-351",
+            "variantId":a,"name":"역사적 상품명","quantity":3,"unitPrice":29817});
+        let raw="가상원문 그대로 보관";
+        let frozen=json!({"id":"confirmed-1","clientId":"dealer-1",
+            "status":"STATEMENT","createdAt":"2026-11-08T00:00:00+09:00",
+            "confirmedAt":"2026-11-08T00:05:00+09:00","raw":raw,
+            "recipients":[{"id":"frozen-recipient","name":"받는사람",
+                "items":[frozen_item.clone()]}],
+            "receipt":{"original":raw,"at":"2026-11-08T00:05:00+09:00"},
+            "rawCorrections":[{"id":"fix-1","before":"예전 원문","after":raw}],
+            "confirmationSnapshot":{"recipients":[{"items":[frozen_item]}]}}
+        );
+        old["orders"]=json!([
+            {"id":"draft-1","clientId":"dealer-1","status":"REVIEW",
+             "createdAt":"2026-11-08T00:00:00+09:00",
+             "recipients":[{"id":"draft-recipient","name":"받는사람",
+                "items":[{"id":"pending-1","productId":"bando-site-351",
+                    "variantId":b,"name":"BD 707A1 프로스트","quantity":2,
+                    "unitPrice":43732}]}]},
+            frozen
+        ]);
+        old["revision"]=json!(7);
+        let confirmed_before=old["orders"][1].clone();
+        let before_clients=old["clients"].clone();
+        let before_revision=old["revision"].clone();
+        let db=Connection::open(&path).unwrap();
+        db.execute_batch("CREATE TABLE app_state(id INTEGER PRIMARY KEY,payload TEXT NOT NULL)").unwrap();
+        db.execute("INSERT INTO app_state(id,payload) VALUES(1,?1)",
+            [serde_json::to_string(&old).unwrap()]).unwrap();
+        drop(db);
+
+        let conn=super::super::initialize_database(&path).unwrap();
+        let state=super::super::get_snapshot(&conn).unwrap();
+        assert_eq!(state["revision"],before_revision);
+        assert_eq!(state["products"].as_array().unwrap().len(),360);
+        assert_eq!(state["clients"],before_clients);
+        assert_eq!(state["orders"][1],confirmed_before);
+        assert_eq!(state["aliases"][0]["clientId"],"dealer-1");
+        let clear=state["products"].as_array().unwrap().iter()
+            .find(|p|p["variants"][0]["id"]==a).unwrap();
+        let frost=state["products"].as_array().unwrap().iter()
+            .find(|p|p["variants"][0]["id"]==b).unwrap();
+        assert_eq!(clear["variants"][0]["retail"],123457);
+        assert_eq!(clear["variants"][0]["wholesale"],31731);
+        assert_eq!(clear["variants"][0]["semi"],43731);
+        assert_eq!(frost["variants"][0]["retail"],123458);
+        assert_eq!(frost["variants"][0]["wholesale"],31732);
+        assert_eq!(frost["variants"][0]["semi"],43732);
+        assert_eq!(state["aliases"][0]["productId"],clear["id"]);
+        assert_eq!(state["clients"][0]["overrides"][a.as_str()],29817);
+        assert_eq!(state["orders"][0]["recipients"][0]["items"][0]["productId"],frost["id"]);
+        assert_eq!(state["orders"][0]["recipients"][0]["items"][0]["unitPrice"],43732);
+        let archived:String=conn.query_row(
+            "SELECT record FROM receipt_archive WHERE id='receipt:confirmed-1'",[],
+            |r|r.get(0)).unwrap();
+        let receipt:Value=serde_json::from_str(&archived).unwrap();
+        assert_eq!(receipt,old["orders"][1]["receipt"]);
+        let correction:String=conn.query_row(
+            "SELECT record FROM receipt_archive WHERE id='correction:fix-1'",[],
+            |r|r.get(0)).unwrap();
+        let correction:Value=serde_json::from_str(&correction).unwrap();
+        assert_eq!(correction,old["orders"][1]["rawCorrections"][0]);
+        verify(&conn).unwrap();
+        drop(conn);
+
+        let reopened=super::super::initialize_database(&path).unwrap();
+        let after=super::super::get_snapshot(&reopened).unwrap();
+        assert_eq!(after,state);
+        verify(&reopened).unwrap();
+        drop(reopened);
+        std::fs::remove_dir_all(folder).unwrap();
+    }
+
+    #[test]
     fn client_order_recipient_and_item_have_reversible_foreign_keys() {
         let path=temp();
         let mut conn=super::super::initialize_database(&path).unwrap();
