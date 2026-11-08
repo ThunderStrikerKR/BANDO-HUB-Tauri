@@ -183,7 +183,7 @@ test("unrecognized 15-column export without the Q return column is rejected expl
     "출력양식.xlsx",headers.slice(0,15));
   await assert.rejects(
     () => parseFactoryReplyWorkbook(s, file),
-    /Q열/,
+    /양식 불일치/,
   );
 });
 
