@@ -3,9 +3,8 @@ import { BackupPanel } from "../ManagementUI";
 import { ReceiptArchive } from "../ReceiptArchive";
 import { SettingsPanel } from "../SettingsPanel";
 import type { NoticeSink } from "../shared/notices";
-import type { InboxEntry, State } from "../types";
+import type { State } from "../types";
 import { PageHeading } from "../ui/PageHeading";
-import { MobilePanel } from "./MobilePanel";
 import { DeveloperLab } from "../developer/DeveloperLab";
 
 declare const __BANDO_VERSION__: string;
@@ -15,13 +14,11 @@ export function SettingsView({
   onSaveSettings,
   onNotice,
   onRestored,
-  onReceive,
 }: {
   state: State;
   onSaveSettings: (changes: Record<string, unknown>, expected: Record<string, unknown>) => Promise<void>;
   onNotice: NoticeSink;
   onRestored: () => Promise<void>;
-  onReceive: (entry: InboxEntry) => Promise<void>;
 }) {
   return (
     <>
@@ -47,7 +44,6 @@ export function SettingsView({
               Windows AppData → com.bandostand.bandohub.tauri → bando-hub-v001.sqlite
             </p>
           </section>
-          <MobilePanel onNotice={onNotice} onReceive={onReceive} />
         </div>
       </div>
       {window.bando?.isTestWorkspace && (

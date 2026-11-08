@@ -220,7 +220,6 @@ export function App() {
                     onSaveSettings={model.saveSettings}
                     onNotice={model.setNotice}
                     onRestored={model.afterRestore}
-                    onReceive={model.receive}
                   />
                 )}
               </ScreenBoundary>
