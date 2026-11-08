@@ -742,6 +742,13 @@ mod tests {
         assert_eq!(frost["variants"][0]["wholesale"],31732);
         assert_eq!(frost["variants"][0]["semi"],43732);
         assert_eq!(state["aliases"][0]["productId"],clear["id"]);
+        // Confirmation snapshots keep their historical ID, while the
+        // authoritative lookup key survives SQLite save and reopening.
+        let source_key=format!("bando-site-351|{a}");
+        let new_id=state["productMappings"][source_key.as_str()].as_str().unwrap();
+        assert_eq!(new_id,clear["id"].as_str().unwrap());
+        assert_eq!(state["orders"][1]["recipients"][0]["items"][0]["productId"],"bando-site-351");
+        assert_eq!(state["orders"][1]["recipients"][0]["items"][0]["variantId"],a);
         assert_eq!(state["clients"][0]["overrides"][a.as_str()],29817);
         assert_eq!(state["orders"][0]["recipients"][0]["items"][0]["productId"],frost["id"]);
         assert_eq!(state["orders"][0]["recipients"][0]["items"][0]["unitPrice"],43732);
