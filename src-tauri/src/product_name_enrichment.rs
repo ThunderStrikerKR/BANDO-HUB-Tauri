@@ -206,7 +206,7 @@ mod tests {
                 };
                 changed_ids.push(product["id"].as_str().unwrap().to_string());
             }
-            // An employee-edited, still prefixed name must never be overwritten.
+            // Staff-added wording remains, while the unwanted prefix alone is removed.
             if product["siteId"] == "310" {
                 product["name"] = json!(
                     "반도스탠드 BD Desk JS-4 Black 검정 / 직원 직접 수정"
@@ -228,7 +228,7 @@ mod tests {
         let revision = state["revision"].as_u64().unwrap();
         write_snapshot(&mut db, state, revision, false).unwrap();
 
-        assert_eq!(apply(&mut db, &base).unwrap(), 4);
+        assert_eq!(apply(&mut db, &base).unwrap(), 6);
         let after = get_snapshot(&db).unwrap();
         let by_site = |site: &str| -> Value {
             after["products"].as_array().unwrap().iter()
@@ -239,9 +239,9 @@ mod tests {
         assert_eq!(by_site("254")["name"], "BD Desk JS-2 / 실버 / 자바라 길이 35cm");
         assert_eq!(by_site("249")["name"], "BD Desk TS-3 / 미니형 마이크 스탠드");
         assert_eq!(by_site("310")["name"],
-            "반도스탠드 BD Desk JS-4 Black 검정 / 직원 직접 수정");
-        assert_eq!(by_site("245")["name"], prior["products"].as_array().unwrap().iter()
-            .find(|p| p["siteId"] == "245").unwrap()["originalName"]);
+            "BD Desk JS-4 Black 검정 / 직원 직접 수정");
+        assert_eq!(by_site("245")["name"],
+            "BD Desk JS-2 Black 검정 (자바라 길이 35cm)");
 
         for (before, after_product) in prior["products"].as_array().unwrap()
             .iter().zip(after["products"].as_array().unwrap())
@@ -259,6 +259,54 @@ mod tests {
         assert_eq!(backup_manager::list_backups(&base).unwrap().len(), 1);
         drop(db);
         std::fs::remove_dir_all(base).unwrap();
+    }
+
+    #[test]
+    fn metadata_mismatch_and_manual_suffix_still_remove_prefix_only() {
+        let catalog: Value = serde_json::from_str(include_str!(
+            "../resources/state-seed.json"
+        )).unwrap();
+        let mut legacy = catalog.clone();
+        let target = legacy["products"].as_array_mut().unwrap().iter_mut()
+            .find(|p| p["siteId"] == "246").unwrap();
+        let original_price = target["variants"].clone();
+        let original_name = target["originalName"].clone();
+        target["name"] = json!(
+            "반도스탠드 BD Desk JS-3 Black 검정 (자바라 길이 43cm) / 직원 별도 메모"
+        );
+        target["siteCode"] = Value::Null; // Old database has incomplete optional metadata.
+        target["priceHistory"] = json!([{"field":"name","source":"MANUAL"}]);
+        let before = target.clone();
+        assert_eq!(apply_to_state(&mut legacy).unwrap(), 1);
+        let updated = legacy["products"].as_array().unwrap().iter()
+            .find(|p| p["siteId"] == "246").unwrap();
+        assert_eq!(
+            updated["name"],
+            "BD Desk JS-3 Black 검정 (자바라 길이 43cm) / 직원 별도 메모"
+        );
+        assert_eq!(updated["originalName"], original_name);
+        assert_eq!(updated["variants"], original_price);
+        assert_eq!(updated["siteCode"], before["siteCode"]);
+        assert_eq!(updated["priceHistory"], before["priceHistory"]);
+        assert_eq!(apply_to_state(&mut legacy).unwrap(), 0);
+    }
+
+    #[test]
+    fn missing_site_metadata_does_not_block_curated_name_when_official_title_matches() {
+        let catalog: Value = serde_json::from_str(include_str!(
+            "../resources/state-seed.json"
+        )).unwrap();
+        let mut legacy = catalog.clone();
+        let target = legacy["products"].as_array_mut().unwrap().iter_mut()
+            .find(|p| p["siteId"] == "255").unwrap();
+        target["name"] = target["originalName"].clone();
+        target["siteCode"] = Value::Null;
+        assert_eq!(apply_to_state(&mut legacy).unwrap(), 1);
+        let updated = legacy["products"].as_array().unwrap().iter()
+            .find(|p| p["siteId"] == "255").unwrap();
+        assert_eq!(updated["name"], "BD Desk JS-3 / 실버 / 자바라 길이 43cm");
+        assert_eq!(updated["siteCode"], Value::Null);
+        assert_eq!(apply_to_state(&mut legacy).unwrap(), 0);
     }
 
     #[test]
