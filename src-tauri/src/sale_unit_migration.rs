@@ -201,10 +201,12 @@ mod tests{
         let original_price_records=old["products"][pos]["variants"].clone();
         let original_history=old["products"][pos]["priceHistory"].clone();
         let override_amount=38291;
+        let mut overrides=serde_json::Map::new();
+        overrides.insert(first.clone(),json!(override_amount));
         old["clients"]=json!([
             {"id":"dealer-special","name":"가상특수대리점","tier":"special",
              "address":"가상 주소","phone":"010-0000-0000",
-             "overrides":{first.clone():override_amount}},
+             "overrides":overrides},
             {"id":"dealer-retail","name":"가상소매점","tier":"retail",
              "address":"가상 주소","phone":"010-1111-1111","overrides":{}}
         ]);
@@ -256,7 +258,7 @@ mod tests{
         assert_eq!(a["priceHistory"],original_history);
         assert_eq!(b["priceHistory"],original_history);
         assert_eq!(migrated["clients"],original_clients);
-        assert_eq!(migrated["clients"][0]["overrides"][&first],override_amount);
+        assert_eq!(migrated["clients"][0]["overrides"][first.as_str()],override_amount);
         assert_eq!(migrated["orders"][0]["recipients"][0]["items"][0]["productId"],b["id"]);
         assert_eq!(migrated["orders"][0]["recipients"][0]["items"][0]["variantId"],second);
         assert_eq!(migrated["orders"][0]["recipients"][0]["items"][0]["unitPrice"],53873);
@@ -274,8 +276,8 @@ mod tests{
         assert_eq!(migrated["sourceLinks"][0]["optionId"],original_links[0]["optionId"]);
         assert_eq!(migrated["sourceLinks"][1]["optionId"],original_links[1]["optionId"]);
         assert_eq!(migrated["settings"]["modelRepresentatives"]["acrylic-clear"]["productId"],a["id"]);
-        assert_eq!(migrated["productMappings"][format!("{original_id}|{first}")],a["id"]);
-        assert_eq!(migrated["productMappings"][format!("{original_id}|{second}")],b["id"]);
+        assert_eq!(migrated["productMappings"][format!("{original_id}|{first}").as_str()],a["id"]);
+        assert_eq!(migrated["productMappings"][format!("{original_id}|{second}").as_str()],b["id"]);
         assert_eq!(migrated["revision"],0);
     }
 
