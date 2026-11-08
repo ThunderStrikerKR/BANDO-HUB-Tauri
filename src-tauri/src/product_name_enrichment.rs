@@ -35,6 +35,55 @@ pub(super) fn apply_to_state(state: &mut Value) -> Result<usize, String> {
         product["name"] = Value::String(new_name.to_string());
         changed += 1;
     }
+
+    // Older SQLite databases can still contain official website titles such as
+    // "반도스탠드 BD Desk JS-3 Black 검정 (자바라 길이 43cm)".
+    // Do NOT replace every prefixed name: staff may have intentionally edited it.
+    // The complete, independently curated 360-item catalog is authoritative
+    // only when the stored name is exactly the unedited official original.
+    let catalog: Value = serde_json::from_str(include_str!("../resources/state-seed.json"))
+        .map_err(err)?;
+    let reference = catalog["products"].as_array()
+        .ok_or("공식 상품명 기준표가 누락됐습니다.")?;
+    let mut catalog_by_id = std::collections::HashMap::new();
+    for candidate in reference {
+        let id = candidate["id"].as_str()
+            .ok_or("공식 상품명 기준표의 상품 ID가 누락됐습니다.")?;
+        if catalog_by_id.insert(id, candidate).is_some() {
+            return Err(format!("공식 상품명 기준표의 상품 ID가 중복됐습니다: {id}"));
+        }
+    }
+    for product in products.iter_mut() {
+        let Some(id) = product["id"].as_str() else { continue };
+        let Some(reference) = catalog_by_id.get(id) else { continue };
+        let Some(existing_name) = product["name"].as_str() else { continue };
+        if !existing_name.starts_with("반도스탠드 ")
+            || product["name"] != product["originalName"]
+            || product["originalName"] != reference["originalName"]
+            || product["siteId"] != reference["siteId"]
+            || product["siteCode"] != reference["siteCode"]
+            || product["catalog"] != reference["catalog"]
+            || product["variants"].as_array().is_none_or(|v| v.len() != 1)
+            || product["variants"][0]["id"] != reference["variants"][0]["id"]
+            || product["deletedAt"].as_str().is_some()
+            || product["supersededBy"].as_str().is_some()
+            || product["priceHistory"].as_array().is_some_and(|history|
+                history.iter().any(|entry| entry["field"] == "name"))
+        {
+            continue;
+        }
+        let Some(curated) = reference["name"].as_str() else {
+            return Err(format!("상품 {id}의 정리된 상품명이 누락됐습니다."));
+        };
+        if curated.trim().is_empty()
+            || curated.starts_with("반도스탠드 ")
+            || curated.contains('◆')
+        {
+            return Err(format!("상품 {id}의 정리된 상품명 표기가 올바르지 않습니다."));
+        }
+        product["name"] = Value::String(curated.to_string());
+        changed += 1;
+    }
     Ok(changed)
 }
 
