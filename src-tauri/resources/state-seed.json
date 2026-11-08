@@ -1926,7 +1926,7 @@
       ],
       "origin": "FACTORY",
       "defaultColor": "색상 미표기",
-      "active": true,
+      "active": false,
       "saleStatus": "판매 표시",
       "variants": [
         {
@@ -1948,7 +1948,8 @@
       "priceHistory": [],
       "requiresOption": false,
       "originalName": "반도스탠드 BD 뮤직트레이 (Wine)",
-      "saleUnit": true
+      "saleUnit": true,
+      "supersededBy": "sku:bando-site-237:bando-237-P00000JC000I"
     },
     {
       "id": "bando-site-77",
@@ -1965,7 +1966,7 @@
       ],
       "origin": "FACTORY",
       "defaultColor": "색상 미표기",
-      "active": true,
+      "active": false,
       "saleStatus": "판매 표시",
       "variants": [
         {
@@ -1987,7 +1988,8 @@
       "priceHistory": [],
       "requiresOption": false,
       "originalName": "반도스탠드 BD 뮤직트레이 (Dark green)",
-      "saleUnit": true
+      "saleUnit": true,
+      "supersededBy": "sku:bando-site-237:bando-237-P00000JC000H"
     },
     {
       "id": "sku:bando-site-76:bando-76-P00000CX000B",
