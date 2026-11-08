@@ -36,8 +36,7 @@
   background: #3b3b3b;
 }
 .app-modal-layer.product-detail-dialog .product-detail-image-column > small,
-.app-modal-layer.product-detail-dialog .product-detail-money span,
-.app-modal-layer.product-detail-dialog .product-detail-multi-note { color: #a9a9a9; }
+.app-modal-layer.product-detail-dialog .product-detail-money span { color: #a9a9a9; }
 .app-modal-layer.product-detail-dialog .product-detail-fieldline > label,
 .app-modal-layer.product-detail-dialog .product-detail-wide-fields .field-label,
 .app-modal-layer.product-detail-dialog .product-detail-advanced summary { color: #d5d5d5; }
