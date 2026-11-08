@@ -533,10 +533,18 @@ mod tests {
                 id TEXT PRIMARY KEY,product_id TEXT NOT NULL REFERENCES core_products(id) ON DELETE CASCADE,
                 position INTEGER NOT NULL,color TEXT NOT NULL,
                 wholesale INTEGER,semi INTEGER,retail INTEGER,payload TEXT NOT NULL);
-            CREATE TABLE core_clients(id TEXT PRIMARY KEY,position INTEGER NOT NULL,payload TEXT NOT NULL);
-            CREATE TABLE core_orders(id TEXT PRIMARY KEY,position INTEGER NOT NULL,payload TEXT NOT NULL);
-            CREATE TABLE core_recipients(id TEXT PRIMARY KEY,order_id TEXT NOT NULL,position INTEGER NOT NULL,payload TEXT NOT NULL);
-            CREATE TABLE core_items(id TEXT PRIMARY KEY,recipient_id TEXT NOT NULL,position INTEGER NOT NULL,payload TEXT NOT NULL);
+            CREATE TABLE core_clients(
+                id TEXT PRIMARY KEY,position INTEGER NOT NULL,name TEXT NOT NULL,
+                tier TEXT NOT NULL,address TEXT NOT NULL,payload TEXT NOT NULL);
+            CREATE TABLE core_orders(
+                id TEXT PRIMARY KEY,position INTEGER NOT NULL,client_id TEXT,
+                created_at TEXT,confirmed_at TEXT,status TEXT,payload TEXT NOT NULL);
+            CREATE TABLE core_recipients(
+                id TEXT PRIMARY KEY,order_id TEXT NOT NULL,position INTEGER NOT NULL,
+                name TEXT NOT NULL,payload TEXT NOT NULL);
+            CREATE TABLE core_items(
+                id TEXT PRIMARY KEY,recipient_id TEXT NOT NULL,position INTEGER NOT NULL,
+                product_id TEXT,variant_id TEXT,payload TEXT NOT NULL);
             INSERT INTO core_schema(key,version) VALUES ('business-core',1);
         "#).unwrap();
         let old:Value=serde_json::from_str(include_str!("../resources/legacy-state-seed-303.json")).unwrap();
