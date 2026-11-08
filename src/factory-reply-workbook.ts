@@ -1,4 +1,5 @@
 import type ExcelJS from "exceljs";
+import { LOGEN_HEADERS } from "./factory-export.js";
 import { connectFactoryReply, type FactoryReply, type ReplyRow } from "./factory-replies";
 import type { State } from "./types";
 
@@ -6,11 +7,8 @@ import type { State } from "./types";
  * additional Q waybill column. Never infer a tracking number from A-O. */
 const MAX_BYTES = 10 * 1024 * 1024;
 const MAX_ROWS = 1000;
-const FIELD_MAP = [
-  [1, /수하인명/], [3, /수하인주소/],
-  [4, /수하인전화/], [5, /수하인(?:핸드폰|휴대폰)/],
-  [7, /택배운임/], [17, /(?:운송장|송장)번호|운송장|송장/],
-] as const;
+// The fixed A:P real-world Logen shipping form plus the Q waybill field.
+const STANDARD_REPLY_HEADERS = [...LOGEN_HEADERS, "운송장번호"] as const;
 
 export interface FactoryReplyPreview {
   revision: number;
@@ -49,6 +47,29 @@ const stableHash = async (bytes: ArrayBuffer) => {
 const formatDate = () => new Date().toLocaleDateString("sv-SE");
 const validName = (name: string) => /\.xlsx$/i.test(name) && !/[\\/\0]/.test(name);
 
+// Do not infer columns, accept alternative header names, or repair a moved column.
+function requireStandardReplySheet(sheet: ExcelJS.Worksheet): void {
+  const header = sheet.getRow(1);
+  for (let index = 1; index <= STANDARD_REPLY_HEADERS.length; index++) {
+    const cell = header.getCell(index);
+    cellText(cell); // Reject merged/formula header cells as well as wrong labels.
+    const actual = cell.value == null ? "" : cell.text;
+    const expected = STANDARD_REPLY_HEADERS[index - 1];
+    if (actual !== expected) {
+      const column = String.fromCharCode(64 + index);
+      throw Error("로젠 회신 양식 불일치: " + column +
+        "열 제목은 " + (expected || "(공백)") + "이어야 합니다.");
+    }
+  }
+  for (let index = STANDARD_REPLY_HEADERS.length + 1; index <= header.cellCount; index++) {
+    const cell = header.getCell(index);
+    cellText(cell);
+    if (cell.value != null && cell.text !== "") {
+      throw Error("로젠 회신 양식 불일치: Q열 뒤에 추가 열 제목이 있습니다.");
+    }
+  }
+}
+
 export function previewFactoryReply(state: State, reply: FactoryReply): FactoryReplyPreview {
   if (state.factoryReplies?.some((r) => r.id === reply.id)) {
     throw Error("이미 등록된 동일 회신 파일입니다. 회신 이력에서 확인하세요.");
@@ -74,17 +95,25 @@ export async function parseFactoryReplyWorkbook(state: State, file: File):
   const Excel = (await import("exceljs")).default;
   const book = new Excel.Workbook();
   await book.xlsx.load(new Uint8Array(bytes) as unknown as Parameters<typeof book.xlsx.load>[0]);
-  const sheet = book.worksheets.find((s) => FIELD_MAP.every(([col, pattern]) => {
-    const cell = s.getRow(1).getCell(col);
-    return pattern.test(cellText(cell).replace(/\s+/g, ""));
-  }));
-  if (!sheet) {
-    throw Error("로젠 회신 양식의 A/C/D/E/G열과 Q열 운송장번호를 찾지 못했습니다. 공장 파일의 열 제목을 확인하세요.");
-  }
+  const sheet = book.worksheets[0];
+  if (!sheet) throw Error("로젠 회신 Excel의 첫 번째 시트를 찾지 못했습니다.");
+  requireStandardReplySheet(sheet);
   if (sheet.rowCount - 1 > MAX_ROWS) throw Error("공장 회신은 한 번에 최대 1,000행을 처리합니다.");
   const rows: ReplyRow[] = [];
   for (let i = 2; i <= sheet.rowCount; i++) {
     const row = sheet.getRow(i);
+    const reserved = row.getCell(10);
+    cellText(reserved);
+    if (reserved.value != null && reserved.text !== "") {
+      throw Error(i + "행: 표준 양식의 J열은 공백이어야 합니다.");
+    }
+    for (let index = 18; index <= row.cellCount; index++) {
+      const extra = row.getCell(index);
+      cellText(extra);
+      if (extra.value != null && extra.text !== "") {
+        throw Error(i + "행: Q열 뒤의 추가 데이터는 허용하지 않습니다.");
+      }
+    }
     const relevant = [1, 3, 4, 5, 7, 17];
     const values = relevant.map((column) => cellText(row.getCell(column)));
     if (values.every((value) => value === "")) continue;

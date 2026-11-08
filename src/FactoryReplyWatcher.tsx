@@ -20,6 +20,7 @@ export function FactoryReplyWatcher({
   latest.current = { enabled, paused, onRefresh, onNotice };
   const running = useRef(false);
   const lastError = useRef("");
+  const rejected = useRef(new Set<string>());
 
   useEffect(() => {
     const tick = async () => {
@@ -31,22 +32,28 @@ export function FactoryReplyWatcher({
         const files = await api.factoryReplyWatchScan();
         for (const file of files) {
           if (latest.current.paused || !latest.current.enabled) break;
+          // Reject each unchanged malformed file only once per running session.
+          if (rejected.current.has(file.id)) continue;
           const result = await processWatchedFactoryReply(api, file);
+          if (result.invalid) {
+            rejected.current.add(file.id);
+            lastError.current = "";
+            latest.current.onNotice(
+              "공장 회신 " + file.filename +
+                ": 표준 Excel 양식과 달라 반려했습니다. DB는 변경하지 않았습니다. " +
+                (result.reason ?? "파일 내용을 확인하세요."),
+              "error",
+            );
+            continue;
+          }
           if (result.duplicate) continue;
           await latest.current.onRefresh();
           lastError.current = "";
-          if (result.invalid) {
-            latest.current.onNotice(
-              "공장 회신 " + file.filename + ": Excel 형식 오류를 회신 이력에 보류했습니다.",
-              "error",
-            );
-          } else {
-            latest.current.onNotice(
-              "공장 회신 " + file.filename + ": 자동 반영 " + result.applied +
-                "건, 직원 확인 " + result.held + "건",
-              result.held ? "error" : "success",
-            );
-          }
+          latest.current.onNotice(
+            "공장 회신 " + file.filename + ": 자동 반영 " + result.applied +
+              "건, 직원 확인 " + result.held + "건",
+            result.held ? "error" : "success",
+          );
           if (result.archiveWarning) {
             latest.current.onNotice(
               "회신 원본과 DB는 보존했으나 Excel 보관함 사본 생성은 실패했습니다: " +

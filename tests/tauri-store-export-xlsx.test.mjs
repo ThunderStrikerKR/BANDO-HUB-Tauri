@@ -91,11 +91,12 @@ test("real XLSX: store queue produces 15 Logen columns without guessing parcel c
   assert.equal(row.getCell(7).value, ""); // Billed shipping != actual postage.
   assert.equal(row.getCell(8).value, "010");
   assert.equal(row.getCell(9).value, "기타줄 블랙 3개");
-  assert.equal(row.getCell(10).value, "문 앞");
-  assert.equal(row.getCell(11).value, "한빛악기"); // Proxy sender, never the hub.
-  assert.equal(row.getCell(12).value, "04506");
-  assert.equal(row.getCell(13).value, "경기도 의정부시 12");
-  assert.equal(row.getCell(14).value, "031-1234-5678");
+  assert.equal(row.getCell(10).value, "");
+  assert.equal(row.getCell(11).value, "문 앞");
+  assert.equal(row.getCell(12).value, "한빛악기"); // Proxy sender, never the hub.
+  assert.equal(row.getCell(13).value, "04506");
+  assert.equal(row.getCell(14).value, "경기도 의정부시 12");
+  assert.equal(row.getCell(15).value, "031-1234-5678");
   assert.equal(JSON.stringify(state), JSON.stringify(fixture()));
 });
 

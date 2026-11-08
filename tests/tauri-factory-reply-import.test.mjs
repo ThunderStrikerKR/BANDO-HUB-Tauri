@@ -58,9 +58,9 @@ function stateFixture() {
   };
 }
 const headers = [
-  "수하인명", "수하인우편번호", "수하인주소", "수하인전화", "수하인핸드폰",
-  "택배수량", "택배운임", "운임구분", "품목명", "메시지", "송하인명", "(송)우편",
-  "(송)주소1", "(송)전화", "(송)핸드폰", "기타", "운송장번호",
+  "수하인명", "수하인우편번호", "수하인주소", "수하인전화번호", "수하인핸드폰번호",
+  "택배수량", "택배운임", "운임구분", "품목명", "", "메시지", "송하인명",
+  "(송)우편", "(송)주소1", "(송)전화", "(송)핸드폰", "운송장번호",
 ];
 async function workbookFile(rows, name = "공장회신.xlsx", customHeaders = headers) {
   const book = new ExcelJS.Workbook();
@@ -74,8 +74,8 @@ async function workbookFile(rows, name = "공장회신.xlsx", customHeaders = he
 }
 const goodRow = (tracking = "001234567891", freight = "4,000") =>
   ["박수하", "", "서울 서초구 123", "02-1234-5678", "010-2222-4444",
-    "1", freight, "010", "BD 709", "", "예시악기", "", "경기도 김포시 34",
-    "031-500-2000", "", "", tracking];
+    "1", freight, "010", "BD 709", "", "", "예시악기", "", "경기도 김포시 34",
+    "031-500-2000", "", tracking];
 
 test("real Logen XLSX Q waybill and G freight are parsed; approved data updates only factory shipment", async () => {
   const s = stateFixture();
@@ -183,7 +183,7 @@ test("unrecognized 15-column export without the Q return column is rejected expl
     "출력양식.xlsx",headers.slice(0,15));
   await assert.rejects(
     () => parseFactoryReplyWorkbook(s, file),
-    /Q열 운송장번호를 찾지 못했습니다/,
+    /Q열/,
   );
 });
 
@@ -217,7 +217,7 @@ test("different XLSX files with already-applied identical waybill and postage ar
   const afterFirst = applyFactoryReplyPreview(state, first).next;
   afterFirst.revision = 6;
   const repeatRow = goodRow();
-  repeatRow[9] = "같은 결과 재회신"; // distinct file bytes, same delivery identity and values
+  repeatRow[10] = "같은 결과 재회신"; // distinct file bytes, same delivery identity and values
   const second = await parseFactoryReplyWorkbook(afterFirst, await workbookFile([repeatRow]));
   assert.equal(second.applied, 1);
   const beforeEvents = afterFirst.workflow.events.length;
@@ -226,4 +226,33 @@ test("different XLSX files with already-applied identical waybill and postage ar
   assert.equal(result.factoryReplies.length, 2);
   assert.equal(result.workflow.shipments[0].tracking.FACTORY, "001234567891");
   assert.equal(result.workflow.shipments[0].actualFreight.FACTORY, 4000);
+});
+
+test("nonstandard Logen headers, filled J column, or extra R data reject entire workbook", async () => {
+  const state = stateFixture();
+  for (const [column, wrong] of [[3, "수하인전화"], [4, "수하인핸드폰"],
+    [9, "메시지"], [10, "송하인명"], [16, "송장번호"]]) {
+    const bad = [...headers];
+    bad[column] = wrong;
+    await assert.rejects(
+      () => parseFactoryReplyWorkbook(state, await workbookFile([goodRow()], "bad.xlsx", bad)),
+      /양식 불일치/,
+    );
+  }
+  const nonblankJ = goodRow();
+  nonblankJ[9] = "임의 데이터";
+  await assert.rejects(
+    () => parseFactoryReplyWorkbook(state, await workbookFile([nonblankJ])),
+    /J열은 공백/,
+  );
+  const extraHeaders = [...headers, "추가 열"];
+  await assert.rejects(
+    () => parseFactoryReplyWorkbook(state, await workbookFile([goodRow()], "extra.xlsx", extraHeaders)),
+    /추가 열 제목/,
+  );
+  const extraData = [...goodRow(), "추가 데이터"];
+  await assert.rejects(
+    () => parseFactoryReplyWorkbook(state, await workbookFile([extraData])),
+    /추가 데이터/,
+  );
 });

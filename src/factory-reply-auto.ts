@@ -1,7 +1,6 @@
 import {
   applyFactoryReplyPreview, parseFactoryReplyWorkbook,
 } from "./factory-reply-workbook";
-import type { FactoryReply } from "./factory-replies";
 import type { Api, State } from "./types";
 
 export interface WatchedReplyFile {
@@ -18,6 +17,7 @@ export interface WatchedReplyResult {
 
 export interface AutoReplyOutcome extends WatchedReplyResult {
   invalid: boolean;
+  reason?: string;
 }
 
 /** Reuse the existing manual XLSX parser and row-matching policy.
@@ -40,7 +40,6 @@ export async function processWatchedFactoryReply(
     { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" },
   );
   let next: State;
-  let invalid = false;
   try {
     const preview = await parseFactoryReplyWorkbook(current, file);
     if (preview.reply.id !== source.id) {
@@ -48,24 +47,12 @@ export async function processWatchedFactoryReply(
     }
     next = applyFactoryReplyPreview(current, preview).next;
   } catch (error) {
-    // An invalid file does not silently disappear and cannot change any
-    // shipment. Save a REVIEW record with the original file for human audit.
-    invalid = true;
-    const report: FactoryReply = {
-      id: source.id,
-      filename: source.filename,
-      businessDate: new Date().toLocaleDateString("sv-SE"),
-      at: new Date().toISOString(),
-      actor: current.settings.operatorName?.trim() || "자동 감시",
-      status: "REVIEW",
-      error: "Excel 양식 검증 실패: " + String(error).slice(0, 340),
-      rows: [],
-    };
-    next = structuredClone(current);
-    next.factoryReplies = [...(current.factoryReplies ?? []), report];
+    // A rejected file cannot alter SQLite, receipt history, or shipment data.
+    return { duplicate: false, applied: 0, held: 0, invalid: true, reason: String(error) };
   }
+  // Native validation and the revision-checked commit run only for valid files.
   const result = await api.factoryReplyWatchCommit(
     source.filename, source.id, next, current.revision ?? 0,
   );
-  return { ...result, invalid };
+  return { ...result, invalid: false };
 }

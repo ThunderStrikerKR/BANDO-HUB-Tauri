@@ -54,7 +54,7 @@ function stateFixture() {
   };
 }
 
-test("factory Logen workbook exports exactly 15 expected columns with preserved freight code 010", async () => {
+test("factory Logen workbook exports exactly 16 expected columns with preserved freight code 010", async () => {
   const state = stateFixture();
   const report = previewFactoryExport(state, ["excel:s1:FACTORY"]);
   const bytes = await createFactoryWorkbook(report);
@@ -63,14 +63,21 @@ test("factory Logen workbook exports exactly 15 expected columns with preserved 
   assert.equal(workbook.worksheets.length,1);
   const sheet = workbook.worksheets[0];
   assert.equal(sheet.rowCount,2);
-  assert.deepEqual(Array.from({length:15}, (_,i)=>sheet.getRow(1).getCell(i+1).value),
+  assert.deepEqual(Array.from({length:16}, (_,i)=>sheet.getRow(1).getCell(i+1).value),
     [...LOGEN_HEADERS]);
   assert.equal(sheet.getCell("A2").value,"김수취");
   assert.equal(sheet.getCell("H2").value,"010");
-  assert.equal(sheet.getCell("K2").value,"예시악기");
-  assert.equal(sheet.getCell("L2").value,"22300");
+  assert.equal(sheet.getCell("L2").value,"예시악기");
+  assert.equal(sheet.getCell("M2").value,"22300");
   assert.equal(sheet.getCell("I2").value,"BD 709 3개 / BD 900 1개");
-  assert.equal(sheet.getCell("J2").value,"문 앞 배송 요청");
+  assert.deepEqual([...LOGEN_HEADERS], [
+    "수하인명", "수하인우편번호", "수하인주소", "수하인전화번호", "수하인핸드폰번호",
+    "택배수량", "택배운임", "운임구분", "품목명", "", "메시지", "송하인명",
+    "(송)우편", "(송)주소1", "(송)전화", "(송)핸드폰",
+  ]);
+  assert.equal(sheet.getCell("J1").value,"");
+  assert.equal(sheet.getCell("J2").value,"");
+  assert.equal(sheet.getCell("K2").value,"문 앞 배송 요청");
   assert.equal(sheet.getCell("F2").value,"","factory fills package count");
   assert.equal(sheet.getCell("G2").value,"","factory fills postage");
   assert.equal(sheet.getCell("B2").value,"","no guessed recipient postcode");
@@ -126,7 +133,7 @@ test("020 is preserved as a text freight code while factory postal data remains 
   const wb=new ExcelJS.Workbook();
   await wb.xlsx.load(Buffer.from(bytes));
   assert.equal(wb.worksheets[0].getCell("H2").value,"020");
-  assert.equal(wb.worksheets[0].getCell("L2").value,"");
+  assert.equal(wb.worksheets[0].getCell("M2").value,"");
 });
 
 test("Tauri native Save As wired; canceled dialog does not mark export in UI", () => {

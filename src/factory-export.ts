@@ -4,8 +4,8 @@ import { resolveHistoricalProductReference } from "./historical-product-referenc
 import type { ExcelQueueEntry } from "./workflow-types";
 
 export const LOGEN_HEADERS = [
-  "수하인명", "수하인우편번호", "수하인주소", "수하인전화", "수하인핸드폰",
-  "택배수량", "택배운임", "운임구분", "품목명", "메시지", "송하인명",
+  "수하인명", "수하인우편번호", "수하인주소", "수하인전화번호", "수하인핸드폰번호",
+  "택배수량", "택배운임", "운임구분", "품목명", "", "메시지", "송하인명",
   "(송)우편", "(송)주소1", "(송)전화", "(송)핸드폰",
 ] as const;
 
@@ -123,7 +123,7 @@ function exportRow(state: State, entry: ExcelQueueEntry): FactoryExportRow {
   const values = [
     trim(recipient.name), "", trim(recipient.address), trim(recipient.phone),
     trim(recipient.mobile), "", "", entry.snapshot.freightCode,
-    goods, trim(recipient.note), trim(sender.displayName || sender.name),
+    goods, "", trim(recipient.note), trim(sender.displayName || sender.name),
     trim(sender.postcode), trim(sender.address), trim(sender.phone), trim(sender.mobile),
   ];
   if (values.length !== LOGEN_HEADERS.length) throw Error("로젠 열 수가 일치하지 않습니다.");
@@ -157,9 +157,9 @@ export async function createFactoryWorkbook(preview: FactoryExportPreview): Prom
   sheet.addRow([...LOGEN_HEADERS]);
   for (const row of preview.rows) sheet.addRow(row.values);
   sheet.views = [{ state: "frozen", ySplit: 1 }];
-  sheet.autoFilter = { from: "A1", to: "O1" };
+  sheet.autoFilter = { from: "A1", to: "P1" };
   // Shipping identifiers (010/020), phone numbers and postcodes must retain zeros.
-  for (const [i, width] of [17, 20, 45, 20, 20, 13, 13, 13, 56, 40, 30, 18, 45, 20, 20].entries()) {
+  for (const [i, width] of [16, 14, 48, 18, 18, 12, 12, 12, 64, 3, 35, 18, 12, 48, 18, 18].entries()) {
     const column = sheet.getColumn(i + 1);
     column.width = width;
     column.numFmt = "@";

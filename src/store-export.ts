@@ -57,7 +57,7 @@ function storeRow(state: State, entry: ExcelQueueEntry): StoreExportRow {
   const values = [
     trim(recipient.name), "", trim(recipient.address), trim(recipient.phone),
     trim(recipient.mobile), "", "", entry.snapshot.freightCode,
-    goods, trim(recipient.note), trim(sender.displayName || sender.name),
+    goods, "", trim(recipient.note), trim(sender.displayName || sender.name),
     trim(sender.postcode), trim(sender.address), trim(sender.phone), trim(sender.mobile),
   ];
   if (values.length !== LOGEN_HEADERS.length) throw Error("로젠 열 수가 일치하지 않습니다.");

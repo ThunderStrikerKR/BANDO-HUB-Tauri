@@ -52,9 +52,9 @@ function sample() {
   };
 }
 const columns=[
-  "수하인명","수하인우편번호","수하인주소","수하인전화","수하인핸드폰",
-  "택배수량","택배운임","운임구분","품목명","메시지","송하인명",
-  "(송)우편","(송)주소1","(송)전화","(송)핸드폰","기타","운송장번호",
+  "수하인명","수하인우편번호","수하인주소","수하인전화번호","수하인핸드폰번호",
+  "택배수량","택배운임","운임구분","품목명","","메시지","송하인명",
+  "(송)우편","(송)주소1","(송)전화","(송)핸드폰","운송장번호",
 ];
 async function inbox(rows, name="reply.xlsx") {
   const book=new ExcelJS.Workbook();
@@ -67,8 +67,8 @@ async function inbox(rows, name="reply.xlsx") {
 }
 function row(tracking="001122334455", freight="4,000") {
   return ["김수취","","경기 의정부시 새길 20","031-111-2222",
-    "010-2222-3333",1,freight,"010","709B","","반도","","","",
-    "","",""+tracking];
+    "010-2222-3333",1,freight,"010","709B","","","반도","","","",
+    "",""+tracking];
 }
 function fakeApi(initial) {
   let value=structuredClone(initial);
@@ -113,20 +113,20 @@ test("address mismatch is recorded as held without editing shipping data",async(
   assert.equal(api.value.workflow.shipments[0].tracking.FACTORY,undefined);
   assert.equal(api.value.factoryReplies[0].status,"REVIEW");
 });
-test("invalid workbook header becomes an audit REVIEW record with zero changes",async()=>{
+test("invalid workbook is rejected without any SQLite write or audit record",async()=>{
   const api=fakeApi(sample());
   const book=new ExcelJS.Workbook();
   book.addWorksheet("잘못된양식").addRow(["제목이 다름"]);
   const bytes=Buffer.from(await book.xlsx.writeBuffer());
   const digest=Buffer.from(await webcrypto.subtle.digest("SHA-256",bytes)).toString("hex");
-  const before=structuredClone(api.value.workflow);
+  const before=structuredClone(api.value);
   const result=await processWatchedFactoryReply(api,{
     filename:"invalid.xlsx",id:"factory-reply-"+digest,bytes:[...bytes],
   });
   assert.equal(result.invalid,true);
-  assert.equal(api.value.factoryReplies[0].status,"REVIEW");
-  assert.match(api.value.factoryReplies[0].error,/양식 검증 실패/);
-  assert.deepEqual(api.value.workflow,before);
+  assert.match(result.reason,/양식 불일치/);
+  assert.deepEqual(api.value,before);
+  assert.equal(api.commits,0);
 });
 test("automatic parser keeps conflicting values on hold for manual approval",async()=>{
   const s=sample();
