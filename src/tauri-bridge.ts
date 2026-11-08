@@ -1,5 +1,5 @@
-/** BANDO HUB v0.0.4. Tauri-to-legacy React compatibility layer.
- * Electron IPC methods that have not been migrated fail explicitly.
+/** BANDO HUB Tauri bridge. Active React actions map to native commands.
+ * Planned mobile networking remains explicitly unavailable offline.
  */
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -9,7 +9,7 @@ import { parseOfficialProductPage } from "./official-product-import";
 import { officialLinksFromSnapshot } from "./official-links";
 
 const notReady = (feature: string): never => {
-  throw new Error(`${feature}: Tauri v0.0.4에서 아직 이전하지 않은 기능입니다.`);
+  throw new Error(`${feature} 기능은 아직 구현되지 않았습니다.`);
 };
 const appWindow = () => getCurrentWindow();
 const safeImage = (siteId?: string) => {
@@ -41,7 +41,6 @@ const api: Api = {
   readClipboard: () => invoke<string>("clipboard_read"),
   openProduct: (url) => invoke<void>("product_open", { target: url }),
   catalogReport: () => invoke<CatalogReport>("catalog_report"),
-  approveCatalog: () => invoke<{ updated: number; created: number }>("catalog_approve"),
   backup: () => invoke<string>("backup_create"),
   backups: () => invoke<string[]>("backup_list"),
   restore: (filename) => invoke<void>("backup_restore", { filename }),
@@ -72,14 +71,9 @@ const api: Api = {
   receiptArchive: () => invoke<{ id: string; orderId: string; record: Record<string, unknown> }[]>("receipt_archive"),
   // Confirmed receipts and corrections are written atomically by state_save.
   // The old Electron secondary-write IPC is intentionally not duplicated.
-  registrationTemplate: async () => notReady("상품 일괄 등록 양식 다운로드"),
-  registrationPreview: async () => notReady("상품 일괄 등록 검증"),
-  registrationCommit: async () => notReady("상품 일괄 등록 반영"),
-  registrationResults: async () => notReady("상품 일괄 등록 결과"),
   chooseExcelDirectory: async () => (await invoke<string | null>("choose_excel_directory")) ?? undefined,
   openExcelDirectory: () => invoke<void>("open_excel_directory"),
   openExportFile: (id) => invoke<void>("open_export_file", { id }),
-  exportExcel: async () => notReady("공장 엑셀 내보내기"),
   previewImport: async (url) => {
     const html = await invoke<string>("fetch_official_product_html", { target: url });
     const state = await invoke<State>("state_load");
@@ -88,9 +82,6 @@ const api: Api = {
   // Suggests links from the bundled historical catalog; individual previews
   // still fetch their official product detail pages live.
   officialList: async () => officialLinksFromSnapshot(await invoke<CatalogReport>("catalog_report")),
-  downloadSheet: async () => notReady("시트 다운로드"),
-  previewSheet: async () => notReady("시트 업로드 검증"),
-  approveSheet: async () => notReady("시트 업로드 승인"),
   mobileStart: async () => notReady("스마트폰 연동"),
   mobileStop: async () => notReady("스마트폰 연동"),
   mobileStatus: async () => ({ running: false, urls: [] }),
