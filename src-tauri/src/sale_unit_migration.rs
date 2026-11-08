@@ -176,6 +176,131 @@ mod tests{
             .all(|p|p["variants"].as_array().unwrap().len()==1));
     }
     #[test]
+    fn preserves_custom_prices_special_overrides_scoped_aliases_and_both_order_states(){
+        let mut old:Value=serde_json::from_str(
+            include_str!("../resources/legacy-state-seed-303.json")).unwrap();
+        let pos=old["products"].as_array().unwrap().iter()
+            .position(|p|p["id"]=="bando-site-351").unwrap();
+        let original_id="bando-site-351";
+        let first=old["products"][pos]["variants"][0]["id"].as_str().unwrap().to_string();
+        let second=old["products"][pos]["variants"][1]["id"].as_str().unwrap().to_string();
+        let first_option=old["products"][pos]["variants"][0]["siteOptionId"].clone();
+        let second_option=old["products"][pos]["variants"][1]["siteOptionId"].clone();
+
+        // Deliberately non-default employee prices must override the bundled template.
+        old["products"][pos]["variants"][0]["wholesale"]=json!(41731);
+        old["products"][pos]["variants"][0]["semi"]=json!(53729);
+        old["products"][pos]["variants"][0]["retail"]=json!(123457);
+        old["products"][pos]["variants"][1]["wholesale"]=json!(41993);
+        old["products"][pos]["variants"][1]["semi"]=json!(53873);
+        old["products"][pos]["variants"][1]["retail"]=json!(123491);
+        old["products"][pos]["priceHistory"]=json!([{
+            "field":format!("{first}.retail"),"before":119000,"after":123457,
+            "source":"MANUAL","at":"2026-11-08T00:00:00+09:00"
+        }]);
+        let original_price_records=old["products"][pos]["variants"].clone();
+        let original_history=old["products"][pos]["priceHistory"].clone();
+        let override_amount=38291;
+        old["clients"]=json!([
+            {"id":"dealer-special","name":"가상특수대리점","tier":"special",
+             "address":"가상 주소","phone":"010-0000-0000",
+             "overrides":{first.clone():override_amount}},
+            {"id":"dealer-retail","name":"가상소매점","tier":"retail",
+             "address":"가상 주소","phone":"010-1111-1111","overrides":{}}
+        ]);
+        let original_clients=old["clients"].clone();
+        old["aliases"]=json!([
+            {"id":"alias-global","clientId":null,"text":"투명아크릴","productId":original_id,"variantId":first},
+            {"id":"alias-private","clientId":"dealer-special","text":"불투명아크릴",
+             "productId":original_id,"variantId":second}
+        ]);
+        old["sourceLinks"]=json!([
+            {"id":"source-first","productId":original_id,"optionId":first_option},
+            {"id":"source-second","productId":original_id,"optionId":second_option}
+        ]);
+        old["settings"]["modelRepresentatives"]=json!({
+            "acrylic-clear":{"productId":original_id,"variantId":first}
+        });
+        let draft_item=json!({
+            "id":"item-draft","productId":original_id,"variantId":second,
+            "name":"BD 707A1 프로스트","quantity":2,"unitPrice":53873
+        });
+        let confirmed_item=json!({
+            "id":"item-confirmed","productId":original_id,"variantId":first,
+            "name":"BD 707A 클리어","quantity":3,"unitPrice":38291
+        });
+        let snapshot=json!({
+            "at":"2026-11-07T12:00:00+09:00",
+            "recipients":[{"id":"snapshot-recipient","items":[confirmed_item.clone()]}],
+            "client":old["clients"][0].clone()
+        });
+        old["orders"]=json!([
+            {"id":"draft-1","clientId":"dealer-special","status":"REVIEW",
+             "recipients":[{"id":"recipient-draft","name":"받는 사람 A","items":[draft_item.clone()]}]},
+            {"id":"confirmed-1","clientId":"dealer-special","status":"STATEMENT",
+             "confirmedAt":"2026-11-07T12:00:00+09:00",
+             "recipients":[{"id":"recipient-confirmed","name":"받는 사람 B","items":[confirmed_item.clone()]}],
+             "confirmationSnapshot":snapshot,
+             "receipt":{"original":"가상원문","actor":"가상 직원"}}
+        ]);
+        let original_confirmed=old["orders"][1].clone();
+        let original_links=old["sourceLinks"].clone();
+        let migrated=transform(old).unwrap();
+        let a=migrated["products"].as_array().unwrap().iter()
+            .find(|p|p["variants"][0]["id"]==first).unwrap();
+        let b=migrated["products"].as_array().unwrap().iter()
+            .find(|p|p["variants"][0]["id"]==second).unwrap();
+        assert_ne!(a["id"],b["id"]);
+        assert_eq!(a["variants"][0],original_price_records[0]);
+        assert_eq!(b["variants"][0],original_price_records[1]);
+        assert_eq!(a["priceHistory"],original_history);
+        assert_eq!(b["priceHistory"],original_history);
+        assert_eq!(migrated["clients"],original_clients);
+        assert_eq!(migrated["clients"][0]["overrides"][&first],override_amount);
+        assert_eq!(migrated["orders"][0]["recipients"][0]["items"][0]["productId"],b["id"]);
+        assert_eq!(migrated["orders"][0]["recipients"][0]["items"][0]["variantId"],second);
+        assert_eq!(migrated["orders"][0]["recipients"][0]["items"][0]["unitPrice"],53873);
+        assert_eq!(migrated["orders"][0]["recipients"][0]["items"][0]["originalProductId"],original_id);
+        // Frozen confirmation and receipt data are never silently rewritten.
+        assert_eq!(migrated["orders"][1],original_confirmed);
+        assert_eq!(migrated["aliases"][0]["productId"],a["id"]);
+        assert_eq!(migrated["aliases"][1]["productId"],b["id"]);
+        assert_eq!(migrated["aliases"][0]["clientId"],Value::Null);
+        assert_eq!(migrated["aliases"][1]["clientId"],"dealer-special");
+        assert_eq!(migrated["aliases"][0]["variantId"],first);
+        assert_eq!(migrated["aliases"][1]["variantId"],second);
+        assert_eq!(migrated["sourceLinks"][0]["productId"],a["id"]);
+        assert_eq!(migrated["sourceLinks"][1]["productId"],b["id"]);
+        assert_eq!(migrated["sourceLinks"][0]["optionId"],original_links[0]["optionId"]);
+        assert_eq!(migrated["sourceLinks"][1]["optionId"],original_links[1]["optionId"]);
+        assert_eq!(migrated["settings"]["modelRepresentatives"]["acrylic-clear"]["productId"],a["id"]);
+        assert_eq!(migrated["productMappings"][format!("{original_id}|{first}")],a["id"]);
+        assert_eq!(migrated["productMappings"][format!("{original_id}|{second}")],b["id"]);
+        assert_eq!(migrated["revision"],0);
+    }
+
+    #[test]
+    fn ambiguous_draft_order_refuses_migration_without_fabricating_product(){
+        let mut old:Value=serde_json::from_str(
+            include_str!("../resources/legacy-state-seed-303.json")).unwrap();
+        old["orders"]=json!([{"id":"draft-ambiguous","status":"REVIEW","recipients":[{
+            "id":"recipient-ambiguous","name":"가상 수취인",
+            "items":[{"id":"item-ambiguous","productId":"bando-site-351",
+                "variantId":null,"name":"아크릴 보면대","quantity":1}]
+        }]}]);
+        assert!(transform(old).unwrap_err().contains("미확정 주문"));
+    }
+
+    #[test]
+    fn ambiguous_official_link_refuses_migration_without_selecting_a_variant(){
+        let mut old:Value=serde_json::from_str(
+            include_str!("../resources/legacy-state-seed-303.json")).unwrap();
+        old["sourceLinks"]=json!([{"id":"wrong-source","productId":"bando-site-351",
+            "optionId":"UNKNOWN"}]);
+        assert!(transform(old).unwrap_err().contains("공식 사이트 연결"));
+    }
+
+    #[test]
     fn ambiguous_order_or_alias_aborts_conversion_without_guessing(){
         let mut old:Value=serde_json::from_str(include_str!("../resources/legacy-state-seed-303.json")).unwrap();
         old["aliases"]=json!([{"id":"a1","productId":"bando-site-351","text":"아크릴 악보대"}]);
