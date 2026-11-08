@@ -599,13 +599,6 @@ export interface Api {
   >;
   resetTestDatabase?: (revision: number) => Promise<{ backup: string }>;
   receiptArchive: () => Promise<{ id: string; orderId: string; record: Record<string, unknown> }[]>;
-  registrationTemplate: () => Promise<void>;
-  registrationPreview: () => Promise<{
-    fingerprint: string;
-    rows: import("./product-registry.js").RegistrationRow[];
-  } | null>;
-  registrationCommit: (fingerprint: string) => Promise<{ created: number; skipped: number }>;
-  registrationResults: () => Promise<void>;
   openProduct: (url: string) => Promise<void>;
   dockRegion: (region: { x: number; y: number; width: number; height: number }) => Promise<void>;
   requestClose: (hasUnsavedChanges: boolean) => Promise<void>;
@@ -619,7 +612,6 @@ export interface Api {
   chooseExcelDirectory: () => Promise<string | undefined>;
   openExcelDirectory: () => Promise<void>;
   openExportFile: (id: string) => Promise<void>;
-  exportExcel: (ids: string[]) => Promise<{ cancelled: boolean; filename?: string }>;
   previewImport: (url: string) => Promise<ImportPreview>;
   officialList: () => Promise<OfficialLink[]>;
   copy: (text: string) => Promise<void>;
@@ -629,10 +621,6 @@ export interface Api {
   mobileStatus: () => Promise<MobileStatus>;
   inbox: () => Promise<InboxEntry[]>;
   catalogReport: () => Promise<CatalogReport>;
-  approveCatalog: () => Promise<{ updated: number; created: number }>;
-  downloadSheet: (kind: "prices" | "clients") => Promise<void>;
-  previewSheet: (kind: "prices" | "clients") => Promise<BulkPreview | null>;
-  approveSheet: () => Promise<void>;
   backup: () => Promise<string>;
   backups: () => Promise<string[]>;
   restore: (filename: string) => Promise<void>;
