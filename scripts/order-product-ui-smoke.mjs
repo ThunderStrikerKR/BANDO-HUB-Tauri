@@ -133,17 +133,43 @@ try {
   await row.getByRole("button", {name:/상품 수정.*Z-2.*바퀴 미포함/}).waitFor();
   console.log("PASS UI03: cancellation preserves previous selected product and price");
 
+  // UI05: adding a second independent product creates a separate order row
+  // rather than a selectable nested price option under the first product.
+  await page.locator(".recipient-row-actions button").filter({hasText:"상품 추가"}).first().click();
+  await search.getByRole("textbox", {name:"추가 상품 검색"}).fill("709-1");
+  await search.locator(".product-search-results article button").filter({hasText:"709-1 / 블랙 / 비타공 상판"}).first().click();
+  await search.waitFor({state:"detached"});
+  const rows = page.locator(".compact-items tbody tr[data-item-id]");
+  await rows.nth(1).waitFor();
+  assert.equal(await rows.count(), 2);
+  const second = rows.nth(1);
+  await second.getByRole("button", {name:/상품 수정.*709-1.*비타공/}).click();
+  await editor.getByRole("spinbutton", {name:"수량"}).fill("1");
+  await editor.getByRole("button", {name:"적용",exact:true}).click();
+  await editor.waitFor({state:"detached"});
+  await second.getByRole("button", {name:/상품 수정.*709-1.*비타공/}).waitFor();
+  console.log("PASS UI05: additional independent product creates its own editable order row");
+
   // UI04: the unresolved selection must surface an actionable warning
   // in the *visible* modal, rather than placing an alert behind the search.
   await row.getByRole("button", {name:/상품 수정.*Z-2.*바퀴 미포함/}).click();
   await editor.getByRole("button", {name:"상품 변경"}).click();
   await search.getByRole("textbox", {name:"추가 상품 검색"}).fill("UI-999");
   await search.locator(".product-search-results article button").filter({hasText:"UI-999"}).first().click();
-  const visibleWarning = page.getByRole("alert").filter({hasText:"상품 구성이 미확정"});
-  await visibleWarning.waitFor({state:"visible", timeout:3500});
-  console.log("PASS UI04: unresolved product selection warning is visible to employee");
+  const warningState = await page.evaluate(() => {
+    const editor = document.querySelector('dialog[aria-label="상품 상세 수정"]');
+    const search = document.querySelector('dialog[aria-label="상품 검색"]');
+    const alert = editor?.querySelector('[role="alert"]');
+    return {editorOpen: Boolean(editor?.open), searchOpen: Boolean(search?.open),
+      warningText: alert?.textContent?.trim() ?? "", alertVisible: Boolean(alert?.getClientRects().length)};
+  });
+  console.log("UI04 WARNING DIAGNOSTICS:", JSON.stringify(warningState));
   assert.deepEqual(errors, [], "React errors: " + errors.join("\n"));
   assert.ok(!await page.evaluate(() => window.__ciCalls.includes("state_save")), "No native writes");
+  assert.ok(warningState.warningText.includes("상품 구성이 미확정"), "Warning text was not rendered");
+  assert.ok(warningState.alertVisible && warningState.editorOpen && !warningState.searchOpen,
+    "UI04 FAIL: warning rendered behind still-open product search; staff cannot see it");
+  console.log("PASS UI04: unresolved product warning visible to employee");
 } finally {
   if (browser) await browser.close();
   server.kill("SIGTERM");
