@@ -277,7 +277,7 @@
       "originalName": "반도스탠드 BD FloorJS-2BK",
       "oldName": "BD FloorJS-2BK / 미니형 마이크 스탠드",
       "oldSubtitle": "",
-      "name": "BD FloorJS-2BK / 블랙 / 높이 35cm",
+      "name": "BD FloorJS-2BK / 블랙 / 자바라 길이 35cm",
       "subtitle": "FLOOR 테이블탑 마이크 스탠드. 높이 35cm, 붐암 없음, 베이스 높이 4cm, 베이스 크기 24cm × 19.5cm, 무게 1.5kg.",
       "type": "Floor",
       "model": "JS-2",
@@ -287,7 +287,10 @@
       "boomCm": null,
       "weightKg": 1.5,
       "baseHeightCm": 4,
-      "baseSize": "24cm × 19.5cm"
+      "baseSize": "24cm × 19.5cm",
+      "previousNames": [
+        "BD FloorJS-2BK / 블랙 / 높이 35cm"
+      ]
     },
     {
       "id": "bando-site-320",
@@ -296,7 +299,7 @@
       "originalName": "반도스탠드 BD FloorJS-3BK",
       "oldName": "BD FloorJS-3BK / 미니형 마이크 스탠드",
       "oldSubtitle": "",
-      "name": "BD FloorJS-3BK / 블랙 / 높이 43cm",
+      "name": "BD FloorJS-3BK / 블랙 / 자바라 길이 43cm",
       "subtitle": "FLOOR 테이블탑 마이크 스탠드. 높이 43cm, 붐암 없음, 베이스 높이 4cm, 베이스 크기 24cm × 19.5cm, 무게 1.5kg.",
       "type": "Floor",
       "model": "JS-3",
@@ -306,7 +309,10 @@
       "boomCm": null,
       "weightKg": 1.5,
       "baseHeightCm": 4,
-      "baseSize": "24cm × 19.5cm"
+      "baseSize": "24cm × 19.5cm",
+      "previousNames": [
+        "BD FloorJS-3BK / 블랙 / 높이 43cm"
+      ]
     },
     {
       "id": "bando-site-321",
@@ -315,7 +321,7 @@
       "originalName": "반도스탠드 BD FloorJS-4BK",
       "oldName": "BD FloorJS-4BK / 미니형 마이크 스탠드",
       "oldSubtitle": "",
-      "name": "BD FloorJS-4BK / 블랙 / 높이 60cm",
+      "name": "BD FloorJS-4BK / 블랙 / 자바라 길이 60cm",
       "subtitle": "FLOOR 테이블탑 마이크 스탠드. 높이 60cm, 붐암 없음, 베이스 높이 4cm, 베이스 크기 24cm × 19.5cm, 무게 1.5kg.",
       "type": "Floor",
       "model": "JS-4",
@@ -325,7 +331,10 @@
       "boomCm": null,
       "weightKg": 1.5,
       "baseHeightCm": 4,
-      "baseSize": "24cm × 19.5cm"
+      "baseSize": "24cm × 19.5cm",
+      "previousNames": [
+        "BD FloorJS-4BK / 블랙 / 높이 60cm"
+      ]
     },
     {
       "id": "bando-site-322",

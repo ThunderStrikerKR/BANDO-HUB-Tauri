@@ -88,9 +88,13 @@ try {
   console.log("PASS UI: TS lengths appear in products and no invented color prompt");
 
   for (const [query,expected] of [
+    ["Desk IS-1","BD Desk IS-1 / 블랙 / Bar 길이 10cm"],
     ["Desk IS-3","BD Desk IS-3 / 블랙 / Bar 길이 26cm"],
+    ["Desk JS-2","BD Desk JS-2 / 블랙 / 자바라 길이 35cm"],
     ["Desk-BTS","BD Desk-BTS / 블랙 / 높이 27cm"],
-    ["FloorJS-2BK","BD FloorJS-2BK / 블랙 / 높이 35cm"],
+    ["FloorJS-2BK","BD FloorJS-2BK / 블랙 / 자바라 길이 35cm"],
+    ["FloorJS-3BK","BD FloorJS-3BK / 블랙 / 자바라 길이 43cm"],
+    ["FloorJS-4BK","BD FloorJS-4BK / 블랙 / 자바라 길이 60cm"],
     ["Floor TS-1","BD Floor TS-1 / 실버 / 높이 17cm"],
     ["Floor-BTS","BD Floor-BTS / 블랙 / 높이 27cm"],
   ]) {

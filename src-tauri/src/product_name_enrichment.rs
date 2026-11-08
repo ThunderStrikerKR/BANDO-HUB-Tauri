@@ -194,7 +194,15 @@ pub(super) fn apply_to_state(state: &mut Value) -> Result<usize, String> {
         let Some(target_name) = spec["name"].as_str() else {
             return Err(format!("마이크 스탠드 상품명이 누락됐습니다: {id}"));
         };
-        if current_name != target_name && product["name"] != spec["oldName"] {
+        // Previously shipped specification labels can be corrected without
+        // guessing which employee-entered wording refers to a physical model.
+        let matches_prior_spec = spec["previousNames"].as_array().is_some_and(
+            |names| names.iter().any(|name| name.as_str() == Some(current_name))
+        );
+        if current_name != target_name
+            && product["name"] != spec["oldName"]
+            && !matches_prior_spec
+        {
             continue; // Employee-edited names are authoritative.
         }
         if target_name.trim().is_empty() || target_name.contains('◆') {
@@ -636,6 +644,71 @@ mod tests {
         assert_eq!(backup_manager::list_backups(&base).unwrap().len(), 1);
         drop(db);
         std::fs::remove_dir_all(base).unwrap();
+    }
+
+    #[test]
+    fn prior_floor_js_height_labels_upgrade_once_without_altering_prices_or_orders() {
+        let salt = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let base = std::env::temp_dir().join(format!(
+            "bando-floor-js-labels-{}-{salt}", std::process::id()
+        ));
+        std::fs::create_dir_all(&base).unwrap();
+        let mut db = initialize_database(&base.join("state.sqlite")).unwrap();
+        let mut prior = get_snapshot(&db).unwrap();
+        let models = [
+            ("319", "35"),
+            ("320", "43"),
+            ("321", "60"),
+        ];
+        for p in prior["products"].as_array_mut().unwrap() {
+            if let Some((_, length)) = models.iter().find(|(site,_)|
+                p["siteId"].as_str() == Some(*site)
+            ) {
+                let model = p["siteId"].as_str().unwrap();
+                let idx = match model {"319"=>"2","320"=>"3","321"=>"4",_=>unreachable!()};
+                p["name"] = json!(format!(
+                    "BD FloorJS-{idx}BK / 블랙 / 높이 {length}cm"
+                ));
+            }
+        }
+        let old = prior.clone();
+        let rev = prior["revision"].as_u64().unwrap();
+        write_snapshot(&mut db, prior, rev, false).unwrap();
+        assert_eq!(apply(&mut db, &base).unwrap(), 3);
+        let after = get_snapshot(&db).unwrap();
+        for (site, length) in models {
+            let original = old["products"].as_array().unwrap().iter()
+                .find(|p| p["siteId"] == site).unwrap();
+            let current = after["products"].as_array().unwrap().iter()
+                .find(|p| p["siteId"] == site).unwrap();
+            let idx = match site {"319"=>"2","320"=>"3","321"=>"4",_=>unreachable!()};
+            assert_eq!(current["name"], format!(
+                "BD FloorJS-{idx}BK / 블랙 / 자바라 길이 {length}cm"
+            ));
+            assert_eq!(current["variants"], original["variants"]);
+            assert_eq!(current["originalName"], original["originalName"]);
+            assert_eq!(current["subtitle"], original["subtitle"]);
+        }
+        assert_eq!(after["orders"], old["orders"]);
+        assert_eq!(after["clients"], old["clients"]);
+        assert_eq!(apply(&mut db, &base).unwrap(), 0);
+        assert_eq!(backup_manager::list_backups(&base).unwrap().len(), 1);
+        drop(db);
+        std::fs::remove_dir_all(base).unwrap();
+    }
+
+    #[test]
+    fn employee_edited_floor_js_name_is_preserved() {
+        let mut state: Value = serde_json::from_str(include_str!(
+            "../resources/state-seed.json"
+        )).unwrap();
+        let p = state["products"].as_array_mut().unwrap().iter_mut()
+            .find(|p| p["siteId"] == "319").unwrap();
+        p["name"] = json!("BD FloorJS-2BK / 직원 직접 작성한 상품명");
+        assert_eq!(apply_to_state(&mut state).unwrap(), 0);
+        let p = state["products"].as_array().unwrap().iter()
+            .find(|p| p["siteId"] == "319").unwrap();
+        assert_eq!(p["name"], "BD FloorJS-2BK / 직원 직접 작성한 상품명");
     }
 
     #[test]

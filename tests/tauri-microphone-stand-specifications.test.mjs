@@ -52,3 +52,25 @@ test("JS dual colors remain separate with unchanged IDs and no invented configur
   }
   assert.equal(spec.items.filter(x=>x.type==="Desk"&&x.model==="JS-1").length,1);
 });
+
+
+test("IS uses exact Bar length and JS uses exact gooseneck length in sellable product names",()=>{
+  const bySite=new Map(seed.products.map(p=>[p.siteId,p]));
+  const isLengths=[["252",10],["251",15],["250",26]];
+  const jsLengths=[["253",25],["245",35],["254",35],["246",43],["255",43],["310",60],["256",60],["319",35],["320",43],["321",60]];
+  for(const [site,length] of isLengths){
+    const p=bySite.get(site);
+    assert.ok(p?.name.includes("Bar 길이 "+length+"cm"),site);
+    assert.ok(!p.name.includes("자바라 길이"),site);
+  }
+  for(const [site,length] of jsLengths){
+    const p=bySite.get(site);
+    assert.ok(p?.name.includes("자바라 길이 "+length+"cm"),site);
+    assert.ok(!p.name.includes(" / 높이 "),site);
+  }
+  for(const [site,model,length] of [["319",2,35],["320",3,43],["321",4,60]]){
+    const item=spec.items.find(p=>p.siteId===site);
+    assert.deepEqual(item.previousNames,["BD FloorJS-"+model+"BK / 블랙 / 높이 "+length+"cm"]);
+    assert.equal(item.name,"BD FloorJS-"+model+"BK / 블랙 / 자바라 길이 "+length+"cm");
+  }
+});
