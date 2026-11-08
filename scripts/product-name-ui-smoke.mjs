@@ -110,7 +110,7 @@ try {
     await row.waitFor();
     const label=await row.locator(".product-title-line b").innerText();
     assert.equal(label.trim(),name);
-    assert.ok((await row.innerText()).includes(price),name);
+    assert.equal(await row.locator('input[data-price-cell]').last().inputValue(),price,name);
     assert.ok(!(await row.innerText()).includes("색상 확인 필요"),name);
   }
   const ledText=await table.innerText();
