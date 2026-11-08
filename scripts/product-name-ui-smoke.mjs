@@ -77,9 +77,30 @@ try {
   assert.ok(!content.includes("반도스탠드 BD Desk JS-3"));
   assert.ok(content.includes("BD Desk JS-3 / 블랙 / 자바라 길이 43cm"));
   assert.ok(content.includes("BD Desk JS-3 / 실버 / 자바라 길이 43cm"));
+  await page.getByRole("textbox",{name:"상품 검색"}).fill("Desk TS-");
+  for(const [model,length] of [["1","15"],["2","22"],["3","32"]]) {
+    await rows.filter({hasText:`BD Desk TS-${model} / Bar 길이 ${length}cm`})
+      .first().waitFor();
+  }
+  let tableText = await table.innerText();
+  assert.ok(!tableText.includes("미니형 마이크 스탠드"));
+  assert.ok(!tableText.includes("색상 확인 필요"));
+  console.log("PASS UI: TS lengths appear in products and no invented color prompt");
+
+  await page.getByRole("textbox",{name:"상품 검색"}).fill("뮤직");
+  await rows.filter({hasText:"뮤직 트레이 / 다크 그린"}).first().waitFor();
+  await rows.filter({hasText:"뮤직 트레이 / 와인"}).first().waitFor();
+  await rows.filter({hasText:"뮤직 트레이 / 그레이"}).first().waitFor();
+  tableText = await table.innerText();
+  assert.ok(!tableText.includes("뮤직트레이 / 다크그린"));
+  assert.ok(!tableText.includes("뮤직트레이 / 와인"));
+  assert.ok(!tableText.includes("다크그린, 와인, 그레이 옵션"));
+  assert.ok(!tableText.includes("색상 확인 필요"));
+  console.log("PASS UI: three separate music-tray colors and no duplicate dark-green/wine listings");
+
   assert.deepEqual(errors, []);
   assert.ok(!await page.evaluate(() => window.__ciCalls.includes("state_save")));
-  console.log("PASS UI: product manager shows curated JS-3 names, not legacy branded originals");
+  console.log("PASS UI: product manager shows curated names and preserves read-only state");
 } finally {
   if (browser) await browser.close();
   server.kill("SIGTERM");

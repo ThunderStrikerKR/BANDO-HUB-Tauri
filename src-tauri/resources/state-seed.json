@@ -1609,7 +1609,6 @@
       "priceHistory": [],
       "requiresOption": false,
       "originalName": "반도스탠드 BD 뮤직 트레이 (색상선택)",
-      "subtitle": "다크그린, 와인, 그레이 옵션",
       "sourceProductId": "bando-site-237",
       "familyKey": "bando-site-237",
       "manufacturerCode": "P00000JC",
@@ -1658,7 +1657,6 @@
       "priceHistory": [],
       "requiresOption": false,
       "originalName": "반도스탠드 BD 뮤직 트레이 (색상선택)",
-      "subtitle": "다크그린, 와인, 그레이 옵션",
       "sourceProductId": "bando-site-237",
       "familyKey": "bando-site-237",
       "manufacturerCode": "P00000JC",
@@ -1707,7 +1705,6 @@
       "priceHistory": [],
       "requiresOption": false,
       "originalName": "반도스탠드 BD 뮤직 트레이 (색상선택)",
-      "subtitle": "다크그린, 와인, 그레이 옵션",
       "sourceProductId": "bando-site-237",
       "familyKey": "bando-site-237",
       "manufacturerCode": "P00000JC",
@@ -1926,7 +1923,7 @@
       ],
       "origin": "FACTORY",
       "defaultColor": "색상 미표기",
-      "active": true,
+      "active": false,
       "saleStatus": "판매 표시",
       "variants": [
         {
@@ -1948,7 +1945,8 @@
       "priceHistory": [],
       "requiresOption": false,
       "originalName": "반도스탠드 BD 뮤직트레이 (Wine)",
-      "saleUnit": true
+      "saleUnit": true,
+      "supersededBy": "sku:bando-site-237:bando-237-P00000JC000I"
     },
     {
       "id": "bando-site-77",
@@ -1965,7 +1963,7 @@
       ],
       "origin": "FACTORY",
       "defaultColor": "색상 미표기",
-      "active": true,
+      "active": false,
       "saleStatus": "판매 표시",
       "variants": [
         {
@@ -1987,7 +1985,8 @@
       "priceHistory": [],
       "requiresOption": false,
       "originalName": "반도스탠드 BD 뮤직트레이 (Dark green)",
-      "saleUnit": true
+      "saleUnit": true,
+      "supersededBy": "sku:bando-site-237:bando-237-P00000JC000H"
     },
     {
       "id": "sku:bando-site-76:bando-76-P00000CX000B",
@@ -12929,7 +12928,7 @@
       "siteCode": "P00000JR",
       "catalog": "BANDOSTAND",
       "code": "BD Desk IS-1",
-      "name": "BD Desk IS-1 / 바 길이 10cm",
+      "name": "BD Desk IS-1 / Bar 길이 10cm",
       "modelCodes": [
         "BD Desk IS-1"
       ],
@@ -12969,7 +12968,7 @@
       "siteCode": "P00000JQ",
       "catalog": "BANDOSTAND",
       "code": "BD Desk IS-2",
-      "name": "BD Desk IS-2 / 바 길이 15cm",
+      "name": "BD Desk IS-2 / Bar 길이 15cm",
       "modelCodes": [
         "BD Desk IS-2"
       ],
@@ -13009,7 +13008,7 @@
       "siteCode": "P00000JP",
       "catalog": "BANDOSTAND",
       "code": "BD Desk IS-3",
-      "name": "BD Desk IS-3 / 바 길이 26cm",
+      "name": "BD Desk IS-3 / Bar 길이 26cm",
       "modelCodes": [
         "BD Desk IS-3"
       ],
@@ -13049,7 +13048,7 @@
       "siteCode": "P00000JO",
       "catalog": "BANDOSTAND",
       "code": "BD Desk TS-3",
-      "name": "BD Desk TS-3 / 미니형 마이크 스탠드",
+      "name": "BD Desk TS-3 / Bar 길이 32cm",
       "modelCodes": [
         "BD Desk TS-3"
       ],
@@ -13081,7 +13080,7 @@
       "priceHistory": [],
       "requiresOption": false,
       "originalName": "반도스탠드 BD Desk TS-3 (길이 참고)",
-      "subtitle": "길이 확인 필요",
+      "subtitle": "",
       "saleUnit": true
     },
     {
@@ -13090,7 +13089,7 @@
       "siteCode": "P00000JN",
       "catalog": "BANDOSTAND",
       "code": "BD Desk TS-2",
-      "name": "BD Desk TS-2 / 미니형 마이크 스탠드",
+      "name": "BD Desk TS-2 / Bar 길이 22cm",
       "modelCodes": [
         "BD Desk TS-2"
       ],
@@ -13122,7 +13121,7 @@
       "priceHistory": [],
       "requiresOption": false,
       "originalName": "반도스탠드 BD Desk TS-2 (길이 참고)",
-      "subtitle": "길이 확인 필요",
+      "subtitle": "",
       "saleUnit": true
     },
     {
@@ -13131,7 +13130,7 @@
       "siteCode": "P00000JM",
       "catalog": "BANDOSTAND",
       "code": "BD Desk TS-1",
-      "name": "BD Desk TS-1 / 미니형 마이크 스탠드",
+      "name": "BD Desk TS-1 / Bar 길이 15cm",
       "modelCodes": [
         "BD Desk TS-1"
       ],
@@ -13163,7 +13162,7 @@
       "priceHistory": [],
       "requiresOption": false,
       "originalName": "반도스탠드 BD Desk TS-1 (길이 참고)",
-      "subtitle": "길이 확인 필요",
+      "subtitle": "",
       "saleUnit": true
     },
     {
