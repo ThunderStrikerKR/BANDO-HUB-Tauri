@@ -340,6 +340,47 @@ pub(super) fn hydrate(conn:&Connection,state:&mut Value)->Result<(),String>{
     Ok(())
 }
 
+/// Recreate missing immutable audit rows from already-confirmed legacy order
+/// snapshots when older SQLite backups only contain receipt/correction JSON.
+/// Do not infer absent receipts and never overwrite conflicting audit evidence.
+fn restore_legacy_receipt_archive(tx:&Transaction<'_>,state:&Value)->Result<(),String>{
+    let mut seen=HashSet::new();
+    for order in source_list(state,"orders")?{
+        let Some(confirmed)=order["confirmedAt"].as_str() else {continue};
+        if confirmed.is_empty(){continue;}
+        let order_id=required_id(order,"확정 주문")?;
+        let mut records:Vec<(String,&Value)>=Vec::new();
+        if let Some(receipt)=order.get("receipt").filter(|v|!v.is_null()){
+            records.push((format!("receipt:{order_id}"),receipt));
+        }
+        for correction in order["rawCorrections"].as_array().into_iter().flatten(){
+            let correction_id=required_id(correction,"접수 정정")?;
+            records.push((format!("correction:{correction_id}"),correction));
+        }
+        for (id,record) in records{
+            if !seen.insert(id.clone()){
+                return Err(format!("접수 감사 ID {id}가 중복됐습니다. 이전을 중단합니다."));
+            }
+            let existing:Option<(String,String)>=tx.query_row(
+                "SELECT order_id,record FROM receipt_archive WHERE id=?1",
+                [id.as_str()],|r|Ok((r.get(0)?,r.get(1)?))
+            ).optional().map_err(err)?;
+            if let Some((existing_owner,existing_raw))=existing{
+                let old:Value=serde_json::from_str(&existing_raw).map_err(err)?;
+                if existing_owner!=order_id || old!=*record{
+                    return Err(format!("접수 감사 기록 {id}가 기존 데이터와 충돌해 이전을 중단했습니다."));
+                }
+            }else{
+                tx.execute("INSERT INTO receipt_archive(id,order_id,record)
+                    VALUES (?1,?2,?3)",
+                    params![id,order_id,serde_json::to_string(record).map_err(err)?]
+                ).map_err(err)?;
+            }
+        }
+    }
+    Ok(())
+}
+
 pub(super) fn migrate(conn:&mut Connection)->Result<(),String>{
     sql_schema(conn)?;
     let prior=schema_version(conn)?;
@@ -353,6 +394,7 @@ pub(super) fn migrate(conn:&mut Connection)->Result<(),String>{
     valid_state(&state)?;
     let tx=conn.transaction().map_err(err)?;
     store(&tx,&state)?;
+    restore_legacy_receipt_archive(&tx,&state)?;
     // Legacy search indexes are non-authoritative copies and rebuilt after migration.
     tx.execute("DELETE FROM product_index",[]).map_err(err)?;
     {
