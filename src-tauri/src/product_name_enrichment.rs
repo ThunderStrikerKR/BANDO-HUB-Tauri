@@ -4,21 +4,18 @@
 use super::*;
 use serde_json::Value;
 
-pub(super) fn apply(conn: &mut Connection, base: &Path) -> Result<usize, String> {
+pub(super) fn apply_to_state(state: &mut Value) -> Result<usize, String> {
     let mapping: Value = serde_json::from_str(include_str!(
         "../resources/product-name-enrichment-20261109.json"
     )).map_err(err)?;
     let updates = mapping["changes"].as_array()
         .ok_or("상품명 변경 목록이 누락됐습니다.")?;
-    let mut state = get_snapshot(conn)?;
-    let revision = state["revision"].as_u64()
-        .ok_or("상품명 갱신 전 데이터 리비전을 확인할 수 없습니다.")?;
     let products = state["products"].as_array_mut()
         .ok_or("상품명 갱신 전 상품 목록을 확인할 수 없습니다.")?;
     let mut changed = 0_usize;
     for update in updates {
         let Some(product) = products.iter_mut().find(|p| p["id"] == update["id"]) else {
-            continue; // Another installation may have removed this product.
+            continue;
         };
         if product["name"] != update["oldName"]
             || product["originalName"] != update["originalName"]
@@ -38,8 +35,18 @@ pub(super) fn apply(conn: &mut Connection, base: &Path) -> Result<usize, String>
         product["name"] = Value::String(new_name.to_string());
         changed += 1;
     }
+    Ok(changed)
+}
+
+pub(super) fn apply(conn: &mut Connection, base: &Path) -> Result<usize, String> {
+    let mut state = get_snapshot(conn)?;
+    let revision = state["revision"].as_u64()
+        .ok_or("상품명 갱신 전 데이터 리비전을 확인할 수 없습니다.")?;
+    let changed = apply_to_state(&mut state)?;
     if changed == 0 { return Ok(0); }
-    // Create and verify a full SQLite backup BEFORE touching any business rows.
+    // Already-relational installations need their own verified safety backup.
+    // Legacy 303->360 migrations enrich names *inside their prior migration*
+    // and thus do not create a second backup or bump revision twice.
     backup_manager::manual_backup(conn, base)?;
     write_snapshot(conn, state, revision, false)?;
     Ok(changed)
