@@ -338,6 +338,145 @@ mod tests {
     }
 
     #[test]
+    fn practical_v2_backup_restore_returns_prices_aliases_orders_and_audit_with_safe_undo(){
+        let base=temporary();
+        let path=base.join("main.sqlite");
+        let mut conn=initialize_database(&path).unwrap();
+        let mut original=get_snapshot(&conn).unwrap();
+        let product_id=original["products"][0]["id"].as_str().unwrap().to_owned();
+        let price_id=original["products"][0]["variants"][0]["id"].as_str().unwrap().to_owned();
+        let second_id=original["products"][1]["id"].as_str().unwrap().to_owned();
+        let second_price=original["products"][1]["variants"][0]["id"].as_str().unwrap().to_owned();
+
+        original["products"][0]["variants"][0]["wholesale"]=json!(31870);
+        original["products"][0]["variants"][0]["semi"]=json!(41870);
+        original["products"][0]["variants"][0]["retail"]=json!(51870);
+        original["clients"]=json!([{
+            "id":"company-1","name":"가상 특수 거래처","tier":"special",
+            "address":"가상 발송지","phone":"010-0000-0000",
+            "overrides":{price_id.clone():27630}
+        }]);
+        original["aliases"]=json!([{
+            "id":"dealer-alias","clientId":"company-1","text":"특수거래처 지정 상품",
+            "productId":product_id,"variantId":price_id
+        },{
+            "id":"global-alias","clientId":null,"text":"공통 가상 상품",
+            "productId":second_id,"variantId":second_price
+        }]);
+        let date="2026-11-08T10:00:00+09:00";
+        let confirmed_item=json!({
+            "id":"item-confirmed","productId":product_id,"variantId":price_id,
+            "name":"당시 확정 상품명","quantity":2,"unitPrice":27630
+        });
+        let confirmed_snapshot=json!({
+            "at":date,"raw":"확정 원문 / 상품 2개",
+            "recipients":[{"id":"copy-receiver","name":"가상 수령인",
+                "items":[confirmed_item.clone()]}]
+        });
+        original["orders"]=json!([{
+            "id":"paid-confirmed","clientId":"company-1","createdAt":date,
+            "confirmedAt":date,"raw":"확정 원문 / 상품 2개","status":"STATEMENT",
+            "receipt":{"original":"확정 원문 / 상품 2개","at":date,
+                "actor":"검증 담당자","clientId":"company-1"},
+            "rawCorrections":[{
+                "id":"history-1","at":date,"before":"원문 수정 전",
+                "after":"원문 수정 후","actor":"검증 담당자"
+            }],
+            "confirmationSnapshot":confirmed_snapshot,
+            "recipients":[{
+                "id":"receiver-confirmed","name":"확정 수취인","items":[confirmed_item]
+            }]
+        },{
+            "id":"draft-pending","clientId":"company-1","createdAt":date,
+            "status":"REVIEW","raw":"미확정 주문",
+            "recipients":[{
+                "id":"receiver-draft","name":"가상 수취인",
+                "items":[{
+                    "id":"item-draft","productId":second_id,"variantId":second_price,
+                    "name":"두 번째 상품","quantity":5,"unitPrice":41870
+                }]
+            }]
+        }]);
+        original["workflow"]=json!({
+            "shipments":[{
+                "id":"ship-1","orderId":"paid-confirmed",
+                "recipientId":"receiver-confirmed","step":2,
+                "freight":4000,"trackingNumber":"TEST123"
+            }],
+            "events":[{
+                "id":"event-1","action":"주문 확인 완료",
+                "shipmentIds":["ship-1"]
+            }]
+        });
+        let saved=write_snapshot(&mut conn,original,0,false).unwrap();
+        assert_eq!(saved["revision"],1);
+        let archive_before:Vec<(String,String,String)> = {
+            let mut query=conn.prepare(
+                "SELECT id,order_id,record FROM receipt_archive ORDER BY id"
+            ).unwrap();
+            query.query_map([],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?))).unwrap()
+                .collect::<Result<Vec<_>,_>>().unwrap()
+        };
+        assert_eq!(archive_before.len(),2);
+        let original_manual=manual_backup(&conn,&base).unwrap();
+        let opened=read_backup(Path::new(&original_manual)).unwrap();
+        assert_eq!(get_snapshot(&opened).unwrap(),saved);
+        relational_store::verify(&opened).unwrap();
+        drop(opened);
+
+        // Simulate employee changes after the backup: prices, alias links,
+        // draft order quantity, special pricing, workflow, audit archive.
+        let mut latest=saved.clone();
+        latest["products"][0]["variants"][0]["wholesale"]=json!(99999);
+        latest["products"][0]["variants"][0]["semi"]=json!(88888);
+        latest["products"][0]["variants"][0]["retail"]=json!(77777);
+        latest["clients"][0]["overrides"][price_id.as_str()]=json!(60000);
+        latest["clients"][0]["address"]=json!("사후 변경된 주소");
+        latest["aliases"]=json!([]);
+        latest["orders"][1]["recipients"][0]["items"][0]["quantity"]=json!(98);
+        latest["workflow"]["shipments"][0]["trackingNumber"]=json!("AFTER999");
+        let changed=write_snapshot(&mut conn,latest,1,false).unwrap();
+        assert_eq!(changed["revision"],2);
+        conn.execute("DELETE FROM receipt_archive WHERE id='correction:history-1'",[]).unwrap();
+        assert_ne!(get_snapshot(&conn).unwrap(),saved);
+
+        let safety=restore_backup(&mut conn,&base,&original_manual).unwrap();
+        let mut expected=saved.clone();
+        expected["revision"]=json!(3);
+        assert_eq!(get_snapshot(&conn).unwrap(),expected);
+        let recovered_archive:Vec<(String,String,String)> = {
+            let mut query=conn.prepare("SELECT id,order_id,record FROM receipt_archive ORDER BY id").unwrap();
+            query.query_map([],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?))).unwrap()
+                .collect::<Result<Vec<_>,_>>().unwrap()
+        };
+        assert_eq!(recovered_archive,archive_before);
+        assert_eq!(conn.query_row("SELECT COUNT(*) FROM core_product_prices",
+            [],|r|r.get::<_,i64>(0)).unwrap(),360);
+        assert_eq!(conn.query_row("SELECT COUNT(*) FROM core_items",
+            [],|r|r.get::<_,i64>(0)).unwrap(),2);
+        assert_eq!(conn.query_row("SELECT COUNT(*) FROM order_index",
+            [],|r|r.get::<_,i64>(0)).unwrap(),2);
+        relational_store::verify(&conn).unwrap();
+
+        // The rollback copy contains the entire state from just before restore.
+        let undo=read_backup(Path::new(&safety)).unwrap();
+        assert_eq!(get_snapshot(&undo).unwrap(),changed);
+        let count:i64=undo.query_row("SELECT COUNT(*) FROM receipt_archive",
+            [],|r|r.get(0)).unwrap();
+        assert_eq!(count,1);
+        drop(undo);
+        assert!(write_snapshot(&mut conn,changed.clone(),2,false).unwrap_err()
+            .contains("새로고침"));
+
+        drop(conn);
+        let reopened=initialize_database(&path).unwrap();
+        assert_eq!(get_snapshot(&reopened).unwrap(),expected);
+        relational_store::verify(&reopened).unwrap();
+        drop(reopened);
+        fs::remove_dir_all(base).unwrap();
+    }
+
+    #[test]
     fn corrupt_backup_is_rejected_without_changing_current_db() {
         let base = temporary();
         let mut conn = initialize_database(&base.join("main.sqlite")).unwrap();
