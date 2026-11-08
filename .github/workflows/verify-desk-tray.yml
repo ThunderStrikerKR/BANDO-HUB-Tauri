@@ -1,0 +1,37 @@
+name: Verify Desk specs and unique Music Tray colors (isolated)
+on:
+  push:
+    branches:
+      - test/desk-spec-product-names-20261109
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  node-and-ui:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund --ignore-scripts
+      - name: TypeScript type check
+        run: npm run check:types
+      - name: All Node regressions
+        run: npm test
+      - name: Install Playwright
+        run: npm install --no-save --no-package-lock --no-audit --no-fund playwright@1.55.1
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Click product management to verify TS names and duplicate removal
+        run: node scripts/product-name-ui-smoke.mjs
+  windows-sqlite:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Exercise native SQLite Desk correction and duplicate retirement
+        run: cargo test --manifest-path src-tauri/Cargo.toml --lib -- --nocapture
