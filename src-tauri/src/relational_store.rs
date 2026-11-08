@@ -600,6 +600,42 @@ mod tests {
     }
 
     #[test]
+    fn ambiguous_alias_refuses_migration_without_overwriting_original_sqlite_or_backup(){
+        let folder=temp().with_extension("legacy-ambiguous-rollback");
+        std::fs::create_dir_all(&folder).unwrap();
+        let path=folder.join("source.sqlite");
+        let mut original:Value=serde_json::from_str(
+            include_str!("../resources/legacy-state-seed-303.json")).unwrap();
+        original["aliases"]=json!([{"id":"ambiguous-alias","clientId":null,
+            "text":"가상 아크릴","productId":"bando-site-351"}]);
+        original["revision"]=json!(14);
+        let initial=serde_json::to_string(&original).unwrap();
+        let source=Connection::open(&path).unwrap();
+        source.execute_batch("CREATE TABLE app_state(id INTEGER PRIMARY KEY,payload TEXT NOT NULL)").unwrap();
+        source.execute("INSERT INTO app_state(id,payload) VALUES (1,?1)",[&initial]).unwrap();
+        drop(source);
+        let error=super::super::initialize_database(&path).err()
+            .expect("Ambiguous source data must block migration");
+        assert!(error.contains("별칭"),"Unexpected migration error: {error}");
+        let remaining=Connection::open(&path).unwrap();
+        let payload:String=remaining.query_row("SELECT payload FROM app_state WHERE id=1",
+            [],|r|r.get(0)).unwrap();
+        assert_eq!(payload,initial);
+        assert_eq!(schema_version(&remaining).unwrap(),0);
+        drop(remaining);
+
+        let backups=std::fs::read_dir(folder.join("backups")).unwrap()
+            .map(|entry|entry.unwrap().path()).collect::<Vec<_>>();
+        assert_eq!(backups.len(),1);
+        let preserved=Connection::open_with_flags(&backups[0],
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY).unwrap();
+        assert_eq!(preserved.query_row("SELECT payload FROM app_state WHERE id=1",
+            [],|r|r.get::<_,String>(0)).unwrap(),initial);
+        drop(preserved);
+        std::fs::remove_dir_all(folder).unwrap();
+    }
+
+    #[test]
     fn legacy_db_round_trip_preserves_prices_aliases_drafts_frozen_orders_and_receipt_audit(){
         let folder=temp().with_extension("legacy-business-roundtrip");
         std::fs::create_dir_all(&folder).unwrap();
