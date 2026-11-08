@@ -59,3 +59,21 @@ test("factory diamond never leaks into product names, buyer messages, or store e
   assert.ok(current.products.every(p=>!p.name.includes("◆")));
   assert.ok(plan.changes.every(p=>!p.newName.includes("◆")));
 });
+
+test("all 360 curated product names are unbranded while official titles stay traceable", () => {
+  assert.equal(current.products.length, 360);
+  const raw = current.products.filter(p => p.originalName?.startsWith("반도스탠드 "));
+  assert.equal(raw.length, 357);
+  assert.ok(current.products.every(p => !p.name.startsWith("반도스탠드 ")));
+  assert.equal(current.products.find(p => p.siteId==="246").name,
+    "BD Desk JS-3 / 블랙 / 자바라 길이 43cm");
+  assert.equal(current.products.find(p => p.siteId==="255").name,
+    "BD Desk JS-3 / 실버 / 자바라 길이 43cm");
+  assert.equal(current.products.find(p => p.siteId==="254").name,
+    "BD Desk JS-2 / 실버 / 자바라 길이 35cm");
+  assert.equal(current.products.find(p => p.siteId==="310").name,
+    "BD Desk JS-4 / 블랙 / 자바라 길이 60cm");
+  const manager = src("src/ProductManager.tsx");
+  assert.match(manager, /\{p\.name\}/);
+  assert.doesNotMatch(manager, /\{p\.originalName\}/);
+});

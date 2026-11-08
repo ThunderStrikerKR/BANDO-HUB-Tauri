@@ -92,3 +92,5 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Run real React UI audit smoke test
         run: node scripts/receipt-audit-ui-smoke.mjs
+      - name: Verify product manager displays curated names instead of website titles
+        run: node scripts/product-name-ui-smoke.mjs
