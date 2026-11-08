@@ -142,6 +142,98 @@ mod tests {
     }
 
     #[test]
+    fn stored_official_branded_names_migrate_to_curated_names_without_changing_business_data() {
+        let salt = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let base = std::env::temp_dir().join(format!(
+            "bando-original-title-migration-{}-{salt}", std::process::id()
+        ));
+        std::fs::create_dir_all(&base).unwrap();
+        let mut db = initialize_database(&base.join("state.sqlite")).unwrap();
+        let mut state = get_snapshot(&db).unwrap();
+        let sites = ["246", "255", "254", "249"];
+        let mut changed_ids = Vec::new();
+        for product in state["products"].as_array_mut().unwrap() {
+            if sites.iter().any(|site| product["siteId"].as_str() == Some(site)) {
+                product["name"] = product["originalName"].clone();
+                changed_ids.push(product["id"].as_str().unwrap().to_string());
+            }
+            // An employee-edited, still prefixed name must never be overwritten.
+            if product["siteId"] == "310" {
+                product["name"] = json!(
+                    "반도스탠드 BD Desk JS-4 Black 검정 / 직원 직접 수정"
+                );
+            }
+            // Even if the employee set the name back to the original, a recorded
+            // manual name edit is authoritative over automatic cleanup.
+            if product["siteId"] == "245" {
+                product["name"] = product["originalName"].clone();
+                product["priceHistory"] = json!([{
+                    "field": "name", "source": "MANUAL",
+                    "before": "직원 기록 이전 이름", "after": "공식 이름",
+                    "at": "2026-11-09T00:00:00+09:00"
+                }]);
+            }
+        }
+        assert_eq!(changed_ids.len(), sites.len());
+        let prior = state.clone();
+        let revision = state["revision"].as_u64().unwrap();
+        write_snapshot(&mut db, state, revision, false).unwrap();
+
+        assert_eq!(apply(&mut db, &base).unwrap(), 4);
+        let after = get_snapshot(&db).unwrap();
+        let by_site = |site: &str| -> Value {
+            after["products"].as_array().unwrap().iter()
+                .find(|p| p["siteId"].as_str() == Some(site)).unwrap().clone()
+        };
+        assert_eq!(by_site("246")["name"], "BD Desk JS-3 / 블랙 / 자바라 길이 43cm");
+        assert_eq!(by_site("255")["name"], "BD Desk JS-3 / 실버 / 자바라 길이 43cm");
+        assert_eq!(by_site("254")["name"], "BD Desk JS-2 / 실버 / 자바라 길이 35cm");
+        assert_eq!(by_site("249")["name"], "BD Desk TS-3 / 미니형 마이크 스탠드");
+        assert_eq!(by_site("310")["name"],
+            "반도스탠드 BD Desk JS-4 Black 검정 / 직원 직접 수정");
+        assert_eq!(by_site("245")["name"], prior["products"].as_array().unwrap().iter()
+            .find(|p| p["siteId"] == "245").unwrap()["originalName"]);
+
+        for (before, after_product) in prior["products"].as_array().unwrap()
+            .iter().zip(after["products"].as_array().unwrap())
+        {
+            assert_eq!(before["id"], after_product["id"]);
+            assert_eq!(before["originalName"], after_product["originalName"]);
+            assert_eq!(before["variants"], after_product["variants"]);
+            assert_eq!(before["subtitle"], after_product["subtitle"]);
+            assert_eq!(before["priceHistory"], after_product["priceHistory"]);
+        }
+        assert_eq!(after["orders"], prior["orders"]);
+        assert_eq!(after["clients"], prior["clients"]);
+        assert_eq!(after["aliases"], prior["aliases"]);
+        assert_eq!(apply(&mut db, &base).unwrap(), 0);
+        assert_eq!(backup_manager::list_backups(&base).unwrap().len(), 1);
+        drop(db);
+        std::fs::remove_dir_all(base).unwrap();
+    }
+
+    #[test]
+    fn full_legacy_site_titles_normalize_to_all_360_curated_independent_names() {
+        let curated: Value = serde_json::from_str(include_str!(
+            "../resources/state-seed.json"
+        )).unwrap();
+        let mut outdated = curated.clone();
+        let mut official = 0;
+        for product in outdated["products"].as_array_mut().unwrap() {
+            if product["originalName"].as_str().is_some_and(
+                |name| name.starts_with("반도스탠드 ")
+            ) {
+                product["name"] = product["originalName"].clone();
+                official += 1;
+            }
+        }
+        assert_eq!(official, 357);
+        assert_eq!(apply_to_state(&mut outdated).unwrap(), official);
+        assert_eq!(outdated["products"], curated["products"]);
+        assert_eq!(apply_to_state(&mut outdated).unwrap(), 0);
+    }
+
+    #[test]
     fn curated_seed_names_are_idempotent_and_do_not_create_a_backup() {
         let salt = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
         let base = std::env::temp_dir().join(format!(
