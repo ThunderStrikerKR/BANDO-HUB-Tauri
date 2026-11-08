@@ -124,6 +124,9 @@ try {
   await page.addInitScript(
     ({ state, archive, storePath }) => {
       let mode = "ORIGINAL";
+      let auditRecords = structuredClone(archive);
+      const testBackups = new Map();
+      let testBackupSequence = 0;
       const response = (extra = {}) => ({
         active: mode !== "ORIGINAL", mode, ratio: 0.8,
         handle: mode !== "ORIGINAL" ? "123" : undefined, ...extra,
@@ -173,20 +176,47 @@ try {
             return undefined;
           }
           if (command === "state_load") return structuredClone(state);
-          if (command === "backup_create") return "CI-SQLITE-BACKUP";
+          if (command === "backup_create") {
+            const name = "C:\\BANDO_TEST\\developer-test\\backups\\manual-ui-" + (++testBackupSequence) + ".sqlite";
+            testBackups.set(name, { state: structuredClone(state), audit: structuredClone(auditRecords) });
+            return name;
+          }
+          if (command === "backup_list") return [...testBackups.keys()];
+          if (command === "backup_restore") {
+            const entry = testBackups.get(args.filename);
+            if (!entry) throw Error("The selected mock backup does not exist");
+            const previousRevision = state.revision ?? 0;
+            state = structuredClone(entry.state);
+            state.revision = Math.max(previousRevision, state.revision ?? 0) + 1;
+            auditRecords = structuredClone(entry.audit);
+            const undo = "C:\\BANDO_TEST\\developer-test\\backups\\pre-restore-ui-" +
+              (++testBackupSequence) + ".sqlite";
+            testBackups.set(undo, { state: structuredClone(args.__previousState ?? entry.state), audit: [] });
+            window.__testRestoreCount = (window.__testRestoreCount ?? 0) + 1;
+            return undefined;
+          }
           if (command === "save_store_workbook") {
             if (!Array.isArray(args.bytes) || args.bytes.length <= 1000) throw Error("Invalid workbook bytes");
             window.__storeWorkbookSaved = args.bytes.slice(0, 4).join(",") === "80,75,3,4";
             return storePath;
           }
           if (command === "state_save") {
+            const priorOrderIds = new Set(state.orders.map((order) => order.id));
+            for (const order of args.state.orders) {
+              if (order.confirmedAt && !priorOrderIds.has(order.id)) {
+                auditRecords.push({
+                  id: "receipt:" + order.id, orderId: order.id,
+                  record: structuredClone(order.receipt),
+                });
+              }
+            }
             state = structuredClone(args.state);
             state.revision = (state.revision ?? 0) + 1;
             window.__storeCommit = structuredClone(state.workflow.queue.find(
               (q) => q.id === "ci-store-queue"));
             return undefined;
           }
-          if (command === "receipt_archive") return structuredClone(archive);
+          if (command === "receipt_archive") return structuredClone(auditRecords);
           if (command === "choose_excel_directory") return "C:\\BANDO_CI_SELECTED";
           if (command === "open_excel_directory") return undefined;
           if (command === "dock_region_native") return undefined;
@@ -307,6 +337,22 @@ try {
   await productDialog.getByRole("textbox", { name: "추가 상품 검색" }).fill("709");
   await productDialog.getByRole("button", { name: /닫기/ }).click();
   await productDialog.waitFor({ state: "detached" });
+  // Exercise the real React TEST workflow through the same backup/create,
+  // save and restore IPC names used by Tauri. The browser mocks IPC only;
+  // native SQLite persistence and rollback are covered by Rust tests.
+  await page.getByRole("heading", { name: "TEST 백업 및 복원 검증" }).waitFor();
+  await page.getByRole("button", { name: "1. TEST 백업 만들기" }).click();
+  await page.getByText(/검증 기준 백업:/).waitFor();
+  await page.getByRole("button", { name: "2. 가상 주문과 가격 변경" }).click();
+  await page.getByRole("dialog", { name: "작업 확인" })
+    .getByRole("button", { name: "TEST 데이터 생성" }).click();
+  await page.getByRole("heading", { name: "가상 데이터 변경 확인" }).waitFor();
+  await page.getByRole("button", { name: "3. 백업 복원 및 비교" }).click();
+  await page.getByRole("dialog", { name: "작업 확인" })
+    .getByRole("button", { name: "TEST DB 복원" }).click();
+  await page.getByRole("heading", { name: "복원 검증 통과" }).waitFor();
+  await page.waitForFunction(() => window.__testRestoreCount === 1);
+  await page.getByText(/TEST DB 전체 내용 및 접수 감사 기록이 백업 시점과 일치/).waitFor();
   assert.deepEqual(pageErrors, [], "React runtime errors: " + pageErrors.join("\n"));
   console.log("PASS: audit UI, docking, STORE, official URL, isolated developer tests and real Modal (mock IPC)");
 } finally {
