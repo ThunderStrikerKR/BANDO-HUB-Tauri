@@ -267,6 +267,104 @@ mod tests {
         fs::remove_dir_all(base).unwrap();
     }
     #[test]
+    fn guided_test_backup_restore_accepts_real_reception_and_restores_every_sqlite_record() {
+        let base=temp_base();
+        let test_base=base.join("developer-test");
+        fs::create_dir_all(&test_base).unwrap();
+        let mut conn=initialize_database(&test_base.join("bando-hub-test.sqlite")).unwrap();
+        let before=get_snapshot(&conn).unwrap();
+        let backup=backup_manager::manual_backup(&conn,&test_base).unwrap();
+        let mut candidate=before.clone();
+        let product=&before["products"][0];
+        let product_id=product["id"].as_str().unwrap().to_owned();
+        let price_id=product["variants"][0]["id"].as_str().unwrap().to_owned();
+        let old_price=product["variants"][0]["retail"].as_i64().unwrap();
+        let raised=old_price+137;
+        candidate["products"][0]["variants"][0]["retail"]=json!(raised);
+        let mut override_prices=serde_json::Map::new();
+        override_prices.insert(price_id.clone(),json!(raised-37));
+        let client=json!({
+            "id":"backup-drill-synthetic-client","name":"TEST 백업 검증 거래처",
+            "contact":"010-0000-0000","tier":"special",
+            "shippingFeeExcluded":false,"payment":"PREPAID","active":true,
+            "identifiers":"backup-drill-synthetic","overrides":override_prices,
+            "address":"테스트 전용 가상 주소 1","phone":"010-0000-0000","mobile":""
+        });
+        candidate["clients"].as_array_mut().unwrap().push(client.clone());
+        candidate["aliases"].as_array_mut().unwrap().push(json!({
+            "id":"backup-drill-global-alias","clientId":null,
+            "text":"가상 공통 별칭","productId":product_id,"variantId":price_id
+        }));
+        candidate["aliases"].as_array_mut().unwrap().push(json!({
+            "id":"backup-drill-scoped-alias","clientId":"backup-drill-synthetic-client",
+            "text":"가상 거래처 별칭","productId":product_id,"variantId":price_id
+        }));
+        let recipient=json!({
+            "id":"backup-drill-recipient","name":"TEST 가상 수취인",
+            "address":"테스트 전용 가상 배송지 1","phone":"010-0000-0000",
+            "mobile":"","note":"실제 발송 금지",
+            "items":[{
+                "id":"backup-drill-item","productId":product_id,"variantId":price_id,
+                "raw":product["name"],"name":product["name"],
+                "color":product["variants"][0]["color"],"quantity":2,
+                "unitPrice":raised,"origin":product["origin"],
+                "defaulted":false,"issues":[],"url":product["variants"][0]["url"]
+            }]
+        });
+        let now="2026-11-08T11:00:00.000Z";
+        let raw="TEST 전용 가상 발주서";
+        let recipients=json!([recipient.clone()]);
+        let order=json!({
+            "id":"backup-drill-order","clientId":"backup-drill-synthetic-client",
+            "orderType":"DEALER","clientSnapshot":client,"senderSnapshot":client,
+            "raw":raw,"channel":"TEST","recipients":recipients,
+            "shippingFee":0,"applyVat":false,"vatAmount":0,
+            "status":"STATEMENT","notified":false,"paid":false,"postpaidApproved":false,
+            "freightCode":"010","createdAt":now,"updatedAt":now,
+            "receptionVersion":1,"confirmedAt":now,
+            "receipt":{
+                "original":raw,"at":now,"actor":"TEST 검증",
+                "clientId":"backup-drill-synthetic-client","legacy":false
+            },
+            "confirmationSnapshot":{
+                "at":now,"raw":raw,"client":client,"recipients":recipients,
+                "data":{
+                    "id":"backup-drill-order","clientId":"backup-drill-synthetic-client",
+                    "raw":raw,"channel":"TEST","recipients":recipients,"orderType":"DEALER",
+                    "shippingFee":0,"applyVat":false,"vatAmount":0,"status":"STATEMENT",
+                    "notified":false,"paid":false,"postpaidApproved":false,"freightCode":"010",
+                    "createdAt":now,"updatedAt":now
+                }
+            }
+        });
+        candidate["orders"].as_array_mut().unwrap().push(order);
+        candidate["workflow"]["shipments"].as_array_mut().unwrap().push(json!({
+            "id":"backup-drill-shipment","orderId":"backup-drill-order",
+            "recipientId":"backup-drill-recipient","step":1
+        }));
+        candidate["workflow"]["events"].as_array_mut().unwrap().push(json!({
+            "action":"주문 확인 완료","shipmentIds":["backup-drill-shipment"]
+        }));
+        reception::validate_reception(&before,&candidate).unwrap();
+        let saved=write_snapshot(&mut conn,candidate,0,true).unwrap();
+        assert_eq!(saved["revision"],1);
+        assert_eq!(saved["orders"].as_array().unwrap().len(),1);
+        assert_eq!(conn.query_row("SELECT COUNT(*) FROM receipt_archive WHERE id='receipt:backup-drill-order'",
+            [],|r|r.get::<_,i64>(0)).unwrap(),1);
+        let undo=backup_manager::restore_backup(&mut conn,&test_base,&backup).unwrap();
+        assert!(Path::new(&undo).is_file());
+        let mut recovered=get_snapshot(&conn).unwrap();
+        assert_eq!(recovered["revision"],2);
+        recovered["revision"]=before["revision"].clone();
+        assert_eq!(recovered,before);
+        assert_eq!(conn.query_row("SELECT COUNT(*) FROM receipt_archive WHERE id='receipt:backup-drill-order'",
+            [],|r|r.get::<_,i64>(0)).unwrap(),0);
+        relational_store::verify(&conn).unwrap();
+        drop(conn);
+        fs::remove_dir_all(base).unwrap();
+    }
+
+    #[test]
     fn test_reset_preserves_prices_and_archives_old_audit_and_case_runs() {
         let base = temp_base();
         let test_base = base.join("developer-test");
