@@ -87,6 +87,7 @@ export function BackupRestoreDrill({ onRestored }: { onRestored: () => Promise<v
       setChanged({ sample, revision: after.revision ?? -1 });
       setPhase("CHANGED");
       setChecks(result);
+      await onRestored(); // Show the synthetic order in the live TEST order/history views.
       if (result.some((check) => !check.passed)) {
         setError("가상 데이터 확인에 실패했습니다. 백업으로 복원하여 원래 상태를 회복하세요.");
       }
