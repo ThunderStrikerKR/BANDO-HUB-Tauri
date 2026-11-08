@@ -553,10 +553,9 @@ mod tests {
             "#).unwrap();
             conn.execute("INSERT INTO app_state(id,payload) VALUES (1,?1)",
                 [serde_json::to_string(data).unwrap()]).unwrap();
-            conn.execute(
-                "INSERT INTO receipt_archive(id,order_id,record)
-                 VALUES ('receipt:legacy-confirmed','legacy-confirmed',?1)",
-                [data["orders"][1]["receipt"].to_string()]).unwrap();
+            // Old backups can contain the frozen receipt only inside the order
+            // JSON, before an independent receipt_archive row was introduced.
+            // The restore migration must backfill it without changing the order.
             conn
         };
         let historical=create_legacy(&backup_file,&legacy);
@@ -619,6 +618,25 @@ mod tests {
             "SELECT record FROM receipt_archive WHERE id='receipt:legacy-confirmed'",[],
             |r|r.get(0)).unwrap();
         assert_eq!(after_audit,before_audit);
+        relational_store::verify(&live).unwrap();
+
+        // A legacy backup with a *different* receipt under an existing audit ID
+        // is rejected rather than overwriting immutable evidence.
+        let conflict_path=base.join("backups").join("manual-conflicting-audit-v0.sqlite");
+        let conflicting=create_legacy(&conflict_path,&legacy);
+        conflicting.execute(
+            "INSERT INTO receipt_archive(id,order_id,record)
+             VALUES ('receipt:legacy-confirmed','legacy-confirmed',?1)",
+            [r#"{"original":"변조된 가상 접수 원문"}"#]
+        ).unwrap();
+        drop(conflicting);
+        let before_conflict=get_snapshot(&live).unwrap();
+        let failure=restore_backup(&mut live,&base,&conflict_path.to_string_lossy()).unwrap_err();
+        assert!(failure.contains("충돌"),"unexpected conflict response: {failure}");
+        assert_eq!(get_snapshot(&live).unwrap(),before_conflict);
+        assert_eq!(live.query_row(
+            "SELECT record FROM receipt_archive WHERE id='receipt:legacy-confirmed'",[],
+            |r|r.get::<_,String>(0)).unwrap(),before_audit);
         relational_store::verify(&live).unwrap();
         drop(live);
         let reopened=initialize_database(&path).unwrap();
