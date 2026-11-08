@@ -69,7 +69,7 @@ test("factory Logen workbook exports exactly 16 expected columns with preserved 
   assert.equal(sheet.getCell("H2").value,"010");
   assert.equal(sheet.getCell("L2").value,"예시악기");
   assert.equal(sheet.getCell("M2").value,"22300");
-  assert.equal(sheet.getCell("I2").value,"BD 709 3개 / BD 900 1개");
+  assert.equal(sheet.getCell("I2").value,"◆ BD 709 3개 ◆ BD 900 1개");
   assert.deepEqual([...LOGEN_HEADERS], [
     "수하인명", "수하인우편번호", "수하인주소", "수하인전화번호", "수하인핸드폰번호",
     "택배수량", "택배운임", "운임구분", "품목명", "", "메시지", "송하인명",
@@ -165,7 +165,7 @@ test("factory workbook requires explicit bag and wheel configurations on frozen 
   assert.throws(()=>previewFactoryExport(original,["excel:s1:FACTORY"]),/가방 포함/);
   item.name="BD 700 / 가방 포함";
   let report=previewFactoryExport(original,["excel:s1:FACTORY"]);
-  assert.match(report.rows[0].values[8],/BD 700 \/ 가방 포함/);
+  assert.match(report.rows[0].values[8],/◆ BD 700 \/ 가방 포함/);
   product.name="BD 700 / 바퀴 미포함";
   item.name="BD 700";
   assert.throws(()=>previewFactoryExport(original,["excel:s1:FACTORY"]),/바퀴 포함/);
@@ -197,7 +197,7 @@ test("Factory export uses the frozen complete product name without a second colo
   const state = stateFixture();
   state.workflow.queue[0].snapshot.recipient.items[0].name = "BD 709 / 블랙 / 타공 상판";
   const report = previewFactoryExport(state,["excel:s1:FACTORY"]);
-  assert.match(report.rows[0].values[8], /BD 709 \/ 블랙 \/ 타공 상판 3개/);
+  assert.match(report.rows[0].values[8], /◆ BD 709 \/ 블랙 \/ 타공 상판 3개/);
   assert.doesNotMatch(report.rows[0].values[8], /블랙 블랙/);
 });
 
@@ -216,7 +216,7 @@ test("frozen legacy confirmed orders resolve to a precise sale product without r
   item.name="BD 707A / 클리어"; item.quantity=3; item.unitPrice=117777;
   const previous=JSON.stringify(state);
   const result=previewFactoryExport(state,["excel:s1:FACTORY"]);
-  assert.match(result.rows[0].values[8], /BD 707A \/ 클리어 3개/);
+  assert.match(result.rows[0].values[8], /◆ BD 707A \/ 클리어 3개/);
   assert.doesNotMatch(result.rows[0].values[8], /프로스트/);
   assert.equal(JSON.stringify(state),previous);
   assert.equal(item.unitPrice,117777);
@@ -312,4 +312,13 @@ test("frozen factory queue blocks items with no confirmed product or price-recor
   item.productId="product-709";
   delete item.variantId;
   assert.throws(()=>previewFactoryExport(state,["excel:s1:FACTORY"]),/상품 또는 가격 기록 ID/);
+});
+
+test("factory workbook prefixes every item including the first with a diamond and no inter-item slash",()=>{
+  const state=stateFixture();
+  const goods=previewFactoryExport(state,["excel:s1:FACTORY"]).rows[0].values[8];
+  assert.equal(goods,"◆ BD 709 3개 ◆ BD 900 1개");
+  assert.equal(goods.split("◆ ").length-1,2);
+  state.workflow.queue[0].snapshot.recipient.items.pop();
+  assert.equal(previewFactoryExport(state,["excel:s1:FACTORY"]).rows[0].values[8],"◆ BD 709 3개");
 });
