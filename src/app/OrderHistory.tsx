@@ -3,6 +3,7 @@ import { DateNavigator } from "./DateNavigator";
 import { useMemo, useState } from "react";
 import { won } from "../domain";
 import { internalModel } from "../matching";
+import { resolveHistoricalProductReference } from "../historical-product-reference";
 import type { Order, State } from "../types";
 import { Field } from "../ui";
 import { EmptyState, PageHeading } from "../ui/PageHeading";
@@ -90,6 +91,22 @@ export function OrderHistory({
                       row.recipients.map((r) => (
                         <div key={r.id}>
                           {r.name} / {r.address}
+                          {r.items.map((item) => {
+                            const linked = resolveHistoricalProductReference(
+                              state, item.productId, item.variantId,
+                            );
+                            return (
+                              <p key={item.id}>
+                                주문 당시: {item.name} × {item.quantity ?? "수량 확인"}
+                                {linked?.via === "HISTORICAL" && (
+                                  <> / 현재 연결 상품: {linked.product.name}</>
+                                )}
+                                {!linked && item.productId && (
+                                  <> / 상품 연결 확인 필요</>
+                                )}
+                              </p>
+                            );
+                          })}
                           {state.workflow?.shipments
                             .filter((s) => s.orderId === row.order.id && s.recipientId === r.id)
                             .map((ship) => (
