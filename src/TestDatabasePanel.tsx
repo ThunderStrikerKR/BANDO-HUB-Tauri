@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { BackupRestoreDrill } from "./developer/BackupRestoreDrill";
 import { confirmAction } from "./dialogs";
 import type { Api, State } from "./types";
 export function TestDatabasePanel({ state, onReset }: { state: State; onReset: () => Promise<void> }) {
@@ -77,6 +78,7 @@ export function TestDatabasePanel({ state, onReset }: { state: State; onReset: (
         백업 후 테스트 데이터 초기화
       </button>
       <p className="form-error">{error}</p>
+      <BackupRestoreDrill onRestored={onReset} />
     </section>
   );
 }
