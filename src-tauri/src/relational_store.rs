@@ -397,6 +397,23 @@ pub(super) fn migrate(conn:&mut Connection)->Result<(),String>{
 
 pub(super) fn verify(conn:&Connection)->Result<(),String>{
     if !active(conn)? { return Ok(()); }
+    // A price record points to an existing product via FK, but that alone
+    // does not ensure EVERY product still has its single required price row.
+    let missing_price:i64=conn.query_row(
+        "SELECT COUNT(*) FROM core_products p LEFT JOIN core_product_prices pr
+         ON pr.product_id=p.id WHERE pr.product_id IS NULL",
+        [],|r|r.get(0)).map_err(err)?;
+    if missing_price>0 {
+        return Err(format!("독립 상품 중 가격 기록이 누락된 항목이 {missing_price}개입니다."));
+    }
+    let mismatched_id:i64=conn.query_row(
+        "SELECT COUNT(*) FROM core_product_prices
+         WHERE json_extract(payload,'$.id') IS NULL OR
+               json_extract(payload,'$.id')<>price_record_id",
+        [],|r|r.get(0)).map_err(err)?;
+    if mismatched_id>0 {
+        return Err(format!("상품 가격 기록의 원본 식별자가 다른 항목이 {mismatched_id}개입니다."));
+    }
     let broken:Option<String>=conn.query_row(
         "SELECT \"table\" || ':' || rowid FROM pragma_foreign_key_check LIMIT 1",
         [],|r|r.get(0)).optional().map_err(err)?;
@@ -633,6 +650,24 @@ mod tests {
             [],|r|r.get::<_,String>(0)).unwrap(),initial);
         drop(preserved);
         std::fs::remove_dir_all(folder).unwrap();
+    }
+
+    #[test]
+    fn detects_missing_or_mismatched_product_price_rows_even_if_foreign_keys_pass(){
+        let path=temp();
+        let conn=super::super::initialize_database(&path).unwrap();
+        let product_id=conn.query_row("SELECT id FROM core_products ORDER BY position LIMIT 1",
+            [],|r|r.get::<_,String>(0)).unwrap();
+        conn.execute("DELETE FROM core_product_prices WHERE product_id=?1",[&product_id]).unwrap();
+        assert!(verify(&conn).unwrap_err().contains("가격 기록이 누락"));
+        drop(conn);close(&path);
+
+        let other=temp();
+        let conn=super::super::initialize_database(&other).unwrap();
+        conn.execute("UPDATE core_product_prices SET price_record_id='corrupted-source-id'
+            WHERE product_id=?1",[&product_id]).unwrap();
+        assert!(verify(&conn).unwrap_err().contains("원본 식별자"));
+        drop(conn);close(&other);
     }
 
     #[test]
