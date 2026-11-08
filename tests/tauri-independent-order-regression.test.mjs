@@ -106,17 +106,18 @@ test("T09: replacing an item with another independent product updates ID and pri
   assert.notEqual(before.productId, after.productId);
 });
 
-test("T10 KNOWN-ISSUE baseline: legacy requiresOption blocks manual implicit price linking", (t) => {
+test("T10: unresolved source configuration cannot be manually linked to a price record", () => {
   const product = structuredClone(bySite("48", "타공 상판"));
   product.requiresOption = true;
   assert.equal(product.variants.length, 1);
   const item = itemFromProduct(product, client, product.variants[0].color, 2);
-  if (item.variantId === null && item.unitPrice === null) {
-    t.diagnostic("REPRODUCED: one-price product loses variantId and unitPrice when requiresOption=true");
-  } else {
-    t.diagnostic("NOT REPRODUCED: price record remained linked");
-  }
+  assert.equal(item.variantId, null);
+  assert.equal(item.unitPrice, null);
+  assert.ok(item.issues.some((issue) => issue.includes("상품 구성 미확정")));
   assert.equal(item.productId, product.id);
+  const explicit = itemFromProduct(product, client, product.variants[0].color, 2, product.variants[0].id);
+  assert.equal(explicit.variantId, null, "An explicit internal ID must not bypass source review");
+  assert.equal(explicit.unitPrice, null);
 });
 
 test("T11: a product with zero or two price records is rejected by validation", () => {
@@ -136,7 +137,7 @@ test("T12: special dealer price uses the sole price-record identifier", () => {
   assert.equal(item.unitPrice, 43210);
 });
 
-test("T13 KNOWN-ISSUE baseline: compare auto parse against manual legacy option guard", (t) => {
+test("T13: automatic parse honors the same unresolved-product guard as manual entry", () => {
   const product = structuredClone(bySite("48", "타공 상판"));
   product.id = "synthetic-unique-product";
   product.code = "BD 987XY";
@@ -151,11 +152,11 @@ test("T13 KNOWN-ISSUE baseline: compare auto parse against manual legacy option 
   const manual = itemFromProduct(product, client, product.variants[0].color, 1);
   const automatically = itemsFor("BD 987XY 1개", state)[0];
   assert.ok(automatically, "Synthetic order should produce an item for comparison");
-  const discrepancy = manual.variantId === null && automatically.variantId === product.variants[0].id;
-  t.diagnostic(discrepancy
-    ? "REPRODUCED: automatic parsing linked a price record blocked by manual selection"
-    : "NOT REPRODUCED: check whether both paths applied the same safeguards");
-  assert.ok(automatically.variantId === null || automatically.variantId === product.variants[0].id);
+  assert.equal(manual.variantId, null);
+  assert.equal(automatically.variantId, null, "Parser must not bypass unresolved configuration");
+  assert.equal(automatically.unitPrice, null);
+  assert.ok(automatically.issues.length > 0);
+  assert.ok(automatically.issues.some((issue) => issue.includes("미확정") || issue.includes("다시 선택")));
 });
 
 test("T14: ambiguous official-page options are refused before write", () => {
