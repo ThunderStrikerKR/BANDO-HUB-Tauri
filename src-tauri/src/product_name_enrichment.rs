@@ -197,6 +197,24 @@ pub(super) fn apply_to_state(state: &mut Value) -> Result<usize, String> {
         }
     }
 
+    // A separated sale item must not list all other colors as its subtitle.
+    // Preserve any description the employee has already changed.
+    for product in products.iter_mut() {
+        let id = product["id"].as_str().unwrap_or("");
+        if [
+            "sku:bando-site-237:bando-237-P00000JC000H",
+            "sku:bando-site-237:bando-237-P00000JC000I",
+            "sku:bando-site-237:bando-237-P00000JC000J",
+        ].contains(&id)
+            && product["subtitle"].as_str() == Some("다크그린, 와인, 그레이 옵션")
+        {
+            if let Some(object) = product.as_object_mut() {
+                object.remove("subtitle");
+                changed += 1;
+            }
+        }
+    }
+
     // Never silently claim completion while a visible active product still
     // carries the same unwanted prefix. All writes happen only after this.
     if let Some(product) = products.iter().find(|p| {
