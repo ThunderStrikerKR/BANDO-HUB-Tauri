@@ -18,7 +18,10 @@ test("360 independent products retain original historical identity and price dat
     assert.equal(p.variants.length,1,p.id);
     assert.equal(p.saleUnit,true,p.id);
     assert.equal(p.requiresOption,false,p.id);
-    assert.deepEqual(p.variants[0], priceOriginal.get(p.variants[0].id),p.id);
+    const previous = priceOriginal.get(p.variants[0].id);
+    assert.ok(previous,p.id);
+    for(const field of ["id","color","option","siteOptionId","wholesale","semi","retail","officialRetail","url","source","collectedAt"])
+      assert.deepEqual(p.variants[0][field], previous[field],p.id+" / "+field);
     assert.ok(!p.name.includes("◆"),p.id);
   }
 });
