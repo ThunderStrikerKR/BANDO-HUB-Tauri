@@ -318,6 +318,38 @@ fn state_save(db: State<'_, Database>, state: Value) -> Result<(), String> {
     Ok(())
 }
 
+fn validate_color_guidance(state: &Value) -> Result<(), String> {
+    let Some(config) = state["settings"].get("colorGuidanceGroups") else { return Ok(()); };
+    let groups = config.as_object().ok_or("대표색상 그룹 저장 형식 오류")?;
+    let products = state["products"].as_array().ok_or("상품 목록 누락")?;
+    let mut names = std::collections::HashSet::new();
+    let mut assigned = std::collections::HashSet::new();
+    for (id, group) in groups {
+        let name = group["name"].as_str().unwrap_or("").trim();
+        let color = group["representativeColor"].as_str().unwrap_or("").trim();
+        if id.trim().is_empty() || name.is_empty() || color.is_empty()
+            || color == "단일" || color == "색상 미표기" {
+            return Err("그룹 이름과 대표색상을 입력하세요.".into());
+        }
+        if !names.insert(name.to_lowercase()) { return Err("그룹 이름이 중복됩니다.".into()); }
+        let members = group["productIds"].as_array().ok_or("소속 상품 형식 오류")?;
+        if members.is_empty() { return Err("그룹에 상품을 등록하세요.".into()); }
+        for member in members {
+            let pid = member.as_str().ok_or("상품 ID 오류")?;
+            if !assigned.insert(pid.to_owned()) {
+                return Err("같은 상품은 두 대표색상 그룹에 등록할 수 없습니다.".into());
+            }
+            if !products.iter().any(|p| p["id"].as_str() == Some(pid)
+                && p["active"] != false && p["deletedAt"].as_str().is_none()
+                && p["supersededBy"].as_str().is_none()
+                && p["variants"].as_array().is_some_and(|v| v.len() == 1)) {
+                return Err("활성 독립 상품만 그룹에 등록할 수 있습니다.".into());
+            }
+        }
+    }
+    Ok(())
+}
+
 // Save just the edited settings keys. Order/product updates do not invalidate
 // this edit, but a simultaneous edit of the very same settings key is rejected.
 #[tauri::command]
@@ -329,7 +361,7 @@ fn settings_patch(db: State<'_, Database>, changes: Value, expected: Value) -> R
         return Err("격리 작업공간의 Excel 보관 경로는 변경할 수 없습니다.".into());
     }
     let allowed = ["senderPostcode", "excelDirectory", "factoryReplyDirectory",
-        "modelRepresentatives", "modelFamilies", "kakaoTitleMappings", "kakaoTitleEnabled",
+        "modelRepresentatives", "modelFamilies", "colorGuidanceGroups", "kakaoTitleMappings", "kakaoTitleEnabled",
         "panelRatios", "receptionVerticalRatio", "operatorName", "uiScale", "accounts",
         "defaultAccountId", "senderName", "senderAddress", "senderPhone", "senderMobile",
         "rounding", "brandAccounts", "specialPolicy"];
@@ -352,6 +384,7 @@ fn settings_patch(db: State<'_, Database>, changes: Value, expected: Value) -> R
             else { settings.insert(field.clone(), updated.clone()); }
         }
     }
+    if changes.contains_key("colorGuidanceGroups") { validate_color_guidance(&state)?; }
     if ["accounts", "defaultAccountId", "brandAccounts"].iter().any(|k| changes.contains_key(*k)) {
         validate_accounts(&state)?;
     }

@@ -2,6 +2,7 @@ import { messages, orderClient, totals, unassignedClient, validProductUrl, won }
 import { groupedCustomerQuestions } from "./customer-questions.js";
 import { customerModel } from "./matching.js";
 import { colorLabel } from "./product-models.js";
+import { colorGuidanceQuestion } from "./color-guidance.js";
 import type { Order, Price, State, ValidationIssue } from "./types.js";
 import { orderIssues } from "./validation.js";
 import {
@@ -148,6 +149,7 @@ export function hubMessages(
     (i) => !(amounts.every((a) => a.shipping !== null) && i === "운임 확인 필요"),
   );
   if (amounts.some((a) => a.shipping === null)) paymentIssues.push("배송 건별 운임 확인 필요");
+  const colorQuestions = recipients.flatMap(r => r.items.map(colorGuidanceQuestion)).filter(Boolean);
   const optionLinks = links.options
     ? recipients
         .flatMap((r) => [
@@ -165,10 +167,12 @@ export function hubMessages(
     blocks,
     payment: parts.join("\n"),
     options:
-      (customer.length ? customer.join("\n") : "주문 내용 확인 부탁드립니다.") +
+      (customer.length || colorQuestions.length
+        ? [...customer, ...colorQuestions].join("\n")
+        : "주문 내용 확인 부탁드립니다.") +
       (optionLinks ? "\n\n" + optionLinks : ""),
     paymentIssues: [...new Set(paymentIssues)],
-    customerCount: customer.length,
+    customerCount: customer.length + colorQuestions.length,
     mixedVat: mixed,
     optionsIssues,
   };

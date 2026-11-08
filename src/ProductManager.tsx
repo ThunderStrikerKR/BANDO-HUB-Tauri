@@ -1,10 +1,9 @@
-import { RepresentativeManager } from "./RepresentativeManager";
+import { ColorGuidanceManager } from "./ColorGuidanceManager";
 import { CategoryManager } from "./CategoryManager";
 import { categoryPath } from "./category-tree";
 import { catalogFromCategory, withCatalogRoots } from "./category-roots";
 import { BrandCombobox, ProductCategoryPicker } from "./ProductDetailComponents";
 import { SALE_STATES } from "./sale-status";
-import { isRepresentative } from "./model-families";
 import { useEffect, useMemo, useState } from "react";
 import { AliasManager } from "./AliasManager";
 import { ClassificationFilters, RegistrySettings } from "./Classification";
@@ -186,7 +185,7 @@ export function ProductManager({
         {[
           "상품 목록",
           "카테고리 관리",
-          "모델군 관리",
+          "대표색상 관리",
           "별칭 관리",
           "브랜드 관리",
           "상품 동기화",
@@ -203,7 +202,7 @@ export function ProductManager({
       <div className="management-search">
         <input
           aria-label="상품 검색"
-          placeholder={section === "카테고리 관리" ? "카테고리 이름 또는 전체 경로 검색" : section === "모델군 관리" ? "모델 코드 또는 상품명 검색" : "모델명 또는 상품명 검색"}
+          placeholder={section === "카테고리 관리" ? "카테고리 이름 또는 전체 경로 검색" : section === "대표색상 관리" ? "그룹 이름 또는 상품명 검색" : "모델명 또는 상품명 검색"}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -292,9 +291,6 @@ export function ProductManager({
                             <div className="product-title-line">
                               <b>
                                 {p.name}{" "}
-                                {isRepresentative(state, p) && (
-                                  <small className="representative-badge">대표</small>
-                                )}
                               </b>
                               <span>{p.subtitle}</span>
                               {p.colorStatus !== "NOT_REQUIRED" &&
@@ -332,7 +328,7 @@ export function ProductManager({
         {section === "카테고리 관리" && (
           <CategoryManager state={state} onSave={onSave} onNotice={onNotice} query={search} />
         )}
-        {section === "모델군 관리" && <RepresentativeManager state={state} onRefresh={onRefresh} query={search} />}
+        {section === "대표색상 관리" && <ColorGuidanceManager state={state} onRefresh={onRefresh} query={search} />}
         {section === "별칭 관리" && (
           <AliasManager state={state} onSave={onSave} onNotice={onNotice} />
         )}

@@ -1,4 +1,5 @@
 import { validProductUrl } from "./domain.js";
+import { colorGuidanceQuestion } from "./color-guidance.js";
 import { hubMessages } from "./hub-messages.js";
 import { groupAccount, groupOrder, groupStep, workflowIssues } from "./workflow.js";
 import type { State } from "./types.js";
@@ -31,7 +32,8 @@ export function automaticMessage(state: State, gid: string) {
           return [(row.items.find((item) => item.id === i.itemId)?.name || "상품") + " 모델 / 옵션"];
         return [];
       });
-    if (labels.length) {
+    const colorQuestions = row.items.map(colorGuidanceQuestion).filter(Boolean);
+    if (labels.length || colorQuestions.length) {
       const links = row.items
         .filter((i) => i.modelProposal?.required && validProductUrl(i.url))
         .map((i) => i.name + "\n" + i.url);
@@ -39,6 +41,7 @@ export function automaticMessage(state: State, gid: string) {
         [
           `${lines.length + 1}. ${row.name || "수취인"}님: ${[...new Set(labels)].join(", ")}`,
           ...new Set(links),
+          ...colorQuestions,
         ].join("\n"),
       );
     }

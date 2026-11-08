@@ -133,6 +133,7 @@ export interface Item {
   temporary?: boolean;
   recognitionReason?: string;
   modelProposal?: { original: string; required: boolean };
+  colorSuggestion?: { groupId: string; color: string };
   manuallyConfirmed?: boolean;
   quantityConfirmed?: boolean;
   productCandidates?: Candidate[];
@@ -398,6 +399,7 @@ export interface Settings {
   factoryReplyDirectory?: string;
   modelRepresentatives?: Record<string, { productId: string; variantId: string }>;
   modelFamilies?: Record<string, { code: string; productIds: string[] }>;
+  colorGuidanceGroups?: Record<string, { name: string; productIds: string[]; representativeColor: string }>;
   kakaoTitleMappings?: Record<
     string,
     { clientId: string; updatedAt: string; actor: string; ambiguous?: boolean }

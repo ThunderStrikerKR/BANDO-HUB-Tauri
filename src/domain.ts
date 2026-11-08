@@ -593,11 +593,7 @@ export function messages(
     ...items.map((i) => `${label(i)} * ${i.quantity ?? "?"}개`),
     "",
     ...questions,
-    ...(items.some((i) => i.defaulted && normalizeColor(i.color) === "Black")
-      ? [
-          "별도 색상 지정이 없는 상품은 기본 색상인 검정으로 출고됩니다. 다른 색상을 원하시면 말씀해 주세요.",
-        ]
-      : []),
+
     "",
     "주문 내용 확인 후 회신 부탁드립니다.",
     urls(links.options),

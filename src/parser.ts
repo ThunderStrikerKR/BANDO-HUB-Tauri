@@ -1,4 +1,4 @@
-import { baseModelCandidates, modelGroup, representative } from "./model-families.js";
+import { suggestGroupColor } from "./color-guidance.js";
 import {
   itemFromProduct,
   normalizeCode,
@@ -552,10 +552,8 @@ function parseLegacy(raw: string, selectedClient: Client | undefined, state: Sta
           (t) => t && line.toLowerCase().includes(t.toLowerCase()),
         ),
       ) ?? false;
-    const familySuggestions =
-      !choices.length && !aliases.length ? baseModelCandidates(line, state) : [];
     const family = productFamily(line),
-      generic = !!family && !choices.length && !aliases.length && !familySuggestions.length;
+      generic = !!family && !choices.length && !aliases.length;
     const qs = quantities(line),
       unknownModel = line.match(/(?:BD\s*)?\d{3}[A-Za-z0-9-]*/i);
     if (!qs.length && choices.length) {
@@ -597,8 +595,7 @@ function parseLegacy(raw: string, selectedClient: Client | undefined, state: Sta
       !qs.length &&
       !unknownModel &&
       !generic &&
-      !knownBrandText &&
-      !familySuggestions.length
+      !knownBrandText
     ) {
       if (person(remainder.trim())) {
         if (
@@ -662,8 +659,6 @@ function parseLegacy(raw: string, selectedClient: Client | undefined, state: Sta
       }
     }
 
-    const baseCandidates = familySuggestions;
-    if (baseCandidates.length) choices = baseCandidates;
     let brandedCategory = false;
     if (!choices.length && !aliases.length && knownBrandText) {
       choices = ps.filter((p) =>
@@ -709,11 +704,6 @@ function parseLegacy(raw: string, selectedClient: Client | undefined, state: Sta
       // Zero or multiple matches are unresolved; never pick a different item.
       if (proven.length) choices = proven;
     }
-    choices.sort(
-      (a, b) =>
-        Number(representative(state, modelGroup(state, b).id)?.id === b.id) -
-        Number(representative(state, modelGroup(state, a).id)?.id === a.id),
-    );
     const codeChoices = choices.slice();
     const alias = aliases[0];
     if (!choices.length && alias) {
@@ -726,18 +716,8 @@ function parseLegacy(raw: string, selectedClient: Client | undefined, state: Sta
         )
       : choices;
     let p = filtered.length === 1 ? filtered[0] : undefined;
-    if (!p && !explicit && !choices.some((p) => p.catalog === "BANDOMALL")) {
-      p = choices.find((p) => p.id === alias?.productId);
-      if (!p) {
-        const preferred = choices.filter(
-          (candidate) =>
-            representative(state, modelGroup(state, candidate).id)?.id === candidate.id,
-        );
-        const defaults = choices.filter((candidate) => candidate.isDefaultSale);
-        if (preferred.length === 1) p = preferred[0];
-        else if (defaults.length === 1) p = defaults[0];
-      }
-    }
+    if (!p && !explicit && alias)
+      p = choices.find(candidate => candidate.id === alias.productId);
     const exact = explicit
         ? codeChoices.filter((p) =>
             p.variants.some((v) => normalizeColor(v.color) === normalizeColor(explicit!)),
@@ -772,14 +752,7 @@ function parseLegacy(raw: string, selectedClient: Client | undefined, state: Sta
         unknownModel?.[0] ?? line.replace(/\s*\d+\s*(개|대).*$/, ""),
         state,
       );
-    const ambiguousOptions =
-      !explicit &&
-      !alias &&
-      (baseCandidates.length > 0 ||
-        (choices.length > 1 &&
-          choices.some(
-            (candidate) => !!state.settings.modelRepresentatives?.[modelGroup(state, candidate).id],
-          )));
+    const ambiguousOptions = !explicit && !alias && choices.length > 1;
     if (ambiguousOptions) p = undefined;
     if (brandedCategory) p = undefined;
     let item: Item;
@@ -814,7 +787,7 @@ function parseLegacy(raw: string, selectedClient: Client | undefined, state: Sta
       };
     if (ambiguousOptions)
       item.recognitionReason =
-        "기본 모델을 인식했습니다. 대표모델을 우선 추천하며 실제 SKU를 확인하세요.";
+        "여러 독립 상품 후보가 있습니다. 실제 상품과 색상을 확인하세요.";
     else if (!p && choices.length > 1 && !generic)
       item.recognitionReason = "등록된 모델명에 여러 SKU/옵션이 있습니다. 실제 SKU를 확인하세요.";
     item.match = {
@@ -858,6 +831,15 @@ function parseLegacy(raw: string, selectedClient: Client | undefined, state: Sta
         item.unitPrice = resolvePrice(p, v.id, client);
         item.url = v.url;
       }
+    }
+    // Manual color suggestion is outbound advice only, never SKU approval.
+    const guidance = !explicit && !conflict && !categoryMismatch && !generic && !brandedCategory
+      ? suggestGroupColor(state, codeChoices.length ? codeChoices : aliasProducts)
+      : undefined;
+    if (guidance) {
+      item.colorSuggestion = guidance;
+      if (item.productId && item.variantId)
+        item.issues = [...new Set([...item.issues, "대표색상 안내 후 고객 확인 필요"])];
     }
     item.raw = line;
     item.quantityConfirmed = confirmed;
