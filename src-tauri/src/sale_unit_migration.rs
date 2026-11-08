@@ -39,6 +39,8 @@ pub(super) fn transform(mut state:Value)->Result<Value,String>{
             return Err(format!("상품 {id}에 가격 기록이 없습니다."));
         }
         affected.insert(id.clone());
+        let historic_price_ids:HashSet<&str>=variants.iter()
+            .filter_map(|value|value["id"].as_str()).collect();
         for v in variants {
             let vid=ident(v,"기존 가격 기록")?.to_string();
             let template=by_legacy.get(&(id.clone(),vid.clone()))
@@ -53,6 +55,18 @@ pub(super) fn transform(mut state:Value)->Result<Value,String>{
             unit["modelCodes"]=template["modelCodes"].clone();
             unit["defaultColor"]=v["color"].clone();
             unit["variants"]=json!([v]);
+            // A parent site listing may have price edits for several configurations.
+            // Keep each variant-specific audit entry with the matching sale product
+            // rather than duplicating another product's price history. Histories
+            // unrelated to a price-record ID remain shared product metadata.
+            if let Some(history)=p["priceHistory"].as_array(){
+                let relevant=history.iter().filter(|entry|{
+                    let field=entry["field"].as_str().unwrap_or("");
+                    let prefix=field.split('.').next().unwrap_or("");
+                    !historic_price_ids.contains(prefix)||prefix==vid
+                }).cloned().collect::<Vec<_>>();
+                unit["priceHistory"]=json!(relevant);
+            }
             unit["saleUnit"]=json!(true);
             unit["requiresOption"]=json!(false);
             if unit.get("originalName").is_none(){
@@ -199,6 +213,14 @@ mod tests{
             "source":"MANUAL","at":"2026-11-08T00:00:00+09:00"
         }]);
         let original_price_records=old["products"][pos]["variants"].clone();
+        old["products"][pos]["priceHistory"].as_array_mut().unwrap().push(json!({
+            "field":format!("{second}.semi"),"before":null,"after":53873,
+            "source":"XLSX","at":"2026-11-08T01:00:00+09:00"
+        }));
+        old["products"][pos]["priceHistory"].as_array_mut().unwrap().push(json!({
+            "field":"name","before":"기존 이름","after":"수정된 이름",
+            "source":"MANUAL","at":"2026-11-08T02:00:00+09:00"
+        }));
         let original_history=old["products"][pos]["priceHistory"].clone();
         let override_amount=38291;
         let mut overrides=serde_json::Map::new();
@@ -255,8 +277,15 @@ mod tests{
         assert_ne!(a["id"],b["id"]);
         assert_eq!(a["variants"][0],original_price_records[0]);
         assert_eq!(b["variants"][0],original_price_records[1]);
-        assert_eq!(a["priceHistory"],original_history);
-        assert_eq!(b["priceHistory"],original_history);
+        let ah=a["priceHistory"].as_array().unwrap();
+        let bh=b["priceHistory"].as_array().unwrap();
+        assert_eq!(original_history.as_array().unwrap().len(),3);
+        assert_eq!(ah.len(),2);
+        assert_eq!(bh.len(),2);
+        assert_eq!(ah[0]["field"],format!("{first}.retail"));
+        assert_eq!(bh[0]["field"],format!("{second}.semi"));
+        assert_eq!(ah[1]["field"],"name");
+        assert_eq!(bh[1]["field"],"name");
         assert_eq!(migrated["clients"],original_clients);
         assert_eq!(migrated["clients"][0]["overrides"][first.as_str()],override_amount);
         assert_eq!(migrated["orders"][0]["recipients"][0]["items"][0]["productId"],b["id"]);
