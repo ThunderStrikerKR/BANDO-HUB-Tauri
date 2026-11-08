@@ -13,8 +13,14 @@ const compiled = ts.transpileModule(read("src/factory-export.ts"), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
 }).outputText;
 const exported = {};
+const referenceCode = ts.transpileModule(read("src/historical-product-reference.ts"), {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+}).outputText;
+const referenceExports = {};
+vm.runInThisContext("(function(exports) {\n" + referenceCode + "\n})")(referenceExports);
 const load = vm.runInThisContext("(function(exports, require, crypto, structuredClone) {\n" + compiled + "\n})");
-load(exported, require, webcrypto, structuredClone);
+load(exported, (id) => id === "./historical-product-reference.js" ? referenceExports : require(id),
+  webcrypto, structuredClone);
 const { previewFactoryExport, createFactoryWorkbook, recordFactoryExport, LOGEN_HEADERS } = exported;
 
 function stateFixture() {
@@ -180,4 +186,63 @@ test("Factory export uses the frozen complete product name without a second colo
   const report = previewFactoryExport(state,["excel:s1:FACTORY"]);
   assert.match(report.rows[0].values[8], /BD 709 \/ 블랙 \/ 타공 상판 3개/);
   assert.doesNotMatch(report.rows[0].values[8], /블랙 블랙/);
+});
+
+test("frozen legacy confirmed orders resolve to a precise sale product without rewriting the factory Excel item",()=>{
+  const state=stateFixture();
+  const reference=JSON.parse(read("src-tauri/resources/state-seed.json"));
+  const oldId="bando-site-351",priceId="bando-351-P00000NN000B";
+  const matchedId=reference.productMappings[oldId+"|"+priceId];
+  const linked=reference.products.find((p)=>p.id===matchedId);
+  assert.ok(linked);
+  state.products=[structuredClone(linked)];
+  state.productMappings={ [oldId+"|"+priceId]:matchedId };
+  state.orders[0].confirmedAt="2026-11-07T01:00:00+09:00";
+  const item=state.workflow.queue[0].snapshot.recipient.items[0];
+  item.productId=oldId; item.variantId=priceId;
+  item.name="BD 707A / 클리어"; item.quantity=3; item.unitPrice=117777;
+  const previous=JSON.stringify(state);
+  const result=previewFactoryExport(state,["excel:s1:FACTORY"]);
+  assert.match(result.rows[0].values[8], /BD 707A \/ 클리어 3개/);
+  assert.doesNotMatch(result.rows[0].values[8], /프로스트/);
+  assert.equal(JSON.stringify(state),previous);
+  assert.equal(item.unitPrice,117777);
+});
+
+test("an unresolved or forged legacy product map blocks factory export, never guesses by model",()=>{
+  const state=stateFixture();
+  const seed=JSON.parse(read("src-tauri/resources/state-seed.json"));
+  const legacyId="bando-site-351",goodPrice="bando-351-P00000NN000B";
+  const item=state.workflow.queue[0].snapshot.recipient.items[0];
+  item.productId=legacyId; item.variantId=goodPrice;
+  item.name="BD 707A / 클리어";
+  assert.throws(()=>previewFactoryExport(state,["excel:s1:FACTORY"]),/상품 ID와 가격 기록 ID/);
+  const linkedId=seed.productMappings[legacyId+"|"+goodPrice];
+  const linked=seed.products.find((p)=>p.id===linkedId);
+  state.products=[structuredClone(linked)];
+  state.productMappings={[legacyId+"|"+goodPrice]:linkedId};
+  assert.doesNotThrow(()=>previewFactoryExport(state,["excel:s1:FACTORY"]));
+  item.variantId="INVALID";
+  assert.throws(()=>previewFactoryExport(state,["excel:s1:FACTORY"]),/상품 ID와 가격 기록 ID/);
+  item.variantId=goodPrice;
+  state.productMappings={[legacyId+"|"+goodPrice]:"other-product"};
+  assert.throws(()=>previewFactoryExport(state,["excel:s1:FACTORY"]),/상품 ID와 가격 기록 ID/);
+  state.productMappings={[legacyId+"|"+goodPrice]:linkedId};
+  state.products[0].sourceProductId="not-the-original-parent";
+  assert.throws(()=>previewFactoryExport(state,["excel:s1:FACTORY"]),/상품 ID와 가격 기록 ID/);
+});
+
+test("legacy wheel configuration mapping does not invent a missing distinction in the frozen item",()=>{
+  const state=stateFixture();
+  const seed=JSON.parse(read("src-tauri/resources/state-seed.json"));
+  const oldId="bando-site-136";
+  const mapped=seed.products.find((p)=>p.siteId==="136" && /바퀴 미포함/.test(p.name));
+  assert.ok(mapped);
+  state.products=[structuredClone(mapped)];
+  state.productMappings={[oldId+"|"+mapped.variants[0].id]:mapped.id};
+  const item=state.workflow.queue[0].snapshot.recipient.items[0];
+  item.productId=oldId;item.variantId=mapped.variants[0].id;item.name="BD Z-2";
+  assert.throws(()=>previewFactoryExport(state,["excel:s1:FACTORY"]),/바퀴 포함 \/ 미포함/);
+  item.name="BD Z-2 / 바퀴 미포함";
+  assert.doesNotThrow(()=>previewFactoryExport(state,["excel:s1:FACTORY"]));
 });
