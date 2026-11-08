@@ -79,13 +79,25 @@ try {
   assert.ok(content.includes("BD Desk JS-3 / 실버 / 자바라 길이 43cm"));
   await page.getByRole("textbox",{name:"상품 검색"}).fill("Desk TS-");
   for(const [model,length] of [["1","15"],["2","22"],["3","32"]]) {
-    await rows.filter({hasText:`BD Desk TS-${model} / Bar 길이 ${length}cm`})
+    await rows.filter({hasText:`BD Desk TS-${model} / 실버 / Bar 길이 ${length}cm`})
       .first().waitFor();
   }
   let tableText = await table.innerText();
   assert.ok(!tableText.includes("미니형 마이크 스탠드"));
   assert.ok(!tableText.includes("색상 확인 필요"));
   console.log("PASS UI: TS lengths appear in products and no invented color prompt");
+
+  for (const [query,expected] of [
+    ["Desk IS-3","BD Desk IS-3 / 블랙 / Bar 길이 26cm"],
+    ["Desk-BTS","BD Desk-BTS / 블랙 / 높이 27cm"],
+    ["FloorJS-2BK","BD FloorJS-2BK / 블랙 / 높이 35cm"],
+    ["Floor TS-1","BD Floor TS-1 / 실버 / 높이 17cm"],
+    ["Floor-BTS","BD Floor-BTS / 블랙 / 높이 27cm"],
+  ]) {
+    await page.getByRole("textbox",{name:"상품 검색"}).fill(query);
+    await rows.filter({hasText:expected}).first().waitFor();
+  }
+  console.log("PASS UI: DESK/FLOOR reference models render normalized color and measured dimensions");
 
   await page.getByRole("textbox",{name:"상품 검색"}).fill("뮤직");
   await rows.filter({hasText:"뮤직 트레이 / 다크 그린"}).first().waitFor();

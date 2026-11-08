@@ -154,6 +154,71 @@ pub(super) fn apply_to_state(state: &mut Value) -> Result<usize, String> {
         changed += 1;
     }
 
+    // User-provided DESK/FLOOR specification tables: 18 models, 21
+    // independently sold color-specific items. Update only recognized
+    // default labels with exact product/price/source identifiers.
+    // Bar length and overall height are different measurements (IS-3).
+    let stand_specs: Value = serde_json::from_str(include_str!(
+        "../resources/microphone-stand-specifications-20261109.json"
+    )).map_err(err)?;
+    let stand_items = stand_specs["items"].as_array()
+        .ok_or("마이크 스탠드 규격 목록이 누락됐습니다.")?;
+    for spec in stand_items {
+        let Some(id) = spec["id"].as_str() else {
+            return Err("마이크 스탠드 규격의 상품 ID가 누락됐습니다.".into());
+        };
+        let Some(reference) = catalog_by_id.get(id) else {
+            return Err(format!("마이크 스탠드 기준 상품 누락: {id}"));
+        };
+        if reference["name"] != spec["name"]
+            || reference["originalName"] != spec["originalName"]
+            || reference["variants"].as_array().is_none_or(|v| v.len() != 1)
+            || reference["variants"][0]["id"] != spec["priceRecordId"]
+        {
+            return Err(format!("마이크 스탠드 기준 상품이 불일치합니다: {id}"));
+        }
+        let Some(product) = products.iter_mut().find(|p| p["id"] == id) else {
+            continue;
+        };
+        if product["originalName"] != spec["originalName"]
+            || product["variants"].as_array().is_none_or(|v| v.len() != 1)
+            || product["variants"][0]["id"] != spec["priceRecordId"]
+            || product["deletedAt"].as_str().is_some()
+            || product["supersededBy"].as_str().is_some()
+            || product["priceHistory"].as_array().is_some_and(|history|
+                history.iter().any(|entry| entry["field"] == "name"))
+        {
+            continue;
+        }
+        let Some(current_name) = product["name"].as_str() else { continue };
+        let Some(target_name) = spec["name"].as_str() else {
+            return Err(format!("마이크 스탠드 상품명이 누락됐습니다: {id}"));
+        };
+        if current_name != target_name && product["name"] != spec["oldName"] {
+            continue; // Employee-edited names are authoritative.
+        }
+        if target_name.trim().is_empty() || target_name.contains('◆') {
+            return Err(format!("마이크 스탠드 상품명 규칙 위반: {id}"));
+        }
+        if current_name != target_name {
+            product["name"] = Value::String(target_name.to_string());
+            changed += 1;
+        }
+        let Some(target_description) = spec["subtitle"].as_str() else {
+            return Err(format!("마이크 스탠드 설명이 누락됐습니다: {id}"));
+        };
+        let current_description = product["subtitle"].as_str().unwrap_or("");
+        let default_description = spec["oldSubtitle"].as_str().unwrap_or("");
+        if current_description != target_description
+            && (current_description.is_empty()
+                || current_description == default_description
+                || current_description == "길이 확인 필요")
+        {
+            product["subtitle"] = Value::String(target_description.to_string());
+            changed += 1;
+        }
+    }
+
     // Exact-model label corrections for the Mighty Bright LED family.
     // Previous releases already wrote brand-first names to SQLite; matching
     // only an official source title would not update those installed records.
@@ -543,7 +608,12 @@ mod tests {
         ] {
             let p = products.iter().find(|p| p["siteId"].as_str() == Some(site)).unwrap();
             assert_eq!(p["name"], expected);
-            assert!(p["subtitle"].as_str().unwrap_or("").is_empty());
+            let specs: Value = serde_json::from_str(include_str!(
+                "../resources/microphone-stand-specifications-20261109.json"
+            )).unwrap();
+            let spec = specs["items"].as_array().unwrap().iter()
+                .find(|row| row["siteId"].as_str() == Some(site)).unwrap();
+            assert_eq!(p["subtitle"], spec["subtitle"]);
         }
         for (id, successor) in [
             ("bando-site-77", "sku:bando-site-237:bando-237-P00000JC000H"),

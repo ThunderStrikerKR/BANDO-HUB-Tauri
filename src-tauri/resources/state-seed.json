@@ -12246,7 +12246,7 @@
       "siteCode": "P00000MZ",
       "catalog": "BANDOSTAND",
       "code": "BD Floor-BTS",
-      "name": "BD Floor-BTS / 미니형 마이크 스탠드",
+      "name": "BD Floor-BTS / 블랙 / 높이 27cm",
       "modelCodes": [
         "BD Floor-BTS"
       ],
@@ -12278,7 +12278,8 @@
       "priceHistory": [],
       "requiresOption": false,
       "originalName": "반도스탠드 BD Floor-BTS",
-      "saleUnit": true
+      "saleUnit": true,
+      "subtitle": "FLOOR 테이블탑 마이크 스탠드. 높이 27cm, 붐암 길이 40cm, 베이스 높이 4cm, 베이스 크기 24cm × 19.5cm, 무게 2.4kg."
     },
     {
       "id": "bando-site-334",
@@ -12286,7 +12287,7 @@
       "siteCode": "P00000MW",
       "catalog": "BANDOSTAND",
       "code": "BD Desk-BTS",
-      "name": "BD Desk-BTS / 미니형 마이크 스탠드",
+      "name": "BD Desk-BTS / 블랙 / 높이 27cm",
       "modelCodes": [
         "BD Desk-BTS"
       ],
@@ -12318,7 +12319,8 @@
       "priceHistory": [],
       "requiresOption": false,
       "originalName": "반도스탠드 BD Desk-BTS",
-      "saleUnit": true
+      "saleUnit": true,
+      "subtitle": "DESK 테이블탑 마이크 스탠드. 높이 27cm, 붐암 길이 40cm, 베이스 높이 5cm, 베이스 지름 16cm, 무게 3.1kg."
     },
     {
       "id": "bando-site-326",
@@ -12406,7 +12408,7 @@
       "siteCode": "P00000MM",
       "catalog": "BANDOSTAND",
       "code": "BD floor TS-3",
-      "name": "BD Floor TS-3",
+      "name": "BD floor TS-3 / 실버 / 높이 32cm",
       "modelCodes": [
         "BD floor TS-3"
       ],
@@ -12438,7 +12440,8 @@
       "priceHistory": [],
       "requiresOption": false,
       "originalName": "반도스탠드 BD floor TS-3",
-      "saleUnit": true
+      "saleUnit": true,
+      "subtitle": "FLOOR 테이블탑 마이크 스탠드. 높이 32cm, 붐암 길이 50cm, 베이스 높이 4cm, 베이스 크기 24cm × 19.5cm, 무게 2.4kg."
     },
     {
       "id": "bando-site-323",
@@ -12446,7 +12449,7 @@
       "siteCode": "P00000ML",
       "catalog": "BANDOSTAND",
       "code": "BD Floor TS-2",
-      "name": "BD Floor TS-2 / 미니형 마이크 스탠드",
+      "name": "BD Floor TS-2 / 실버 / 높이 22cm",
       "modelCodes": [
         "BD Floor TS-2"
       ],
@@ -12478,7 +12481,8 @@
       "priceHistory": [],
       "requiresOption": false,
       "originalName": "반도스탠드 BD Floor TS-2",
-      "saleUnit": true
+      "saleUnit": true,
+      "subtitle": "FLOOR 테이블탑 마이크 스탠드. 높이 22cm, 붐암 길이 50cm, 베이스 높이 4cm, 베이스 크기 24cm × 19.5cm, 무게 2.25kg."
     },
     {
       "id": "bando-site-322",
@@ -12486,7 +12490,7 @@
       "siteCode": "P00000MK",
       "catalog": "BANDOSTAND",
       "code": "BD Floor TS-1",
-      "name": "BD Floor TS-1 / 미니형 마이크 스탠드",
+      "name": "BD Floor TS-1 / 실버 / 높이 17cm",
       "modelCodes": [
         "BD Floor TS-1"
       ],
@@ -12518,7 +12522,8 @@
       "priceHistory": [],
       "requiresOption": false,
       "originalName": "반도스탠드 BD Floor TS-1",
-      "saleUnit": true
+      "saleUnit": true,
+      "subtitle": "FLOOR 테이블탑 마이크 스탠드. 높이 17cm, 붐암 길이 50cm, 베이스 높이 4cm, 베이스 크기 24cm × 19.5cm, 무게 1.9kg."
     },
     {
       "id": "bando-site-321",
@@ -12526,7 +12531,7 @@
       "siteCode": "P00000MJ",
       "catalog": "BANDOSTAND",
       "code": "BD FloorJS-4BK",
-      "name": "BD FloorJS-4BK / 미니형 마이크 스탠드",
+      "name": "BD FloorJS-4BK / 블랙 / 높이 60cm",
       "modelCodes": [
         "BD FloorJS-4BK"
       ],
@@ -12558,7 +12563,8 @@
       "priceHistory": [],
       "requiresOption": false,
       "originalName": "반도스탠드 BD FloorJS-4BK",
-      "saleUnit": true
+      "saleUnit": true,
+      "subtitle": "FLOOR 테이블탑 마이크 스탠드. 높이 60cm, 붐암 없음, 베이스 높이 4cm, 베이스 크기 24cm × 19.5cm, 무게 1.5kg."
     },
     {
       "id": "bando-site-320",
@@ -12566,7 +12572,7 @@
       "siteCode": "P00000MI",
       "catalog": "BANDOSTAND",
       "code": "BD FloorJS-3BK",
-      "name": "BD FloorJS-3BK / 미니형 마이크 스탠드",
+      "name": "BD FloorJS-3BK / 블랙 / 높이 43cm",
       "modelCodes": [
         "BD FloorJS-3BK"
       ],
@@ -12598,7 +12604,8 @@
       "priceHistory": [],
       "requiresOption": false,
       "originalName": "반도스탠드 BD FloorJS-3BK",
-      "saleUnit": true
+      "saleUnit": true,
+      "subtitle": "FLOOR 테이블탑 마이크 스탠드. 높이 43cm, 붐암 없음, 베이스 높이 4cm, 베이스 크기 24cm × 19.5cm, 무게 1.5kg."
     },
     {
       "id": "bando-site-319",
@@ -12606,7 +12613,7 @@
       "siteCode": "P00000MH",
       "catalog": "BANDOSTAND",
       "code": "BD FloorJS-2BK",
-      "name": "BD FloorJS-2BK / 미니형 마이크 스탠드",
+      "name": "BD FloorJS-2BK / 블랙 / 높이 35cm",
       "modelCodes": [
         "BD FloorJS-2BK"
       ],
@@ -12638,7 +12645,8 @@
       "priceHistory": [],
       "requiresOption": false,
       "originalName": "반도스탠드 BD FloorJS-2BK",
-      "saleUnit": true
+      "saleUnit": true,
+      "subtitle": "FLOOR 테이블탑 마이크 스탠드. 높이 35cm, 붐암 없음, 베이스 높이 4cm, 베이스 크기 24cm × 19.5cm, 무게 1.5kg."
     },
     {
       "id": "bando-site-310",
@@ -12678,7 +12686,8 @@
       "priceHistory": [],
       "requiresOption": false,
       "originalName": "반도스탠드 BD Desk JS-4 Black 검정 (자바라 길이 60cm)",
-      "saleUnit": true
+      "saleUnit": true,
+      "subtitle": "DESK 테이블탑 마이크 스탠드. 높이 60cm, 붐암 없음, 베이스 높이 5cm, 베이스 지름 16cm, 무게 2.64kg."
     },
     {
       "id": "bando-site-285",
@@ -12798,7 +12807,8 @@
       "priceHistory": [],
       "requiresOption": false,
       "originalName": "반도스탠드 BD Desk JS-4 Silver (자바라길이 60cm)",
-      "saleUnit": true
+      "saleUnit": true,
+      "subtitle": "DESK 테이블탑 마이크 스탠드. 높이 60cm, 붐암 없음, 베이스 높이 5cm, 베이스 지름 16cm, 무게 2.64kg."
     },
     {
       "id": "bando-site-255",
@@ -12838,7 +12848,8 @@
       "priceHistory": [],
       "requiresOption": false,
       "originalName": "반도스탠드 BD Desk JS-3 Silver (자바라길이 43cm)",
-      "saleUnit": true
+      "saleUnit": true,
+      "subtitle": "DESK 테이블탑 마이크 스탠드. 높이 43cm, 붐암 없음, 베이스 높이 5cm, 베이스 지름 16cm, 무게 2.44kg."
     },
     {
       "id": "bando-site-254",
@@ -12878,7 +12889,8 @@
       "priceHistory": [],
       "requiresOption": false,
       "originalName": "반도스탠드 BD Desk JS-2 Silver (자바라길이 35cm)",
-      "saleUnit": true
+      "saleUnit": true,
+      "subtitle": "DESK 테이블탑 마이크 스탠드. 높이 35cm, 붐암 없음, 베이스 높이 5cm, 베이스 지름 16cm, 무게 2.27kg."
     },
     {
       "id": "bando-site-253",
@@ -12918,7 +12930,8 @@
       "priceHistory": [],
       "requiresOption": false,
       "originalName": "반도스탠드 BD Desk JS-1 Silver  (자바라길이 25cm)",
-      "saleUnit": true
+      "saleUnit": true,
+      "subtitle": "DESK 테이블탑 마이크 스탠드. 높이 25cm, 베이스 높이 5cm, 베이스 지름 16cm, 무게 2.24kg."
     },
     {
       "id": "bando-site-252",
@@ -12926,7 +12939,7 @@
       "siteCode": "P00000JR",
       "catalog": "BANDOSTAND",
       "code": "BD Desk IS-1",
-      "name": "BD Desk IS-1 / Bar 길이 10cm",
+      "name": "BD Desk IS-1 / 블랙 / Bar 길이 10cm",
       "modelCodes": [
         "BD Desk IS-1"
       ],
@@ -12958,7 +12971,8 @@
       "priceHistory": [],
       "requiresOption": false,
       "originalName": "반도스탠드 BD Desk IS-1 (Bar 길이 10cm)",
-      "saleUnit": true
+      "saleUnit": true,
+      "subtitle": "DESK 테이블탑 마이크 스탠드. 높이 10cm, 베이스 높이 5cm, 베이스 지름 16cm, 무게 3kg."
     },
     {
       "id": "bando-site-251",
@@ -12966,7 +12980,7 @@
       "siteCode": "P00000JQ",
       "catalog": "BANDOSTAND",
       "code": "BD Desk IS-2",
-      "name": "BD Desk IS-2 / Bar 길이 15cm",
+      "name": "BD Desk IS-2 / 블랙 / Bar 길이 15cm",
       "modelCodes": [
         "BD Desk IS-2"
       ],
@@ -12998,7 +13012,8 @@
       "priceHistory": [],
       "requiresOption": false,
       "originalName": "반도스탠드 BD Desk IS-2 (Bar 길이 15cm)",
-      "saleUnit": true
+      "saleUnit": true,
+      "subtitle": "DESK 테이블탑 마이크 스탠드. 높이 15cm, 베이스 높이 5cm, 베이스 지름 16cm, 무게 3kg."
     },
     {
       "id": "bando-site-250",
@@ -13006,7 +13021,7 @@
       "siteCode": "P00000JP",
       "catalog": "BANDOSTAND",
       "code": "BD Desk IS-3",
-      "name": "BD Desk IS-3 / Bar 길이 26cm",
+      "name": "BD Desk IS-3 / 블랙 / Bar 길이 26cm",
       "modelCodes": [
         "BD Desk IS-3"
       ],
@@ -13038,7 +13053,8 @@
       "priceHistory": [],
       "requiresOption": false,
       "originalName": "반도스탠드 BD Desk IS-3 (Bar 길이 26cm)",
-      "saleUnit": true
+      "saleUnit": true,
+      "subtitle": "DESK 테이블탑 마이크 스탠드. 높이 25cm, 베이스 높이 5cm, 베이스 지름 16cm, 무게 3kg."
     },
     {
       "id": "bando-site-249",
@@ -13046,7 +13062,7 @@
       "siteCode": "P00000JO",
       "catalog": "BANDOSTAND",
       "code": "BD Desk TS-3",
-      "name": "BD Desk TS-3 / Bar 길이 32cm",
+      "name": "BD Desk TS-3 / 실버 / Bar 길이 32cm",
       "modelCodes": [
         "BD Desk TS-3"
       ],
@@ -13078,7 +13094,7 @@
       "priceHistory": [],
       "requiresOption": false,
       "originalName": "반도스탠드 BD Desk TS-3 (길이 참고)",
-      "subtitle": "",
+      "subtitle": "DESK 테이블탑 마이크 스탠드. 높이 32cm, 붐암 길이 50cm, 베이스 높이 5cm, 베이스 지름 16cm, 무게 3kg.",
       "saleUnit": true
     },
     {
@@ -13087,7 +13103,7 @@
       "siteCode": "P00000JN",
       "catalog": "BANDOSTAND",
       "code": "BD Desk TS-2",
-      "name": "BD Desk TS-2 / Bar 길이 22cm",
+      "name": "BD Desk TS-2 / 실버 / Bar 길이 22cm",
       "modelCodes": [
         "BD Desk TS-2"
       ],
@@ -13119,7 +13135,7 @@
       "priceHistory": [],
       "requiresOption": false,
       "originalName": "반도스탠드 BD Desk TS-2 (길이 참고)",
-      "subtitle": "",
+      "subtitle": "DESK 테이블탑 마이크 스탠드. 높이 22cm, 붐암 길이 50cm, 베이스 높이 5cm, 베이스 지름 16cm, 무게 3kg.",
       "saleUnit": true
     },
     {
@@ -13128,7 +13144,7 @@
       "siteCode": "P00000JM",
       "catalog": "BANDOSTAND",
       "code": "BD Desk TS-1",
-      "name": "BD Desk TS-1 / Bar 길이 15cm",
+      "name": "BD Desk TS-1 / 실버 / Bar 길이 15cm",
       "modelCodes": [
         "BD Desk TS-1"
       ],
@@ -13160,7 +13176,7 @@
       "priceHistory": [],
       "requiresOption": false,
       "originalName": "반도스탠드 BD Desk TS-1 (길이 참고)",
-      "subtitle": "",
+      "subtitle": "DESK 테이블탑 마이크 스탠드. 높이 15cm, 붐암 길이 50cm, 베이스 높이 5cm, 베이스 지름 16cm, 무게 3kg.",
       "saleUnit": true
     },
     {
@@ -13201,7 +13217,8 @@
       "priceHistory": [],
       "requiresOption": false,
       "originalName": "반도스탠드 BD Desk JS-3 Black 검정 (자바라 길이 43cm)",
-      "saleUnit": true
+      "saleUnit": true,
+      "subtitle": "DESK 테이블탑 마이크 스탠드. 높이 43cm, 붐암 없음, 베이스 높이 5cm, 베이스 지름 16cm, 무게 2.44kg."
     },
     {
       "id": "bando-site-245",
@@ -13241,7 +13258,8 @@
       "priceHistory": [],
       "requiresOption": false,
       "originalName": "반도스탠드 BD Desk JS-2 Black 검정 (자바라 길이 35cm)",
-      "saleUnit": true
+      "saleUnit": true,
+      "subtitle": "DESK 테이블탑 마이크 스탠드. 높이 35cm, 붐암 없음, 베이스 높이 5cm, 베이스 지름 16cm, 무게 2.27kg."
     },
     {
       "id": "sku:bando-site-244:bando-244-P00000JJ000B",
