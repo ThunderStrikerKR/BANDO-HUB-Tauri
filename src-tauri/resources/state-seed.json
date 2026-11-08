@@ -10593,7 +10593,7 @@
       "siteCode": "P00000LP",
       "catalog": "BANDOSTAND",
       "code": "P00000LP",
-      "name": "Mighty Bright LED-3N Nuflex / 보면대등",
+      "name": "BD LED-3N / Mighty Bright Nuflex / 보면대등",
       "modelCodes": [],
       "category": "연주의자 용품",
       "categories": [
@@ -10632,7 +10632,7 @@
       "siteCode": "P00000LO",
       "catalog": "BANDOSTAND",
       "code": "P00000LO",
-      "name": "Mighty Bright LED-2W Wonderflex / 보면대등",
+      "name": "BD LED-2W / Mighty Bright Wonderflex / 보면대등",
       "modelCodes": [],
       "category": "연주의자 용품",
       "categories": [
@@ -10711,7 +10711,7 @@
       "siteCode": "P00000IU",
       "catalog": "BANDOSTAND",
       "code": "BD LED-2s",
-      "name": "BD LED-2s / Mighty Bright Light",
+      "name": "BD LED-2S / Mighty Bright Light",
       "modelCodes": [
         "BD LED-2s"
       ],
@@ -10743,7 +10743,6 @@
       "priceHistory": [],
       "requiresOption": false,
       "originalName": "반도스탠드 BD LED-2s (Mighty Bright Light)",
-      "subtitle": "Mighty Bright Light",
       "saleUnit": true
     },
     {
@@ -10784,7 +10783,6 @@
       "priceHistory": [],
       "requiresOption": false,
       "originalName": "반도스탠드 BD LED-3 (Mighty Bright Light)",
-      "subtitle": "Mighty Bright Light",
       "saleUnit": true
     },
     {
