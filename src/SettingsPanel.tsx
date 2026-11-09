@@ -1,3 +1,4 @@
+import { forwardRef, useImperativeHandle } from "react";
 import { confirmAction } from "./dialogs";
 import { uid } from "./domain";
 import type { NoticeSink } from "./shared/notices";
@@ -18,15 +19,23 @@ function settingsChanges(saved: Record<string, unknown>, edited: Record<string, 
   }
   return { changes, expected };
 }
-export function SettingsPanel({
-  state,
-  onSaveSettings,
-  onNotice,
-}: {
+export type SettingsPanelHandle = {
+  hasUnsavedChanges: () => boolean;
+  isBusy: () => boolean;
+  save: () => Promise<boolean>;
+};
+
+export const SettingsPanel = forwardRef<SettingsPanelHandle, {
   state: State;
   onSaveSettings: (changes: Record<string, unknown>, expected: Record<string, unknown>) => Promise<void>;
   onNotice: NoticeSink;
-}) {
+  section: "basic" | "files";
+}>(function SettingsPanel({
+  state,
+  onSaveSettings,
+  onNotice,
+  section,
+}, ref) {
   const {
     draft: s,
     setDraft: setS,
@@ -35,6 +44,27 @@ export function SettingsPanel({
     dirty,
   } = useDraft({ ...state.settings, senderName: state.settings.senderName || "반도스탠드" });
   const { busy: saving, run } = useAsyncTask(onNotice);
+  const saveSettings = async (): Promise<boolean> => {
+    if (saving) return false;
+    if (conflicts.length) {
+      onNotice("다른 작업에서 변경된 설정을 다시 불러온 뒤 저장하세요.", "error");
+      return false;
+    }
+    const { changes, expected } = settingsChanges(
+      state.settings as unknown as Record<string, unknown>,
+      s as unknown as Record<string, unknown>,
+    );
+    if (!Object.keys(changes).length) return true;
+    const result = await run(() => onSaveSettings(changes, expected));
+    if (!result.ok) return false;
+    onNotice("설정을 저장했습니다.", "success");
+    return true;
+  };
+  useImperativeHandle(ref, () => ({
+    hasUnsavedChanges: () => dirty,
+    isBusy: () => saving,
+    save: saveSettings,
+  }));
   const remove = (id: string) => {
     const users = state.clients.filter((c) => !c.deletedAt && c.preferredAccountId === id);
     if (users.length) {
@@ -70,6 +100,7 @@ export function SettingsPanel({
           </button>
         </div>
       )}
+      <div hidden={section !== "basic"}>
       <h2>화면 글자 크기</h2>
       <Field label="전체 UI 크기">
         <select
@@ -117,6 +148,8 @@ export function SettingsPanel({
           />
         </Field>
       ))}
+      </div>
+      <div hidden={section !== "files"}>
       <h2>Excel 보관함 위치</h2>
       <p>{s.excelDirectory || "설정되지 않음"}</p>
       <button type="button" disabled={saving}
@@ -169,6 +202,8 @@ export function SettingsPanel({
         격리 TEST에서는 별도 수신 폴더만 사용하며 실사용 수신 폴더를 감시하지 않습니다.
         원본은 앱 데이터에 보관하고 별도 사본은 Excel 보관함에 저장합니다.
       </p>
+      </div>
+      <div hidden={section !== "basic"}>
       <h2>입금 계좌</h2>
       <p className="muted">
         반도스탠드 상품 및 혼합 주문은 반도스탠드 계좌, 반도몰 상품만 있는 주문은 반도몰 계좌를
@@ -239,29 +274,18 @@ export function SettingsPanel({
       </div>
       <p className="muted">
         부가세는 주문별 기본 해제입니다. 원 미만 세액은 현재 반올림하며 회사 회계 기준을 확인해야
-        합니다. 대리발송 송하인은 거래처, 대리점 납품 / 소매 주문은 반도스탠드 정보를 사용합니다.
+        합니다. 대리발송 송하인은 거래처, 대리점 납품 / 직접 입력은 반도스탠드 정보를 사용합니다.
       </p>
+      </div>
       <div className="settings-actions">
         <button
           className="primary"
           disabled={saving || conflicts.length > 0}
-          onClick={() =>
-            void run(async () => {
-              if (conflicts.length) throw Error("변경된 설정을 다시 불러온 뒤 저장하세요.");
-              const { changes, expected } = settingsChanges(
-                state.settings as unknown as Record<string, unknown>,
-                s as unknown as Record<string, unknown>,
-              );
-              if (!Object.keys(changes).length) return;
-              await onSaveSettings(changes, expected);
-              reset();
-              onNotice("설정을 저장했습니다.", "success");
-            })
-          }
+          onClick={() => void saveSettings()}
         >
           {saving ? "저장 중…" : "설정 저장"}
         </button>
       </div>
     </section>
   );
-}
+});

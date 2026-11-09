@@ -357,3 +357,40 @@
   white-space: nowrap;
   margin: 0;
 }
+
+/* Categorized settings navigation */
+.settings-tab-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 0 12px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border-default);
+}
+.app-v03 .management-container .settings-tab-list .settings-tab {
+  height: auto;
+  min-height: var(--control-compact);
+  padding: 8px 14px;
+  background: var(--surface-panel);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-default);
+}
+.app-v03 .management-container .settings-tab-list .settings-tab[aria-selected="true"] {
+  background: #404040;
+  color: var(--text-primary);
+  border-color: var(--border-focus);
+}
+.settings-tab-panels,
+.settings-tab-panels .settings-layout-single {
+  min-width: 0;
+}
+.settings-tab-panels .settings-layout-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+.settings-tab-panels .settings-support {
+  max-width: 1000px;
+}
+.settings-unsaved-modal .actions {
+  justify-content: flex-end;
+  margin-top: 20px;
+}
