@@ -579,7 +579,7 @@ export function messages(
     renderAutomaticTemplate(s,"paymentFreight",{운임:won(t.shipping)}),
     ...(o.applyVat ? [renderAutomaticTemplate(s,"paymentVat",{부가세:won(t.vat)})] : []),
     "",
-    renderAutomaticTemplate(s,"paymentTotal",{합계:won(t.total)}),
+    renderAutomaticTemplate(s,"paymentTotal",{합계:t.total===null ? "금액 확인 필요" : won(t.total)}),
     "",
     a?.bank && a.number && a.holder
       ? renderAutomaticTemplate(s,"paymentAccount",{

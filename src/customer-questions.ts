@@ -23,10 +23,14 @@ export function groupedCustomerQuestions(
         : null;
       if (settings && customKey && settings.automaticMessageTemplates?.[customKey]) {
         const item = row.items.find(item=>item.id===issue.itemId);
-        messages.add(renderAutomaticTemplate(settings,customKey as
+        const rendered=renderAutomaticTemplate(settings,customKey as
           "recipientName"|"addressMissing"|"addressDetail"|"contactMissing"|"quantityMissing",{
           수취인:row.name || "수취인",상품명:customerModel(item?.name || "상품"),
-        }).replace(new RegExp("^"+row.name.replace(/[.*+?^${}()|[\]\\]/g,"\\      if (issue.kind === "NAME") labels.add("수취인 성함");")+"님[, ]*"),""));
+        });
+        const prefix=row.name ? row.name+"님" : "";
+        messages.add(prefix && rendered.startsWith(prefix)
+          ? rendered.slice(prefix.length).trim().replace(/^[,\s]+/,"")
+          : rendered);
       }
       else if (issue.kind === "NAME") labels.add("수취인 성함");
       else if (issue.kind === "ADDRESS")
