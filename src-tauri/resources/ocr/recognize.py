@@ -48,7 +48,7 @@ def main():
     if len(sys.argv) != 2:
         raise ValueError("OCR 이미지 경로 누락")
     text = extract(make_pipeline().predict(sys.argv[1]))
-    print("BANDO_OCR_RESULT=" + json.dumps({"text": text}, ensure_ascii=False), flush=True)
+    print("BANDO_OCR_RESULT=" + json.dumps({"text": text}, ensure_ascii=True), flush=True)
 
 if __name__ == "__main__":
     try:

@@ -16,6 +16,7 @@ test("employee Python is never used by OCR", () => {
   assert.match(native, /join\("runtime"\)\.join\("python\.exe"\)/);
   assert.match(native, /env\("BANDO_OCR_MODEL_ROOT", &models\)/);
   assert.match(native, /env_remove\("PYTHONPATH"\)/);
+  assert.ok(native.includes('arg("-X").arg("utf8")'));
   assert.doesNotMatch(native, /std::env::var_os\("LOCALAPPDATA"\)|join\("venv"\)|SETUP_OCR_WINDOWS/);
   assert.match(native, /ocr 폴더를 함께 보관하세요/);
 });

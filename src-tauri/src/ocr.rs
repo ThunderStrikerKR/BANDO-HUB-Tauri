@@ -68,7 +68,7 @@ fn capture_blocking() -> Result<OcrCapture, String> {
     let stderr = temp.path.join("error.txt");
     fs::write(&input, &bmp).map_err(|e| format!("OCR 임시 이미지 쓰기 실패: {e}"))?;
     let mut command = Command::new(python);
-    command.arg("-I").arg("-c").arg(include_str!("../resources/ocr/recognize.py")).arg(&input);
+    command.arg("-I").arg("-B").arg("-X").arg("utf8").arg("-c").arg(include_str!("../resources/ocr/recognize.py")).arg(&input);
     command.current_dir(&ocr_dir)
         .env("BANDO_OCR_MODEL_ROOT", &models)
         .env("PYTHONDONTWRITEBYTECODE", "1")
