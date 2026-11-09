@@ -11,7 +11,7 @@ test("source header has four intake controls and no duplicated buttons below", (
   assert.match(source, /source-heading-actions/);
   for (const label of ["대리발송", "대리점 납품", "직접 입력", "캡처 범위 지정"])
     assert.ok(source.includes(label), label);
-  assert.equal((source.match(/대리발송/g) ?? []).length, 1);
+  assert.equal((source.match(/<button disabled=\{busy\} onClick=\{\(\) => void paste\(undefined, "AGENCY"\)\}>/g) ?? []).length, 1);
 });
 test("OCR result requires user review before replacing a provisional order", () => {
   assert.match(source, /confirmAction\("기존 미확정 원문/);

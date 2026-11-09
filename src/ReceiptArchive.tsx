@@ -33,7 +33,7 @@ export function ReceiptArchive() {
   };
   return (
     <section className="card">
-      <h2 className="settings-help-heading">접수 원문 감사 보관함 <HelpTooltip title="접수 원문 보관함" purpose="주문을 처음 받았을 때의 내용과 나중에 고친 내용을 확인할 수 있도록 기록을 보관합니다." when="주문 내용이 어떻게 변경됐는지 확인해야 할 때 사용합니다." steps={["감사 기록 열기를 누릅니다.", "주문이나 담당자 정보를 검색합니다.", "확인할 기록을 펼쳐 최초 주문 내용과 변경 내용을 확인합니다."]} result="주문을 처음 확인한 내용과 이후 정정 기록을 구분해 확인할 수 있습니다." caution="확정 전 분석 초안은 기록에 포함되지 않습니다. 기록을 조회해도 기존 주문이 변경되지는 않습니다." /></h2>
+      <h2 className="settings-help-heading">접수 원문 감사 보관함 <HelpTooltip title="접수 원문 보관함" purpose="주문을 처음 받았을 때의 내용과 나중에 고친 내용을 확인할 수 있도록 기록을 보관합니다." when="주문 내용이 어떻게 변경됐는지 확인해야 할 때 사용합니다." steps={["감사 기록 열기를 누릅니다.", "주문이나 담당자 정보를 검색합니다.", "확인할 기록을 펼쳐 최초 주문 내용과 변경 내용을 확인합니다."]} result="주문을 처음 확인한 내용과 이후 정정 기록을 구분해 확인할 수 있습니다." caution="확정 전 분석 초안은 감사 기록에 포함하지 않습니다. 기록을 조회해도 기존 주문이 변경되지는 않습니다." /></h2>
 
       <button type="button" disabled={loading} onClick={() => void open()}>
         {loading ? "기록 조회 중…" : "감사 기록 열기"}

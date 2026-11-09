@@ -11,8 +11,8 @@ test("settings have five tabs and accounts are part of basic settings", () => {
   }
   assert.equal((view.match(/title: "(기본 설정|파일 관리|데이터 관리|시스템|개발자 모드)"/g) ?? []).length, 5);
   assert.ok(!view.includes('title: "계좌 관리"'));
-  assert.ok(settings.includes('<h2>입금 계좌</h2>'));
-  assert.ok(settings.includes('<h2>Excel 보관함 위치</h2>'));
+  assert.ok(settings.includes('<h2 className="settings-help-heading">입금 계좌 <HelpTooltip'));
+  assert.ok(settings.includes('<h2 className="settings-help-heading">Excel 보관함 위치 <HelpTooltip'));
 });
 
 test("unsaved settings offer save, discard and cancel on tab change", () => {
