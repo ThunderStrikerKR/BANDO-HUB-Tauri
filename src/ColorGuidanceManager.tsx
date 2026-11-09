@@ -75,7 +75,7 @@ export function ColorGuidanceManager({state,onRefresh,query=""}: {
     <aside className="family-list-panel">
       <header className="family-list-heading">
         <h2>직원 등록 그룹</h2>
-        <p>사전 등록된 그룹은 없습니다. 발주서에 색상이 없을 때 확인 안내문에 사용할 그룹을 만드세요.</p>
+        <p>자동 생성되는 그룹은 없습니다. 직원이 상품을 묶고 대표색상을 미리 등록하세요.</p>
       </header>
       <div className="family-field">
         <label htmlFor="new-color-group">새 그룹 이름</label>
@@ -114,7 +114,7 @@ export function ColorGuidanceManager({state,onRefresh,query=""}: {
             <label htmlFor="representative-color">대표색상</label>
             <input id="representative-color" placeholder="예: 블랙, 실버, 크롬" value={active.representativeColor}
               onChange={e=>edit(g=>{g[activeId].representativeColor=e.target.value;})}/>
-            <p className="family-help">대표색상은 발주서 분석과 복사용 안내문에만 적용합니다. 상품 선택이나 출고 색상을 자동 확정하지 않습니다.</p>
+            <p className="family-help">직원이 사전에 등록한 대표색상은 발주서의 옵션 오류 창에서 직접 선택할 때만 주문에 적용됩니다. 이후 복사용 안내문에 적용 색상을 통보합니다.</p>
           </div>
           <div className="family-members-section">
             <div className="family-section-heading"><h3>등록한 상품</h3><span>{active.productIds.length}개</span></div>

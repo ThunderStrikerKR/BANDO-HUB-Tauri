@@ -2,7 +2,7 @@ import { messages, orderClient, totals, unassignedClient, validProductUrl, won }
 import { groupedCustomerQuestions } from "./customer-questions.js";
 import { customerModel } from "./matching.js";
 import { colorLabel } from "./product-models.js";
-import { colorGuidanceQuestion } from "./color-guidance.js";
+import { appliedDefaultColorNotice } from "./color-guidance.js";
 import type { Order, Price, State, ValidationIssue } from "./types.js";
 import { orderIssues } from "./validation.js";
 import {
@@ -105,6 +105,8 @@ export function hubMessages(
       parts.push(
         `${customerModel(i.name)}${color} * ${i.quantity ?? "?"}개 : ${i.unitPrice !== null && i.quantity !== null ? won(i.unitPrice * i.quantity) : !client.id ? "거래처 선택 후 단가 적용" : "판매가 확인 필요"}`,
       );
+      const notice = appliedDefaultColorNotice(i);
+      if (notice) parts.push(notice);
     }
     parts.push(
       shipmentFreightCode(order, r) === "020"
@@ -149,7 +151,7 @@ export function hubMessages(
     (i) => !(amounts.every((a) => a.shipping !== null) && i === "운임 확인 필요"),
   );
   if (amounts.some((a) => a.shipping === null)) paymentIssues.push("배송 건별 운임 확인 필요");
-  const colorQuestions = recipients.flatMap(r => r.items.map(colorGuidanceQuestion)).filter(Boolean);
+  const colorNotices = recipients.flatMap(r => r.items.map(appliedDefaultColorNotice)).filter(Boolean);
   const optionLinks = links.options
     ? recipients
         .flatMap((r) => [
@@ -167,12 +169,12 @@ export function hubMessages(
     blocks,
     payment: parts.join("\n"),
     options:
-      (customer.length || colorQuestions.length
-        ? [...customer, ...colorQuestions].join("\n")
+      (customer.length || colorNotices.length
+        ? [...customer, ...colorNotices].join("\n")
         : "주문 내용 확인 부탁드립니다.") +
       (optionLinks ? "\n\n" + optionLinks : ""),
     paymentIssues: [...new Set(paymentIssues)],
-    customerCount: customer.length + colorQuestions.length,
+    customerCount: customer.length,
     mixedVat: mixed,
     optionsIssues,
   };

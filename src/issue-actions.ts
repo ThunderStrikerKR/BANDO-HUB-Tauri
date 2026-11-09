@@ -1,4 +1,4 @@
-import { itemFromProduct, orderClient, uid } from "./domain.js";
+import { itemFromProduct, normalizeColor, orderClient, uid } from "./domain.js";
 import { aliasProblems, saveAlias } from "./matching.js";
 import type { Order, State } from "./types.js";
 export function resolveProduct(
@@ -10,6 +10,7 @@ export function resolveProduct(
   scope: "once" | "client" | "common",
   needsCustomer: boolean,
   variantId?: string,
+  defaultColorGroupId?: string,
 ) {
   let next = structuredClone(state);
   const o = structuredClone(order),
@@ -30,6 +31,16 @@ export function resolveProduct(
   };
   const v = variantId ? p.variants.find((v) => v.id === variantId) : p.variants[0];
   if (!v) throw Error("실제 상품 옵션을 선택하세요.");
+  let appliedDefaultColor: {groupId:string;color:string} | undefined;
+  if (defaultColorGroupId) {
+    const group = next.settings.colorGuidanceGroups?.[defaultColorGroupId];
+    if (!group || !group.productIds.includes(p.id) ||
+        normalizeColor(group.representativeColor) !== normalizeColor(v.color) ||
+        (i.color && !["색상 미표기", "단일"].includes(i.color))) {
+      throw Error("기본색상 등록 정보와 선택 상품이 일치하지 않습니다.");
+    }
+    appliedDefaultColor = {groupId:defaultColorGroupId,color:v.color};
+  }
   delete i.pendingAlias;
   const chosen = itemFromProduct(p, c, v.color, i.quantity);
   Object.assign(i, chosen, old, {
@@ -44,6 +55,8 @@ export function resolveProduct(
     productId: p.id,
     variantId: v.id,
   };
+  if (appliedDefaultColor) i.appliedDefaultColor = appliedDefaultColor;
+  else delete i.appliedDefaultColor;
   if (r.dispatchOrigin) i.origin = r.dispatchOrigin;
   if (changedProduct) delete i.quantityApproval;
   if (needsCustomer) {

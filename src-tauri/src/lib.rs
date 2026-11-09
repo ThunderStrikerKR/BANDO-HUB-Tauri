@@ -361,7 +361,7 @@ fn settings_patch(db: State<'_, Database>, changes: Value, expected: Value) -> R
         return Err("격리 작업공간의 Excel 보관 경로는 변경할 수 없습니다.".into());
     }
     let allowed = ["senderPostcode", "excelDirectory", "factoryReplyDirectory",
-        "modelRepresentatives", "modelFamilies", "colorGuidanceGroups", "kakaoTitleMappings", "kakaoTitleEnabled",
+        "colorGuidanceGroups", "kakaoTitleMappings", "kakaoTitleEnabled",
         "panelRatios", "receptionVerticalRatio", "operatorName", "uiScale", "accounts",
         "defaultAccountId", "senderName", "senderAddress", "senderPhone", "senderMobile",
         "rounding", "brandAccounts", "specialPolicy"];

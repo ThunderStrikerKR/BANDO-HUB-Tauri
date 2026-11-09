@@ -1,4 +1,3 @@
-import { suggestGroupColor } from "./color-guidance.js";
 import {
   itemFromProduct,
   normalizeCode,
@@ -780,7 +779,7 @@ function parseLegacy(raw: string, selectedClient: Client | undefined, state: Sta
         origin: "FACTORY",
         defaulted: false,
         recognitionReason: generic
-          ? "상품 종류는 인식했으나 모델명이 없습니다. 등록된 대표모델을 검토하세요."
+          ? "상품 종류는 인식했지만 모델명은 확정되지 않았습니다. 실제 상품을 선택하세요."
           : "등록된 모델명 또는 별칭과 일치하지 않습니다.",
         issues: ["제품명이 확인되지 않습니다."],
         url: "",
@@ -831,15 +830,6 @@ function parseLegacy(raw: string, selectedClient: Client | undefined, state: Sta
         item.unitPrice = resolvePrice(p, v.id, client);
         item.url = v.url;
       }
-    }
-    // Manual color suggestion is outbound advice only, never SKU approval.
-    const guidance = !explicit && !conflict && !categoryMismatch && !generic && !brandedCategory
-      ? suggestGroupColor(state, codeChoices.length ? codeChoices : aliasProducts)
-      : undefined;
-    if (guidance) {
-      item.colorSuggestion = guidance;
-      if (item.productId && item.variantId)
-        item.issues = [...new Set([...item.issues, "대표색상 안내 후 고객 확인 필요"])];
     }
     item.raw = line;
     item.quantityConfirmed = confirmed;

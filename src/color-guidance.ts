@@ -40,11 +40,10 @@ export function suggestGroupColor(state: State, candidates: Product[]): ColorGui
   return color && !["단일","색상 미표기"].includes(color) ? {groupId,color} : undefined;
 }
 
-/** Outbound wording requests consent: representative color is NOT shipment approval. */
-export function colorGuidanceQuestion(item: Item): string {
-  const color = colorLabel(item.colorSuggestion?.color ?? "").trim();
-  return color
-    ? item.name + ": 색상이 기재되지 않아 대표색상 " + color +
-      "으로 우선 안내드립니다. " + color + "으로 진행해도 될까요?"
-    : "";
+/** Created after employee selection only; customer notice, not a confirmation request. */
+export function appliedDefaultColorNotice(item: Item): string {
+  const color = colorLabel(item.appliedDefaultColor?.color ?? "").trim();
+  if (!color) return "";
+  return "별도 색상 지정이 없어 " + item.name + " 상품은 기본색상 " +
+    color + "으로 접수했습니다.";
 }

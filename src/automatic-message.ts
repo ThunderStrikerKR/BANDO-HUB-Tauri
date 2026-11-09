@@ -1,5 +1,5 @@
 import { validProductUrl } from "./domain.js";
-import { colorGuidanceQuestion } from "./color-guidance.js";
+import { appliedDefaultColorNotice } from "./color-guidance.js";
 import { hubMessages } from "./hub-messages.js";
 import { groupAccount, groupOrder, groupStep, workflowIssues } from "./workflow.js";
 import type { State } from "./types.js";
@@ -9,6 +9,7 @@ export function automaticMessage(state: State, gid: string) {
       (i) => i.severity === "ACTION" && i.blockingStage <= 1,
     ),
     lines: string[] = [];
+  let requiresCustomerResponse = false;
   for (const row of order.recipients) {
     const labels = issues
       .filter((i) => i.recipientId === row.id)
@@ -32,22 +33,23 @@ export function automaticMessage(state: State, gid: string) {
           return [(row.items.find((item) => item.id === i.itemId)?.name || "상품") + " 모델 / 옵션"];
         return [];
       });
-    const colorQuestions = row.items.map(colorGuidanceQuestion).filter(Boolean);
-    if (labels.length || colorQuestions.length) {
+    const colorNotices = row.items.map(appliedDefaultColorNotice).filter(Boolean);
+    if (labels.length || colorNotices.length) {
+      if (labels.length) requiresCustomerResponse = true;
       const links = row.items
         .filter((i) => i.modelProposal?.required && validProductUrl(i.url))
         .map((i) => i.name + "\n" + i.url);
       lines.push(
         [
-          `${lines.length + 1}. ${row.name || "수취인"}님: ${[...new Set(labels)].join(", ")}`,
+          ...(labels.length ? [`${lines.length + 1}. ${row.name || "수취인"}님: ${[...new Set(labels)].join(", ")}`] : []),
           ...new Set(links),
-          ...colorQuestions,
+          ...colorNotices,
         ].join("\n"),
       );
     }
   }
   const payment = hubMessages(order, state, gid, { payment: true, options: false });
-  const phase = groupStep(state, gid) >= 2 && !lines.length ? "payment" : "request";
+  const phase = groupStep(state, gid) >= 2 && !requiresCustomerResponse ? "payment" : "request";
   const text =
     phase === "payment"
       ? payment.payment.replace(/^안녕하세요[.。]?\s*/, "")

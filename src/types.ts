@@ -133,7 +133,8 @@ export interface Item {
   temporary?: boolean;
   recognitionReason?: string;
   modelProposal?: { original: string; required: boolean };
-  colorSuggestion?: { groupId: string; color: string };
+  /** Set only when an employee selects the saved representative color in the issue resolver. */
+  appliedDefaultColor?: { groupId: string; color: string };
   manuallyConfirmed?: boolean;
   quantityConfirmed?: boolean;
   productCandidates?: Candidate[];
@@ -397,8 +398,7 @@ export interface Settings {
   senderPostcode?: string;
   excelDirectory?: string;
   factoryReplyDirectory?: string;
-  modelRepresentatives?: Record<string, { productId: string; variantId: string }>;
-  modelFamilies?: Record<string, { code: string; productIds: string[] }>;
+  // Legacy model-family settings are ignored; never infer color from model codes.
   colorGuidanceGroups?: Record<string, { name: string; productIds: string[]; representativeColor: string }>;
   kakaoTitleMappings?: Record<
     string,
