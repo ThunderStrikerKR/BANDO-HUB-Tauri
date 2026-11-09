@@ -38,7 +38,7 @@ test("every shipment renders its own shipping labels before its delivery data", 
 test("compact fixed columns prioritise address and panel heading is a distinct band", () => {
   assert.match(code, /className="manual-col-address"/);
   for (const cls of ["manual-col-shipment","manual-col-name","manual-col-mobile","manual-col-phone","manual-col-note"]) {
-    assert.ok(css.includes(".manual-"+cls), cls);
+    assert.ok(css.includes("."+cls), cls);
   }
   assert.match(css, /\.manual-sheet-heading h3 \{/);
   assert.match(css, /font-size: 15px;/);
