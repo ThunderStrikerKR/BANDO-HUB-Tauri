@@ -84,7 +84,13 @@ export function WorkflowFreightRows({
                   />
                   <span>원</span>
                 </div>
-                <button hidden={b.origin !== "FACTORY"} disabled title="공장 문의 연동 준비 중">
+                <button
+                  className="freight-inquiry"
+                  aria-hidden={b.origin !== "FACTORY"}
+                  style={{ visibility: b.origin === "FACTORY" ? "visible" : "hidden" }}
+                  disabled
+                  title="공장 문의 연동 준비 중"
+                >
                   공장에 운임 문의
                 </button>
               </div>
