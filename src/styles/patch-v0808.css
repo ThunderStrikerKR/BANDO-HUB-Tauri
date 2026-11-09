@@ -50,8 +50,12 @@
   cursor: default;
 }
 .review-layout {
-  grid-template-rows: minmax(0, 0.28fr) minmax(0, 0.32fr) minmax(0, 0.4fr);
+  /* Keep the checks area stable; let the recipient form take only its content height. */
+  grid-template-rows: minmax(0, 28%) fit-content(240px) minmax(0, 1fr);
   gap: 6px;
+}
+.review-layout > .recipient-body > .receipt-panel-content {
+  flex: 0 1 auto;
 }
 .review-layout > .staff-checks,
 .review-layout > .recipient-body,
@@ -103,10 +107,20 @@
 .items-freight-panel .compact-items th:first-child {
   width: 40%;
 }
-.dispatch-origin {
+.recipient-row-actions {
+  flex-wrap: wrap;
+}
+.recipient-row-actions > .dispatch-origin {
   display: flex;
+  align-items: center;
   gap: 6px;
-  padding: 8px 0;
+  padding: 0;
+  margin-left: auto;
+  white-space: nowrap;
+}
+.dispatch-origin-label {
+  font-size: 13px;
+  color: #bbb;
 }
 .dispatch-origin button[aria-pressed="true"] {
   background: #414141;

@@ -409,40 +409,6 @@ export function OrderDesk(props: OrderDeskProps) {
                       .filter((r) => r.id === shownRecipient)
                       .map((r) => (
                         <article key={r.id}>
-                          <div className="dispatch-origin" aria-label="배송 건 출고지">
-                            {(["FACTORY", "STORE"] as const).map((origin) => (
-                              <button
-                                key={origin}
-                                disabled={exported}
-                                aria-pressed={
-                                  (r.dispatchOrigin ??
-                                    (r.items.every((i) => i.origin === "STORE")
-                                      ? "STORE"
-                                      : r.items.every((i) => i.origin === "FACTORY")
-                                        ? "FACTORY"
-                                        : undefined)) === origin
-                                }
-                                onClick={() =>
-                                  recEdit(
-                                    r.id,
-                                    (row) => {
-                                      const previous =
-                                        row.dispatchOrigin ?? row.items[0]?.origin ?? "FACTORY";
-                                      row.dispatchOrigin = origin;
-                                      row.items.forEach((i) => (i.origin = origin));
-                                      if (row.shippingCharges)
-                                        row.shippingCharges = {
-                                          [origin]: row.shippingCharges[previous] ?? null,
-                                        };
-                                    },
-                                    false,
-                                  )
-                                }
-                              >
-                                {origin === "FACTORY" ? "공장" : "매장"}
-                              </button>
-                            ))}
-                          </div>
                           <table className="compact-items">
                             <thead>
                               <tr>
@@ -541,6 +507,41 @@ export function OrderDesk(props: OrderDeskProps) {
                             >
                               ＋ 상품 추가
                             </button>
+                            <div className="dispatch-origin" role="group" aria-label="발송지">
+                              <span className="dispatch-origin-label">발송지:</span>
+                              {(["FACTORY", "STORE"] as const).map((origin) => (
+                                <button
+                                  key={origin}
+                                  disabled={exported}
+                                  aria-pressed={
+                                    (r.dispatchOrigin ??
+                                      (r.items.every((i) => i.origin === "STORE")
+                                        ? "STORE"
+                                        : r.items.every((i) => i.origin === "FACTORY")
+                                          ? "FACTORY"
+                                          : undefined)) === origin
+                                  }
+                                  onClick={() =>
+                                    recEdit(
+                                      r.id,
+                                      (row) => {
+                                        const previous =
+                                          row.dispatchOrigin ?? row.items[0]?.origin ?? "FACTORY";
+                                        row.dispatchOrigin = origin;
+                                        row.items.forEach((i) => (i.origin = origin));
+                                        if (row.shippingCharges)
+                                          row.shippingCharges = {
+                                            [origin]: row.shippingCharges[previous] ?? null,
+                                          };
+                                      },
+                                      false,
+                                    )
+                                  }
+                                >
+                                  {origin === "FACTORY" ? "공장" : "매장"}
+                                </button>
+                              ))}
+                            </div>
                           </div>
                         </article>
                       ))}
