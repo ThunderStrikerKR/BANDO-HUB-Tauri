@@ -11,16 +11,16 @@ export function disableInputHistorySuggestions(root: HTMLElement) {
         node.matches(selector)) {
       node.setAttribute("autocomplete", "off");
     }
-    for (const field of node.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(selector)) {
+    node.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(selector).forEach((field) => {
       field.setAttribute("autocomplete", "off");
-    }
+    });
   };
   apply(root);
   const observer = new MutationObserver((records) => {
     for (const record of records) {
-      for (const node of record.addedNodes) {
+      record.addedNodes.forEach((node) => {
         if (node instanceof HTMLElement) apply(node);
-      }
+      });
     }
   });
   observer.observe(root, { childList: true, subtree: true });

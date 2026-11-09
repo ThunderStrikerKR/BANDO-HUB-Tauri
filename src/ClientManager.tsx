@@ -155,59 +155,56 @@ export function ClientManager({
             draft={edit}
             busy={savingView}
             title="거래처 상세 관리"
+            className="client-editor-modal"
             onClose={() => {
               if (!savingView) setEdit(undefined);
             }}
           >
-            <Field label="거래처명 (관리용)">
+            <Field label="거래처명">
               <p className="muted">거래처 검색과 내부 주문 관리에 사용하는 공식 이름입니다.</p>
               <input
                 value={edit.name}
+                aria-invalid={!edit.name.trim()}
                 onChange={(e) => setEdit({ ...edit, name: e.target.value })}
               />
             </Field>
-            <Field label="송장 표시 상호 (선택)">
+            <Field label="송장 표시 상호">
               <p className="muted">택배 운송장의 송하인에 표시합니다. 비우면 거래처명을 사용합니다.</p>
               <input
                 value={edit.displayName ?? ""}
                 onChange={(e) => setEdit({ ...edit, displayName: e.target.value })}
               />
             </Field>
-            <Field label="거래처 주소 *">
+            <Field label="거래처 주소">
               <input
                 value={edit.address ?? ""}
+                aria-invalid={!edit.address?.trim()}
                 onChange={(e) => setEdit({ ...edit, address: e.target.value })}
               />
             </Field>
-            <Field label="거래처 전화번호 또는 휴대폰 *">
-              <p className="muted">전화번호 또는 휴대폰 번호 중 하나는 반드시 입력하세요.</p>
+            <Field label="전화번호">
               <input
                 value={edit.phone ?? ""}
+                aria-invalid={!edit.phone?.trim() && !edit.mobile?.trim()}
                 onChange={(e) => setEdit({ ...edit, phone: e.target.value })}
               />
             </Field>
-            <Field label="거래처 휴대폰 번호">
+            <Field label="휴대폰번호">
               <input
                 value={edit.mobile ?? ""}
+                aria-invalid={!edit.phone?.trim() && !edit.mobile?.trim()}
                 onChange={(e) => setEdit({ ...edit, mobile: e.target.value })}
               />
             </Field>
-            <Field label="거래처 별칭 (선택)">
-              <p className="muted">거래처 검색과 발주서 거래처 인식에 사용할 다른 이름입니다.</p>
+            <Field label="검색 태그">
               <input
-                value={edit.shortNames ?? ""}
-                onChange={(e) => setEdit({ ...edit, shortNames: e.target.value })}
-              />
-            </Field>
-            <Field label="검색 식별자">
-              <input
-                value={edit.identifiers}
-                onChange={(e) => setEdit({ ...edit, identifiers: e.target.value })}
+                value={[edit.shortNames, edit.identifiers].filter(Boolean).join(", ")}
+                onChange={(e) => setEdit({ ...edit, shortNames: e.target.value, identifiers: "" })}
               />
             </Field>
             <div className="account-recommendations">
               <AccountPicker
-                label="주 사용 입금계좌 (선택)"
+                label="주 사용 입금계좌"
                 emptyLabel="미지정 (상품군 추천 계좌 사용)"
                 accounts={state.settings.accounts}
                 value={edit.preferredAccountId ?? ""}

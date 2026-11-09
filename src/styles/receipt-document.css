@@ -329,3 +329,8 @@
   font-size: 13px;
   line-height: 1.6;
 }
+
+/* Missing required client information is indicated at the field itself. */
+.app-modal-layer.client-editor-modal .field input[aria-invalid="true"] {
+  border-color: #d96969;
+}
