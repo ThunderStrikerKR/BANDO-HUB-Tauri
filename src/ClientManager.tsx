@@ -178,14 +178,14 @@ export function ClientManager({
               <section className="client-editor-section">
                 <h3>거래처 식별</h3>
                 <div className="client-editor-grid">
-            <Field label="거래처명" help={{{ purpose: "거래처를 검색하고 주문을 관리할 때 사용할 이름을 정합니다.", when: "새 거래처를 등록하거나 기존 거래처의 이름을 변경할 때 사용합니다.", steps: ["실제 거래처 상호를 입력합니다.", "다른 필수 정보를 입력한 후 거래처를 저장합니다."], result: "접수 화면과 거래처 목록에 이 이름으로 표시됩니다." }}}>
+            <Field label="거래처명" help={{ purpose: "거래처를 검색하고 주문을 관리할 때 사용할 이름을 정합니다.", when: "새 거래처를 등록하거나 기존 거래처의 이름을 변경할 때 사용합니다.", steps: ["실제 거래처 상호를 입력합니다.", "다른 필수 정보를 입력한 후 거래처를 저장합니다."], result: "접수 화면과 거래처 목록에 이 이름으로 표시됩니다." }}>
               <input
                 value={edit.name}
                 aria-invalid={!edit.name.trim()}
                 onChange={(e) => setEdit({ ...edit, name: e.target.value })}
               />
             </Field>
-            <Field label="송장 표시 상호" help={{{ purpose: "택배를 보낼 때 운송장에 표시할 보내는 사람의 상호를 정합니다.", when: "거래처의 실제 상호와 운송장에 인쇄할 상호가 다를 때 사용합니다.", steps: ["운송장에 표시할 상호를 입력합니다.", "거래처 정보를 저장합니다."], result: "대리발송 운송장을 만들 때 이 상호를 사용합니다.", caution: "비워두면 거래처명을 사용합니다." }}}>
+            <Field label="송장 표시 상호" help={{ purpose: "택배를 보낼 때 운송장에 표시할 보내는 사람의 상호를 정합니다.", when: "거래처의 실제 상호와 운송장에 인쇄할 상호가 다를 때 사용합니다.", steps: ["운송장에 표시할 상호를 입력합니다.", "거래처 정보를 저장합니다."], result: "대리발송 운송장을 만들 때 이 상호를 사용합니다.", caution: "비워두면 거래처명을 사용합니다." }}>
               <input
                 value={edit.displayName ?? ""}
                 onChange={(e) => setEdit({ ...edit, displayName: e.target.value })}
@@ -193,7 +193,7 @@ export function ClientManager({
             </Field>
 
                   <div className="client-editor-wide">
-            <Field label="검색 태그" help={{{ purpose: "거래처를 다른 이름이나 약칭으로도 쉽게 찾을 수 있도록 합니다.", when: "거래처 이름 외에 자주 사용하는 호칭이 있을 때 사용합니다.", steps: ["검색에 사용할 이름이나 약칭을 쉼표로 구분하여 입력합니다.", "거래처를 저장합니다.", "거래처 검색창에서 등록한 단어로 검색합니다."], result: "검색할 때 거래처를 더 쉽게 찾을 수 있습니다." }}}>
+            <Field label="검색 태그" help={{ purpose: "거래처를 다른 이름이나 약칭으로도 쉽게 찾을 수 있도록 합니다.", when: "거래처 이름 외에 자주 사용하는 호칭이 있을 때 사용합니다.", steps: ["검색에 사용할 이름이나 약칭을 쉼표로 구분하여 입력합니다.", "거래처를 저장합니다.", "거래처 검색창에서 등록한 단어로 검색합니다."], result: "검색할 때 거래처를 더 쉽게 찾을 수 있습니다." }}>
               <input
                 value={[edit.shortNames, edit.identifiers].filter(Boolean).join(", ")}
                 onChange={(e) => setEdit({ ...edit, shortNames: e.target.value, identifiers: "" })}
@@ -206,7 +206,7 @@ export function ClientManager({
                 <h3>발송인 정보</h3>
                 <div className="client-editor-grid">
                   <div className="client-editor-wide">
-            <Field label="거래처 주소" help={{{ purpose: "대리발송 택배 운송장에 사용할 거래처의 보내는 사람 주소를 저장합니다.", steps: ["거래처의 발송인 주소를 정확하게 입력합니다.", "연락처와 함께 거래처를 저장합니다."], result: "해당 거래처가 보내는 사람인 주문에서 주소를 사용할 수 있습니다.", caution: "주소를 입력하지 않으면 거래처를 저장할 수 없습니다." }}}>
+            <Field label="거래처 주소" help={{ purpose: "대리발송 택배 운송장에 사용할 거래처의 보내는 사람 주소를 저장합니다.", steps: ["거래처의 발송인 주소를 정확하게 입력합니다.", "연락처와 함께 거래처를 저장합니다."], result: "해당 거래처가 보내는 사람인 주문에서 주소를 사용할 수 있습니다.", caution: "주소를 입력하지 않으면 거래처를 저장할 수 없습니다." }}>
               <input
                 value={edit.address ?? ""}
                 aria-invalid={!edit.address?.trim()}
@@ -235,7 +235,7 @@ export function ClientManager({
                 <h3>거래 조건</h3>
                 <div className="client-editor-grid">
 
-              <Field label="가격 등급" help={{{ purpose: "거래처에 적용할 상품 가격 종류를 정합니다.", steps: ["도매, 반도매, 소매, 특수 중 하나를 선택합니다.", "거래처 정보를 저장합니다."], result: "이 거래처의 새 주문에서 해당 가격 기준을 사용합니다.", caution: "특수 등급에서는 상품별 별도 가격을 지정할 수 있습니다." }}}>
+              <Field label="가격 등급" help={{ purpose: "거래처에 적용할 상품 가격 종류를 정합니다.", steps: ["도매, 반도매, 소매, 특수 중 하나를 선택합니다.", "거래처 정보를 저장합니다."], result: "이 거래처의 새 주문에서 해당 가격 기준을 사용합니다.", caution: "특수 등급에서는 상품별 별도 가격을 지정할 수 있습니다." }}>
                 <select
                   value={edit.tier}
                   onChange={(e) => setEdit({ ...edit, tier: e.target.value as Client["tier"] })}
@@ -246,7 +246,7 @@ export function ClientManager({
                   <option value="special">특수</option>
                 </select>
               </Field>
-              <Field label="결제 방식" help={{{ purpose: "거래처가 상품 대금을 언제 내는지 정합니다.", steps: ["주문 전에 입금하는 거래처는 선입금을 선택합니다.", "물품 발송 후 입금하는 거래처는 후불을 선택합니다.", "거래처를 저장합니다."], result: "해당 거래처의 주문 처리 순서와 안내 내용에 반영됩니다." }}}>
+              <Field label="결제 방식" help={{ purpose: "거래처가 상품 대금을 언제 내는지 정합니다.", steps: ["주문 전에 입금하는 거래처는 선입금을 선택합니다.", "물품 발송 후 입금하는 거래처는 후불을 선택합니다.", "거래처를 저장합니다."], result: "해당 거래처의 주문 처리 순서와 안내 내용에 반영됩니다." }}>
                 <select
                   value={edit.payment}
                   onChange={(e) =>
