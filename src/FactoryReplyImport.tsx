@@ -8,6 +8,7 @@ import type { NoticeSink } from "./shared/notices";
 import { useAsyncTask } from "./shared/useAsyncTask";
 import type { State } from "./types";
 import { Modal } from "./ui";
+import { HelpTooltip } from "./ui/HelpTooltip";
 
 export function FactoryReplyImport({
   onSave, onRefresh, onNotice, previewOnly = false,
@@ -68,16 +69,12 @@ export function FactoryReplyImport({
   return (
     <section className="card factory-reply-import">
       <div className="section-title">
-        <h2>공장 운송장 및 운임 회신</h2>
+        <h2 className="settings-help-heading">공장 운송장 및 운임 회신 <HelpTooltip title="공장 회신 Excel 등록" purpose="공장에서 알려준 운송장번호와 실제 배송비를 해당 주문에 등록합니다." when="공장에서 택배 발송 후 회신 Excel 파일을 보냈을 때 사용합니다." steps={["공장 회신 Excel 업로드 버튼을 누릅니다.", "공장에서 받은 Excel 파일을 선택합니다.", "운송장번호와 배송비가 올바른 주문에 연결되는지 확인합니다.", "확인 후 등록 버튼을 눌러 반영합니다."]} result="수취인 정보가 일치한 배송 건에 운송장번호와 실제 운임을 기록합니다." caution="수취인 정보가 일치하지 않거나 충돌한 항목은 자동 변경하지 않고 직원 확인 대상으로 남깁니다." /></h2>
         <button type="button" disabled={busy} onClick={() => input.current?.click()}>
           공장 회신 Excel 업로드
         </button>
       </div>
-      <p className="muted">
-        로젠 회신 Excel의 Q열 운송장번호와 G열 실제 택배운임을 읽습니다.
-        수하인 이름, 주소, 연락처가 공장 발송 건과 일치할 때만 자동 연결합니다.
-        불일치와 충돌은 직원 확인 대상으로 보존합니다.
-      </p>
+
       <input hidden ref={input} type="file"
         accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         onChange={(event) => {
@@ -109,7 +106,7 @@ export function FactoryReplyImport({
               ))}</tbody>
             </table>
           </div>
-          <p className="muted">감사용 원본은 앱 데이터에 보관하고, 별도 사본은 지정된 Excel 보관함의 공장 회신 날짜별 폴더에 저장합니다. 등록 후 충돌 건은 회신 이력에서 개별 검토할 수 있습니다.</p>
+          <HelpTooltip title="공장 회신 파일 보관" purpose="공장에서 받은 원본 파일과 확인 결과를 나중에 다시 살펴볼 수 있도록 보관합니다." steps={["회신 Excel 파일을 확인하고 등록합니다.", "필요할 때 Excel 보관함의 공장 회신 폴더를 엽니다.", "충돌한 항목은 공장 회신 이력에서 다시 확인합니다."]} result="원본은 프로그램 데이터에 보관하고 별도의 Excel 사본은 날짜별 보관함에 저장합니다." />
           {previewOnly && <p className="muted">UI 검사 전용: 행 검토 화면만 표시하며 원본 보관 및 실제 회신 적용은 차단합니다.</p>}
           <label className="check">
             <input type="checkbox" checked={accepted} onChange={(event) => setAccepted(event.target.checked)}/>

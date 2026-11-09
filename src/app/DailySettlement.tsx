@@ -5,6 +5,7 @@ import type { State } from "../types";
 import { Field } from "../ui";
 import { EmptyState, PageHeading } from "../ui/PageHeading";
 import { DateNavigator } from "./DateNavigator";
+import { HelpTooltip } from "../ui/HelpTooltip";
 import { orderHistory } from "./order-history";
 import { dailySettlement } from "./settlement-report";
 
@@ -28,12 +29,9 @@ export function DailySettlement({
       />
       <section className="card">
         <div className="section-title">
-          <h2>{date} / 일일 결산 조회</h2>
+          <h2 className="settings-help-heading">{date} / 일일 결산 조회 <HelpTooltip title="일일 결산" purpose="선택한 날짜에 접수한 주문의 청구 금액과 실제 계좌 입금 내역을 따로 확인합니다." when="하루 주문 금액과 실제 들어온 돈을 점검할 때 사용합니다." steps={["조회할 날짜를 선택합니다.", "접수 주문과 청구 합계를 확인합니다.", "아래 실제 입금 내역과 비교합니다.", "미확정 항목이나 확인할 내용이 있는지 점검합니다."]} result="해당 날짜의 주문과 입금 상태를 확인할 수 있습니다." caution="청구 금액은 주문 접수 날짜, 실제 입금액은 은행 입금 날짜를 기준으로 집계하므로 두 금액을 단순히 더하지 않습니다." /></h2>
         </div>
-        <p className="muted">
-          청구 금액은 접수 확정일, 실제 입금액은 은행 입금 일시를 기준으로 조회합니다.
-          청구액과 입금액은 발생 날짜가 다르므로 서로 합산하지 않습니다.
-        </p>
+
         <div className="settlement-kpis">
           <div><small>접수 주문</small><strong>{report.orderRows.length}건</strong></div>
           <div><small>청구 합계 확인분</small><strong>{won(report.billedKnown)}</strong></div>
@@ -49,11 +47,11 @@ export function DailySettlement({
           <span>현재 미수 확인분 <b>{won(report.outstandingKnown)}</b></span>
           <span>현재 공장 운임 확인분 <b>{won(report.actualFreightKnown)}</b></span>
         </div>
-        <p className="muted">
-          미수 및 실제 운임은 현재 저장된 자료 기준입니다.
-          이 날짜에 실제로 회수하거나 지급한 금액과 동일하지 않습니다.
-          미수 미확정 {report.outstandingUnknown}건, 실제 운임 미확정 {report.freightUnknown}건입니다.
-        </p>
+        <div className="settlement-review-summary">
+          <span>미수 미확정 {report.outstandingUnknown}건</span>
+          <span>실제 운임 미확정 {report.freightUnknown}건</span>
+          <HelpTooltip title="미수금과 실제 운임" purpose="아직 받지 못한 돈과 실제 배송비 중 확인되지 않은 항목을 찾아 점검합니다." when="주문이나 운임이 확정되지 않아 금액을 확인해야 할 때 사용합니다." steps={["미수 미확정 건수와 실제 운임 미확정 건수를 확인합니다.", "아래 주문 내역에서 미확정 항목을 찾습니다.", "확인된 내용을 해당 주문에 반영합니다."]} result="현재 저장된 주문과 배송 자료를 기준으로 미수금과 실제 운임을 확인할 수 있습니다." caution="현재 미수금과 실제 운임은 선택 날짜에 실제로 입금되거나 지급된 돈과 같지 않을 수 있습니다." />
+        </div>
         <div className="table-scroll settlement-scroll">
           <table>
             <thead>
