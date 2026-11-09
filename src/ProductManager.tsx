@@ -28,6 +28,7 @@ import type { NoticeSink } from "./shared/notices";
 import { useAsyncTask } from "./shared/useAsyncTask";
 import type { Product, State, Variant } from "./types";
 import { Field, Modal, MoneyInput, clone } from "./ui";
+import { HelpTooltip } from "./ui/HelpTooltip";
 export function ProductManager({
   state,
   onSave,
@@ -48,6 +49,7 @@ export function ProductManager({
     [edit, setEdit] = useState<Product>(),
     [section, setSection] = useState("상품 목록"),
     [adding, setAdding] = useState(false),
+    [excelOpen, setExcelOpen] = useState(false),
     [priceMode, setPriceMode] = useState(false),
     [detailPriceMode, setDetailPriceMode] = useState(false),
     [categoryPicker, setCategoryPicker] = useState(false);
@@ -212,16 +214,20 @@ export function ProductManager({
           <>
             <div className="manager-bar">
               <div>
-                <h2>
-                  상품 가격표 <span>{products.length}개 상품</span>
-                </h2>
-                <small>
-                  {priceMode
-                    ? "가격 수정 중 / 0은 미등록 / Enter 저장 / Esc 취소 / Tab 다음 셀"
-                    : "가격 잠금 / 수정하려면 가격 수정 모드를 켜세요."}
-                </small>
+                <div className="product-heading-help">
+                  <h2>상품 가격표 <span>{products.length}개 상품</span></h2>
+                  <HelpTooltip
+                    title="상품 가격 수정"
+                    purpose="등록된 상품의 도매가, 반도매가, 소매가를 확인하거나 변경하는 기능입니다."
+                    when="판매 가격이 달라졌거나 잘못 등록한 가격을 고칠 때 사용합니다."
+                    steps={["가격 수정 모드 켜기를 누릅니다.", "변경할 가격을 입력합니다.", "Enter를 눌러 해당 가격을 저장합니다.", "수정을 마치면 가격 수정 모드 종료를 누릅니다."]}
+                    result="저장한 가격이 상품 가격표에 반영됩니다."
+                    caution="수정 모드를 켜기 전에는 가격을 바꿀 수 없습니다. 가격이 비어 있으면 등록되지 않은 상태입니다."
+                  />
+                </div>
               </div>
               <div className="actions">
+                <button type="button" aria-expanded={excelOpen} onClick={() => setExcelOpen((open) => !open)}>Excel 관리</button>
                 <button
                   aria-pressed={priceMode}
                   className={priceMode ? "primary" : ""}
@@ -229,7 +235,7 @@ export function ProductManager({
                 >
                   {priceMode ? "가격 수정 모드 종료" : "가격 수정 모드 켜기"}
                 </button>
-                <button onClick={() => setAdding(!adding)}>상품 추가</button>
+                <button className="primary" onClick={() => setAdding(!adding)}>상품 추가</button>
               </div>
             </div>
             {adding && (
@@ -240,16 +246,18 @@ export function ProductManager({
                 <ProductImports state={state} onSave={onSave} onRefresh={onRefresh} onNotice={onNotice} />
               </section>
             )}
-            <section className="card">
-              <h3>상품 Excel 관리</h3>
-              <p className="muted">
-                독립 상품 1개를 Excel 1행에 표시합니다. 상품명, 상품설명, 색상 및 가격을 한 행에서 조회하고 수정합니다.
-                신규 상품만 대량 등록할 때는 같은 화면의 등록 양식을 이용하세요.
-                등록 성공, 중복, 오류 결과는 반도허브에서 확인합니다.
-              </p>
+            {excelOpen && <section className="card product-excel-panel">
+              <h3>상품 Excel 관리 <HelpTooltip
+                title="상품 Excel 관리"
+                purpose="상품을 여러 개 수정하거나 새 상품을 한꺼번에 등록할 때 사용합니다."
+                when="가격이나 상품 정보를 많이 변경해야 할 때 사용합니다."
+                steps={["현재 상품 전체 Excel을 내려받거나 신규 등록 양식을 받습니다.", "Excel 파일에 상품 정보를 입력하거나 수정합니다.", "파일을 업로드하고 변경 내용을 확인합니다.", "오류가 없을 때 변경사항을 승인합니다."]}
+                result="검토한 상품 정보만 저장됩니다."
+                caution="색상이나 가방 포함 여부 등 판매 구성이 다르면 각각 별도의 상품으로 관리합니다."
+              /> </h3>
               <ProductSyncWorkbookTools onSave={onSave} onRefresh={onRefresh} onNotice={onNotice} />
               <RegistrationManager state={state} onSave={onSave} onRefresh={onRefresh} onNotice={onNotice} />
-            </section>
+            </section>}
             <section className="card product-prices">
               <div className="manager-filters">
                 <ClassificationFilters
@@ -345,7 +353,7 @@ export function ProductManager({
             draft={edit}
             busy={savingView}
             className="product-detail-dialog"
-            title="상품 상세관리"
+            title={state.products.some((item) => item.id === edit.id) ? "상품 상세 관리" : "상품 등록"}
             onClose={() => { if (!savingView) { setEdit(undefined); setCategoryPicker(false); } }}
           >
             <div className="product-detail-body">
@@ -402,7 +410,7 @@ export function ProductManager({
                     </select>
                   </div>
                   <div className="product-detail-price-heading">
-                    <strong>판매 가격</strong>
+                    <span className="product-heading-help"><strong>판매 가격</strong><HelpTooltip title="상품 가격" purpose="이 상품을 거래처에 판매할 때 적용할 가격을 등록합니다." steps={["가격 수정을 눌러 입력을 시작합니다.", "도매가, 반도매가, 소매가를 각각 입력합니다.", "상품 상세 화면 아래의 변경사항 저장을 누릅니다."]} result="거래처 가격 등급에 맞는 금액으로 주문 금액을 계산할 수 있습니다." /></span>
                     <button type="button" disabled={edit.variants.length !== 1} onClick={() => setDetailPriceMode((open) => !open)}>
                       {detailPriceMode ? "가격 수정 잠금" : "가격 수정"}
                     </button>
@@ -430,10 +438,10 @@ export function ProductManager({
                 </div>
               </div>
               <div className="product-detail-wide-fields">
-                <Field label="상품명 (거래처 / 매장 / 공장 공통)">
+                <Field label="상품명" help={{ purpose: "매장 직원과 공장 직원이 같은 상품을 정확히 구별할 수 있도록 이름을 정합니다.", steps: ["상품의 모델명과 판매 구성의 차이를 알 수 있도록 입력합니다.", "가방 포함 또는 미포함, 바퀴 포함 여부, 크기 등 주문에 중요한 차이를 빠뜨리지 않습니다.", "상품 정보를 저장합니다."], result: "입력한 상품명이 주문 확인과 발송 업무에 사용됩니다.", caution: "판매 구성이 다르면 옵션 하나로 합치지 않고 각각 별도 상품으로 등록합니다." }}>
                   <input value={edit.name} onChange={(event) => setEdit({ ...edit, name: event.target.value })} />
                 </Field>
-                <Field label="상품설명 (매장 내부 참고)">
+                <Field label="상품설명" help={{ purpose: "매장 직원이 상품 특징을 기억하거나 상품을 구별할 때 참고할 내용을 남깁니다.", steps: ["직원에게 필요한 상품 특징이나 참고사항을 입력합니다.", "변경사항을 저장합니다."], result: "매장 상품 관리에서 상품 정보를 확인할 때 참고할 수 있습니다.", caution: "주문서와 공장에 전달해야 할 구성 정보는 상품설명이 아니라 상품명에 적습니다." }}>
                   <input value={edit.subtitle ?? ""} onChange={(event) => setEdit({ ...edit, subtitle: event.target.value })} />
                 </Field>
                 <div className="field">
@@ -448,7 +456,7 @@ export function ProductManager({
               </div>
               {edit.variants.length === 1 && (
                 <div className="product-detail-wide-fields">
-                  <Field label="상품 색상">
+                  <Field label="상품 색상" help={{ purpose: "이 상품의 판매 색상을 기록해 다른 색상의 상품과 구별합니다.", steps: ["상품에 실제 색상 구분이 있다면 해당 색상을 입력합니다.", "색상 구분이 없는 상품은 단일로 입력합니다.", "변경사항을 저장합니다."], result: "주문 접수와 상품 검색에서 색상을 확인할 수 있습니다." }}>
                     <input
                       value={edit.variants[0].color}
                       placeholder="예: 블랙 / 색상 구분이 없으면 단일"
@@ -463,7 +471,7 @@ export function ProductManager({
               )}
               <details className="product-detail-advanced">
                 <summary>고급 정보 / 홈페이지 연결 (선택) / 배송 그룹 / 변경 이력</summary>
-                <Field label="배송 그룹">
+                <Field label="배송 그룹" help={{ purpose: "같은 포장 기준으로 배송할 수 있는 상품을 묶어 운임을 관리합니다.", when: "이미 확인된 배송 그룹을 이 상품에 적용할 때 사용합니다.", steps: ["해당 상품이 속할 배송 그룹을 선택합니다.", "상품 정보를 저장합니다."], result: "주문에서 해당 그룹에 등록된 운임 기준을 참고할 수 있습니다.", caution: "포장 조건이 확인되지 않았다면 그룹을 임의로 선택하지 않습니다." }}>
                   <select
                     value={edit.shippingGroupId ?? ""}
                     onChange={(event) => setEdit({ ...edit, shippingGroupId: event.target.value || undefined })}
@@ -476,7 +484,7 @@ export function ProductManager({
                 </Field>
                 {edit.variants.length === 1 && (
                   <div className="product-detail-variant-extra">
-                    <Field label="홈페이지 상품 연결 (선택)">
+                    <Field label="홈페이지 상품 연결" help={{ purpose: "공식 쇼핑몰의 상품 주소를 저장해 상품 정보를 빠르게 확인합니다.", steps: ["해당 상품의 공식 상세페이지 주소를 입력합니다.", "변경사항을 저장합니다."], result: "필요한 경우 상품 안내에 해당 주소를 사용할 수 있습니다.", caution: "이 주소를 입력해도 모든 주문 메시지에 자동으로 링크가 붙는 것은 아닙니다." }}>
                       <input
                         value={edit.variants[0].url}
                         onChange={(event) => setEdit({
