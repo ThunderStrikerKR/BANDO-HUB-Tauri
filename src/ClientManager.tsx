@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { AutomaticMessageTemplateManager } from "./AutomaticMessageTemplateManager";
+import { ProvisionalProductNoticeManager } from "./ProvisionalProductNoticeManager";
 import { confirmAction } from "./dialogs";
 import { clientCandidates, uid } from "./domain";
 import { TierBadge } from "./ManagementUI";
@@ -23,6 +24,7 @@ export function ClientManager({
 }) {
   const { busy: savingView, run: runSave } = useAsyncTask(onNotice);
   const [section,setSection]=useState<"clients"|"messages">("clients");
+  const [messageSection,setMessageSection]=useState<"general"|"provisional">("general");
   const [search, setSearch] = useState(""),
     [edit, setEdit] = useState<Client>(),
     [exception, setException] = useState(""),
@@ -56,7 +58,15 @@ export function ClientManager({
       </nav>
       {section==="messages" ? (
         <div className="management-scroll">
-          <AutomaticMessageTemplateManager state={state} onRefresh={onRefresh} onNotice={onNotice}/>
+          <nav className="product-subnav" aria-label="자동 메시지 편집 종류">
+            <button type="button" aria-current={messageSection==="general"?"page":undefined}
+              onClick={()=>setMessageSection("general")}>상황별 공통 안내</button>
+            <button type="button" aria-current={messageSection==="provisional"?"page":undefined}
+              onClick={()=>setMessageSection("provisional")}>잠정 상품 선택 안내</button>
+          </nav>
+          {messageSection==="general"
+            ? <AutomaticMessageTemplateManager state={state} onRefresh={onRefresh} onNotice={onNotice}/>
+            : <ProvisionalProductNoticeManager state={state} onRefresh={onRefresh} onNotice={onNotice}/>}
         </div>
       ) : (<>
       <div className="management-search">

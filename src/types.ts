@@ -402,6 +402,8 @@ export interface Settings {
   colorGuidanceGroups?: Record<string, { name: string; productIds: string[]; representativeColor: string }>;
   /** Company-wide user-edited message snippets used for future copyable output. */
   automaticMessageTemplates?: Record<string, string>;
+  /** Staff-authored guidance for tentative manual product selections, keyed by stable product ID. */
+  provisionalProductNotices?: Record<string, string>;
   kakaoTitleMappings?: Record<
     string,
     { clientId: string; updatedAt: string; actor: string; ambiguous?: boolean }

@@ -39,6 +39,7 @@ fn valid_state(s: &Value) -> Result<(), String> {
     if s["products"].as_array().is_some_and(|p| p.len() > 50000) { return Err("상품 한도 초과".into()); }
     if s["orders"].as_array().is_some_and(|p| p.len() > 100000) { return Err("주문 한도 초과".into()); }
     validate_message_templates(s)?;
+    validate_provisional_product_notices(s)?;
     Ok(())
 }
 fn write_snapshot(conn: &mut Connection, mut state: Value, expected_revision: u64, validate_orders: bool) -> Result<Value, String> {
@@ -384,6 +385,27 @@ fn validate_color_guidance(state: &Value) -> Result<(), String> {
 }
 
 
+fn validate_provisional_product_notices(state: &Value) -> Result<(), String> {
+    let Some(config) = state["settings"].get("provisionalProductNotices") else {
+        return Ok(());
+    };
+    let entries = config.as_object().ok_or("잠정 상품 안내문 설정 형식 오류")?;
+    if entries.len() > 5000 {
+        return Err("잠정 상품 안내문 등록 한도를 초과했습니다.".into());
+    }
+    let products = state["products"].as_array().ok_or("상품 목록이 누락됐습니다.")?;
+    for (product_id, notice) in entries {
+        if !products.iter().any(|p| p["id"].as_str() == Some(product_id.as_str())) {
+            return Err("등록된 상품에만 잠정 상품 안내문을 연결할 수 있습니다.".into());
+        }
+        let message = notice.as_str().ok_or("잠정 상품 안내문은 문자여야 합니다.")?;
+        if message.trim().is_empty() || message.chars().count() > 2000 {
+            return Err("잠정 상품 안내문은 1자 이상 2000자 이하로 입력하세요.".into());
+        }
+    }
+    Ok(())
+}
+
 fn validate_message_templates(state: &Value) -> Result<(), String> {
     let Some(config) = state["settings"].get("automaticMessageTemplates") else { return Ok(()); };
     let entries = config.as_object().ok_or("자동 메시지 설정은 객체여야 합니다.")?;
@@ -444,7 +466,7 @@ fn settings_patch(db: State<'_, Database>, changes: Value, expected: Value) -> R
         return Err("격리 작업공간의 Excel 보관 경로는 변경할 수 없습니다.".into());
     }
     let allowed = ["senderPostcode", "excelDirectory", "factoryReplyDirectory",
-        "colorGuidanceGroups", "automaticMessageTemplates", "kakaoTitleMappings", "kakaoTitleEnabled",
+        "colorGuidanceGroups", "automaticMessageTemplates", "provisionalProductNotices", "kakaoTitleMappings", "kakaoTitleEnabled",
         "panelRatios", "receptionVerticalRatio", "operatorName", "uiScale", "accounts",
         "defaultAccountId", "senderName", "senderAddress", "senderPhone", "senderMobile",
         "rounding", "brandAccounts", "specialPolicy"];
@@ -469,6 +491,7 @@ fn settings_patch(db: State<'_, Database>, changes: Value, expected: Value) -> R
     }
     if changes.contains_key("colorGuidanceGroups") { validate_color_guidance(&state)?; }
     if changes.contains_key("automaticMessageTemplates") { validate_message_templates(&state)?; }
+    if changes.contains_key("provisionalProductNotices") { validate_provisional_product_notices(&state)?; }
     if ["accounts", "defaultAccountId", "brandAccounts"].iter().any(|k| changes.contains_key(*k)) {
         validate_accounts(&state)?;
     }
