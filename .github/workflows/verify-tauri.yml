@@ -81,6 +81,13 @@ jobs:
           if (!(Test-Path (Join-Path $portable "ocr/runtime/python.exe"))) { throw "Bundled Python missing" }
           if (!(Test-Path (Join-Path $portable "ocr/models/korean_PP-OCRv5_mobile_rec"))) { throw "Bundled Korean model missing" }
           Compress-Archive -Path (Join-Path $portable "*") -DestinationPath (Join-Path $root "BANDO-HUB-portable.zip") -Force
+      - name: Validate offline OCR from the extracted ZIP
+        shell: pwsh
+        run: |
+          $root = "src-tauri/target/release"
+          $unpacked = Join-Path $env:RUNNER_TEMP "bando-ocr-unpacked"
+          Expand-Archive -LiteralPath (Join-Path $root "BANDO-HUB-portable.zip") -DestinationPath $unpacked
+          ./scripts/verify-packaged-ocr.ps1 -OcrRoot (Join-Path $unpacked "ocr")
       - name: Upload portable Windows test distribution (EXE and OCR together)
         uses: actions/upload-artifact@v4
         with:

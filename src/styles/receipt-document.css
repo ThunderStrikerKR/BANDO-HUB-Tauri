@@ -271,3 +271,24 @@
 }
 .ocr-review-textarea { min-height: 190px; width: 100%; }
 .ocr-review-actions { justify-content: flex-end; margin-top: 14px; }
+
+/* OCR native process errors must be readable and copyable, not hidden by
+   the narrow intake status line. */
+.ocr-error-detail {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+  max-height: 300px;
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid #555;
+  border-radius: 5px;
+}
+.app-v03 .source-inline-status .ocr-error-detail-button {
+  display: inline-flex;
+  width: auto;
+  height: auto;
+  margin-left: 8px;
+  padding: 3px 8px;
+  font-size: 12px;
+}

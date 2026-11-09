@@ -2,6 +2,7 @@ import { flushSync } from "react-dom";
 import { newRetailOrder } from "./orders/retail";
 import { RetailOrderDialog } from "./orders/RetailOrderDialog";
 import { OcrReviewDialog } from "./OcrReviewDialog";
+import { Modal } from "./ui";
 import { useEffect, useRef, useState } from "react";
 import { ClientChooser } from "./ClientChooser";
 import { KakaoClients } from "./KakaoClients";
@@ -50,6 +51,8 @@ export function SourceDocument({
     alive = useRef(true);
   const [windows, setWindows] = useState<DockWindow[]>([]);
   const [error, setError] = useState("");
+  const [ocrFailure, setOcrFailure] = useState("");
+  const [showOcrFailure, setShowOcrFailure] = useState(false);
   useEffect(() => {
     alive.current = true;
     return () => {
@@ -104,6 +107,7 @@ export function SourceDocument({
     pending.current = true;
     setBusy(true);
     setError("");
+    setOcrFailure("");
     try {
       if (!window.bando?.captureOcr) throw Error("이 버전에서는 OCR 화면 캡처를 사용할 수 없습니다.");
       const result = await window.bando.captureOcr();
@@ -114,7 +118,12 @@ export function SourceDocument({
       }
       setOcrResult(result);
     } catch (cause) {
-      if (alive.current) setError(String(cause).replace(/^Error: /, ""));
+      if (alive.current) {
+        const detail = String(cause).replace(/^Error: /, "");
+        setError("OCR 처리에 실패했습니다.");
+        setOcrFailure(detail);
+        setShowOcrFailure(true);
+      }
     } finally {
       pending.current = false;
       if (alive.current) setBusy(false);
@@ -293,6 +302,12 @@ export function SourceDocument({
       )}
       <div className="source-inline-status" role="status" title={error}>
         {error}
+        {!!ocrFailure && (
+          <button type="button" className="ocr-error-detail-button"
+            onClick={() => setShowOcrFailure(true)}>
+            오류 상세
+          </button>
+        )}
       </div>
       {!formal && (
         <div className="source-actions">
@@ -325,6 +340,18 @@ export function SourceDocument({
         <small className="source-protection">
           확정 원문 / 주문 변경은 수취인 / 상품 정보에서 처리하세요.
         </small>
+      )}
+      {showOcrFailure && (
+        <Modal title="OCR 실행 오류" onClose={() => setShowOcrFailure(false)}>
+          <p>OCR 실행 중 오류가 발생했습니다. 기존 발주 원문과 주문 데이터는 변경되지 않았습니다.</p>
+          <pre className="ocr-error-detail">{ocrFailure}</pre>
+          <div className="actions">
+            <button type="button" onClick={() => void window.bando?.copy(ocrFailure)}>
+              오류 내용 복사
+            </button>
+            <button type="button" onClick={() => setShowOcrFailure(false)}>닫기</button>
+          </div>
+        </Modal>
       )}
       {ocrResult && !formal && (
         <OcrReviewDialog

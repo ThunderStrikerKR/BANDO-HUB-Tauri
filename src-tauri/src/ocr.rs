@@ -90,12 +90,13 @@ fn capture_blocking() -> Result<OcrCapture, String> {
         }
         std::thread::sleep(Duration::from_millis(200));
     };
-    let out = fs::read_to_string(&stdout).map_err(|e| e.to_string())?;
-    let err = fs::read_to_string(&stderr).unwrap_or_default();
+    let out = String::from_utf8_lossy(&fs::read(&stdout).map_err(|e| e.to_string())?).into_owned();
+    // Windows native extensions sometimes crash before Python can write our
+    // BANDO_OCR_ERROR marker. Never turn an undecodable stderr into an empty
+    // generic message: preserve a bounded, copyable failure diagnosis.
+    let err = String::from_utf8_lossy(&fs::read(&stderr).unwrap_or_default()).into_owned();
     if !status.success() {
-        let cause = err.lines().rev().find_map(|l| l.strip_prefix("BANDO_OCR_ERROR="))
-            .unwrap_or("한글 OCR 모델 또는 Python 실행 환경을 확인해 주세요.");
-        return Err(format!("OCR 인식 실패: {}", cause.chars().take(300).collect::<String>()));
+        return Err(describe_ocr_failure(status.code(), &out, &err));
     }
     let payload = out.lines().rev().find_map(|line| line.strip_prefix("BANDO_OCR_RESULT="))
         .ok_or("OCR 결과를 읽을 수 없습니다.")?;
@@ -108,6 +109,40 @@ fn capture_blocking() -> Result<OcrCapture, String> {
             base64::engine::general_purpose::STANDARD.encode(bmp)),
         width, height,
     })
+}
+
+#[cfg(windows)]
+fn describe_ocr_failure(exit_code: Option<i32>, stdout: &str, stderr: &str) -> String {
+    let code = exit_code.map(|value| format!("0x{:08X}", value as u32))
+        .unwrap_or_else(|| "unknown".to_string());
+    let guidance = match exit_code.map(|value| value as u32) {
+        Some(0xC0000135) => "필수 Windows DLL을 찾을 수 없습니다.",
+        Some(0xC000007B) => "Windows DLL 비트 수 또는 형식이 맞지 않습니다.",
+        Some(0xC0000142) => "Windows DLL 초기화에 실패했습니다.",
+        Some(0xC000001D) => "현재 PC CPU에서 지원하지 않는 명령을 실행했습니다.",
+        Some(0xC0000005) => "OCR 라이브러리의 네이티브 코드가 메모리 접근 오류로 종료됐습니다.",
+        _ => "OCR 하위 프로세스가 비정상 종료됐습니다.",
+    };
+    let marker = stderr.lines().rev()
+        .find_map(|line| line.trim().strip_prefix("BANDO_OCR_ERROR="));
+    let mut last_lines: Vec<&str> = stderr.lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .rev()
+        .take(7)
+        .collect();
+    last_lines.reverse();
+    let detail = marker.map(str::to_owned).or_else(|| {
+        let joined = last_lines.join("\n");
+        if joined.is_empty() { None } else { Some(joined) }
+    }).or_else(|| {
+        let last = stdout.lines().rev().find(|line| !line.trim().is_empty())?;
+        Some(last.to_string())
+    }).unwrap_or_else(|| "추가 오류 로그가 기록되지 않았습니다.".to_owned());
+    format!(
+        "OCR 인식 실패 (종료 코드 {code}). {guidance}\n상세 원인: {}",
+        detail.chars().take(1000).collect::<String>()
+    )
 }
 
 #[cfg(windows)]
@@ -204,6 +239,16 @@ mod tests {
         OCR_RUNNING.store(true, Ordering::Release);
         { let _guard = RunningGuard; }
         assert!(!OCR_RUNNING.load(Ordering::Acquire));
+    }
+    #[cfg(windows)]
+    #[test]
+    fn native_failures_keep_exit_code_and_nonempty_diagnostics() {
+        let detail = describe_ocr_failure(Some(0xC0000135u32 as i32), "", "");
+        assert!(detail.contains("0xC0000135"));
+        assert!(detail.contains("DLL"));
+        let detail = describe_ocr_failure(Some(1), "", "traceback\nBANDO_OCR_ERROR=model corrupted");
+        assert!(detail.contains("model corrupted"));
+        assert!(!detail.contains("추가 오류 로그가 기록되지 않았습니다"));
     }
     #[cfg(windows)]
     #[test]

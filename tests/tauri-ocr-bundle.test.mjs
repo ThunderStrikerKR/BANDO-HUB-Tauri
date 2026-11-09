@@ -9,6 +9,9 @@ const provision = read("scripts/prepare-ocr-bundle.py");
 const build = read("BUILD_WINDOWS_TAURI.cmd");
 const ci = read(".github/workflows/verify-tauri.yml");
 const legacy = read("SETUP_OCR_WINDOWS.cmd");
+const portableVerifier = read("scripts/verify-portable-ocr.py");
+const verifierScript = read("scripts/verify-packaged-ocr.ps1");
+const source = read("src/SourceDocument.tsx");
 
 test("employee Python is never used by OCR", () => {
   assert.match(native, /std::env::current_exe\(\)/);
@@ -51,4 +54,17 @@ test("release and CI never publish standalone EXE without OCR", () => {
   assert.match(ci, /BANDO-HUB-portable\.zip/);
   assert.match(ci, /package-ocr-runtime\.ps1/);
   assert.doesNotMatch(ci, /BANDO-HUB-Tauri-v0\.0\.4-Windows-unsigned-test/);
+  assert.match(ci, /Validate offline OCR from the extracted ZIP/);
+  assert.match(build, /verify-packaged-ocr\.ps1/);
+  assert.match(verifierScript, /verify-portable-ocr\.py/);
+  assert.match(portableVerifier, /subprocess\.run/);
+  assert.match(portableVerifier, /BANDO_OCR_RESULT=/);
+  assert.match(portableVerifier, /-I", "-B", "-X", "utf8"/);
+});
+test("native OCR failures expose Windows exit codes and copyable details", () => {
+  assert.match(native, /fn describe_ocr_failure/);
+  assert.match(native, /0xC0000135/);
+  assert.match(native, /String::from_utf8_lossy/);
+  assert.match(source, /OCR 실행 오류/);
+  assert.match(source, /오류 내용 복사/);
 });

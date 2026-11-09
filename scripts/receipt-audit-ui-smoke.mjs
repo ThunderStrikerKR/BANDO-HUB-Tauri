@@ -219,11 +219,14 @@ try {
             return undefined;
           }
           if (command === "receipt_archive") return structuredClone(auditRecords);
-          if (command === "capture_ocr") return {
+          if (command === "capture_ocr") {
+            if (window.__ocrFailureForTest) throw Error("OCR 인식 실패 (종료 코드 0xC0000135). 필수 Windows DLL을 찾을 수 없습니다.");
+            return {
             text: "709B 2개",
             imageDataUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL/nwAAAABJRU5ErkJggg==",
             width: 1, height: 1,
-          };
+            };
+          }
           if (command === "choose_excel_directory") return "C:\\BANDO_CI_SELECTED";
           if (command === "open_excel_directory") return undefined;
           if (command === "dock_region_native") return undefined;
@@ -262,6 +265,14 @@ try {
   await ocrReview.waitFor({ state: "detached" });
   await page.waitForFunction(() =>
     document.querySelector(".source-document")?.textContent?.includes("709B 2개"));
+  await page.evaluate(() => { window.__ocrFailureForTest = true; });
+  await captureButton.click();
+  const ocrFailure = page.getByRole("dialog", { name: "OCR 실행 오류" });
+  await ocrFailure.waitFor();
+  await ocrFailure.getByText(/0xC0000135/).waitFor();
+  await ocrFailure.getByRole("button", { name: "닫기", exact: true }).click();
+  await ocrFailure.waitFor({ state: "detached" });
+  await page.evaluate(() => { window.__ocrFailureForTest = false; });
   await page.reload();
   const nav = page.getByRole("navigation", { name: "업무 메뉴" });
   await nav.getByRole("button", { name: "엑셀 관리" }).click();

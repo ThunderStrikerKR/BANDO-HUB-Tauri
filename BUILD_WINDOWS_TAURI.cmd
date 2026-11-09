@@ -30,6 +30,8 @@ if errorlevel 1 goto copy_failed
 if exist "release\ocr.next" rmdir /S /Q "release\ocr.next"
 powershell -NoProfile -ExecutionPolicy Bypass -File "scripts\package-ocr-runtime.ps1" -TargetDir "release\ocr.next"
 if errorlevel 1 goto ocr_failed
+powershell -NoProfile -ExecutionPolicy Bypass -File "scripts\verify-packaged-ocr.ps1" -OcrRoot "release\ocr.next"
+if errorlevel 1 goto ocr_failed
 
 echo [5/5] Staging and publishing the EXE and OCR together...
 if not exist "src-tauri\target\release\bando_hub_tauri.exe" goto failed
