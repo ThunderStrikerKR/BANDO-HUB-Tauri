@@ -1,3 +1,4 @@
+import { HelpTooltip } from "../ui/HelpTooltip";
 import { useEffect, useState } from "react";
 import { useAsyncTask } from "../shared/useAsyncTask";
 import type { NoticeSink } from "../shared/notices";
@@ -103,11 +104,8 @@ export function DeveloperLab({ state, onNotice, revision }: {
   return (
     <div className="developer-lab">
       <section className="card">
-        <h2>발주서 오류 검증</h2>
-        <p className="muted">
-          실제 접수 화면과 동일한 파서 및 업무 오류 검증 함수를 사용합니다.
-          결과는 테스트 DB에만 기록하며 이 화면에서 실제 주문을 확정하거나 발송하지 않습니다.
-        </p>
+        <h2 className="settings-help-heading">발주서 오류 검증 <HelpTooltip title="발주서 오류 검증" purpose="발주서에 정보가 빠졌거나 잘못 적혔을 때 프로그램이 문제를 제대로 찾아내는지 시험합니다." when="접수 기능을 수정했거나 새 오류 사례를 확인하고 싶을 때 사용합니다." steps={["시험 시나리오를 선택합니다.", "필요하면 시험 거래처와 발주서 내용을 수정합니다.", "현재 발주서 검사 또는 기본 시나리오 전체 검사를 누릅니다.", "아래 검사 결과를 확인합니다."]} result="발주서의 확인 사항이 예상한 대로 발견되는지 비교할 수 있습니다." caution="검사 결과는 시험 공간에만 기록되며 실제 주문을 확정하거나 상품을 발송하지 않습니다." /></h2>
+
         <div className="developer-lab-field">
           <label htmlFor="dev-case">시험 시나리오</label>
           <select id="dev-case" value={caseId}

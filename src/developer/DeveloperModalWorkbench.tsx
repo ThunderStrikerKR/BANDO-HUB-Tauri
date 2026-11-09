@@ -1,3 +1,4 @@
+import { HelpTooltip } from "../ui/HelpTooltip";
 import { useEffect, useMemo, useState } from "react";
 import { ClientManager } from "../ClientManager";
 import { FactoryReplyImport } from "../FactoryReplyImport";
@@ -175,12 +176,8 @@ export function DeveloperModalWorkbench({ state, raw, onNotice, onRecorded }: {
   const isWorkspace = ["client", "product", "registration", "reply", "receipt"].includes(popup);
   return (
     <section className="card developer-modal-workbench">
-      <h2>실제 업무 팝업 및 UI 상태 검사</h2>
-      <p className="muted">
-        공통 상태는 실제 Modal 컴포넌트로 재현합니다. 업무별 항목은 샘플 제목이 아니라
-        해당 React 업무 컴포넌트를 그대로 실행합니다. 원문 정정 및 수동 분류는 왼쪽 발주서 검사 입력을 사용하며,
-        주요 저장 콜백은 미리보기에서 차단됩니다.
-      </p>
+      <h2 className="settings-help-heading">실제 업무 팝업 및 UI 상태 검사 <HelpTooltip title="팝업 화면 검사" purpose="주문이나 거래처 관리에 사용하는 팝업창이 올바르게 열리고 버튼과 오류 표시가 정상인지 시험합니다." when="팝업의 레이아웃, 입력 오류 또는 버튼 동작을 확인할 때 사용합니다." steps={["검사할 업무 화면과 상태를 선택합니다.", "선택한 실제 화면 열기를 누릅니다.", "입력창과 안내 메시지, 버튼 상태를 확인합니다.", "정상이면 정상으로 기록, 문제가 있으면 문제 발견 기록을 누릅니다."]} result="확인한 팝업 상태를 시험 기록으로 남길 수 있습니다." caution="미리보기에서는 실제 업무 저장을 차단합니다. 실제 저장 흐름은 TEST 프로그램에서 따로 확인합니다." /></h2>
+
       <div className="developer-lab-field">
         <label htmlFor="dev-popup">검사 대상</label>
         <select id="dev-popup" value={popup}

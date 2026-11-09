@@ -63,3 +63,5 @@
 
 .order-history-heading-actions { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
 .settlement-review-summary { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 10px 0; font-size: 12px; color: #d2d2d2; }
+
+.source-help-heading { display: inline-flex; align-items: center; gap: 5px; flex-wrap: nowrap; }

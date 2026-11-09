@@ -1,4 +1,5 @@
 import { flushSync } from "react-dom";
+import { HelpTooltip } from "./ui/HelpTooltip";
 import { newRetailOrder } from "./orders/retail";
 import { RetailOrderDialog } from "./orders/RetailOrderDialog";
 import { OcrReviewDialog } from "./OcrReviewDialog";
@@ -220,7 +221,7 @@ export function SourceDocument({
         />
       )}
       <header className="pane-heading source-heading">
-        <h2>발주 원문</h2>
+        <h2 className="source-help-heading">발주 원문 <HelpTooltip title="발주서 접수" purpose="거래처에서 받은 주문 내용을 입력하고, 주문할 상품과 받는 사람 정보를 확인합니다." when="카카오톡이나 문자, 메일, 팩스 등으로 주문이 들어왔을 때 사용합니다." steps={["대리발송이나 대리점 납품 등 주문에 맞는 입력 방식을 선택합니다.", "주문 내용을 붙여넣거나 캡처 범위 지정을 눌러 화면 글자를 인식합니다.", "거래처를 확인하고 수취인과 상품 내용을 검토합니다.", "확인이 필요한 항목을 수정한 뒤 주문을 진행합니다."]} result="주문 원문을 바탕으로 상품과 수취인 정보를 확인할 수 있습니다." caution="화면에서 글자를 인식하더라도 잘못 읽은 내용은 직원이 직접 확인해야 합니다." /></h2>
         {!formal && (
           <div className="source-heading-actions" aria-label="발주 입력 방식">
             <button disabled={busy} onClick={() => void paste(undefined, "AGENCY")}>

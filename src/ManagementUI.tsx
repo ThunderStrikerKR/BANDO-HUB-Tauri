@@ -1,3 +1,4 @@
+import { HelpTooltip } from "./ui/HelpTooltip";
 import { useEffect, useRef, useState } from "react";
 import { confirmAction, promptText } from "./dialogs";
 import { clientCandidates, suggestClient, won } from "./domain";
@@ -277,13 +278,8 @@ export function BackupPanel({
   const [files, setFiles] = useState<string[]>([]);
   return (
     <section className="card settings">
-      <h2>데이터 백업 및 복구</h2>
-      <p className="muted">
-        프로그램을 시작할 때 자동 백업을 확인합니다. 같은 날 다시 실행해도 중복 생성하지 않습니다. 일반 자동 백업은 최근 30일,
-        해당 월에 처음 생성된 자동 백업은 날짜와 관계없이 영구 보관합니다.
-        수동 백업과 복원 직전 안전 백업도 자동 삭제하지 않습니다.
-        PC가 꺼진 날에는 백업이 생성되지 않습니다.
-      </p>
+      <h2 className="settings-help-heading">데이터 백업 및 복구 <HelpTooltip title="데이터 백업 및 복구" purpose="컴퓨터에 저장된 주문, 상품, 거래처 등의 업무 정보를 안전하게 보관하고 필요하면 이전 상태로 되돌립니다." when="중요한 설정을 바꾸기 전이나 데이터 복구가 필요할 때 사용합니다." steps={["지금 백업을 눌러 현재 자료의 사본을 만듭니다.", "백업 목록에서 보관된 파일을 확인합니다.", "이전 상태로 돌아가야 한다면 해당 파일의 이 백업으로 복구 버튼을 누르고 확인합니다."]} result="선택한 백업 시점의 업무 정보를 복구할 수 있습니다." caution="자동 백업은 프로그램을 시작할 때 확인합니다. 일반 자동 백업은 최근 30일간 보관하고, 각 달에 처음 생성된 백업과 수동 백업은 계속 보관합니다. 복구하면 주문과 작업 기록도 해당 시점으로 돌아갑니다." /></h2>
+
       <div className="actions">
         <button
           onClick={async () => {
