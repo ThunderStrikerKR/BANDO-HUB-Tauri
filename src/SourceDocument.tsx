@@ -42,6 +42,7 @@ export function SourceDocument({
 }) {
   const [retail, setRetail] = useState(false);
   const [ocrResult, setOcrResult] = useState<OcrCapture | null>(null);
+  const [ocrBusy, setOcrBusy] = useState(false);
   const [retailDraft, setRetailDraft] = useState(newRetailOrder);
   const settingsLink = useRef(onSettings);
   settingsLink.current = onSettings;
@@ -106,6 +107,7 @@ export function SourceDocument({
     if (formal || pending.current) return;
     pending.current = true;
     setBusy(true);
+    setOcrBusy(true);
     setError("");
     setOcrFailure("");
     try {
@@ -126,7 +128,10 @@ export function SourceDocument({
       }
     } finally {
       pending.current = false;
-      if (alive.current) setBusy(false);
+      if (alive.current) {
+        setBusy(false);
+        setOcrBusy(false);
+      }
     }
   };
   const applyOcr = async (edited: string, mode: "replace" | "append") => {
@@ -228,7 +233,7 @@ export function SourceDocument({
               직접 입력
             </button>
             <button disabled={busy} onClick={() => void captureOcr()}>
-              {busy ? "처리 중…" : "캡처 범위 지정"}
+              캡처 범위 지정
             </button>
           </div>
         )}
@@ -296,6 +301,12 @@ export function SourceDocument({
           ])}
           onChange={() => {}}
         />
+        {ocrBusy && (
+          <div className="source-ocr-progress" role="status" aria-live="polite" aria-label="OCR 진행 상태">
+            <strong>OCR 처리 중…</strong>
+            <span>화면에서 캡처 범위를 지정하거나 문자 인식이 끝날 때까지 기다려 주세요.</span>
+          </div>
+        )}
       </div>
       {order.analysisRaw && order.analysisRaw !== order.raw && (
         <small>작업용 정정 원문 / 최초 접수 원문 보존</small>

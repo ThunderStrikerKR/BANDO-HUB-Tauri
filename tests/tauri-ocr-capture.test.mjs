@@ -28,3 +28,15 @@ test("Windows local PP-OCRv5 uses new clipboard images only", () => {
   assert.match(script, /ocr_version="PP-OCRv5"/);
   assert.match(script, /lang="korean"/);
 });
+
+test("OCR progress is shown prominently over the source body and never replaces button text", () => {
+  const css = read("src/styles/receipt-document.css");
+  assert.match(source, /const \[ocrBusy, setOcrBusy\] = useState\(false\)/);
+  assert.match(source, /setOcrBusy\(true\)/);
+  assert.match(source, /setOcrBusy\(false\)/);
+  assert.match(source, /className="source-ocr-progress"/);
+  assert.match(source, /<strong>OCR 처리 중…<\/strong>/);
+  assert.match(source, /<button disabled=\{busy\} onClick=\{\(\) => void captureOcr\(\)\}>\s*캡처 범위 지정\s*<\/button>/);
+  assert.doesNotMatch(source, /\{busy \? "처리 중…"/);
+  assert.match(css, /\.source-pane \.source-ocr-progress\s*\{[\s\S]*?position: absolute/);
+});

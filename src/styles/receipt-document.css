@@ -292,3 +292,33 @@
   padding: 3px 8px;
   font-size: 12px;
 }
+
+/* OCR progress belongs to the original-document canvas, never the header button. */
+.source-pane .source-document {
+  position: relative;
+}
+.source-pane .source-ocr-progress {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 22px;
+  background: rgba(17, 17, 17, 0.94);
+  color: var(--text-primary, #f2f2f2);
+  text-align: center;
+}
+.source-pane .source-ocr-progress strong {
+  font-size: clamp(22px, 2vw, 30px);
+  line-height: 1.4;
+  font-weight: 700;
+}
+.source-pane .source-ocr-progress span {
+  max-width: 280px;
+  color: var(--text-secondary, #bbb);
+  font-size: 13px;
+  line-height: 1.6;
+}

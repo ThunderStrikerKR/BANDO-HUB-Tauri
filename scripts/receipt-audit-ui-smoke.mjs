@@ -220,6 +220,9 @@ try {
           }
           if (command === "receipt_archive") return structuredClone(auditRecords);
           if (command === "capture_ocr") {
+            if (window.__ocrDelayForTest) {
+              await new Promise((resolve) => { window.__resolveOcrForTest = resolve; });
+            }
             if (window.__ocrFailureForTest) throw Error("OCR 인식 실패 (종료 코드 0xC0000135). 필수 Windows DLL을 찾을 수 없습니다.");
             return {
             text: "709B 2개",
@@ -251,7 +254,22 @@ try {
   // The OS screenshot and PaddleOCR are native. The browser verifies the
   // actual staff review flow with mocked IPC, including cancel and apply.
   const captureButton = page.getByRole("button", { name: "캡처 범위 지정" });
+  await page.evaluate(() => { window.__ocrDelayForTest = true; });
   await captureButton.click();
+  const ocrProgress = page.getByRole("status", { name: "OCR 진행 상태" });
+  await ocrProgress.waitFor();
+  await ocrProgress.getByText("OCR 처리 중…").waitFor();
+  if (await captureButton.textContent() !== "캡처 범위 지정") {
+    throw Error("OCR capture button label must remain unchanged while busy");
+  }
+  if (!(await captureButton.isDisabled())) {
+    throw Error("OCR capture button must remain disabled while processing");
+  }
+  await page.evaluate(() => {
+    window.__ocrDelayForTest = false;
+    window.__resolveOcrForTest?.();
+  });
+  await ocrProgress.waitFor({ state: "detached" });
   let ocrReview = page.getByRole("dialog", { name: "OCR 문자 인식 검토" });
   await ocrReview.waitFor();
   await ocrReview.getByRole("button", { name: "취소" }).click();
