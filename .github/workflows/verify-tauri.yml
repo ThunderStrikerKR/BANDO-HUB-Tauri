@@ -85,7 +85,8 @@ jobs:
         shell: pwsh
         run: |
           $root = "src-tauri/target/release"
-          $unpacked = Join-Path $env:RUNNER_TEMP "bando-ocr-unpacked"
+          # A Korean installation path must work with the Paddle native loader.
+          $unpacked = Join-Path $env:RUNNER_TEMP "반도허브-한글경로-검증"
           Expand-Archive -LiteralPath (Join-Path $root "BANDO-HUB-portable.zip") -DestinationPath $unpacked
           ./scripts/verify-packaged-ocr.ps1 -OcrRoot (Join-Path $unpacked "ocr")
       - name: Upload portable Windows test distribution (EXE and OCR together)

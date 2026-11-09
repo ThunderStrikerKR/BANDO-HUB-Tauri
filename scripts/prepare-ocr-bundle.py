@@ -56,8 +56,10 @@ def main():
             source = find_model(cache, model_name)
             target = destination / model_name
             shutil.copytree(source, target)
-            if not any(path.is_file() for path in target.rglob("*")):
-                raise RuntimeError(f"Bundled OCR model {model_name} is empty")
+            required = ("inference.json", "inference.pdiparams", "inference.yml")
+            missing = [name for name in required if not (target / name).is_file()]
+            if missing:
+                raise RuntimeError(f"Bundled OCR model {model_name} missing files: {missing}")
         print("Verifying copied models with actual offline inference...", flush=True)
         local = pipeline_options()
         local["text_detection_model_dir"] = str(destination / DETECTION)

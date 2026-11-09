@@ -68,3 +68,20 @@ test("native OCR failures expose Windows exit codes and copyable details", () =>
   assert.match(source, /OCR 실행 오류/);
   assert.match(source, /오류 내용 복사/);
 });
+
+test("Paddle native OCR loads models through ASCII staging when installed under Korean folders", () => {
+  const source = read("src-tauri/resources/ocr/recognize.py");
+  const prep = read("scripts/prepare-ocr-bundle.py");
+  assert.match(source, /def compatible_model_folders\(root\):/);
+  assert.match(source, /def is_ascii_path\(path\):/);
+  assert.match(source, /tempfile\.TemporaryDirectory\(prefix="bando-ocr-model-", dir=public\)/);
+  assert.match(source, /shutil\.copytree\(det, det_copy\)/);
+  assert.match(source, /shutil\.copytree\(rec, rec_copy\)/);
+  assert.match(source, /with Image\.open\(sys\.argv\[1\]\) as image:/);
+  assert.match(source, /\.predict\(pixels\)/);
+  for (const required of ["inference.json","inference.pdiparams","inference.yml"]) {
+    assert.ok(source.includes(required), required);
+    assert.ok(prep.includes(required), required);
+  }
+  assert.match(ci, /반도허브-한글경로-검증/);
+});
