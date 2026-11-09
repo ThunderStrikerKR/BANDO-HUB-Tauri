@@ -650,8 +650,12 @@
 
 /* Compact delivery information above each shipment's products. */
 .manual-workspace .manual-status { flex: 0 0 auto; height: auto; min-height: 56px; overflow: visible; white-space: normal; }
-.manual-workspace .manual-guide { display: flex; flex-direction: column; gap: 2px; font-size: 11px; line-height: 1.4; }
-.manual-workspace .manual-guide > span:first-child { color: var(--text-primary); font-weight: 600; }
+/* A live unassigned-block count replaces the long inline operation manual. */
+.manual-workspace .manual-help-or-error strong {
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+}
 .manual-workspace .manual-source-heading {
   min-height: 42px; display: flex; align-items: center;
   padding: 0 12px; margin: -8px -8px 0; background: #222;
@@ -659,18 +663,62 @@
 }
 .manual-workspace .manual-source-heading h3 { margin: 0; }
 .manual-workspace .manual-source pre { margin-top: 8px; }
-.manual-workspace .manual-grid-scroll .manual-delivery-table { width: 100%; min-width: 0; table-layout: fixed; }
-.manual-workspace .manual-delivery-table thead th { position: relative; background: #202020; }
-.manual-workspace .manual-delivery-table thead th:not(:last-child)::after {
-  content: ""; position: absolute; top: 24%; right: 0; height: 52%;
-  width: 1px; background: #505050;
+/* Title band matches the source panel and remains visually distinct. */
+.manual-workspace .manual-sheet-heading {
+  flex: 0 0 46px;
+  min-height: 46px;
+  margin: -8px -8px 9px;
+  padding: 0 12px;
+  background: #202020;
+  border-bottom: 1px solid #505050;
 }
-.manual-workspace .manual-delivery-table th:first-child { width: 8%; min-width: 0; }
-.manual-workspace .manual-delivery-table th:nth-child(2) { width: 12%; }
-.manual-workspace .manual-delivery-table th:nth-child(3) { width: 30%; }
-.manual-workspace .manual-delivery-table th:nth-child(4) { width: 17%; }
-.manual-workspace .manual-delivery-table th:nth-child(5) { width: 14%; }
-.manual-workspace .manual-delivery-table th:nth-child(6) { width: 19%; }
+.manual-workspace .manual-sheet-heading h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.manual-workspace .manual-grid-scroll .manual-delivery-table { width: 100%; min-width: 0; table-layout: fixed; }
+/* Fixed narrow fields leave the remaining space for long street addresses. */
+.manual-workspace .manual-delivery-table .manual-col-shipment { width: 65px; }
+.manual-workspace .manual-delivery-table .manual-col-name { width: 96px; }
+.manual-workspace .manual-delivery-table .manual-col-mobile { width: 130px; }
+.manual-workspace .manual-delivery-table .manual-col-phone { width: 124px; }
+.manual-workspace .manual-delivery-table .manual-col-note { width: 132px; }
+.manual-workspace .manual-delivery-table .manual-shipment-heading th {
+  position: relative;
+  width: auto;
+  background: #202020;
+  padding: 7px 7px;
+  white-space: nowrap;
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--text-secondary);
+  border-bottom: 1px solid #505050;
+}
+.manual-workspace .manual-delivery-table .manual-shipment-heading th:first-child {
+  position: static;
+  background: #202020;
+}
+.manual-workspace .manual-delivery-table .manual-shipment-heading th:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: 24%;
+  right: 0;
+  height: 52%;
+  width: 1px;
+  background: #505050;
+}
+.manual-workspace .manual-delivery-table .manual-recipient-row td,
+.manual-workspace .manual-delivery-table .manual-recipient-row th {
+  padding: 5px 3px;
+  vertical-align: middle;
+}
+.manual-workspace .manual-delivery-table .manual-recipient-row > td input {
+  height: 33px;
+  min-height: 33px;
+}
 .manual-workspace .manual-delivery-table .manual-recipient-row > th {
   position: static; background: transparent; white-space: nowrap;
 }

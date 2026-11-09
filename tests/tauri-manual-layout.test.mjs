@@ -19,10 +19,28 @@ test("product actions retain behavior but use compact new layout", () => {
 });
 test("source title, instructions and header dividers match agreed UX", () => {
   assert.match(code, /<h3>붙여넣은 내용<\/h3>/);
-  assert.match(code, /오른쪽 입력 칸을 선택한 후/);
-  assert.match(code, /흰색 블록: 연결되지 않은 내용/);
-  assert.match(code, /Ctrl\+Z: 이전 작업 되돌리기/);
-  assert.match(css, /\.manual-delivery-table thead th:not\(:last-child\)::after/);
+  assert.match(code, /미배정됨: \{unassignedCount\}개/);
+  assert.match(code, /model\.blocks\.filter\(\(block\) => !model\.assignments\[block\.id\]\)\.length/);
+  assert.doesNotMatch(code, /오른쪽 입력 칸을 선택한 후/);
+  assert.match(css, /\.manual-shipment-heading th:not\(:last-child\)::after/);
   assert.match(css, /background: #505050/);
   assert.match(css, /grid-template-columns: minmax\(0, 1fr\)/);
+});
+
+test("every shipment renders its own shipping labels before its delivery data", () => {
+  const repeated = code.indexOf('className="manual-shipment-heading"');
+  const groups = code.indexOf('<tbody key={row.id} className="manual-shipment-group">');
+  const recipient = code.indexOf('className="manual-recipient-row"');
+  assert.ok(groups >= 0 && repeated > groups && recipient > repeated);
+  assert.match(code, /\["배송", "이름", "주소", "휴대폰", "전화", "배송 요청"\]/);
+  assert.doesNotMatch(code, /<thead>/);
+});
+test("compact fixed columns prioritise address and panel heading is a distinct band", () => {
+  assert.match(code, /className="manual-col-address"/);
+  for (const cls of ["manual-col-shipment","manual-col-name","manual-col-mobile","manual-col-phone","manual-col-note"]) {
+    assert.ok(css.includes(".manual-"+cls), cls);
+  }
+  assert.match(css, /\.manual-sheet-heading h3 \{/);
+  assert.match(css, /font-size: 15px;/);
+  assert.match(css, /margin: -8px -8px 9px;/);
 });

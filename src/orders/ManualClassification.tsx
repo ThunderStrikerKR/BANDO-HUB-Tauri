@@ -563,6 +563,7 @@ export function ManualClassification({
     cursor = block.end;
   }
   segments.push((order.analysisRaw ?? order.raw).slice(cursor));
+  const unassignedCount = model.blocks.filter((block) => !model.assignments[block.id]).length;
   const uncommitted = model.rows.some((row) =>
     row.items.some(
       (item) =>
@@ -626,13 +627,7 @@ export function ManualClassification({
               </>
             ) : (
               <div className="manual-help-or-error">
-                {error?.message || (
-                  <div className="manual-guide">
-                    <span>오른쪽 입력 칸을 선택한 후, 왼쪽 원문에서 해당 내용을 클릭하세요.</span>
-                    <span>흰색 블록: 연결되지 않은 내용 / 회색 블록: 연결된 내용으로, 클릭하면 연결 해제</span>
-                    <span>방향키 / Tab: 입력 칸 이동 / Ctrl+Z: 이전 작업 되돌리기</span>
-                  </div>
-                )}
+                {error?.message || <strong>미배정됨: {unassignedCount}개</strong>}
               </div>
             )}
             {pending && error && <small>{error.message}</small>}
@@ -680,15 +675,21 @@ export function ManualClassification({
               </div>
               <div className="manual-grid-scroll">
                 <table className="manual-delivery-table">
-                  <thead>
-                    <tr>
-                      {["배송", "이름", "주소", "휴대폰", "전화", "배송 요청"].map((label) => (
-                        <th key={label} scope="col">{label}</th>
-                      ))}
-                    </tr>
-                  </thead>
+                  <colgroup>
+                    <col className="manual-col-shipment" />
+                    <col className="manual-col-name" />
+                    <col className="manual-col-address" />
+                    <col className="manual-col-mobile" />
+                    <col className="manual-col-phone" />
+                    <col className="manual-col-note" />
+                  </colgroup>
                   {model.rows.map((row, index) => (
                     <tbody key={row.id} className="manual-shipment-group">
+                      <tr className="manual-shipment-heading">
+                        {["배송", "이름", "주소", "휴대폰", "전화", "배송 요청"].map((label) => (
+                          <th key={label} scope="col">{label}</th>
+                        ))}
+                      </tr>
                       <tr className="manual-recipient-row">
                         <th scope="row">배송 {index + 1}</th>
                         {["name", "address", "mobile", "phone", "note"].map((field, n) => (
