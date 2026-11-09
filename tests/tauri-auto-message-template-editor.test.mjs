@@ -39,8 +39,8 @@ test("financial variables and unknown variables are protected",async()=>{
     paymentTotal:"입금해 주실 금액은 {합계}입니다.",
     recipientName:"받는 분 성함을 알려주세요.",
   }));
-  assert.throws(()=>validateAutomaticMessageTemplates({paymentTotal:"합계는 얼마인가요?"}),/필수 변수/);
-  assert.throws(()=>validateAutomaticMessageTemplates({paymentAccount:"{계좌번호}"}),/필수 변수/);
+  assert.throws(()=>validateAutomaticMessageTemplates({paymentTotal:"합계는 얼마인가요?"}),/변수를 삭제/);
+  assert.throws(()=>validateAutomaticMessageTemplates({paymentAccount:"{계좌번호}"}),/변수를 삭제/);
   assert.throws(()=>validateAutomaticMessageTemplates({colorDefault:"{알수없음}으로 보내드릴게요."}),/지원하지 않는 변수/);
   assert.throws(()=>validateAutomaticMessageTemplates({recipientName:""}),/1자 이상/);
 });
@@ -57,7 +57,7 @@ test("editing templates does not modify sale prices or historical orders",()=>{
   const ui=source("src/AutomaticMessageTemplateManager.tsx");
   const native=source("src-tauri/src/lib.rs");
   assert.match(ui,/\{automaticMessageTemplates:draft\}/);
-  assert.match(ui,/\{automaticMessageTemplates:baseline\.settings\.automaticMessageTemplates\?\?null\}/);
+  assert.match(ui,/const expected=Object\.keys\(baseline\)\.length \? baseline : null/);
   assert.doesNotMatch(ui,/state_save|setPrice|write_snapshot/);
   assert.match(native,/"automaticMessageTemplates"/);
   assert.match(native,/validate_message_templates\(&state\)/);

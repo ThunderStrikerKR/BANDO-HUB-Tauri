@@ -15,7 +15,7 @@ test("No model code based auto-family groups or prefilled color groups",async()=
   assert.equal(suggestGroupColor(state,[black,silver]),undefined);
   const ui=read("src/ColorGuidanceManager.tsx");
   assert.match(ui,/그룹 생성/);
-  assert.match(ui,/그룹에 추가/);
+  assert.match(ui,/기존 상품 검색 및 추가/);
   assert.match(ui,/실제 상품 색상|상품의 색상 선택|등록된 상품의 색상 선택/);
   assert.match(ui,/validateColorGuidance/);
   assert.match(ui,/await window.bando.backup\(\)/);
@@ -77,7 +77,7 @@ test("Unspecified color JS-2 stays unresolved until staff chooses from error dia
   assert.equal(selected.variantId,black.variants[0].id);
   assert.equal(selected.appliedDefaultColor.color,"Black");
   assert.equal(selected.modelProposal,undefined);
-  assert.match(appliedDefaultColorNotice(selected),/기본색상 블랙으로 접수했습니다/);
+  assert.equal(appliedDefaultColorNotice(selected),"블랙으로 보내드릴게요.");
   assert.doesNotMatch(appliedDefaultColorNotice(selected),/진행해도 될까요/);
 });
 

@@ -72,7 +72,7 @@ export function suggestGroupColor(state: State, candidates: Product[]): ColorGui
 }
 
 /** Created after employee selection only; customer notice, not a confirmation request. */
-export function appliedDefaultColorNotice(item: Item, settings: Settings): string {
+export function appliedDefaultColorNotice(item: Item, settings: Pick<Settings,"automaticMessageTemplates"> = {}): string {
   const color = colorLabel(item.appliedDefaultColor?.color ?? "").trim();
   if (!color) return "";
   return renderAutomaticTemplate(settings,"colorDefault",{

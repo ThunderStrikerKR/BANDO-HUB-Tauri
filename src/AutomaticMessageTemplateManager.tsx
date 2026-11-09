@@ -46,7 +46,7 @@ export function AutomaticMessageTemplateManager({
       validateAutomaticMessageTemplates(draft);
       if(!window.bando?.patchSettings)throw Error("설정 저장 기능을 사용할 수 없습니다.");
       const latest=await window.bando.load();
-      const expected=state.settings.automaticMessageTemplates??null;
+      const expected=Object.keys(baseline).length ? baseline : null;
       const candidate=structuredClone(latest);
       candidate.settings.automaticMessageTemplates=structuredClone(draft);
       validateAutomaticMessageTemplates(candidate.settings.automaticMessageTemplates);

@@ -116,11 +116,11 @@ export function validateAutomaticMessageTemplates(edits: AutomaticTemplateEdits)
   }
 }
 
-export function templateText(settings: Settings, key:AutomaticTemplateId) {
+export function templateText(settings: Pick<Settings,"automaticMessageTemplates"> = {}, key:AutomaticTemplateId) {
   return settings.automaticMessageTemplates?.[key] ?? AUTOMATIC_MESSAGE_TEMPLATES[key].body;
 }
 export function renderAutomaticTemplate(
-  settings: Settings,key:AutomaticTemplateId,values:Record<string,string>={}
+  settings: Pick<Settings,"automaticMessageTemplates">,key:AutomaticTemplateId,values:Record<string,string>={}
 ) {
   const text=templateText(settings,key);
   return text.replace(/\{([^{}]+)\}/g, (_,name:string)=>values[name] ?? "");
