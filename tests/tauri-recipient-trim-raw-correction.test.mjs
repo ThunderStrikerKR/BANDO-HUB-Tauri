@@ -7,11 +7,10 @@ const staff = load("src/StaffChecks.tsx");
 const guard = load("src/working-raw.ts");
 const css = load("src/styles/patch-v0808.css");
 
-test("raw correction never takes an independent review-grid row", () => {
-  assert.doesNotMatch(desk, /rawCorrectionAllowed\(flowState, draft\) && \(/);
-  assert.match(desk, /<StaffChecks\s+onCorrectRaw=/);
-  assert.match(staff, /onCorrectRaw && rawCorrectableIssue\(b.kind\)/);
-  assert.match(staff, /<button onClick=\{onCorrectRaw\}>원문 정정<\/button>/);
+test("raw correction is not inserted as an unrequested action in order review", () => {
+  assert.doesNotMatch(desk, /WorkingRawDialog|rawCorrectionAllowed|onCorrectRaw|setCorrecting/);
+  assert.doesNotMatch(staff, /원문 정정|onCorrectRaw|rawCorrectableIssue/);
+  assert.match(desk, /<StaffChecks\s+blocks=\{staffBlocks\}/);
   assert.match(guard, /orderIssues\(o\)\.some\([\s\S]*?rawCorrectableIssue\(i.kind\)/);
 });
 test("recipient line and excessive whitespace are removed, extra area goes to products", () => {
@@ -19,4 +18,13 @@ test("recipient line and excessive whitespace are removed, extra area goes to pr
   assert.match(css, /\.review-layout > \.recipient-body \.recipient-fields\s*\{[\s\S]*?padding-bottom: 0;[\s\S]*?margin-bottom: 0;[\s\S]*?border-bottom: 0;/);
   assert.match(css, /\.review-layout > \.recipient-body > \.receipt-panel-content\s*\{[\s\S]*?padding: 6px 10px 4px;/);
   assert.match(css, /\.review-layout > \.recipient-body \.recipient-review\s*\{[\s\S]*?padding: 0;[\s\S]*?margin: 0;/);
+});
+
+test("issue descriptions and informational messages are static; explicit buttons handle navigation", () => {
+  assert.match(staff, /<div className="issue-heading">/);
+  assert.doesNotMatch(staff, /<button className="issue-heading"/);
+  assert.match(staff, /<div className="staff-fact-message">/);
+  assert.doesNotMatch(staff, /클릭해 정정/);
+  assert.match(staff, /<button onClick=\{\(\) => onSelect\(b\)\}>입력 위치로 이동<\/button>/);
+  assert.match(staff, /<button onClick=\{\(\) => onSelect\(b\)\}>수량 수정<\/button>/);
 });

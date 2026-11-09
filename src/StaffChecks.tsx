@@ -1,17 +1,14 @@
 import type { StaffBlock } from "./hub-messages";
-import { rawCorrectableIssue } from "./working-raw";
 export function StaffChecks({
   blocks,
   onSelect,
   onCancelApproval,
   onCandidate,
-  onCorrectRaw,
 }: {
   blocks: StaffBlock[];
   onSelect: (block: StaffBlock) => void;
   onCancelApproval?: (b: StaffBlock) => void;
   onCandidate?: (b: StaffBlock, value: string) => void;
-  onCorrectRaw?: () => void;
 }) {
   const actions = blocks.filter((b) => b.severity !== "INFO"),
     facts = blocks.filter((b) => b.severity === "INFO"),
@@ -52,12 +49,12 @@ export function StaffChecks({
             }
             key={b.issueId ?? n}
           >
-            <button className="issue-heading" onClick={() => onSelect(b)}>
+            <div className="issue-heading">
               <b>{b.title}</b>
               <small className={b.kind === "UNASSIGNED_EVIDENCE" ? "unassigned-evidence-detail" : undefined}>
                 {b.detail}
               </small>
-            </button>
+            </div>
             {b.kind === "UNASSIGNED_EVIDENCE" && (
               <small className="unassigned-evidence-hint">
                 상품 또는 수량으로 인식된 문구입니다. 수동 분류에서 실제 주문 내용과 연결할지 확인하세요.
@@ -67,9 +64,6 @@ export function StaffChecks({
               <small>거래처 확인 대기 / 문의 복사만으로 해결되지 않습니다.</small>
             )}
             <div className="issue-actions">
-              {onCorrectRaw && rawCorrectableIssue(b.kind) && (
-                <button onClick={onCorrectRaw}>원문 정정</button>
-              )}
               {b.choices?.map((c, n) => (
                 <button key={n} onClick={() => onCandidate?.(b, c.value)}>
                   {c.label} → 적용
@@ -102,21 +96,27 @@ export function StaffChecks({
           <details className="staff-fact">
             <summary>공통 상품 자동 적용 / {inherited.length}개 항목</summary>
             {inherited.map((b, n) => (
-              <button key={b.issueId ?? n} onClick={() => onSelect(b)}>
-                {b.detail} / 클릭해 정정
-              </button>
+              <div className="staff-fact-entry" key={b.issueId ?? n}>
+                <div className="staff-fact-message">{b.detail}</div>
+                <div className="issue-actions">
+                  <button onClick={() => onSelect(b)}>입력 위치로 이동</button>
+                </div>
+              </div>
             ))}
           </details>
         )}
         {others.map((b, n) => (
           <article className="staff-fact" key={b.issueId ?? n}>
-            <button onClick={() => onSelect(b)}>
+            <div className="staff-fact-message">
               <b>{b.title}</b>
-              <small>{b.detail} / 클릭해 정정</small>
-            </button>
-            {b.kind === "QUANTITY_MISSING" && (
-              <button onClick={() => onCancelApproval?.(b)}>잠정 승인 취소</button>
-            )}
+              <small>{b.detail}</small>
+            </div>
+            <div className="issue-actions">
+              <button onClick={() => onSelect(b)}>입력 위치로 이동</button>
+              {b.kind === "QUANTITY_MISSING" && (
+                <button onClick={() => onCancelApproval?.(b)}>잠정 승인 취소</button>
+              )}
+            </div>
           </article>
         ))}
       </div>

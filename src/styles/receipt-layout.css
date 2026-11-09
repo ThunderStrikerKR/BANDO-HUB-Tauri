@@ -56,9 +56,6 @@
   white-space: normal;
   line-height: 1.5;
 }
-.staff-checks .staff-block:hover {
-  background: #3b2c1c !important;
-}
 .staff-checks .staff-block b {
   display: block;
   font-size: 15px;

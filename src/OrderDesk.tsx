@@ -1,5 +1,3 @@
-import { WorkingRawDialog } from "./WorkingRawDialog";
-import { rawCorrectionAllowed } from "./working-raw";
 import { useState } from "react";
 import { CorrectionPanel } from "./CorrectionPanel";
 import { ActualFreightField } from "./ActualFreightField";
@@ -21,7 +19,6 @@ import { billingSnapshot } from "./replies";
 import { Field, clone } from "./ui";
 import { clientChangeIssue, orderGrandTotal, reconcileWorkflow, shipmentVat } from "./workflow";
 export function OrderDesk(props: OrderDeskProps) {
-  const [correcting, setCorrecting] = useState(false);
   const [changeRequest, setChangeRequest] = useState<string>();
   const {
     highlight,
@@ -185,11 +182,6 @@ export function OrderDesk(props: OrderDeskProps) {
             <section className="desk-pane review-pane compact-review">
               <div className="review-layout">
                 <StaffChecks
-                  onCorrectRaw={
-                    rawCorrectionAllowed(flowState, draft)
-                      ? () => setCorrecting(true)
-                      : undefined
-                  }
                   blocks={staffBlocks}
                   onSelect={selectIssue}
                   onCancelApproval={(b) => {
@@ -672,19 +664,6 @@ export function OrderDesk(props: OrderDeskProps) {
             ) : null;
           })()}
       </div>
-      {correcting && (
-        <WorkingRawDialog
-          state={flowState}
-          order={draft}
-          onClose={() => setCorrecting(false)}
-          onApply={async (next) => {
-            const updated = next.orders.find((o) => o.id === draft.id)!;
-            if (saved) await onSaveState(next);
-            setSource(updated.analysisRaw ?? updated.raw);
-            onChange(updated);
-          }}
-        />
-      )}
     </LinkContext.Provider>
   );
 }

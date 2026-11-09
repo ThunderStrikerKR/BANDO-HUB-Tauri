@@ -349,3 +349,27 @@
     width: 74px;
   }
 }
+
+/* Issue and information-card copy is static. Only named actions are clickable. */
+.staff-checks .issue-heading,
+.staff-checks .staff-fact-message {
+  cursor: default;
+}
+.staff-checks .staff-fact-entry + .staff-fact-entry {
+  border-top: 1px solid #35577f;
+  margin-top: 8px;
+  padding-top: 8px;
+}
+.app-v03 .staff-checks .staff-fact .issue-actions button {
+  display: inline-flex;
+  width: auto;
+  padding: 5px 8px;
+  border: 1px solid #416897;
+  border-radius: 4px;
+  background: #263b54;
+  color: #cfe4ff;
+  cursor: pointer;
+}
+.app-v03 .staff-checks .staff-fact .issue-actions button:hover {
+  background: #34516f;
+}
