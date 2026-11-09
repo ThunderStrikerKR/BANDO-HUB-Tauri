@@ -1,0 +1,59 @@
+/* Help popovers appear in the browser top layer, including above native dialogs. */
+.help-tooltip-anchor {
+  display: inline-flex;
+  vertical-align: middle;
+  align-items: center;
+  flex: none;
+}
+.help-tooltip-trigger,
+.app-modal-layer .help-tooltip-trigger,
+.app-v03 .management-container .help-tooltip-trigger {
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  min-height: 22px;
+  border: 1px solid #777;
+  border-radius: 50%;
+  background: #333;
+  color: #e6e6e6;
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 700;
+  text-align: center;
+  padding: 0;
+  cursor: help;
+}
+.help-tooltip-trigger:hover,
+.help-tooltip-trigger:focus-visible {
+  background: #4a4a4a;
+  border-color: #ddd;
+  outline-offset: 2px;
+}
+.help-tooltip-panel:popover-open {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  box-sizing: border-box;
+  max-height: min(70dvh, 500px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 15px 17px;
+  background: #292929;
+  border: 1px solid #797979;
+  border-radius: 8px;
+  box-shadow: 0 12px 38px rgb(0 0 0 / 60%);
+  color: #eee;
+  font: 400 13px/1.6 var(--font-body, sans-serif);
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+.help-tooltip-panel .help-tooltip-title {
+  display: block;
+  font-size: 14px;
+  margin-bottom: 9px;
+}
+.help-tooltip-panel b { display: block; margin-top: 11px; }
+.help-tooltip-panel p { margin: 4px 0 8px; }
+.help-tooltip-panel ol { margin: 5px 0 9px; padding-left: 22px; }
+.help-tooltip-panel li + li { margin-top: 3px; }
