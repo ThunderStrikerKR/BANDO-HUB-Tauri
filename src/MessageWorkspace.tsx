@@ -1,5 +1,7 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { automaticMessage, withGreeting } from "./automatic-message";
+import { validProductUrl } from "./domain";
+import { groupOrder } from "./workflow";
 import { recordCopy } from "./message-model";
 import { LinkedText, messageSpans } from "./LinkedText";
 import type { NoticeSink } from "./shared/notices";
@@ -21,16 +23,33 @@ export function MessageWorkspace({
 }) {
   const [busy, setBusy] = useState(false),
     [status, setStatus] = useState(""),
+    [includeLinks, setIncludeLinks] = useState(false),
     latest = useRef(order);
   latest.current = order;
-  useLayoutEffect(() => setStatus(""), [order.id, order.raw, gid]);
-  const automatic = gid && order.orderType !== "RETAIL" ? automaticMessage(state, gid) : undefined,
+  useLayoutEffect(() => {
+    setStatus("");
+    setIncludeLinks(false);
+  }, [order.id, order.raw, gid]);
+  const automatic = gid && order.orderType !== "RETAIL"
+      ? automaticMessage(state, gid, includeLinks)
+      : undefined,
     request = automatic?.phase !== "payment",
-    text = automatic
+    baseText = automatic
       ? request
         ? (order.requestMessages?.[gid!] ?? automatic.text)
         : automatic.text
-      : "";
+      : "",
+    // Confirmation links already required by the request remain as-is.
+    // The checkbox adds only other valid product links, without duplicates.
+    optionalRequestLinks = includeLinks && request && gid
+      ? [...new Set(groupOrder(state, gid).recipients.flatMap((recipient) =>
+          recipient.items
+            .filter((item) => item.url && validProductUrl(item.url) && !baseText.includes(item.url))
+            .map((item) => item.name + "\n" + item.url),
+        ))].join("\n\n")
+      : "",
+    optionalSuffix = optionalRequestLinks ? "\n\n" + optionalRequestLinks : "",
+    text = baseText + optionalSuffix;
   const disabled = busy || !text.trim() || (!request && !!automatic?.paymentIssues.length);
   const copy = async (greeting: boolean) => {
     if (disabled || !gid) return;
@@ -56,6 +75,17 @@ export function MessageWorkspace({
     <aside className="desk-pane messages-pane">
       <header className="pane-heading">
         <h2>복사용 자동 메시지</h2>
+        <label className="message-link-toggle">
+          <input
+            type="checkbox"
+            checked={includeLinks}
+            onChange={(event) => {
+              setIncludeLinks(event.target.checked);
+              setStatus("");
+            }}
+          />
+          링크 포함
+        </label>
       </header>
       <div className="stage-message-preview">
         <LinkedText
@@ -66,7 +96,11 @@ export function MessageWorkspace({
           spans={messageSpans(text, order)}
           onChange={(value) => {
             if (gid && request) {
-              onOrder({ ...order, requestMessages: { ...order.requestMessages, [gid]: value } });
+              // Optional links belong to the copy preview, not the editable request draft.
+              const edited = optionalSuffix && value.endsWith(optionalSuffix)
+                ? value.slice(0, -optionalSuffix.length)
+                : value;
+              onOrder({ ...order, requestMessages: { ...order.requestMessages, [gid]: edited } });
               setStatus("");
             }
           }}

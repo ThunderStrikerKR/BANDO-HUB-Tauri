@@ -4,7 +4,7 @@ import { renderAutomaticTemplate } from "./automatic-message-templates.js";
 import { hubMessages } from "./hub-messages.js";
 import { groupAccount, groupOrder, groupStep, workflowIssues } from "./workflow.js";
 import type { State } from "./types.js";
-export function automaticMessage(state: State, gid: string) {
+export function automaticMessage(state: State, gid: string, includeLinks = false) {
   const order = groupOrder(state, gid),
     issues = workflowIssues(state, gid).filter(
       (i) => i.severity === "ACTION" && i.blockingStage <= 1,
@@ -76,7 +76,7 @@ export function automaticMessage(state: State, gid: string) {
       );
     }
   }
-  const payment = hubMessages(order, state, gid, { payment: true, options: false });
+  const payment = hubMessages(order, state, gid, { payment: includeLinks, options: false });
   const phase = groupStep(state, gid) >= 2 && !requiresCustomerResponse ? "payment" : "request";
   const greeting = renderAutomaticTemplate(state.settings,"paymentGreeting");
   const text =

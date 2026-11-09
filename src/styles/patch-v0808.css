@@ -567,3 +567,24 @@
   font-size: 10px;
   white-space: nowrap;
 }
+
+/* Product links are an optional copy choice beside the message title. */
+.messages-pane > .pane-heading h2 {
+  flex: 0 1 auto;
+}
+.messages-pane .message-link-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.messages-pane .message-link-toggle input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  min-width: 15px;
+  margin: 0;
+  flex: none;
+  cursor: pointer;
+}
