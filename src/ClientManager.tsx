@@ -28,6 +28,7 @@ export function ClientManager({
   const [messageSection,setMessageSection]=useState<"general"|"provisional">("general");
   const [originalEdit, setOriginalEdit] = useState<Client>();
   const [excelOpen, setExcelOpen] = useState(false);
+  const [messageDirty, setMessageDirty] = useState(false);
   const [search, setSearch] = useState(""),
     [edit, setEdit] = useState<Client>(),
     [exception, setException] = useState(""),
@@ -45,6 +46,20 @@ export function ClientManager({
       !(await confirmAction("저장하지 않은 변경사항이 있습니다. 저장하지 않고 닫을까요?"))) return;
     setEdit(undefined);
     setOriginalEdit(undefined);
+  };
+  const switchSection = async (next: "clients" | "messages") => {
+    if (section === next) return;
+    if (section === "messages" && messageDirty &&
+        !(await confirmAction("자동 메시지를 저장하지 않았습니다. 변경 내용을 버리고 이동할까요?"))) return;
+    setMessageDirty(false);
+    setSection(next);
+  };
+  const switchMessageSection = async (next: "general" | "provisional") => {
+    if (messageSection === next) return;
+    if (messageDirty &&
+        !(await confirmAction("자동 메시지에 저장하지 않은 내용이 있습니다. 변경 내용을 버리고 이동할까요?"))) return;
+    setMessageDirty(false);
+    setMessageSection(next);
   };
   const rows = search
     ? clientCandidates(search, state.clients)
@@ -70,20 +85,20 @@ export function ClientManager({
   return (
     <div className="fixed-manager">
       <nav className="product-subnav" aria-label="거래처 관리 메뉴">
-        <button type="button" aria-current={section==="clients"?"page":undefined} onClick={()=>setSection("clients")}>거래처 목록</button>
-        <button type="button" aria-current={section==="messages"?"page":undefined} onClick={()=>setSection("messages")}>자동 메시지 편집</button>
+        <button type="button" aria-current={section==="clients"?"page":undefined} onClick={()=>void switchSection("clients")}>거래처 목록</button>
+        <button type="button" aria-current={section==="messages"?"page":undefined} onClick={()=>void switchSection("messages")}>자동 메시지 편집</button>
       </nav>
       {section==="messages" ? (
         <div className="management-scroll">
           <nav className="product-subnav" aria-label="자동 메시지 편집 종류">
             <button type="button" aria-current={messageSection==="general"?"page":undefined}
-              onClick={()=>setMessageSection("general")}>상황별 공통 안내</button>
+              onClick={()=>void switchMessageSection("general")}>상황별 공통 안내</button>
             <button type="button" aria-current={messageSection==="provisional"?"page":undefined}
-              onClick={()=>setMessageSection("provisional")}>잠정 상품 선택 안내</button>
+              onClick={()=>void switchMessageSection("provisional")}>잠정 상품 선택 안내</button>
           </nav>
           {messageSection==="general"
-            ? <AutomaticMessageTemplateManager state={state} onRefresh={onRefresh} onNotice={onNotice}/>
-            : <ProvisionalProductNoticeManager state={state} onRefresh={onRefresh} onNotice={onNotice}/>}
+            ? <AutomaticMessageTemplateManager state={state} onRefresh={onRefresh} onNotice={onNotice} onDirtyChange={setMessageDirty}/>
+            : <ProvisionalProductNoticeManager state={state} onRefresh={onRefresh} onNotice={onNotice} onDirtyChange={setMessageDirty}/>}
         </div>
       ) : (<>
       <div className="management-search">

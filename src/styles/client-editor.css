@@ -112,3 +112,10 @@
 .client-list-meta { display: block; margin-top: 4px; color: #b7b7b7; font-size: 12px; }
 .client-excel-panel { margin-bottom: 12px; }
 .client-excel-panel .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+.family-admin-workspace[aria-label="자동 메시지 편집"] .family-list-row,
+.family-admin-workspace[aria-label="잠정 상품 선택 안내"] .family-list-row { min-height: 48px; padding: 8px 12px; }
+.family-admin-workspace[aria-label="자동 메시지 편집"] .family-list-row small,
+.family-admin-workspace[aria-label="잠정 상품 선택 안내"] .family-list-row small { margin-top: 2px; }
+.family-admin-workspace .family-list-heading h2 { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.family-inline-help { display: flex; justify-content: flex-end; margin-bottom: 6px; }

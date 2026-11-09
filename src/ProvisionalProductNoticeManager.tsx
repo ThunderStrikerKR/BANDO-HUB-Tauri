@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { HelpTooltip } from "./ui/HelpTooltip";
+import { usePendingChanges } from "./shared/pending-changes";
 import { registeredProducts } from "./product-models";
 import { validateProvisionalProductNotices } from "./provisional-product-notices";
 import type { NoticeSink } from "./shared/notices";
@@ -6,11 +8,12 @@ import type { State } from "./types";
 
 type NoticeMap = Record<string, string>;
 export function ProvisionalProductNoticeManager({
-  state,onRefresh,onNotice,
+  state,onRefresh,onNotice,onDirtyChange,
 }:{
   state: State;
   onRefresh: () => Promise<void>;
   onNotice: NoticeSink;
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const [baseline,setBaseline] = useState<NoticeMap | null>(
     () => structuredClone(state.settings.provisionalProductNotices ?? null));
@@ -21,6 +24,8 @@ export function ProvisionalProductNoticeManager({
   const [busy,setBusy] = useState(false);
   const [status,setStatus] = useState("");
   const dirty = JSON.stringify(draft) !== JSON.stringify(baseline ?? {});
+  usePendingChanges(dirty);
+  useEffect(() => {onDirtyChange?.(dirty);}, [dirty,onDirtyChange]);
   useEffect(() => {
     if (!dirty) {
       setBaseline(structuredClone(state.settings.provisionalProductNotices ?? null));
@@ -75,8 +80,7 @@ export function ProvisionalProductNoticeManager({
   return <section className="family-admin-workspace" aria-label="잠정 상품 선택 안내">
     <aside className="family-list-panel">
       <header className="family-list-heading">
-        <h2>상품별 안내문 등록</h2>
-        <p>발주서의 모델이 불명확해 직원이 상품을 잠정 선택한 경우에만 계좌안내에 추가합니다.</p>
+        <h2>상품별 안내문 등록 <HelpTooltip title="상품별 안내문" purpose="발주서의 상품 이름이 불명확할 때 직원이 선택한 상품에 대한 안내를 거래처에 덧붙입니다." when="주문에 적힌 상품명만으로 정확한 모델을 확인하기 어려운 경우 사용합니다." steps={["안내할 상품을 검색해 선택합니다.", "상품별 안내 문장을 작성합니다.", "아래 미리보기에서 안내 위치를 확인합니다.", "변경사항 저장을 누릅니다."]} result="직원이 해당 상품을 잠정 선택한 주문의 계좌 안내에만 문장이 추가됩니다." caution="해당 상품의 모든 주문에 자동으로 표시되지는 않습니다. 금액과 계좌 안내 뒤, 상품 링크 앞에 표시됩니다." /></h2>
       </header>
       <div className="family-field">
         <label htmlFor="provisional-notice-product-search">안내문을 등록할 상품 검색</label>
@@ -100,14 +104,16 @@ export function ProvisionalProductNoticeManager({
           <button type="button" disabled={busy || !draft[product.id]} onClick={()=>edit("")}>안내문 삭제</button>
         </header>
         <div className="family-editor-scroll">
-          <p>상품 ID에 연결되는 안내문입니다. 같은 모델명이라도 독립 상품은 각각 등록할 수 있습니다.</p>
+          <div className="family-inline-help">
+          <HelpTooltip title="안내문을 등록할 상품" purpose="선택한 상품 하나에만 안내문을 연결합니다." steps={["안내문을 사용할 상품을 선택합니다.", "아래에 문장을 입력하고 저장합니다."]} result="그 상품을 직원이 잠정 선택했을 때만 안내할 수 있습니다." caution="이름이 비슷하더라도 각각 따로 등록된 상품은 안내문을 각각 작성해야 합니다." />
+        </div>
           <div className="family-field">
             <label htmlFor="provisional-product-notice">잠정 선택 시 복사용 계좌안내에 추가할 문구</label>
             <textarea id="provisional-product-notice" aria-label="상품별 잠정 선택 안내문" rows={5}
               value={content} disabled={busy}
               placeholder="예: 709는 상판에 구멍이 있습니다. 구멍이 없는 제품은 709-1 모델을 확인해 주세요."
               onChange={e=>edit(e.target.value)}/>
-            <p className="family-help">상품명이 원문에 명확하게 기재된 정상 주문에는 나오지 않습니다. 상품 링크의 첨부 여부와는 별개입니다.</p>
+
           </div>
           <div className="card">
             <h3>계좌안내에 표시될 위치</h3>
