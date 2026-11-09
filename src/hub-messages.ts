@@ -173,6 +173,8 @@ export function hubMessages(
       (customer.length || colorNotices.length
         ? [...customer, ...colorNotices].join("\n")
         : renderAutomaticTemplate(state.settings,"optionsIntro")) +
+      (state.settings.automaticMessageTemplates?.optionsClosing
+        ? "\n\n" + renderAutomaticTemplate(state.settings,"optionsClosing") : "") +
       (optionLinks ? "\n\n" + optionLinks : ""),
     paymentIssues: [...new Set(paymentIssues)],
     customerCount: customer.length,

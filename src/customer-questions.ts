@@ -20,11 +20,14 @@ export function groupedCustomerQuestions(
         : issue.kind === "ADDRESS" ? (row.address.trim() ? "addressDetail" : "addressMissing")
         : issue.kind === "CONTACT" ? "contactMissing"
         : ["QUANTITY_MISSING","QUANTITY_INVALID"].includes(issue.kind) ? "quantityMissing"
+        : ["MODEL","MODEL_CHOICE","ALIAS_CONFLICT","CATEGORY_CONFLICT","OPTION","ITEM"]
+          .includes(issue.kind) ? "modelMissing"
         : null;
       if (settings && customKey && settings.automaticMessageTemplates?.[customKey]) {
         const item = row.items.find(item=>item.id===issue.itemId);
         const rendered=renderAutomaticTemplate(settings,customKey as
-          "recipientName"|"addressMissing"|"addressDetail"|"contactMissing"|"quantityMissing",{
+          "recipientName"|"addressMissing"|"addressDetail"|"contactMissing"|"quantityMissing"|
+          "modelMissing",{
           수취인:row.name || "수취인",상품명:customerModel(item?.name || "상품"),
         });
         const prefix=row.name ? row.name+"님" : "";

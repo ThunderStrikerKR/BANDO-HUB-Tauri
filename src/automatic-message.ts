@@ -19,10 +19,14 @@ export function automaticMessage(state: State, gid: string) {
       const key = issue.kind === "NAME" ? "recipientName"
         : issue.kind === "ADDRESS" ? (row.address.trim() ? "addressDetail" : "addressMissing")
         : issue.kind === "CONTACT" ? "contactMissing"
-        : /QUANTITY/.test(issue.kind) ? "quantityMissing" : null;
+        : /QUANTITY/.test(issue.kind) ? "quantityMissing"
+        : issue.kind === "MODEL_CONFIRM" ? "modelConfirm"
+        : ["MODEL","MODEL_CHOICE","ALIAS_CONFLICT","CATEGORY_CONFLICT","OPTION","ITEM"]
+          .includes(issue.kind) ? "modelMissing" : null;
       if (!key || !configured?.[key]) return [];
       return [renderAutomaticTemplate(state.settings,key as
-        "recipientName" | "addressMissing" | "addressDetail" | "contactMissing" | "quantityMissing",{
+        "recipientName" | "addressMissing" | "addressDetail" | "contactMissing" | "quantityMissing" |
+        "modelMissing" | "modelConfirm",{
         수취인:row.name || "수취인",상품명:item?.name || "상품",
       })];
     });
@@ -30,7 +34,10 @@ export function automaticMessage(state: State, gid: string) {
         const customKey = i.kind === "NAME" ? "recipientName"
           : i.kind === "ADDRESS" ? (row.address.trim() ? "addressDetail" : "addressMissing")
           : i.kind === "CONTACT" ? "contactMissing"
-          : /QUANTITY/.test(i.kind) ? "quantityMissing" : null;
+          : /QUANTITY/.test(i.kind) ? "quantityMissing"
+          : i.kind === "MODEL_CONFIRM" ? "modelConfirm"
+          : ["MODEL","MODEL_CHOICE","ALIAS_CONFLICT","CATEGORY_CONFLICT","OPTION","ITEM"]
+            .includes(i.kind) ? "modelMissing" : null;
         if (customKey && state.settings.automaticMessageTemplates?.[customKey]) return [];
         if (i.kind === "ADDRESS") return ["배송지 주소"];
         if (i.kind === "CONTACT") return ["연락처"];
