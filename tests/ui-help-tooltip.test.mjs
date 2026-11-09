@@ -43,5 +43,5 @@ test("product and shipping managers prioritize operations and retain critical wa
   assert.match(shipping, /className="shipping-basis-settings"/);
   assert.match(shipping, /className="shipping-savebar"/);
   assert.match(freight, /className="warnings"/);
-  assert.match(freight, /미확정 운임/);
+  assert.match(freight, /확인되지 않은 배송비는 자동으로 추측해 계산하지 않습니다/);
 });
