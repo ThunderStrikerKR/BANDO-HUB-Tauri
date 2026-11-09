@@ -58,3 +58,5 @@
 .help-tooltip-panel p { margin: 4px 0 8px; }
 .help-tooltip-panel ol { margin: 5px 0 9px; padding-left: 22px; }
 .help-tooltip-panel li + li { margin-top: 3px; }
+
+.settings-help-heading { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }

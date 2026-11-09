@@ -7,6 +7,7 @@ import type { NoticeSink } from "../shared/notices";
 import type { State } from "../types";
 import { Modal } from "../ui";
 import { PageHeading } from "../ui/PageHeading";
+import { HelpTooltip } from "../ui/HelpTooltip";
 import { DeveloperLab } from "../developer/DeveloperLab";
 
 declare const __BANDO_VERSION__: string;
@@ -113,14 +114,7 @@ export function SettingsView({
             <ReceiptArchive />
             <BackupPanel onError={onNotice} onRefresh={onRestored} />
             <section className="card">
-              <h2>업무 데이터 저장</h2>
-              <p>
-                프로그램과 분리된 PC 데이터베이스에 저장합니다. 업데이트 후에도
-                상품 / 거래처 / 주문 / 가격 / 운임을 유지합니다.
-              </p>
-              <p className="muted">
-                Windows AppData → com.bandostand.bandohub.tauri → bando-hub-v001.sqlite
-              </p>
+              <h2 className="settings-help-heading">업무 데이터 저장 <HelpTooltip title="업무 데이터 저장" purpose="프로그램에서 입력한 상품, 거래처, 주문, 가격, 운임 정보를 컴퓨터에 보관합니다." when="프로그램을 업데이트하거나 기존 업무 정보가 어디에 저장되는지 궁금할 때 확인합니다." steps={["업무 데이터는 Windows의 프로그램 데이터 폴더에 저장됩니다.", "프로그램을 업데이트해도 기존 저장 정보를 그대로 사용합니다.", "별도 사본이 필요하면 데이터 관리의 백업 기능을 이용합니다."]} result="반도허브를 종료하거나 업데이트한 뒤에도 저장한 업무 정보를 다시 불러올 수 있습니다." caution="저장 위치는 Windows AppData 아래 com.bandostand.bandohub.tauri 폴더의 bando-hub-v001.sqlite 파일입니다. 이 파일을 직접 수정하지 마세요." /></h2>
             </section>
           </div>
         )}
