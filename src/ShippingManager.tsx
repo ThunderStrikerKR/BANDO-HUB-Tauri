@@ -17,6 +17,7 @@ import {
   initialShipping,
 } from "./shipping";
 import type { ShippingRule, ShippingState, State } from "./types";
+import { HelpTooltip } from "./ui/HelpTooltip";
 import { Field, Modal } from "./ui";
 import { PageHeading } from "./ui/PageHeading";
 export function ShippingManager({
@@ -82,8 +83,17 @@ export function ShippingManager({
     <div className="shipping-manager">
       <PageHeading
         title="배송 그룹 관리"
-        description="상품별 최대 묶음 수량과 운임을 등록합니다. 모델이 달라도 동급 그룹으로 지정하면 수량을 합산합니다."
-        actions={<span className="shipping-version">운임 기준 {shipping.epoch}</span>}
+        actions={<div className="shipping-heading-help">
+          <HelpTooltip
+            title="운임 관리"
+            purpose="상품을 포장해 보낼 때 필요한 배송비와 합포장 기준을 관리합니다."
+            when="상품의 배송비가 달라졌거나 같은 상자로 보낼 수 있는 상품을 정할 때 사용합니다."
+            steps={["상품별 기본 운임에서 확인된 배송비를 등록합니다.", "같은 포장 기준을 쓸 상품은 배송 그룹 지정에서 묶습니다.", "동급 그룹 운임표에서 그룹별 배송비를 확인하거나 수정합니다.", "필요한 경우 조합 및 기준 이력을 확인합니다."]}
+            result="주문 접수 시 등록된 운임 기준을 참고할 수 있습니다."
+            caution="실제 확인하지 않은 운임은 임의로 입력하지 않습니다."
+          />
+          <span className="shipping-version">운임 기준 {shipping.epoch}</span>
+        </div>}
       />
       <div className="shipping-stats">
         <article>
@@ -207,7 +217,7 @@ export function ShippingManager({
             <button disabled={!selected.length} onClick={applyBulk}>
               선택 상품에 적용
             </button>
-            <small>변경사항을 확인한 뒤 아래에서 저장하세요.</small>
+            <HelpTooltip title="배송 그룹 일괄 지정" purpose="선택한 여러 상품을 같은 배송 그룹으로 한꺼번에 지정합니다." when="같은 포장 기준을 사용하는 상품들을 정리할 때 사용합니다." steps={["변경할 상품을 체크합니다.", "적용할 배송 그룹을 선택합니다.", "선택 상품에 적용을 누릅니다.", "아래에서 변경 내용을 확인하고 그룹 지정 저장을 누릅니다."]} result="저장한 상품의 배송 그룹이 변경됩니다." caution="실제 포장 조건이 확인된 상품만 같은 그룹으로 묶습니다." />
           </div>
           <div className="shipping-table-scroll">
             <table>
@@ -341,8 +351,12 @@ export function ShippingManager({
       {tab === "rates" && (
         <section className="shipping-card shipping-rates">
           <div className="section-title">
-            <h3>확인된 기본 운임만 추천합니다</h3>
-            <button
+            <h3 className="shipping-rates-title">그룹 운임표 <HelpTooltip title="배송 그룹 운임표" purpose="같은 배송 기준으로 묶은 상품에 적용할 운임을 등록합니다." when="같은 포장 조건의 상품이 여러 개 있을 때 배송비를 확인하거나 수정할 때 사용합니다." steps={["배송 그룹을 확인합니다.", "운임 수정 버튼을 누릅니다.", "최대 합포장 수량과 확인된 운임을 입력합니다.", "저장 버튼을 눌러 적용합니다."]} result="해당 그룹의 상품들이 새 운임 기준을 참고할 수 있습니다." caution="기존 운임 기준을 종료할 때에는 운임 기준 관리에서 따로 처리합니다." /></h3>
+            <details className="shipping-basis-settings">
+              <summary>운임 기준 관리</summary>
+              <div className="shipping-basis-actions">
+                <HelpTooltip title="전체 운임 기준 변경" purpose="지금까지 사용하던 운임 기준을 종료하고 새로운 운임을 등록할 수 있도록 합니다." when="기존 배송비 기준을 더 이상 사용하지 않을 때만 사용합니다." steps={["새 운임 기준을 적용해야 하는지 확인합니다.", "전체 운임 기준 변경 버튼을 누릅니다.", "확인창에서 변경 범위를 확인하고 승인합니다.", "새로운 배송비를 확인한 뒤 다시 등록합니다."]} result="이전 운임의 자동 추천이 중단되고 새 기준을 등록할 수 있습니다." caution="기존 운임 기준 전체에 영향을 주므로 일반적인 운임 수정에는 사용하지 않습니다." />
+            <button className="danger" type="button"
               onClick={async () => {
                 if (
                   await confirmAction(
@@ -357,6 +371,8 @@ export function ShippingManager({
             >
               전체 운임 기준 변경
             </button>
+              </div>
+            </details>
           </div>
           <div className="new-group">
             <input
@@ -626,10 +642,10 @@ export function ShippingManager({
             if (!busy) setEditing(undefined);
           }}
         >
-          <h3>{shipping.groups.find((g) => g.id === editing.id)?.name} 운임</h3>
-          <p className="muted">
-            미확정 운임은 빈칸으로 둡니다. 기존 기준을 바꾸려면 ‘기준 변경’ 후 새 값을 입력하세요.
-          </p>
+          <h3 className="shipping-rates-title">
+            {shipping.groups.find((g) => g.id === editing.id)?.name} 운임
+            <HelpTooltip title="배송 그룹 운임 수정" purpose="선택한 배송 그룹에 적용할 배송비를 등록하거나 수정합니다." steps={["최대 합포장 수량을 선택합니다.", "실제로 확인한 수량별 운임만 입력합니다.", "필요하면 적용 날짜와 기준을 입력합니다.", "저장 버튼을 눌러 운임을 반영합니다."]} result="그룹에 등록된 상품들이 수정된 운임 기준을 참고할 수 있습니다." caution="확인하지 않은 운임은 빈칸으로 둡니다. 기존 기준을 아예 바꾸려면 기준 변경 작업을 먼저 합니다." />
+          </h3>
           <div className="form-row">
             <label>
               최대 합포장 수량

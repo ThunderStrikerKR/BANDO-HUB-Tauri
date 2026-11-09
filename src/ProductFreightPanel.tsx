@@ -1,3 +1,4 @@
+import { HelpTooltip } from "./ui/HelpTooltip";
 import { useState } from "react";
 import { confirmAction } from "./dialogs";
 import { won } from "./domain";
@@ -158,7 +159,7 @@ export function ProductFreightPanel({
           >
             상품별 기준으로 복사
           </button>
-          <small>운임은 실제 확인된 값만 입력합니다.</small>
+          <HelpTooltip title="상품별 운임" purpose="이 상품을 포장해 보낼 때의 배송비를 등록합니다." when="상품별 기본 배송비와 합포장 수량을 확인했을 때 사용합니다." steps={["배송비를 수정할 상품을 찾습니다.", "설정 버튼을 누릅니다.", "확인된 합포장 수량과 배송비를 입력합니다.", "기본 운임 저장을 눌러 적용합니다."]} result="새 주문에서 해당 상품의 운임 기준을 참고할 수 있습니다." caution="확인되지 않은 운임은 임의로 입력하지 않습니다." />
         </div>
         <div className="shipping-table-scroll">
           <table>
@@ -266,12 +267,15 @@ export function ProductFreightPanel({
             </tbody>
           </table>
         </div>
-        <footer className="shipping-savebar">
-          <span>
-            같은 모델은 수량을 합산하고, 동급 그룹으로 지정한 다른 모델도 같은 묶음 기준을
-            사용합니다.
-          </span>
-          <span>수취인 / 출고지가 다르면 별도로 계산합니다.</span>
+        <footer className="shipping-savebar shipping-explanation-footer">
+          <HelpTooltip
+            title="합포장 운임 계산"
+            purpose="같은 곳으로 보내는 여러 상품의 배송비를 합포장 기준에 맞춰 계산합니다."
+            when="같은 수취인에게 여러 상품을 한 번에 보낼 때 사용합니다."
+            steps={["상품별 기본 운임과 배송 그룹을 확인합니다.", "같은 그룹으로 묶을 수 있는 상품의 수량을 확인합니다.", "필요한 배송비를 확인하고 주문에 적용합니다."]}
+            result="같은 모델이나 동급 배송 그룹에 속하는 상품의 수량을 함께 계산할 수 있습니다."
+            caution="수취인이나 출고지가 다른 상품은 별도로 계산합니다."
+          />
         </footer>
       </section>
       {editing && (
@@ -401,10 +405,7 @@ export function ProductFreightPanel({
               }
             />
           </Field>
-          <p className="muted">
-            최대 수량을 넘는 주문은 미확정 운임을 임의 계산하지 않습니다. 직원이 확인한 조합 운임을
-            따로 저장해 재사용할 수 있습니다.
-          </p>
+          <HelpTooltip title="최대 합포장 수량 초과" purpose="한 상자에 넣을 수 있는 최대 수량을 넘을 때 배송비를 어떻게 처리하는지 알려줍니다." when="주문 수량이 등록한 합포장 수량보다 많을 때 확인합니다." steps={["실제로 포장 가능한 조합을 확인합니다.", "확인된 조합의 운임을 따로 등록합니다.", "등록된 운임을 사용합니다."]} result="확인된 조합 운임을 다음 주문에서도 참고할 수 있습니다." caution="확인되지 않은 배송비는 자동으로 추측해 계산하지 않습니다." />
           <button className="primary" disabled={busy} onClick={() => void writeRule()}>
             기본 운임 저장
           </button>

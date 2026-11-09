@@ -304,3 +304,23 @@
     font-size: 22px;
   }
 }
+
+.shipping-heading-help,
+.shipping-rates-title,
+.shipping-basis-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.shipping-rates-title { margin: 0; }
+.shipping-basis-settings { align-self: center; }
+.shipping-basis-settings > summary { cursor: pointer; font-size: 12px; color: #ddd; }
+.shipping-basis-actions {
+  padding: 10px;
+  border: 1px solid #535353;
+  border-radius: 6px;
+  margin-top: 8px;
+  background: #292929;
+}
+.shipping-explanation-footer { justify-content: flex-end; }
