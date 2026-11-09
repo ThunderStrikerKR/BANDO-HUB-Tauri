@@ -20,7 +20,7 @@ test("factory-only inquiry remains a hidden layout placeholder for store dispatc
   assert.match(footer, /className="freight-inquiry"/);
   assert.match(footer, /aria-hidden=\{b\.origin !== "FACTORY"\}/);
   assert.match(footer, /visibility: b\.origin === "FACTORY" \? "visible" : "hidden"/);
-  assert.doesNotMatch(footer, /hidden=\{b\.origin !== "FACTORY"\}/);
+  assert.doesNotMatch(footer, /\s+hidden=\{b\.origin !== "FACTORY"\}/);
   assert.match(css, /\.freight-line > \.freight-inquiry\s*\{[^}]*flex: 0 0 112px;/);
 });
 test("factory/store dispatch buttons have compact spacing and padding", () => {
