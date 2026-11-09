@@ -1,5 +1,6 @@
 import { itemFromProduct, normalizeColor, orderClient, uid } from "./domain.js";
 import { aliasProblems, saveAlias } from "./matching.js";
+import { validateColorGroupProducts } from "./color-guidance.js";
 import type { Order, State } from "./types.js";
 export function resolveProduct(
   state: State,
@@ -39,6 +40,7 @@ export function resolveProduct(
         (i.color && !["색상 미표기", "단일"].includes(i.color))) {
       throw Error("기본색상 등록 정보와 선택 상품이 일치하지 않습니다.");
     }
+    validateColorGroupProducts(next,group.productIds,group.representativeColor);
     appliedDefaultColor = {groupId:defaultColorGroupId,color:v.color};
   }
   delete i.pendingAlias;

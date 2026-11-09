@@ -75,7 +75,7 @@ export function ColorGuidanceManager({state,onRefresh,query=""}: {
     <aside className="family-list-panel">
       <header className="family-list-heading">
         <h2>직원 등록 그룹</h2>
-        <p>자동 생성되는 그룹은 없습니다. 직원이 상품을 묶고 대표색상을 미리 등록하세요.</p>
+        <p>자동으로 묶지 않습니다. 직원이 같은 규격과 가격에 색상만 다른 독립 상품을 묶어 대표색상을 등록하세요.</p>
       </header>
       <div className="family-field">
         <label htmlFor="new-color-group">새 그룹 이름</label>
@@ -112,8 +112,18 @@ export function ColorGuidanceManager({state,onRefresh,query=""}: {
             <input id="color-group-name" value={active.name}
               onChange={e=>edit(g=>{g[activeId].name=e.target.value;})}/>
             <label htmlFor="representative-color">대표색상</label>
-            <input id="representative-color" placeholder="예: 블랙, 실버, 크롬" value={active.representativeColor}
-              onChange={e=>edit(g=>{g[activeId].representativeColor=e.target.value;})}/>
+            <select id="representative-color" value={active.representativeColor}
+              onChange={e=>edit(g=>{g[activeId].representativeColor=e.target.value;})}>
+              <option value="">등록된 상품의 색상 선택</option>
+              {[...new Map(active.productIds.flatMap(id=>{
+                const product=draft.products.find(p=>p.id===id);
+                const color=product?.variants[0]?.color;
+                return color && !["단일","색상 미표기"].includes(color)
+                  ? [[color,colorLabel(color)] as const] : [];
+              })).entries()].map(([color,label])=>(
+                <option key={color} value={color}>{label}</option>
+              ))}
+            </select>
             <p className="family-help">직원이 사전에 등록한 대표색상은 발주서의 옵션 오류 창에서 직접 선택할 때만 주문에 적용됩니다. 이후 복사용 안내문에 적용 색상을 통보합니다.</p>
           </div>
           <div className="family-members-section">

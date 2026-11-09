@@ -318,6 +318,21 @@ fn state_save(db: State<'_, Database>, state: Value) -> Result<(), String> {
     Ok(())
 }
 
+fn canonical_color_key(value: &str) -> String {
+    match value.trim().to_lowercase().as_str() {
+        "black" | "검정" | "검정색" => "블랙".into(),
+        "silver" => "실버".into(),
+        "gray" | "grey" | "회색" => "그레이".into(),
+        "white" | "흰색" => "화이트".into(),
+        "brown" => "브라운".into(),
+        "chrome" => "크롬".into(),
+        "red" => "레드".into(),
+        "blue" => "블루".into(),
+        "gold" => "골드".into(),
+        other => other.to_owned(),
+    }
+}
+
 fn validate_color_guidance(state: &Value) -> Result<(), String> {
     let Some(config) = state["settings"].get("colorGuidanceGroups") else { return Ok(()); };
     let groups = config.as_object().ok_or("대표색상 그룹 저장 형식 오류")?;
@@ -333,18 +348,35 @@ fn validate_color_guidance(state: &Value) -> Result<(), String> {
         }
         if !names.insert(name.to_lowercase()) { return Err("그룹 이름이 중복됩니다.".into()); }
         let members = group["productIds"].as_array().ok_or("소속 상품 형식 오류")?;
-        if members.is_empty() { return Err("그룹에 상품을 등록하세요.".into()); }
+        if members.len() < 2 { return Err("색상이 다른 독립 상품 2개 이상을 등록하세요.".into()); }
+        let mut colors = std::collections::HashSet::new();
+        let mut price_reference: Option<(Value,Value,Value)> = None;
+        let mut price_known=false;
         for member in members {
             let pid = member.as_str().ok_or("상품 ID 오류")?;
             if !assigned.insert(pid.to_owned()) {
                 return Err("같은 상품은 두 대표색상 그룹에 등록할 수 없습니다.".into());
             }
-            if !products.iter().any(|p| p["id"].as_str() == Some(pid)
+            let p=products.iter().find(|p| p["id"].as_str() == Some(pid)
                 && p["active"] != false && p["deletedAt"].as_str().is_none()
                 && p["supersededBy"].as_str().is_none()
-                && p["variants"].as_array().is_some_and(|v| v.len() == 1)) {
-                return Err("활성 독립 상품만 그룹에 등록할 수 있습니다.".into());
+                && p["variants"].as_array().is_some_and(|v| v.len() == 1))
+                .ok_or("활성 독립 상품만 그룹에 등록할 수 있습니다.")?;
+            let v=&p["variants"][0];
+            let color=canonical_color_key(v["color"].as_str().unwrap_or(""));
+            if color.is_empty() || color=="단일" || color=="색상 미표기" {
+                return Err("실제 색상이 등록된 상품만 그룹에 등록하세요.".into());
             }
+            if !colors.insert(color) { return Err("같은 색상이 중복됐습니다. 규격을 확인하세요.".into()); }
+            let price=(v["wholesale"].clone(),v["semi"].clone(),v["retail"].clone());
+            price_known |= !price.0.is_null() || !price.1.is_null() || !price.2.is_null();
+            if let Some(reference)=&price_reference {
+                if reference != &price { return Err("색상별 가격이 다른 상품은 같은 그룹에 등록할 수 없습니다.".into()); }
+            } else { price_reference=Some(price); }
+        }
+        if !price_known { return Err("비교할 가격이 없는 상품은 그룹에 등록할 수 없습니다.".into()); }
+        if !colors.contains(&canonical_color_key(color)) {
+            return Err("대표색상은 등록된 상품의 색상에서 선택하세요.".into());
         }
     }
     Ok(())

@@ -54,7 +54,7 @@ export function automaticMessage(state: State, gid: string) {
     phase === "payment"
       ? payment.payment.replace(/^안녕하세요[.。]?\s*/, "")
       : lines.length
-        ? lines.join("\n\n") + "\n\n위 내용 확인 부탁드립니다."
+        ? lines.join("\n\n") + (requiresCustomerResponse ? "\n\n위 내용 확인 부탁드립니다." : "")
         : "";
   return { phase, text, paymentIssues: payment.paymentIssues };
 }
