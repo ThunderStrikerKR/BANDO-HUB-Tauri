@@ -24,7 +24,7 @@ test("Windows local PP-OCRv5 uses new clipboard images only", () => {
   assert.match(lib, /ocr::capture_ocr/);
   assert.match(bridge, /invoke<OcrCapture>\("capture_ocr"\)/);
   assert.match(ocr, /GetClipboardSequenceNumber/);
-  assert.match(ocr, /include_str!\("../resources\/ocr\/recognize.py"\)/);
+  assert.ok(ocr.includes('include_str!("../resources/ocr/recognize.py")'));
   assert.match(script, /ocr_version="PP-OCRv5"/);
   assert.match(script, /lang="korean"/);
 });

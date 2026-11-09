@@ -219,6 +219,11 @@ try {
             return undefined;
           }
           if (command === "receipt_archive") return structuredClone(auditRecords);
+          if (command === "capture_ocr") return {
+            text: "709B 2개",
+            imageDataUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL/nwAAAABJRU5ErkJggg==",
+            width: 1, height: 1,
+          };
           if (command === "choose_excel_directory") return "C:\\BANDO_CI_SELECTED";
           if (command === "open_excel_directory") return undefined;
           if (command === "dock_region_native") return undefined;
@@ -240,6 +245,24 @@ try {
     { state, archive, storePath },
   );
   await page.goto(url);
+  // The OS screenshot and PaddleOCR are native. The browser verifies the
+  // actual staff review flow with mocked IPC, including cancel and apply.
+  const captureButton = page.getByRole("button", { name: "캡처 범위 지정" });
+  await captureButton.click();
+  let ocrReview = page.getByRole("dialog", { name: "OCR 문자 인식 검토" });
+  await ocrReview.waitFor();
+  await ocrReview.getByRole("button", { name: "취소" }).click();
+  await ocrReview.waitFor({ state: "detached" });
+  await captureButton.click();
+  ocrReview = page.getByRole("dialog", { name: "OCR 문자 인식 검토" });
+  await ocrReview.waitFor();
+  await ocrReview.getByRole("textbox", { name: "OCR 인식 문구 편집" })
+    .fill("709B 2개\\n김테스트");
+  await ocrReview.getByRole("button", { name: "원문 교체" }).click();
+  await ocrReview.waitFor({ state: "detached" });
+  await page.waitForFunction(() =>
+    document.querySelector(".source-document")?.textContent?.includes("709B 2개"));
+  await page.reload();
   const nav = page.getByRole("navigation", { name: "업무 메뉴" });
   await nav.getByRole("button", { name: "엑셀 관리" }).click();
   await page.getByRole("button", { name: "엑셀 작성 이력" }).click();
