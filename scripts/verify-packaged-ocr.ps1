@@ -6,7 +6,7 @@ param(
 # recognize.py entrypoint with the exact arguments Tauri passes at runtime.
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
-$root = [IO.Path]::GetFullPath((Join-Path (Get-Location).Path $OcrRoot))
+$root = [IO.Path]::GetFullPath($OcrRoot)
 $python = Join-Path $root "runtime\python.exe"
 $runner = Join-Path $PSScriptRoot "..\src-tauri\resources\ocr\recognize.py"
 $verifier = Join-Path $PSScriptRoot "verify-portable-ocr.py"
