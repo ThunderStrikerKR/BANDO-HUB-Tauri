@@ -1,8 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-type HelpTooltipProps = {
-  title: string;
+export type HelpTooltipText = {
   purpose: string;
   when?: string;
   steps?: string[];
@@ -14,7 +13,7 @@ type HelpTooltipProps = {
  * Beginner-friendly help. Native popover keeps the full explanation above
  * modal dialogs and scrolling panels instead of clipping it.
  */
-export function HelpTooltip({ title, purpose, when, steps, result, caution }: HelpTooltipProps) {
+export function HelpTooltip({ title, purpose, when, steps, result, caution }: HelpTooltipText & { title: string }) {
   const id = useId();
   const trigger = useRef<HTMLButtonElement>(null);
   const panel = useRef<HTMLDivElement>(null);

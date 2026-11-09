@@ -1,17 +1,20 @@
 import { useEffect, useId, useRef, useState } from "react";
 import type { Account } from "../types";
+import { HelpTooltip, type HelpTooltipText } from "./HelpTooltip";
 export function AccountPicker({
   label,
   accounts,
   value,
   onChange,
   emptyLabel = "계좌 선택",
+  help,
 }: {
   label: string;
   accounts: Account[];
   value: string;
   onChange: (id: string) => void;
   emptyLabel?: string;
+  help?: HelpTooltipText;
 }) {
   const [open, setOpen] = useState(false),
     [active, setActive] = useState(0),
@@ -50,7 +53,7 @@ export function AccountPicker({
   }, [open]);
   return (
     <div className="account-picker" ref={root}>
-      <span id={id + "-label"}>{label}</span>
+      <span id={id + "-label"}>{label} {help && <HelpTooltip title={label} {...help} />}</span>
       <button
         type="button"
         role="combobox"
