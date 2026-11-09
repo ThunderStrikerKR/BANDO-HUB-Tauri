@@ -625,16 +625,23 @@ export function ManualClassification({
                 <span>선택한 상품의 수량을 확정하세요.</span>
               </>
             ) : (
-              <span>
-                {error?.message || "셀 선택 → 원문 블록 배정 / 방향키/Tab 이동 / Ctrl+Z 복구"}
-              </span>
+              <div className="manual-help-or-error">
+                {error?.message || (
+                  <div className="manual-guide">
+                    <span>오른쪽 입력 칸을 선택한 후, 왼쪽 원문에서 해당 내용을 클릭하세요.</span>
+                    <span>흰색 블록: 연결되지 않은 내용 / 회색 블록: 연결된 내용으로, 클릭하면 연결 해제</span>
+                    <span>방향키 / Tab: 입력 칸 이동 / Ctrl+Z: 이전 작업 되돌리기</span>
+                  </div>
+                )}
+              </div>
             )}
             {pending && error && <small>{error.message}</small>}
           </div>
           <div className="manual-columns">
             <section className="manual-source">
-              <h3>발주 원문</h3>
-              <small>흰 블록: 미배정 / 회색 블록: 클릭하여 강제 회수</small>
+              <header className="manual-source-heading">
+                <h3>붙여넣은 내용</h3>
+              </header>
               <pre>{segments}</pre>
             </section>
             <section className="manual-sheet">
@@ -672,43 +679,36 @@ export function ManualClassification({
                 </div>
               </div>
               <div className="manual-grid-scroll">
-                <table>
+                <table className="manual-delivery-table">
                   <thead>
                     <tr>
-                      {[
-                        "배송",
-                        "이름",
-                        "주소",
-                        "휴대폰",
-                        "전화",
-                        "배송 요청",
-                        "상품",
-                        "수량",
-                        "행 동작",
-                      ].map((text) => (
-                        <th key={text}>{text}</th>
+                      {["배송", "이름", "주소", "휴대폰", "전화", "배송 요청"].map((label) => (
+                        <th key={label} scope="col">{label}</th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody>
-                    {model.rows.map((row, index) =>
-                      (row.items.length ? row.items : [undefined]).map((item, itemIndex) => (
-                        <tr key={item?.id ?? row.id}>
-                          {itemIndex === 0 && (
-                            <>
-                              <th rowSpan={Math.max(row.items.length, 1)}>배송 {index + 1}</th>
-                              {["name", "address", "mobile", "phone", "note"].map((field, n) => (
-                                <td key={field} rowSpan={Math.max(row.items.length, 1)}>
-                                  {textCell(
-                                    { recipientId: row.id, field },
-                                    `배송 ${index + 1} ${["이름", "주소", "휴대폰", "전화", "배송 요청"][n]}`,
-                                  )}
-                                </td>
-                              ))}
-                            </>
-                          )}
-                          <td>
-                            {item ? (
+                  {model.rows.map((row, index) => (
+                    <tbody key={row.id} className="manual-shipment-group">
+                      <tr className="manual-recipient-row">
+                        <th scope="row">배송 {index + 1}</th>
+                        {["name", "address", "mobile", "phone", "note"].map((field, n) => (
+                          <td key={field}>
+                            {textCell(
+                              { recipientId: row.id, field },
+                              `배송 ${index + 1} ${["이름", "주소", "휴대폰", "전화", "배송 요청"][n]}`,
+                            )}
+                          </td>
+                        ))}
+                      </tr>
+                      <tr className="manual-product-section">
+                        <td colSpan={6}>
+                          <div className="manual-products-header">
+                            <span>상품</span>
+                            <span>수량</span>
+                            <span>행 동작</span>
+                          </div>
+                          {row.items.map((item, itemIndex) => (
+                            <div className="manual-product-row" key={item.id}>
                               <div className="manual-product-cell">
                                 {textCell(
                                   { recipientId: row.id, itemId: item.id, field: "product" },
@@ -716,62 +716,44 @@ export function ManualClassification({
                                 )}
                                 <button
                                   disabled={!!pending}
-                                  onClick={() =>
-                                    setSearch({
-                                      recipientId: row.id,
-                                      itemId: item.id,
-                                      field: "product",
-                                    })
-                                  }
+                                  onClick={() => setSearch({
+                                    recipientId: row.id,
+                                    itemId: item.id,
+                                    field: "product",
+                                  })}
                                 >
                                   검색
                                 </button>
                               </div>
-                            ) : (
-                              <button
-                                className="manual-missing-product"
-                                aria-invalid="true"
-                                disabled={!!pending}
-                                onClick={() => addProduct(row.id)}
-                              >
-                                상품 추가
-                              </button>
-                            )}
-                          </td>
-                          <td>
-                            {item &&
-                              textCell(
-                                { recipientId: row.id, itemId: item.id, field: "quantity" },
-                                `배송 ${index + 1} 수량 ${itemIndex + 1}`,
-                              )}
-                          </td>
-                          <td>
-                            {item && (
-                              <>
+                              <div>
+                                {textCell(
+                                  { recipientId: row.id, itemId: item.id, field: "quantity" },
+                                  `배송 ${index + 1} 수량 ${itemIndex + 1}`,
+                                )}
+                              </div>
+                              <div className="manual-product-actions">
                                 <button
                                   disabled={!!pending}
-                                  onClick={() =>
-                                    removeProduct({
-                                      recipientId: row.id,
-                                      itemId: item.id,
-                                      field: "product",
-                                    })
-                                  }
+                                  onClick={() => removeProduct({
+                                    recipientId: row.id,
+                                    itemId: item.id,
+                                    field: "product",
+                                  })}
                                 >
-                                  상품 행 제외
+                                  상품 제거
                                 </button>
-                                {itemIndex === 0 && (
-                                  <button disabled={!!pending} onClick={() => addProduct(row.id)}>
-                                    상품 추가
-                                  </button>
-                                )}
-                              </>
-                            )}
-                          </td>
-                        </tr>
-                      )),
-                    )}
-                  </tbody>
+                              </div>
+                            </div>
+                          ))}
+                          <div className="manual-add-product">
+                            <button disabled={!!pending} onClick={() => addProduct(row.id)}>
+                              상품 추가
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    </tbody>
+                  ))}
                 </table>
               </div>
             </section>
