@@ -7,7 +7,7 @@ const component = source("src/OrderDesk.tsx");
 const style = source("src/styles/patch-v0808.css");
 
 test("recipient section height follows content and leaves extra room for product and freight", () => {
-  assert.match(style, /grid-template-rows: minmax\(0, 28%\) fit-content\(240px\) minmax\(0, 1fr\)/);
+  assert.match(style, /grid-template-rows: minmax\(0, 28%\) fit-content\(210px\) minmax\(0, 1fr\)/);
   assert.match(style, /\.review-layout > \.recipient-body > \.receipt-panel-content\s*\{\s*flex: 0 1 auto;/);
   assert.doesNotMatch(style, /minmax\(0, 0\.32fr\)/);
 });
