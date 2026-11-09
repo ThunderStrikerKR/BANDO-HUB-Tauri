@@ -566,7 +566,15 @@ export interface DeveloperRunHistory {
   passed: boolean;
   report: DeveloperTestReport;
 }
+export interface OcrCapture {
+  text: string;
+  imageDataUrl: string;
+  width: number;
+  height: number;
+}
+
 export interface Api {
+  captureOcr?: () => Promise<OcrCapture>;
   saveProductWorkbook?: (bytes: number[]) => Promise<string | null>;
   saveProductSyncWorkbook?: (bytes: number[]) => Promise<string | null>;
   saveFactoryWorkbook?: (bytes: number[]) => Promise<string | null>;

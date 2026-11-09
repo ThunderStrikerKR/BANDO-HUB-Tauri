@@ -3,7 +3,7 @@
  */
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import type { Api, State, CatalogReport } from "./types";
+import type { Api, State, CatalogReport, OcrCapture } from "./types";
 import productImages from "./tauri-product-images.json";
 import { parseOfficialProductPage } from "./official-product-import";
 import { officialLinksFromSnapshot } from "./official-links";
@@ -39,6 +39,7 @@ const api: Api = {
     invoke<State>("price_set", { productId, variantId, tier, price, expected }),
   copy: (text) => invoke<void>("clipboard_write", { text }),
   readClipboard: () => invoke<string>("clipboard_read"),
+  captureOcr: () => invoke<OcrCapture>("capture_ocr"),
   openProduct: (url) => invoke<void>("product_open", { target: url }),
   catalogReport: () => invoke<CatalogReport>("catalog_report"),
   backup: () => invoke<string>("backup_create"),

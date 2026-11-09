@@ -1,6 +1,7 @@
 import { flushSync } from "react-dom";
 import { newRetailOrder } from "./orders/retail";
 import { RetailOrderDialog } from "./orders/RetailOrderDialog";
+import { OcrReviewDialog } from "./OcrReviewDialog";
 import { useEffect, useRef, useState } from "react";
 import { ClientChooser } from "./ClientChooser";
 import { KakaoClients } from "./KakaoClients";
@@ -10,7 +11,7 @@ import { confirmAction } from "./dialogs";
 import { replaceReception } from "./orders/reception";
 import type { NoticeSink } from "./shared/notices";
 import { rememberedTitleClient } from "./title-clients";
-import type { Client, DockWindow, Order, State } from "./types";
+import type { Client, DockWindow, OcrCapture, Order, State } from "./types";
 
 export function SourceDocument({
   state,
@@ -39,6 +40,7 @@ export function SourceDocument({
   onSettings?: () => void;
 }) {
   const [retail, setRetail] = useState(false);
+  const [ocrResult, setOcrResult] = useState<OcrCapture | null>(null);
   const [retailDraft, setRetailDraft] = useState(newRetailOrder);
   const settingsLink = useRef(onSettings);
   settingsLink.current = onSettings;
@@ -97,6 +99,49 @@ export function SourceDocument({
       clearInterval(timer);
     };
   }, [!!text.trim(), client?.id, formal]);
+  const captureOcr = async () => {
+    if (formal || pending.current) return;
+    pending.current = true;
+    setBusy(true);
+    setError("");
+    try {
+      if (!window.bando?.captureOcr) throw Error("이 버전에서는 OCR 화면 캡처를 사용할 수 없습니다.");
+      const result = await window.bando.captureOcr();
+      if (!alive.current) return;
+      if (!result.text.trim()) {
+        setError("선택한 화면에서 글자를 인식하지 못했습니다. 다시 범위를 지정해 주세요.");
+        return;
+      }
+      setOcrResult(result);
+    } catch (cause) {
+      if (alive.current) setError(String(cause).replace(/^Error: /, ""));
+    } finally {
+      pending.current = false;
+      if (alive.current) setBusy(false);
+    }
+  };
+  const applyOcr = async (edited: string, mode: "replace" | "append") => {
+    if (formal || pending.current || !ocrResult) return;
+    const cleaned = edited.trim();
+    if (!cleaned) {
+      setError("OCR 결과가 비어 있습니다. 내용을 확인해 주세요.");
+      return;
+    }
+    const raw = mode === "append" && text.trim() ? text.trimEnd() + "\n" + cleaned : cleaned;
+    if (raw.length > 20000) {
+      setError("발주 원문은 최대 20,000자까지 입력할 수 있습니다.");
+      return;
+    }
+    if (mode === "replace" && text.trim() && raw !== text &&
+      !(await confirmAction("기존 미확정 원문과 분석 결과를 OCR 내용으로 교체할까요?"))) return;
+    if (formal) return;
+    const next = replaceReception(order, raw);
+    onText(raw);
+    onOrder(next);
+    setOcrResult(null);
+    setError("");
+    onNotice("검토한 OCR 문구를 발주 원문에 반영했습니다.", "success");
+  };
   const paste = async (value?: string, orderType = order.orderType ?? "AGENCY") => {
     if (formal || pending.current) return;
     pending.current = true;
@@ -160,8 +205,24 @@ export function SourceDocument({
           }
         />
       )}
-      <header className="pane-heading">
+      <header className="pane-heading source-heading">
         <h2>발주 원문</h2>
+        {!formal && (
+          <div className="source-heading-actions" aria-label="발주 입력 방식">
+            <button disabled={busy} onClick={() => void paste(undefined, "AGENCY")}>
+              대리발송
+            </button>
+            <button disabled={busy} onClick={() => void paste(undefined, "DEALER")}>
+              대리점 납품
+            </button>
+            <button disabled={busy} onClick={() => setRetail(true)}>
+              직접 입력
+            </button>
+            <button disabled={busy} onClick={() => void captureOcr()}>
+              {busy ? "처리 중…" : "캡처 범위 지정"}
+            </button>
+          </div>
+        )}
       </header>
       <div className="source-top" aria-label="현재 거래처 영역">
         {!!text &&
@@ -235,15 +296,6 @@ export function SourceDocument({
       </div>
       {!formal && (
         <div className="source-actions">
-          <button disabled={busy} onClick={() => void paste(undefined, "AGENCY")}>
-            대리발송
-          </button>
-          <button disabled={busy} onClick={() => void paste(undefined, "DEALER")}>
-            대리점 납품
-          </button>
-          <button disabled={busy} onClick={() => setRetail(true)}>
-            소매 주문
-          </button>
           {!!text && (
             <button
               disabled={busy}
@@ -273,6 +325,13 @@ export function SourceDocument({
         <small className="source-protection">
           확정 원문 / 주문 변경은 수취인 / 상품 정보에서 처리하세요.
         </small>
+      )}
+      {ocrResult && !formal && (
+        <OcrReviewDialog
+          result={ocrResult}
+          onCancel={() => setOcrResult(null)}
+          onApply={(edited, mode) => void applyOcr(edited, mode)}
+        />
       )}
       {dealer && (
         <ClientChooser

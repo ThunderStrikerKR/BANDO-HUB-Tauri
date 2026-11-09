@@ -1,4 +1,5 @@
 mod reception;
+mod ocr;
 mod factory_conflict;
 mod factory_reply_watch;
 mod export_file;
@@ -1082,6 +1083,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             state_load, state_save, settings_patch, price_set, clipboard_write, clipboard_read,
+            ocr::capture_ocr,
             product_open, catalog_report, catalog_approve, receipt_archive, backup_create, backup_list, backup_restore, choose_excel_directory, open_excel_directory,
             factory_reply_watch::choose_factory_reply_directory,
             factory_reply_watch::factory_reply_watch_scan,

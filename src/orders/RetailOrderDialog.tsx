@@ -34,7 +34,7 @@ export function RetailOrderDialog({
       setOrder({ ...order, recipients: [{ ...row, ...values }] });
   return (
     <>
-      <Modal title="소매 주문 작성" draft={order} busy={busy} onClose={onClose}>
+      <Modal title="직접 입력" draft={order} busy={busy} onClose={onClose}>
         <div className="retail-order-dialog">
           <div className="retail-order-body">
             <p>주문처: 반도스탠드</p>
