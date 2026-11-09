@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { AutomaticMessageTemplateManager } from "./AutomaticMessageTemplateManager";
 import { confirmAction } from "./dialogs";
 import { clientCandidates, uid } from "./domain";
 import { TierBadge } from "./ManagementUI";
@@ -21,6 +22,7 @@ export function ClientManager({
   onNotice: NoticeSink;
 }) {
   const { busy: savingView, run: runSave } = useAsyncTask(onNotice);
+  const [section,setSection]=useState<"clients"|"messages">("clients");
   const [search, setSearch] = useState(""),
     [edit, setEdit] = useState<Client>(),
     [exception, setException] = useState(""),
@@ -48,6 +50,15 @@ export function ClientManager({
   };
   return (
     <div className="fixed-manager">
+      <nav className="product-subnav" aria-label="거래처 관리 메뉴">
+        <button type="button" aria-current={section==="clients"?"page":undefined} onClick={()=>setSection("clients")}>거래처 목록</button>
+        <button type="button" aria-current={section==="messages"?"page":undefined} onClick={()=>setSection("messages")}>자동 메시지 편집</button>
+      </nav>
+      {section==="messages" ? (
+        <div className="management-scroll">
+          <AutomaticMessageTemplateManager state={state} onRefresh={onRefresh} onNotice={onNotice}/>
+        </div>
+      ) : (<>
       <div className="management-search">
         <input
           aria-label="거래처 관리 검색"
@@ -363,6 +374,7 @@ export function ClientManager({
           </Modal>
         )}
       </div>
+      </>)}
     </div>
   );
 }
