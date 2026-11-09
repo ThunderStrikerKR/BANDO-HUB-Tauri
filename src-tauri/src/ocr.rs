@@ -39,7 +39,7 @@ fn capture_blocking() -> Result<OcrCapture, String> {
 #[cfg(windows)]
 fn capture_blocking() -> Result<OcrCapture, String> {
     use base64::Engine;
-    use std::{fs, io::Write, path::PathBuf, process::{Command, Stdio}, time::{Duration, Instant}};
+    use std::{fs, io::Write, process::{Command, Stdio}, time::{Duration, Instant}};
 
     let (width, height, rgba) = screen_snip::snip()?;
     let count = width.checked_mul(height).and_then(|n| n.checked_mul(4))
@@ -48,12 +48,19 @@ fn capture_blocking() -> Result<OcrCapture, String> {
         return Err("캡처 범위가 너무 크거나 이미지 형식이 잘못됐습니다. 더 작은 범위를 선택해 주세요.".into());
     }
     let bmp = bmp_from_rgba(width, height, &rgba)?;
-    let app_data = std::env::var_os("LOCALAPPDATA")
-        .ok_or("Windows 사용자 데이터 경로를 확인할 수 없습니다.")?;
-    let python = PathBuf::from(app_data).join("BandoHub").join("OCR")
-        .join("venv").join("Scripts").join("python.exe");
-    if !python.is_file() {
-        return Err("PaddleOCR가 설치되지 않았습니다. SETUP_OCR_WINDOWS.cmd를 한 번 실행해 주세요.".into());
+    // Locate the private, relocatable OCR runtime next to bando_hub.exe.
+    // Never read the employee's system Python, PATH or old AppData venv.
+    let executable = std::env::current_exe()
+        .map_err(|e| format!("실행파일 위치 확인 실패: {e}"))?;
+    let app_dir = executable.parent().ok_or("프로그램 설치 폴더를 찾을 수 없습니다.")?;
+    let ocr_dir = app_dir.join("ocr");
+    let python = ocr_dir.join("runtime").join("python.exe");
+    let models = ocr_dir.join("models");
+    if !python.is_file()
+        || !models.join("PP-OCRv5_mobile_det").is_dir()
+        || !models.join("korean_PP-OCRv5_mobile_rec").is_dir()
+    {
+        return Err("OCR 실행 파일 또는 한글 모델이 없습니다. 배포 ZIP을 모두 압축 해제하고 bando_hub.exe와 ocr 폴더를 함께 보관하세요.".into());
     }
     let temp = TempWorkspace::create()?;
     let input = temp.path.join("capture.bmp");
@@ -61,7 +68,13 @@ fn capture_blocking() -> Result<OcrCapture, String> {
     let stderr = temp.path.join("error.txt");
     fs::write(&input, &bmp).map_err(|e| format!("OCR 임시 이미지 쓰기 실패: {e}"))?;
     let mut command = Command::new(python);
-    command.arg("-c").arg(include_str!("../resources/ocr/recognize.py")).arg(&input);
+    command.arg("-I").arg("-c").arg(include_str!("../resources/ocr/recognize.py")).arg(&input);
+    command.current_dir(&ocr_dir)
+        .env("BANDO_OCR_MODEL_ROOT", &models)
+        .env("PYTHONDONTWRITEBYTECODE", "1")
+        .env("PADDLE_PDX_CACHE_HOME", temp.path.join("paddlex-cache"))
+        .env_remove("PYTHONHOME")
+        .env_remove("PYTHONPATH");
     command.stdout(Stdio::from(fs::File::create(&stdout).map_err(|e| e.to_string())?));
     command.stderr(Stdio::from(fs::File::create(&stderr).map_err(|e| e.to_string())?));
     use std::os::windows::process::CommandExt;

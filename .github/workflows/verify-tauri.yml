@@ -50,7 +50,7 @@ jobs:
   windows-release-build:
     name: Windows Tauri executable compilation
     runs-on: windows-latest
-    timeout-minutes: 55
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -67,11 +67,25 @@ jobs:
           $exe = "src-tauri/target/release/bando_hub_tauri.exe"
           if (!(Test-Path $exe)) { throw "Tauri Windows EXE was not produced" }
           Write-Host "EXE generated: $((Get-Item $exe).Length) bytes"
-      - name: Upload unsigned Windows test executable
+      - name: Bundle private embedded Python and Korean PP-OCRv5 models
+        shell: pwsh
+        run: ./scripts/package-ocr-runtime.ps1 -TargetDir "src-tauri/target/release/ocr"
+      - name: Produce offline-ready Windows portable ZIP
+        shell: pwsh
+        run: |
+          $root = "src-tauri/target/release"
+          $portable = Join-Path $root "BANDO-HUB-portable"
+          New-Item -ItemType Directory -Path $portable -Force | Out-Null
+          Copy-Item (Join-Path $root "bando_hub_tauri.exe") (Join-Path $portable "bando_hub.exe")
+          Copy-Item (Join-Path $root "ocr") (Join-Path $portable "ocr") -Recurse
+          if (!(Test-Path (Join-Path $portable "ocr/runtime/python.exe"))) { throw "Bundled Python missing" }
+          if (!(Test-Path (Join-Path $portable "ocr/models/korean_PP-OCRv5_mobile_rec"))) { throw "Bundled Korean model missing" }
+          Compress-Archive -Path (Join-Path $portable "*") -DestinationPath (Join-Path $root "BANDO-HUB-portable.zip") -Force
+      - name: Upload portable Windows test distribution (EXE and OCR together)
         uses: actions/upload-artifact@v4
         with:
-          name: BANDO-HUB-Tauri-v0.0.4-Windows-unsigned-test
-          path: src-tauri/target/release/bando_hub_tauri.exe
+          name: BANDO-HUB-Tauri-v0.0.4-Windows-portable-OCR
+          path: src-tauri/target/release/BANDO-HUB-portable.zip
           if-no-files-found: error
           retention-days: 7
 
