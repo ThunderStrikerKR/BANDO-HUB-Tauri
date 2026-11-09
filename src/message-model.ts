@@ -2,6 +2,7 @@ import { paymentSignature } from "./automatic-message.js";
 import { uid, validProductUrl } from "./domain.js";
 import { hubMessages } from "./hub-messages.js";
 import { customerModel } from "./matching.js";
+import { renderAutomaticTemplate } from "./automatic-message-templates.js";
 import { groupedCustomerQuestions } from "./customer-questions.js";
 import type { State } from "./types.js";
 import { groupOrder, groupShipments, workflowIssues } from "./workflow.js";
@@ -57,20 +58,17 @@ export function requestDraft(state: State, gid: string) {
           "요청하신 " +
           (i.modelProposal?.original.replace(/\d+\s*(?:개|대).*$/, "").trim() || "상품") +
           "는 " +
-          customerModel(i.name) +
-          " 상품으로 보내드리면 될까요?\n" +
-          i.url;
+          renderAutomaticTemplate(state.settings,"modelConfirm",{상품명:customerModel(i.name)}) +
+          "\n" + i.url;
       else missing.push("상품 링크 등록 필요");
     }
     if (issue.kind === "QUANTITY_MISSING")
-      text =
-        (r?.name || "수취인") +
-        "님 " +
-        customerModel(i?.name || "상품") +
-        " 수량을 확인 부탁드립니다.";
+      text = renderAutomaticTemplate(state.settings,"quantityMissing",{
+        상품명:customerModel(i?.name || "상품"),
+      });
     issue.customer = text;
   }
-  const questions = groupedCustomerQuestions(o, outbound);
+  const questions = groupedCustomerQuestions(o, outbound,o.additionalQuestions??[],state.settings);
   return {
     text: questions.map((s, i) => `${i + 1}. ${s}`).join("\n\n"),
     missing,

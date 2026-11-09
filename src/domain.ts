@@ -3,6 +3,7 @@ import { z } from "zod";
 import { aliasProblems } from "./matching.js";
 import { parseSmart } from "./parser.js";
 import { colorLabel, registeredProducts } from "./product-models.js";
+import { renderAutomaticTemplate } from "./automatic-message-templates.js";
 import type { Alias, Client, Item, Order, Product, Recipient, Settings, State } from "./types.js";
 import { blocking, orderIssues } from "./validation.js";
 export const unassignedClient: Client = {
@@ -560,42 +561,49 @@ export function messages(
       ...(!a?.bank.trim() || !a.number.trim() || !a.holder.trim() ? ["입금 계좌 등록 필요"] : []),
     ]),
   ];
-  const amountLines = items.map(
-    (i) =>
-      `${label(i)} * ${i.quantity ?? "?"}개${i.quantityConfirmed === false ? " (수량 미확정)" : ""} : ${i.unitPrice !== null && i.quantity !== null ? won(i.unitPrice * i.quantity) : i.quantity === null ? "수량 확인 필요" : !c.id ? "거래처 선택 후 단가 적용" : "판매가 확인 필요"}`,
+  const amountLines = items.map(i =>
+    renderAutomaticTemplate(s,"paymentItem",{
+      상품명:label(i),수량:String(i.quantity??"?"),
+      금액:i.unitPrice !== null && i.quantity !== null
+        ? won(i.unitPrice * i.quantity)
+        : i.quantity === null ? "수량 확인 필요"
+        : !c.id ? "거래처 선택 후 단가 적용" : "판매가 확인 필요",
+    })+(i.quantityConfirmed === false ? " (수량 미확정)" : ""),
   );
   const payment = [
-    "안녕하세요.",
+    renderAutomaticTemplate(s,"paymentGreeting"),
     "",
     ...(paymentIssues.length ? ["[작성 중 / 확인 후 복사 가능]", ""] : []),
     ...amountLines,
     "",
-    `운임 : ${won(t.shipping)}`,
-    ...(o.applyVat ? [`부가세 : ${won(t.vat)}`] : []),
+    renderAutomaticTemplate(s,"paymentFreight",{운임:won(t.shipping)}),
+    ...(o.applyVat ? [renderAutomaticTemplate(s,"paymentVat",{부가세:won(t.vat)})] : []),
     "",
-    ...(t.total === null ? ["합계 : 금액 확인 필요"] : [`합계 : ${won(t.total)} 입니다.`]),
+    renderAutomaticTemplate(s,"paymentTotal",{합계:won(t.total)}),
     "",
     a?.bank && a.number && a.holder
-      ? `${a.bank} ${a.number} ${a.holder} 입니다.`
+      ? renderAutomaticTemplate(s,"paymentAccount",{
+          은행명:a.bank,계좌번호:a.number,예금주:a.holder,
+        })
       : "[입금 계좌 등록 필요]",
     urls(links.payment),
   ].join("\n");
   const questions = items.flatMap((i) => [
-    ...(i.quantityConfirmed === false ? [`${i.name} 수량을 확인 부탁드립니다.`] : []),
-    ...(!i.productId ? [`${i.name}: 정확한 모델명을 확인해 주세요.`] : []),
+    ...(i.quantityConfirmed === false ? [renderAutomaticTemplate(s,"quantityMissing",{상품명:i.name})] : []),
+    ...(!i.productId ? [renderAutomaticTemplate(s,"modelMissing",{상품명:i.name})] : []),
     ...(i.issues.some((x) => x.includes("색상")) ? [`${i.name}: 실제 색상을 확인해 주세요.`] : []),
   ]);
   const options = [
-    "안녕하세요.",
+    renderAutomaticTemplate(s,"paymentGreeting"),
     "",
-    "주문하신 내역 확인 부탁드립니다.",
+    renderAutomaticTemplate(s,"optionsIntro"),
     "",
     ...items.map((i) => `${label(i)} * ${i.quantity ?? "?"}개`),
     "",
     ...questions,
 
     "",
-    "주문 내용 확인 후 회신 부탁드립니다.",
+    renderAutomaticTemplate(s,"optionsClosing"),
     urls(links.options),
   ].join("\n");
   return { payment, options, paymentIssues };
