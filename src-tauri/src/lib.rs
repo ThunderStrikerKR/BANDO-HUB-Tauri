@@ -38,6 +38,7 @@ fn valid_state(s: &Value) -> Result<(), String> {
     if !s.get("settings").is_some_and(Value::is_object) { return Err("설정 데이터 형식 오류".into()); }
     if s["products"].as_array().is_some_and(|p| p.len() > 50000) { return Err("상품 한도 초과".into()); }
     if s["orders"].as_array().is_some_and(|p| p.len() > 100000) { return Err("주문 한도 초과".into()); }
+    validate_message_templates(s)?;
     Ok(())
 }
 fn write_snapshot(conn: &mut Connection, mut state: Value, expected_revision: u64, validate_orders: bool) -> Result<Value, String> {
