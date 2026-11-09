@@ -347,11 +347,6 @@ export function SourceDocument({
           )}
         </div>
       )}
-      {formal && (
-        <small className="source-protection">
-          확정 원문 / 주문 변경은 수취인 / 상품 정보에서 처리하세요.
-        </small>
-      )}
       {showOcrFailure && (
         <Modal title="OCR 실행 오류" onClose={() => setShowOcrFailure(false)}>
           <p>OCR 실행 중 오류가 발생했습니다. 기존 발주 원문과 주문 데이터는 변경되지 않았습니다.</p>

@@ -578,7 +578,7 @@ export function OrderDesk(props: OrderDeskProps) {
                   (
                   {draft.recipients.some((r) => shipmentVat(draft, r)) &&
                   draft.recipients.some((r) => !shipmentVat(draft, r))
-                    ? "배송 건별 부가세 적용"
+                    ? "부가세 포함/별도"
                     : draft.recipients.some((r) => shipmentVat(draft, r))
                       ? "부가세 포함"
                       : "부가세 별도"}

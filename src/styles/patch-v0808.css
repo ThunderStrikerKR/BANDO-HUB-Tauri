@@ -171,11 +171,11 @@
 }
 .flow-fixed-summary {
   display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  min-height: 48px;
-  font-size: 13px;
-  padding: 6px 9px;
+  flex-direction: column;
+  gap: 3px;
+  min-height: 42px;
+  font-size: 12px;
+  padding: 5px 8px;
   font-variant-numeric: tabular-nums;
 }
 .source-actions {
@@ -438,21 +438,24 @@
 }
 
 .flow-fixed-summary {
-  height: 72px;
-  min-height: 72px;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 3px 6px;
-  overflow: hidden;
+  height: auto;
+  min-height: 42px;
+  max-height: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  overflow: visible;
 }
-.flow-fixed-summary span {
+.flow-fixed-summary .flow-summary-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 2px 7px;
+}
+.flow-fixed-summary .flow-summary-line span {
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.flow-fixed-summary span:nth-child(2) {
-  grid-column: 1/-1;
-  order: 4;
+  font-size: 12px;
 }
 
 /* Two reserved toolbar rows keep all three entry buttons visible at narrow resolutions. */

@@ -259,7 +259,7 @@ export function ClientManager({
                 checked={edit.defaultApplyVat ?? false}
                 onChange={(e) => setEdit({ ...edit, defaultApplyVat: e.target.checked })}
               />{" "}
-              부가세 기본 적용
+              부가세 포함 (기본값)
             </label>
             {edit.tier === "special" && (
               <section className="special-prices">

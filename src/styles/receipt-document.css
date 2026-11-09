@@ -296,6 +296,13 @@
 /* OCR progress belongs to the original-document canvas, never the header button. */
 .source-pane .source-document {
   position: relative;
+  border: 1px solid #555;
+  border-radius: 4px;
+  background: #202020;
+  margin: 0 6px;
+}
+.source-pane .source-document:focus-within {
+  border-color: #777;
 }
 .source-pane .source-ocr-progress {
   position: absolute;

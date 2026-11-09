@@ -273,7 +273,7 @@ export const SettingsPanel = forwardRef<SettingsPanelHandle, {
         ))}
       </div>
       <p className="muted">
-        부가세는 주문별 기본 해제입니다. 원 미만 세액은 현재 반올림하며 회사 회계 기준을 확인해야
+        부가세는 주문별 기본 별도입니다. 원 미만 세액은 현재 반올림하며 회사 회계 기준을 확인해야
         합니다. 대리발송 송하인은 거래처, 대리점 납품 / 직접 입력은 반도스탠드 정보를 사용합니다.
       </p>
       </div>

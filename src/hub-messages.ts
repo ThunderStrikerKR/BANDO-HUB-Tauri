@@ -133,7 +133,7 @@ export function hubMessages(
     mixed = vats.some(Boolean) && vats.some((v) => !v);
   parts.push(renderAutomaticTemplate(state.settings,"paymentTotal",{
     합계:sum("total")===null ? "금액 확인 필요" : won(sum("total")),
-  })+(mixed ? " (배송 건별 부가세 적용)" : vats.some(Boolean) ? "" : " (부가세 별도)"));
+  })+(mixed ? " (부가세 포함/별도)" : vats.some(Boolean) ? " (부가세 포함)" : " (부가세 별도)"));
   const account = (groupId ? groupAccount(state, groupId) : undefined)
     ?? recommendAccount(order,state.settings,state.products,client);
   const accountLine = account?.bank && account.number && account.holder

@@ -130,7 +130,7 @@ export function WorkflowFooter({
             checked={shipmentVat(order, recipient)}
             onChange={(e) => onVat(e.target.checked)}
           />{" "}
-          부가세 10% 추가
+          부가세 포함
         </label>
       </div>
     </section>

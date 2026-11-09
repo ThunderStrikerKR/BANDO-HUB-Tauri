@@ -68,7 +68,7 @@ export const AUTOMATIC_MESSAGE_TEMPLATES = {
     body:"운임 : {운임}",variables:["운임"],required:["운임"],sample:{"운임":"3,000원"},
   },
   paymentVat: {
-    label:"부가세 안내",category:"입금 안내",description:"부가세가 적용되는 경우에만 표시",
+    label:"부가세 안내",category:"입금 안내",description:"부가세 포함 주문에서만 표시",
     body:"부가세 : {부가세}",variables:["부가세"],required:["부가세"],sample:{"부가세":"9,300원"},
   },
   paymentTotal: {
