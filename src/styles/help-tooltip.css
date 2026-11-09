@@ -1,4 +1,5 @@
 /* Help popovers appear in the browser top layer, including above native dialogs. */
+.field-label-wrap { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .help-tooltip-anchor {
   display: inline-flex;
   vertical-align: middle;

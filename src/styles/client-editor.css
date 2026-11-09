@@ -74,7 +74,8 @@
   gap: 6px 8px;
   margin-top: 12px;
 }
-.client-editor-flags .check { margin: 0 4px 0 0; }
+.client-editor-flag { display: inline-flex; align-items: center; gap: 6px; }
+.client-editor-flags .check { margin: 0; }
 .app-modal-layer.client-editor-modal .special-prices { margin-top: 14px; }
 .app-modal-layer.client-editor-modal .special-prices h3 {
   display: flex; align-items: center; gap: 7px;

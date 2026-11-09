@@ -17,10 +17,10 @@ export function Field({ label, children, help }: { label: string; children: Reac
   return (
     <FieldContext.Provider value={{ id: target, label }}>
       <div className="field">
-        <label className="field-label" htmlFor={target}>
-          {label}
+        <div className="field-label-wrap">
+          <label className="field-label" htmlFor={target}>{label}</label>
           {help && <HelpTooltip title={label} {...help} />}
-        </label>
+        </div>
         {Children.map(children, (child) =>
           isValidElement<{ "aria-label"?: string; id?: string }>(child) &&
           typeof child.type === "string" &&
