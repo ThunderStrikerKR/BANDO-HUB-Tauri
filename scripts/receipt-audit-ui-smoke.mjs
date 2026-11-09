@@ -302,7 +302,11 @@ try {
   await nav.getByRole("button", { name: "설정" }).click();
   await page.getByRole("tab", { name: "파일 관리" }).click();
   await page.getByRole("heading", { name: "Excel 보관함 위치" }).waitFor();
-  await page.getByText("공장 발송, 매장 발송, 공장 회신, 상품 관리, 거래처 관리 폴더를 자동으로 구분합니다.").waitFor();
+  const folderHelp = page.getByRole("button", { name: "Excel 보관함 위치 도움말" });
+  await folderHelp.hover();
+  await page.getByRole("tooltip").getByText(
+    "공장 발송, 매장 발송, 공장 회신, 상품 관리, 거래처 관리 파일을 구분하고 날짜별 폴더에 보관합니다."
+  ).waitFor();
   await page.getByRole("button", { name: "보관함 폴더 선택", exact: true }).click();
   await page.getByText("C:\\BANDO_CI_SELECTED").waitFor();
   await page.getByRole("button", { name: "보관함 열기", exact: true }).click();
