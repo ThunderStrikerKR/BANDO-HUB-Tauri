@@ -516,13 +516,14 @@
   }
 }
 .items-freight-panel .compact-items th:first-child {
-  width: 35%;
+  /* The product name uses all space remaining after compact numeric columns. */
+  width: auto;
 }
 .items-freight-panel .compact-items th:nth-child(2) {
-  width: 25%;
+  width: 78px;
 }
 .items-freight-panel .compact-items th:nth-child(3) {
-  width: 40%;
+  width: 108px;
 }
 .items-freight-panel .compact-items td:nth-child(2) .linked-field {
   min-width: 0;
@@ -530,10 +531,11 @@
   gap: 2px;
 }
 .items-freight-panel .compact-items input[type="number"] {
-  min-width: 0;
-  width: 100%;
-  max-width: 100%;
-  flex: 1;
+  box-sizing: border-box;
+  width: 56px;
+  min-width: 56px;
+  max-width: 56px;
+  flex: 0 0 56px;
   padding: 3px;
 }
 .items-freight-panel .compact-items td:nth-child(2) .linked-field:after {
@@ -546,8 +548,20 @@
   white-space: nowrap;
 }
 .items-freight-panel .freight-line {
+  /* Share spare horizontal room among controls without stretching inputs. */
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 6px 8px;
+}
+.items-freight-panel .freight-line > select {
+  box-sizing: border-box;
+  flex: 0 0 68px;
+  width: 68px;
+  min-width: 68px;
+  padding: 5px 4px !important;
 }
 .items-freight-panel .freight-line > .freight-money {
   flex: 0 0 auto;
@@ -569,7 +583,7 @@
   max-width: 112px;
   font-size: 12px !important;
   padding: 4px 6px !important;
-  margin-left: auto;
+  margin-left: 0;
   white-space: nowrap;
 }
 
@@ -614,9 +628,12 @@
 
 /* Product links are an optional copy choice beside the message title. */
 .messages-pane > .pane-heading h2 {
-  flex: 0 1 auto;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 .messages-pane .message-link-toggle {
+  margin-left: auto;
+  flex: none;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -631,4 +648,9 @@
   margin: 0;
   flex: none;
   cursor: pointer;
+}
+
+/* Keep the tax checkbox inset from the left edge of the freight section. */
+.items-freight-panel .shipment-vat {
+  padding: 0 12px;
 }
