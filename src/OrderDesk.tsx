@@ -43,7 +43,6 @@ export function OrderDesk(props: OrderDeskProps) {
     portalTargets,
     staffBlocks,
     selectIssue,
-    question,
     recEdit,
     products,
     pricingClient,
@@ -191,7 +190,6 @@ export function OrderDesk(props: OrderDeskProps) {
                 <StaffChecks
                   blocks={staffBlocks}
                   onSelect={selectIssue}
-                  onQuestion={question}
                   onCancelApproval={(b) => {
                     if (b.itemId)
                       recEdit(

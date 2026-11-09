@@ -153,7 +153,7 @@ export function IssueResolver({
               </div>
               <button onClick={() => setSearch(true)}>다른 등록 상품 검색</button>
               {!candidates.length && (
-                <p>적절한 후보가 없습니다. 거래처 문의에 추가해 확인하세요.</p>
+                <p>적절한 후보가 없습니다. 등록된 상품을 검색하거나 원문의 상품 정보를 확인하세요.</p>
               )}
             </li>
           )}

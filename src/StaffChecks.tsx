@@ -7,7 +7,6 @@ export function StaffChecks({
 }: {
   blocks: StaffBlock[];
   onSelect: (block: StaffBlock) => void;
-  onQuestion?: (b: StaffBlock) => void;
   onCancelApproval?: (b: StaffBlock) => void;
   onCandidate?: (b: StaffBlock, value: string) => void;
 }) {
