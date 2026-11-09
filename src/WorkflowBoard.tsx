@@ -434,7 +434,7 @@ export function WorkflowBoard({
                       </span>
                       <span className="shipment-freight">
                         {shipmentFreightCode(shipmentContext(state, s).order, recipient) === "020"
-                          ? "후불"
+                          ? "착불"
                           : shipmentTotals(state, s).shipping === null
                             ? "확인 필요"
                             : won(shipmentTotals(state, s).shipping)}

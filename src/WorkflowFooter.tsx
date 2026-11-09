@@ -43,16 +43,8 @@ export function WorkflowFreightRows({
                       ? "공장 운임"
                       : "매장 운임"}
                 </b>
-                <select
-                  aria-label={index ? "운임구분 " + b.origin : "운임구분"}
-                  value={shipmentFreightCode(order, recipient)}
-                  disabled={disabled}
-                  onChange={(e) => onCode(e.target.value as "010" | "020")}
-                >
-                  <option value="010">선불</option>
-                  <option value="020">후불</option>
-                </select>
-                <div className="freight-money">
+                <div className="freight-amount-code">
+                  <div className="freight-money">
                   <input
                     aria-label={`${recipient.name} ${b.origin === "FACTORY" ? "공장" : "매장"} 적용 운임`}
                     inputMode="numeric"
@@ -82,7 +74,21 @@ export function WorkflowFreightRows({
                       });
                     }}
                   />
-                  <span>원</span>
+                    <span>원</span>
+                  </div>
+                  <span className="freight-payment-code">
+                    <span aria-hidden="true">(</span>
+                    <select
+                      aria-label={index ? "운임구분 " + b.origin : "운임구분"}
+                      value={shipmentFreightCode(order, recipient)}
+                      disabled={disabled}
+                      onChange={(e) => onCode(e.target.value as "010" | "020")}
+                    >
+                      <option value="010">선불</option>
+                      <option value="020">착불</option>
+                    </select>
+                    <span aria-hidden="true">)</span>
+                  </span>
                 </div>
                 <button
                   className="freight-inquiry"

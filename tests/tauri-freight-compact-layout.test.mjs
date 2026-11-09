@@ -7,7 +7,7 @@ const footer = text("src/WorkflowFooter.tsx");
 const css = text("src/styles/patch-v0808.css");
 
 test("freight input stays 84px regardless of dispatch origin or inquiry visibility", () => {
-  const money = css.match(/\.items-freight-panel \.freight-line > \.freight-money\s*\{([^}]*)\}/)?.[1];
+  const money = css.match(/\.items-freight-panel \.freight-amount-code > \.freight-money\s*\{([^}]*)\}/)?.[1];
   const input = css.match(/\.items-freight-panel \.freight-money > input\s*\{([^}]*)\}/)?.[1];
   assert.ok(money && input);
   assert.match(money, /flex: 0 0 auto;/);

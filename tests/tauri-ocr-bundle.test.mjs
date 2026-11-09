@@ -47,7 +47,8 @@ test("build creates portable private Python runtime and fetches models", () => {
 });
 
 test("release and CI never publish standalone EXE without OCR", () => {
-  assert.match(build, /package-ocr-runtime\.ps1/);
+  assert.match(build, /ensure-ocr-package\.ps1/);
+  assert.match(read("scripts/ensure-ocr-package.ps1"), /package-ocr-runtime\.ps1/);
   assert.match(build, /release\\ocr\.next/);
   assert.match(build, /release\\ocr/);
   assert.match(build, /BANDO-HUB-portable\.zip/);
@@ -55,7 +56,7 @@ test("release and CI never publish standalone EXE without OCR", () => {
   assert.match(ci, /package-ocr-runtime\.ps1/);
   assert.doesNotMatch(ci, /BANDO-HUB-Tauri-v0\.0\.4-Windows-unsigned-test/);
   assert.match(ci, /Validate offline OCR from the extracted ZIP/);
-  assert.match(build, /verify-packaged-ocr\.ps1/);
+  assert.match(read("scripts/ensure-ocr-package.ps1"), /verify-packaged-ocr\.ps1/);
   assert.match(verifierScript, /verify-portable-ocr\.py/);
   assert.match(portableVerifier, /subprocess\.run/);
   assert.match(portableVerifier, /BANDO_OCR_RESULT=/);

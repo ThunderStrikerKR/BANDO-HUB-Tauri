@@ -45,6 +45,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          cache-targets: true
       - name: Test real app Rust / SQLite persistence on Windows
         run: cargo test --manifest-path src-tauri/Cargo.toml --lib -- --nocapture
   windows-release-build:
@@ -57,6 +61,10 @@ jobs:
         with:
           node-version: '22'
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          cache-targets: true
       - name: Install frontend dependencies
         run: npm install --no-audit --no-fund
       - name: Build actual Windows executable
@@ -67,9 +75,22 @@ jobs:
           $exe = "src-tauri/target/release/bando_hub_tauri.exe"
           if (!(Test-Path $exe)) { throw "Tauri Windows EXE was not produced" }
           Write-Host "EXE generated: $((Get-Item $exe).Length) bytes"
+      - name: Restore versioned portable OCR runtime and models
+        id: ocr-cache
+        uses: actions/cache@v4
+        with:
+          path: ocr-build-cache
+          key: bando-ocr-win-x64-v1-${{ hashFiles('scripts/package-ocr-runtime.ps1', 'scripts/prepare-ocr-bundle.py', 'scripts/verify-packaged-ocr.ps1', 'scripts/verify-portable-ocr.py', 'src-tauri/resources/ocr/recognize.py') }}
       - name: Bundle private embedded Python and Korean PP-OCRv5 models
+        if: steps.ocr-cache.outputs.cache-hit != 'true'
         shell: pwsh
-        run: ./scripts/package-ocr-runtime.ps1 -TargetDir "src-tauri/target/release/ocr"
+        run: ./scripts/package-ocr-runtime.ps1 -TargetDir "ocr-build-cache"
+      - name: Verify cached or freshly prepared OCR files
+        shell: pwsh
+        run: |
+          if (!(Test-Path "ocr-build-cache/runtime/python.exe")) { throw "Cached OCR Python missing" }
+          if (!(Test-Path "ocr-build-cache/models/PP-OCRv5_mobile_det/inference.json")) { throw "Cached OCR detector missing" }
+          if (!(Test-Path "ocr-build-cache/models/korean_PP-OCRv5_mobile_rec/inference.json")) { throw "Cached OCR Korean recognizer missing" }
       - name: Produce offline-ready Windows portable ZIP
         shell: pwsh
         run: |
@@ -77,7 +98,7 @@ jobs:
           $portable = Join-Path $root "BANDO-HUB-portable"
           New-Item -ItemType Directory -Path $portable -Force | Out-Null
           Copy-Item (Join-Path $root "bando_hub_tauri.exe") (Join-Path $portable "bando_hub.exe")
-          Copy-Item (Join-Path $root "ocr") (Join-Path $portable "ocr") -Recurse
+          Copy-Item "ocr-build-cache" (Join-Path $portable "ocr") -Recurse
           if (!(Test-Path (Join-Path $portable "ocr/runtime/python.exe"))) { throw "Bundled Python missing" }
           if (!(Test-Path (Join-Path $portable "ocr/models/korean_PP-OCRv5_mobile_rec"))) { throw "Bundled Korean model missing" }
           Compress-Archive -Path (Join-Path $portable "*") -DestinationPath (Join-Path $root "BANDO-HUB-portable.zip") -Force

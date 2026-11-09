@@ -29,10 +29,11 @@ test("quantity and amount columns preserve maximum room for product names", () =
 });
 
 test("freight controls spread out without width changes between factory and store", () => {
-  assert.match(block(".items-freight-panel .freight-line"), /justify-content: space-between;/);
-  assert.match(block(".items-freight-panel .freight-line > select"), /width: 68px;/);
+  assert.match(block(".items-freight-panel .freight-line"), /justify-content: flex-start;/);
+  assert.match(block(".items-freight-panel .freight-line > .freight-amount-code"), /gap: 3px;/);
+  assert.match(block(".items-freight-panel .freight-payment-code > select"), /width: 66px;/);
   assert.match(block(".items-freight-panel .freight-money > input"), /width: 84px;/);
-  assert.match(block(".items-freight-panel .freight-line > .freight-inquiry"), /margin-left: 0;/);
+  assert.match(block(".items-freight-panel .freight-line > .freight-inquiry"), /margin-left: auto;/);
   assert.match(freight, /visibility: b\.origin === "FACTORY" \? "visible" : "hidden"/);
 });
 

@@ -28,9 +28,7 @@ echo [4/5] Creating the self-contained OCR folder...
 if not exist "release" mkdir "release"
 if errorlevel 1 goto copy_failed
 if exist "release\ocr.next" rmdir /S /Q "release\ocr.next"
-powershell -NoProfile -ExecutionPolicy Bypass -File "scripts\package-ocr-runtime.ps1" -TargetDir "release\ocr.next"
-if errorlevel 1 goto ocr_failed
-powershell -NoProfile -ExecutionPolicy Bypass -File "scripts\verify-packaged-ocr.ps1" -OcrRoot "release\ocr.next"
+powershell -NoProfile -ExecutionPolicy Bypass -File "scripts\ensure-ocr-package.ps1" -LiveDir "release\ocr" -StageDir "release\ocr.next"
 if errorlevel 1 goto ocr_failed
 
 echo [5/5] Staging and publishing the EXE and OCR together...
@@ -43,13 +41,15 @@ call :ensure_bando_closed
 if errorlevel 1 goto app_running_after_build
 
 rem Keep the existing OCR directory until the new one is staged.
-if exist "release\ocr.previous" goto previous_leftover
-if exist "release\ocr" (
-  move "release\ocr" "release\ocr.previous" >nul
-  if errorlevel 1 goto copy_failed
+if exist "release\ocr.next" (
+  if exist "release\ocr.previous" goto previous_leftover
+  if exist "release\ocr" (
+    move "release\ocr" "release\ocr.previous" >nul
+    if errorlevel 1 goto copy_failed
+  )
+  move "release\ocr.next" "release\ocr" >nul
+  if errorlevel 1 goto ocr_rollback
 )
-move "release\ocr.next" "release\ocr" >nul
-if errorlevel 1 goto ocr_rollback
 move /Y "release\bando_hub.exe.pending" "release\bando_hub.exe" >nul
 if errorlevel 1 goto ocr_rollback
 if exist "release\ocr.previous" rmdir /S /Q "release\ocr.previous"

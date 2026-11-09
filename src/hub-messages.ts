@@ -118,7 +118,7 @@ export function hubMessages(
       if (notice) parts.push(notice);
     }
     parts.push(renderAutomaticTemplate(state.settings,"paymentFreight",{
-      운임:shipmentFreightCode(order, r)==="020" ? "후불" : won(amounts[index].shipping),
+      운임:shipmentFreightCode(order, r)==="020" ? "착불" : won(amounts[index].shipping),
     }));
     if (shipmentVat(order, r))
       parts.push(renderAutomaticTemplate(state.settings,"paymentVat",{부가세:won(amounts[index].vat)}));
