@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 import { createPortal, flushSync } from "react-dom";
 import { HubPanels, defaultPanels } from "./HubPanels";
+import { askSaveChanges } from "./dialogs";
 import { LinkContext } from "./LinkedText";
 import { MessageWorkspace } from "./MessageWorkspace";
 import { OrderDesk } from "./OrderDesk";
@@ -14,6 +15,7 @@ type Props = ComponentProps<typeof OrderDesk> & {
   onNew: () => void;
   onRememberSelection: (s: WorkflowSelection) => void;
   onResetDock: () => void;
+  onRegisterOrderLeaveGuard?: (guard?: () => Promise<{ proceed: boolean; handledDraft: boolean }>) => void;
 };
 const ManualClassification = lazy(() =>
   import("./orders/ManualClassification").then((module) => ({
@@ -22,7 +24,11 @@ const ManualClassification = lazy(() =>
 );
 export function HubWorkspace(props: Props) {
   const [manual, setManual] = useState(false);
+  const [discardRevision, setDiscardRevision] = useState(0);
   const deletedSelection = useRef<WorkflowSelection | undefined>(undefined);
+  const leaveGuardRef = useRef<() => Promise<{ proceed: boolean; handledDraft: boolean }>>(
+    async () => ({ proceed: true, handledDraft: false }),
+  );
   const { state, draft } = props;
   const [receptionId, setReceptionId] = useState(draft.id);
   useEffect(() => {
@@ -36,20 +42,14 @@ export function HubWorkspace(props: Props) {
     [edits, setEdits] = useState<Record<string, Order>>({}),
     [active, setActive] = useState(""),
     [stageHover, setStageHover] = useState<{ groupId: string; step: number }>();
-  const setSelected = (
-    value:
-      | WorkflowSelection
-      | undefined
-      | ((previous: WorkflowSelection | undefined) => WorkflowSelection | undefined),
-  ) => {
-    const next = typeof value === "function" ? value(selected) : value;
+  const applySelection = (next: WorkflowSelection | undefined) => {
     if (next) {
       setReceptionId(next.orderId);
       if (
         next.orderId !== draft.id &&
         receptionId === draft.id &&
         draft.raw.trim() &&
-        JSON.stringify(draft) !== JSON.stringify(state.orders.find((o) => o.id === draft.id))
+        !state.orders.some((o) => o.id === draft.id)
       )
         setEdits((old) => ({ ...old, [draft.id]: structuredClone(draft) }));
     }
@@ -59,8 +59,23 @@ export function HubWorkspace(props: Props) {
       next?.groupId === selected?.groupId
     )
       return;
-    // Data ownership changes immediately; animation must never delay which recipient is edited.
+    // After the user has chosen what happens to edits, change data ownership immediately.
     flushSync(() => commitSelection(next));
+  };
+  const setSelected = (
+    value:
+      | WorkflowSelection
+      | undefined
+      | ((previous: WorkflowSelection | undefined) => WorkflowSelection | undefined),
+  ) => {
+    const next = typeof value === "function" ? value(selected) : value;
+    if (selected?.orderId && next?.orderId && selected.orderId !== next.orderId) {
+      void leaveGuardRef.current().then(({ proceed }) => {
+        if (proceed) applySelection(next);
+      }).catch((error) => props.onNotice(String(error), "error"));
+      return;
+    }
+    applySelection(next);
   };
   useEffect(() => {
     if (!selected?.shipmentId) return;
@@ -156,6 +171,39 @@ export function HubWorkspace(props: Props) {
       }
     }
   };
+  leaveGuardRef.current = async () => {
+    const orderId = selected?.orderId ?? receptionId;
+    const persisted = state.orders.find((order) => order.id === orderId);
+    const pending = orderId === draft.id ? draft : edits[orderId];
+    if (!persisted || !pending || JSON.stringify(pending) === JSON.stringify(persisted))
+      return { proceed: true, handledDraft: false };
+    const choice = await askSaveChanges(
+      "수정한 주문 정보가 저장되지 않았습니다. 저장하고 이동할까요?",
+    );
+    if (choice === "cancel") return { proceed: false, handledDraft: false };
+    if (choice === "save") {
+      try {
+        await onSave(reconcileWorkflow(state, pending));
+      } catch (error) {
+        props.onNotice(error instanceof Error ? error.message : String(error), "error");
+        return { proceed: false, handledDraft: false };
+      }
+    } else {
+      if (orderId === draft.id) props.onChange(structuredClone(persisted));
+      setEdits((previous) => {
+        if (!(orderId in previous)) return previous;
+        const next = { ...previous };
+        delete next[orderId];
+        return next;
+      });
+      setDiscardRevision((value) => value + 1);
+    }
+    return { proceed: true, handledDraft: orderId === draft.id };
+  };
+  useEffect(() => {
+    props.onRegisterOrderLeaveGuard?.(() => leaveGuardRef.current());
+    return () => props.onRegisterOrderLeaveGuard?.(undefined);
+  }, [props.onRegisterOrderLeaveGuard]);
   const changeDetail: Props["onChange"] = (value) => {
     const current = detail ?? draft;
     if (
@@ -394,7 +442,7 @@ export function HubWorkspace(props: Props) {
       <div className="hub-order-engine">
         <OrderDesk
           {...props}
-          key={receptionOrder.id + ":reception"}
+          key={receptionOrder.id + ":reception:" + discardRevision}
           state={base}
           draft={receptionOrder}
           onChange={changeReception}
@@ -406,7 +454,7 @@ export function HubWorkspace(props: Props) {
         />
         <OrderDesk
           {...props}
-          key={(detail?.id ?? draft.id) + ":" + (selected?.groupId ?? "empty")}
+          key={(detail?.id ?? draft.id) + ":" + (selected?.groupId ?? "empty") + ":" + discardRevision}
           state={base}
           draft={detail ?? draft}
           viewMode="details"

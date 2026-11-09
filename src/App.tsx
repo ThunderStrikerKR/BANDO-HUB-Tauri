@@ -147,6 +147,7 @@ export function App() {
                   onSettings={() => void model.navigate("설정")}
                   onRawEditDirty={model.setRawEditDirty}
                   onRememberSelection={model.setWorkflowSelection}
+                  onRegisterOrderLeaveGuard={model.registerOrderLeaveGuard}
                   externalKakao={true}
                   onResetDock={() => {}}
                   workflowSelection={model.workflowSelection}

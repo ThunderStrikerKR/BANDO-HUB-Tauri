@@ -558,7 +558,6 @@ export function OrderDesk(props: OrderDeskProps) {
                       onVat={(v) =>
                         recEdit(activeShipment.recipientId, (r) => (r.vatOverride = v), false)
                       }
-                      onSave={() => void run(() => onWorkflowSave(flowState))}
                     />
                   ) : null}
                 </section>

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { confirmAction } from "../dialogs";
 import { canQueue, orderClient, reviewIssues, totals } from "../domain";
 import { newReception, persistedReceptionState } from "../orders/reception";
@@ -11,12 +11,19 @@ import type { WorkflowSelection } from "../WorkflowBoard";
 import { onlyDeletedGroups } from "../workspace-selection";
 import type { PageId } from "./navigation";
 import { seoulDate } from "./settlement-report";
+export type OrderLeaveResult = { proceed: boolean; handledDraft: boolean };
 export function useAppModel() {
   const { notice, notify: setNotice, dismiss: dismissNotice } = useNotice();
   const [historyDate, setHistoryDate] = useState(() => seoulDate(new Date().toISOString())),
     [settlementDate, setSettlementDate] = useState(() => seoulDate(new Date().toISOString()));
   const hasPendingChanges = useHasPendingChanges();
   const [rawEditDirty, setRawEditDirty] = useState(false);
+  const orderLeaveGuard = useRef<(() => Promise<OrderLeaveResult>) | undefined>(undefined);
+  const registerOrderLeaveGuard = useCallback((guard?: () => Promise<OrderLeaveResult>) => {
+    orderLeaveGuard.current = guard;
+  }, []);
+  const confirmOrderLeave = async (): Promise<OrderLeaveResult> =>
+    orderLeaveGuard.current ? orderLeaveGuard.current() : { proceed: true, handledDraft: false };
   const [state, setState] = useState<State>(),
     [draft, setDraft] = useState<Order>(),
     [tab, setTab] = useState<PageId>("접수"),
@@ -235,8 +242,12 @@ export function useAppModel() {
       setNotice("이 주문의 묶음은 삭제되었습니다. 최초 원문은 설정의 감사 기록에서 확인하세요.");
       return false;
     }
-    if (dirty && !(await confirmAction("저장하지 않은 변경사항이 있습니다. 다른 주문을 열까요?")))
-      return false;
+    const leave = await confirmOrderLeave();
+    if (!leave.proceed) return false;
+    if (
+      dirty && !leave.handledDraft &&
+      !(await confirmAction("저장하지 않은 변경사항이 있습니다. 다른 주문을 열까요?"))
+    ) return false;
     setWorkflowSelection(undefined);
     setDraft(o ? clone(o) : newReception());
     setTab("접수");
@@ -323,12 +334,13 @@ export function useAppModel() {
     setWorkflowSelection(selection);
   };
   const navigate = async (page: PageId) => {
-    if (
-      page !== tab &&
-      hasPendingChanges &&
-      !(await confirmAction("저장하지 않은 입력이 있습니다. 다른 화면으로 이동할까요?"))
-    )
-      return;
+    if (page !== tab) {
+      const leave = await confirmOrderLeave();
+      if (!leave.proceed) return;
+      if (hasPendingChanges &&
+        !(await confirmAction("저장하지 않은 입력이 있습니다. 다른 화면으로 이동할까요?")))
+        return;
+    }
     setTab(page);
     setQuery("");
   };
@@ -336,7 +348,10 @@ export function useAppModel() {
     await open();
   };
   const receive = async (entry: InboxEntry) => {
-    if (dirty && !(await confirmAction("현재 입력을 수신 주문으로 바꿀까요?"))) return;
+    const leave = await confirmOrderLeave();
+    if (!leave.proceed) return;
+    if (dirty && !leave.handledDraft &&
+      !(await confirmAction("현재 입력을 수신 주문으로 바꿀까요?"))) return;
     const order = newReception();
     order.raw = entry.text;
     order.photos = entry.photo ? [entry.photo] : [];
@@ -345,7 +360,11 @@ export function useAppModel() {
     setTab("접수");
   };
   const windowAction = async (action: "minimize" | "maximize" | "close") => {
-    if (action === "close") return window.bando!.requestClose(dirty);
+    if (action === "close") {
+      const leave = await confirmOrderLeave();
+      if (!leave.proceed) return;
+      return window.bando!.requestClose(dirty && !leave.handledDraft);
+    }
     await window.bando!.windowControl(action);
     setDock(await window.bando!.dockStatus());
   };
@@ -379,6 +398,7 @@ export function useAppModel() {
     workflowSelection,
     setWorkflowSelection,
     setRawEditDirty,
+    registerOrderLeaveGuard,
     setDraft,
     refresh,
     commit,

@@ -99,13 +99,11 @@ export function WorkflowFooter({
   state,
   shipment,
   onVat,
-  onSave,
 }: {
   state: State;
   shipment: WorkflowShipment;
   groupId: string;
   onVat: (v: boolean | undefined) => void;
-  onSave: () => void;
 }) {
   const { order, recipient } = shipmentContext(state, shipment),
     disabled = shipment.transferred;
@@ -123,13 +121,6 @@ export function WorkflowFooter({
           부가세 10% 추가
         </label>
       </div>
-      {(!!order.confirmedAt || order.receptionVersion !== 1) && (
-        <div className="row-end">
-          <button disabled={disabled} onClick={onSave}>
-            주문 저장
-          </button>
-        </div>
-      )}
     </section>
   );
 }
