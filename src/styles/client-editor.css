@@ -103,3 +103,12 @@
 .product-heading-help { display: inline-flex; align-items: center; gap: 9px; flex-wrap: wrap; }
 .product-heading-help h2 { margin: 0; }
 .product-excel-panel h3 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+.client-table { width: 100%; table-layout: fixed; }
+.client-table th:first-child { width: 30%; }
+.client-table th:nth-child(2) { width: 38%; }
+.client-table th:nth-child(3) { width: 32%; }
+.client-table td { overflow-wrap: anywhere; }
+.client-list-meta { display: block; margin-top: 4px; color: #b7b7b7; font-size: 12px; }
+.client-excel-panel { margin-bottom: 12px; }
+.client-excel-panel .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }

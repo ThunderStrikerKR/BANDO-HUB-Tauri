@@ -8,6 +8,7 @@ import type { NoticeSink } from "./shared/notices";
 import { useAsyncTask } from "./shared/useAsyncTask";
 import type { State } from "./types";
 import { Modal } from "./ui";
+import { HelpTooltip } from "./ui/HelpTooltip";
 
 export function ClientWorkbookTools({
   onSave, onRefresh, onNotice,
@@ -69,6 +70,7 @@ export function ClientWorkbookTools({
         <button type="button" disabled={busy} onClick={() => input.current?.click()}>
           Excel 업로드 / 전체 변경 검토
         </button>
+        <HelpTooltip title="거래처 Excel 관리" purpose="거래처 목록을 Excel 파일로 보관하거나 여러 거래처를 한 번에 등록하고 수정할 수 있습니다." when="거래처 정보를 대량으로 관리할 때 사용합니다." steps={["현재 거래처 전체 Excel 다운로드를 눌러 기존 목록을 내려받습니다.", "Excel에서 거래처를 추가하거나 수정한 뒤 저장합니다.", "Excel 업로드 / 전체 변경 검토를 눌러 파일을 선택합니다.", "변경 내용을 확인하고 오류가 없을 때 승인합니다."]} result="신규 거래처는 등록되고 기존 거래처는 번호를 유지한 채 수정됩니다." caution="파일에서 누락한 기존 거래처는 삭제되지 않습니다. 중복이나 오류가 있으면 변경을 반영하지 않습니다." />
         <input ref={input} hidden type="file"
           accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
           onChange={(event) => {
@@ -76,10 +78,7 @@ export function ClientWorkbookTools({
             event.currentTarget.value = "";
           }}/>
       </div>
-      <p className="muted">
-        기존 거래처의 ID를 유지하면서 수정하거나 ID 없는 새 행을 등록합니다.
-        Excel에서 누락한 거래처는 삭제하지 않습니다.
-      </p>
+
       {preview && (
         <Modal title="거래처 Excel 전체 변경 검토" busy={busy}
           onClose={() => { if (!busy) { setPreview(undefined); setAccepted(false); } }}>

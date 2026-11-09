@@ -27,6 +27,7 @@ export function ClientManager({
   const [section,setSection]=useState<"clients"|"messages">("clients");
   const [messageSection,setMessageSection]=useState<"general"|"provisional">("general");
   const [originalEdit, setOriginalEdit] = useState<Client>();
+  const [excelOpen, setExcelOpen] = useState(false);
   const [search, setSearch] = useState(""),
     [edit, setEdit] = useState<Client>(),
     [exception, setException] = useState(""),
@@ -96,6 +97,8 @@ export function ClientManager({
       <div className="management-scroll">
         <div className="manager-bar">
           <h2>거래처 관리</h2>
+          <div className="actions">
+            <button type="button" aria-expanded={excelOpen} onClick={() => setExcelOpen((open) => !open)}>Excel 관리</button>
           <button
             className="primary"
             onClick={() =>
@@ -117,18 +120,20 @@ export function ClientManager({
           >
             ＋ 거래처 등록
           </button>
+          </div>
         </div>
+        {excelOpen && (
+          <section className="card client-excel-panel">
+            <ClientWorkbookTools onSave={onSave} onRefresh={onRefresh} onNotice={onNotice} />
+          </section>
+        )}
         <section className="card">
-          <ClientWorkbookTools onSave={onSave} onRefresh={onRefresh} onNotice={onNotice} />
           <table className="client-table">
             <thead>
               <tr>
-                <th>상호</th>
-                <th>주소</th>
-                <th>전화번호</th>
-                <th>가격등급</th>
-                <th>특이사항</th>
-                <th>별칭</th>
+                <th>거래처</th>
+                <th>발송인 정보</th>
+                <th>거래 조건</th>
               </tr>
             </thead>
             <tbody>
@@ -143,23 +148,25 @@ export function ClientManager({
                 >
                   <td>
                     <b>{c.name}</b>
+                    {c.displayName && c.displayName !== c.name && (
+                      <small className="client-list-meta">{c.displayName}</small>
+                    )}
                   </td>
-                  <td>{c.address}</td>
-                  <td>{c.phone || c.mobile}</td>
+                  <td>
+                    <span>{c.address}</span>
+                    <small className="client-list-meta">{[c.phone, c.mobile].filter(Boolean).join(" / ") || "연락처 미등록"}</small>
+                  </td>
                   <td>
                     <TierBadge client={c} />
+                    <small className="client-list-meta">
+                      {[
+                        c.payment === "POSTPAID" ? "후불" : "선입금",
+                        c.defaultApplyVat ? "부가세 포함" : "부가세 별도",
+                        c.shippingFeeExcluded ? "운임 청구 제외" : "",
+                        !c.active ? "거래 중지" : "",
+                      ].filter(Boolean).join(" / ")}
+                    </small>
                   </td>
-                  <td>
-                    {[
-                      c.defaultApplyVat ? "부가세 포함" : "",
-                      c.payment === "POSTPAID" ? "후불 거래" : "",
-                      c.shippingFeeExcluded ? "운임 청구 제외" : "",
-                      !c.active ? "거래 중지" : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" / ")}
-                  </td>
-                  <td>{[c.shortNames, c.identifiers].filter(Boolean).join(" / ")}</td>
                 </tr>
               ))}
             </tbody>
