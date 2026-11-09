@@ -51,8 +51,15 @@ export function StaffChecks({
           >
             <button className="issue-heading" onClick={() => onSelect(b)}>
               <b>{b.title}</b>
-              <small>{b.detail}</small>
+              <small className={b.kind === "UNASSIGNED_EVIDENCE" ? "unassigned-evidence-detail" : undefined}>
+                {b.detail}
+              </small>
             </button>
+            {b.kind === "UNASSIGNED_EVIDENCE" && (
+              <small className="unassigned-evidence-hint">
+                상품 또는 수량으로 인식된 문구입니다. 수동 분류에서 실제 주문 내용과 연결할지 확인하세요.
+              </small>
+            )}
             {b.resolution === "PENDING_CUSTOMER" && (
               <small>거래처 확인 대기 / 문의 복사만으로 해결되지 않습니다.</small>
             )}
@@ -69,7 +76,7 @@ export function StaffChecks({
               ) : (
                 <button onClick={() => onSelect(b)}>
                   {b.kind === "UNASSIGNED_EVIDENCE"
-                    ? "수동 분류로 귀속 확인"
+                    ? "수동 분류에서 확인"
                     : [
                           "MODEL",
                           "MODEL_CHOICE",

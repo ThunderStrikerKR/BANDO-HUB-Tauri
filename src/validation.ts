@@ -4,6 +4,19 @@ import { internalModel } from "./matching.js";
 import type { IssueResolution, Item, Order, Recipient, ValidationIssue } from "./types.js";
 export const issueId = (o: Order, r: Recipient | undefined, kind: string, item?: Item) =>
   ["issue", o.id, r?.id ?? "order", item?.id ?? "recipient", kind].join(":");
+
+// These are unassigned *recognition candidates*, not confirmed products or
+// quantities. Show the original text, rather than guessing which shipment owns it.
+export function unassignedEvidenceDetail(recipient: Recipient): string {
+  const candidates = recipient.unassignedEvidence ?? [];
+  const fragments = candidates.slice(0, 4).map((candidate) => {
+    const source = (candidate.text || candidate.value).replace(/\s+/g, " ").trim();
+    const short = source.length > 60 ? source.slice(0, 60) + "…" : source;
+    return (candidate.kind === "quantity" ? "수량" : "상품") + ': "' + short + '"';
+  });
+  const more = candidates.length > 4 ? " 외 " + (candidates.length - 4) + "개" : "";
+  return "연결되지 않은 원문: " + (fragments.join(" / ") || "확인할 문구 없음") + more;
+}
 export function orderIssues(o: Order): ValidationIssue[] {
   const result: ValidationIssue[] = [];
   const add = (
@@ -34,7 +47,12 @@ export function orderIssues(o: Order): ValidationIssue[] {
       itemId: i?.id,
       kind,
       title,
-      detail: r ? (r.name || "수취인") + " / " + (i ? internalModel(i.name) : title) : title,
+      detail:
+        kind === "UNASSIGNED_EVIDENCE" && r
+          ? unassignedEvidenceDetail(r)
+          : r
+            ? (r.name || "수취인") + " / " + (i ? internalModel(i.name) : title)
+            : title,
       sourceSpan: (i?.sources ?? r?.sources)?.find((s) => s.field === field),
       blockingStage: stage,
       severity: ["AUTO_APPLIED", "PROVISIONALLY_APPROVED", "RESOLVED"].includes(status)
@@ -63,7 +81,7 @@ export function orderIssues(o: Order): ValidationIssue[] {
       add(
         r,
         "UNASSIGNED_EVIDENCE",
-        "원문 정보의 배송 건 귀속을 확인하세요",
+        "상품 또는 수량 정보가 연결되지 않았습니다",
         "product",
         r.unassignedEvidence,
       );

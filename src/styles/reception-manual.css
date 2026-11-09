@@ -703,3 +703,18 @@
     grid-template-columns: minmax(0, 1fr) 108px 76px; column-gap: 5px;
   }
 }
+
+/* Show the exact unassigned source text so staff know what to check. */
+.staff-checks .unassigned-evidence-detail {
+  display: block;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+  text-align: left;
+}
+.staff-checks .unassigned-evidence-hint {
+  display: block;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  padding: 0 10px 6px;
+}
