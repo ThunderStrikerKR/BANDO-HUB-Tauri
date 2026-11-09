@@ -184,10 +184,12 @@ export function OrderDesk(props: OrderDeskProps) {
           place(
             <section className="desk-pane review-pane compact-review">
               <div className="review-layout">
-                {rawCorrectionAllowed(flowState, draft) && (
-                  <button onClick={() => setCorrecting(true)}>원문 정정</button>
-                )}
                 <StaffChecks
+                  onCorrectRaw={
+                    rawCorrectionAllowed(flowState, draft)
+                      ? () => setCorrecting(true)
+                      : undefined
+                  }
                   blocks={staffBlocks}
                   onSelect={selectIssue}
                   onCancelApproval={(b) => {

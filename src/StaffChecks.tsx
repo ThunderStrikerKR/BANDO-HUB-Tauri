@@ -1,14 +1,17 @@
 import type { StaffBlock } from "./hub-messages";
+import { rawCorrectableIssue } from "./working-raw";
 export function StaffChecks({
   blocks,
   onSelect,
   onCancelApproval,
   onCandidate,
+  onCorrectRaw,
 }: {
   blocks: StaffBlock[];
   onSelect: (block: StaffBlock) => void;
   onCancelApproval?: (b: StaffBlock) => void;
   onCandidate?: (b: StaffBlock, value: string) => void;
+  onCorrectRaw?: () => void;
 }) {
   const actions = blocks.filter((b) => b.severity !== "INFO"),
     facts = blocks.filter((b) => b.severity === "INFO"),
@@ -64,6 +67,9 @@ export function StaffChecks({
               <small>거래처 확인 대기 / 문의 복사만으로 해결되지 않습니다.</small>
             )}
             <div className="issue-actions">
+              {onCorrectRaw && rawCorrectableIssue(b.kind) && (
+                <button onClick={onCorrectRaw}>원문 정정</button>
+              )}
               {b.choices?.map((c, n) => (
                 <button key={n} onClick={() => onCandidate?.(b, c.value)}>
                   {c.label} → 적용

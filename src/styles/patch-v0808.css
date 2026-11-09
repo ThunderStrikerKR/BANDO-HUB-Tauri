@@ -51,11 +51,21 @@
 }
 .review-layout {
   /* Keep the checks area stable; let the recipient form take only its content height. */
-  grid-template-rows: minmax(0, 28%) fit-content(240px) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 28%) fit-content(210px) minmax(0, 1fr);
   gap: 6px;
 }
 .review-layout > .recipient-body > .receipt-panel-content {
   flex: 0 1 auto;
+  padding: 6px 10px 4px;
+}
+.review-layout > .recipient-body .recipient-review {
+  padding: 0;
+  margin: 0;
+}
+.review-layout > .recipient-body .recipient-fields {
+  padding-bottom: 0;
+  margin-bottom: 0;
+  border-bottom: 0;
 }
 .review-layout > .staff-checks,
 .review-layout > .recipient-body,
