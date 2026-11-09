@@ -28,12 +28,12 @@ test("input history suggestions are disabled for future modal input fields too",
   assert.match(history, /MutationObserver/);
   assert.match(history, /setAttribute\("autocomplete", "off"\)/);
   assert.match(history, /observer\.observe\(root, \{ childList: true, subtree: true \}\)/);
-  assert.match(manager, /<Field label="검색 태그">/);
+  assert.match(manager, /<Field label="검색 태그" help=\{\{/);
   assert.doesNotMatch(manager, /<Field label="검색 식별자">/);
   assert.match(manager, /\[edit\.shortNames, edit\.identifiers\]\.filter\(Boolean\)\.join\(", "\)/);
   assert.match(manager, /shortNames: e\.target\.value, identifiers: ""/);
   for (const label of ["거래처명", "송장 표시 상호", "거래처 주소", "전화번호", "휴대폰번호"]) {
-    assert.ok(manager.includes('<Field label="' + label + '">'));
+    assert.ok(manager.includes('<Field label="' + label + '"'));
   }
   assert.doesNotMatch(manager, /<Field label="[^"]*(?: \*|\(선택\))">/);
 });

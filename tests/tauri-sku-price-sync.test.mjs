@@ -133,12 +133,13 @@ test("Independent product editor does not show legacy multi-option UI", () => {
   assert.doesNotMatch(admin, /product-detail-multi-note/);
   assert.doesNotMatch(admin, /variants\.length > 1/);
   assert.doesNotMatch(admin, /홈페이지 상품 연결 \(선택\) " \+ \(index \+ 1\)/);
-  assert.match(admin, /<Field label="홈페이지 상품 연결 \(선택\)">/);
+  assert.match(admin, /<Field label="홈페이지 상품 연결" help=\{\{/);
   assert.match(admin, /value=\{edit\.variants\[0\]\.url\}/);
   assert.match(admin, /edit\.variants\.length === 1 && \(/);
   assert.match(admin, /disabled=\{edit\.variants\.length !== 1\}/);
   assert.match(admin, /if \(p\.variants\.length !== 1\) throw Error/);
-  assert.match(admin, /<Field label="상품명 \(거래처 \/ 매장 \/ 공장 공통\)">/);
-  assert.match(admin, /<Field label="상품설명 \(매장 내부 참고\)">/);
+  assert.match(admin, /<Field label="상품명" help=\{\{/);
+  assert.match(admin, /매장 직원과 공장 직원이 같은 상품을 정확히 구별/);
+  assert.match(admin, /<Field label="상품설명" help=\{\{/);
   assert.match(admin, /edit\.priceHistory\?\.slice\(\)\.reverse\(\)/);
 });
