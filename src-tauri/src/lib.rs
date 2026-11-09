@@ -382,6 +382,56 @@ fn validate_color_guidance(state: &Value) -> Result<(), String> {
     Ok(())
 }
 
+
+fn validate_message_templates(state: &Value) -> Result<(), String> {
+    let Some(config) = state["settings"].get("automaticMessageTemplates") else { return Ok(()); };
+    let entries = config.as_object().ok_or("자동 메시지 설정은 객체여야 합니다.")?;
+    if entries.len() > 19 { return Err("자동 메시지 유형 개수가 올바르지 않습니다.".into()); }
+    for (key, value) in entries {
+        let (vars, required): (&[&str], &[&str]) = match key.as_str() {
+            "recipientName" | "requestClosing" | "paymentGreeting"
+              | "optionsIntro" | "optionsClosing" => (&[], &[]),
+            "addressMissing" | "addressDetail" | "contactMissing" => (&["수취인"], &["수취인"]),
+            "quantityMissing" | "modelMissing" | "modelConfirm" => (&["상품명"], &["상품명"]),
+            "requestRecipient" => (&["번호", "수취인", "확인항목"], &["수취인", "확인항목"]),
+            "colorDefault" => (&["색상", "상품명"], &["색상"]),
+            "quantityOne" => (&["수취인", "상품명"], &["수취인", "상품명"]),
+            "paymentItem" => (&["상품명", "수량", "금액"], &["상품명", "수량", "금액"]),
+            "paymentFreight" => (&["운임"], &["운임"]),
+            "paymentVat" => (&["부가세"], &["부가세"]),
+            "paymentTotal" => (&["합계"], &["합계"]),
+            "paymentAccount" => (&["은행명", "계좌번호", "예금주"], &["은행명", "계좌번호", "예금주"]),
+            _ => return Err("등록되지 않은 자동 메시지 유형입니다.".into()),
+        };
+        let text = value.as_str().ok_or("자동 메시지는 문자열이어야 합니다.")?;
+        if text.trim().is_empty() || text.chars().count() > 2000 {
+            return Err("자동 메시지 길이를 확인하세요 (1~2000자).".into());
+        }
+        for required_var in required {
+            if !text.contains(&format!("{{{required_var}}}")) {
+                return Err(format!("{key}: 필수 변수를 삭제할 수 없습니다."));
+            }
+        }
+        let mut remaining = text;
+        while let Some(start) = remaining.find('{') {
+            if remaining[..start].contains('}') {
+                return Err("자동 메시지의 변수 괄호를 확인하세요.".into());
+            }
+            let tail = &remaining[start+1..];
+            let Some(end) = tail.find('}') else {
+                return Err("자동 메시지의 변수 괄호를 확인하세요.".into());
+            };
+            let token = &tail[..end];
+            if !vars.contains(&token) || token.contains('{') {
+                return Err(format!("{key}: 허용되지 않은 메시지 변수입니다."));
+            }
+            remaining = &tail[end+1..];
+        }
+        if remaining.contains('}') { return Err("자동 메시지의 변수 괄호를 확인하세요.".into()); }
+    }
+    Ok(())
+}
+
 // Save just the edited settings keys. Order/product updates do not invalidate
 // this edit, but a simultaneous edit of the very same settings key is rejected.
 #[tauri::command]
@@ -393,7 +443,7 @@ fn settings_patch(db: State<'_, Database>, changes: Value, expected: Value) -> R
         return Err("격리 작업공간의 Excel 보관 경로는 변경할 수 없습니다.".into());
     }
     let allowed = ["senderPostcode", "excelDirectory", "factoryReplyDirectory",
-        "colorGuidanceGroups", "kakaoTitleMappings", "kakaoTitleEnabled",
+        "colorGuidanceGroups", "automaticMessageTemplates", "kakaoTitleMappings", "kakaoTitleEnabled",
         "panelRatios", "receptionVerticalRatio", "operatorName", "uiScale", "accounts",
         "defaultAccountId", "senderName", "senderAddress", "senderPhone", "senderMobile",
         "rounding", "brandAccounts", "specialPolicy"];
@@ -417,6 +467,7 @@ fn settings_patch(db: State<'_, Database>, changes: Value, expected: Value) -> R
         }
     }
     if changes.contains_key("colorGuidanceGroups") { validate_color_guidance(&state)?; }
+    if changes.contains_key("automaticMessageTemplates") { validate_message_templates(&state)?; }
     if ["accounts", "defaultAccountId", "brandAccounts"].iter().any(|k| changes.contains_key(*k)) {
         validate_accounts(&state)?;
     }

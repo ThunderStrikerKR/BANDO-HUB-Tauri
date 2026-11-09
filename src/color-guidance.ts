@@ -1,5 +1,6 @@
 import { colorLabel, registeredProducts } from "./product-models.js";
-import type { Item, Product, State, Variant } from "./types.js";
+import { renderAutomaticTemplate } from "./automatic-message-templates.js";
+import type { Item, Product, State, Variant, Settings } from "./types.js";
 
 export interface ColorGuidanceSuggestion { groupId: string; color: string }
 
@@ -71,9 +72,10 @@ export function suggestGroupColor(state: State, candidates: Product[]): ColorGui
 }
 
 /** Created after employee selection only; customer notice, not a confirmation request. */
-export function appliedDefaultColorNotice(item: Item): string {
+export function appliedDefaultColorNotice(item: Item, settings: Settings): string {
   const color = colorLabel(item.appliedDefaultColor?.color ?? "").trim();
   if (!color) return "";
-  return "별도 색상 지정이 없어 " + item.name + " 상품은 기본색상 " +
-    color + "으로 접수했습니다.";
+  return renderAutomaticTemplate(settings,"colorDefault",{
+    색상:color,상품명:item.name,
+  });
 }

@@ -400,6 +400,8 @@ export interface Settings {
   factoryReplyDirectory?: string;
   // Legacy model-family settings are ignored; never infer color from model codes.
   colorGuidanceGroups?: Record<string, { name: string; productIds: string[]; representativeColor: string }>;
+  /** Company-wide user-edited message snippets used for future copyable output. */
+  automaticMessageTemplates?: Record<string, string>;
   kakaoTitleMappings?: Record<
     string,
     { clientId: string; updatedAt: string; actor: string; ambiguous?: boolean }
