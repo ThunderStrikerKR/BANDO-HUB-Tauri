@@ -248,11 +248,17 @@ try {
   await page.waitForFunction(() => window.__lastOpenedExportId === "ci-open-export");
   await exportRow.getByRole("button", { name: "파일 경로 복사" }).waitFor();
   await nav.getByRole("button", { name: "설정" }).click();
+  await page.getByRole("tab", { name: "파일 관리" }).click();
   await page.getByRole("heading", { name: "Excel 보관함 위치" }).waitFor();
   await page.getByText("공장 발송, 매장 발송, 공장 회신, 상품 관리, 거래처 관리 폴더를 자동으로 구분합니다.").waitFor();
   await page.getByRole("button", { name: "보관함 폴더 선택", exact: true }).click();
   await page.getByText("C:\\BANDO_CI_SELECTED").waitFor();
   await page.getByRole("button", { name: "보관함 열기", exact: true }).click();
+  await page.getByRole("tab", { name: "데이터 관리" }).click();
+  const unsaved = page.getByRole("dialog", { name: "저장하지 않은 변경사항" });
+  await unsaved.waitFor();
+  await unsaved.getByRole("button", { name: "저장 안 함" }).click();
+  await unsaved.waitFor({ state: "detached" });
   await page.getByRole("button", { name: "감사 기록 열기" }).click();
   await page.getByText("3건 조회").waitFor();
   await page.locator("summary", { hasText: "ui-audit-test" }).first().click();
@@ -273,6 +279,7 @@ try {
   // Browser reload proves the React screen can rehydrate from a later IPC read.
   await page.reload();
   await nav.getByRole("button", { name: "설정" }).click();
+  await page.getByRole("tab", { name: "데이터 관리" }).click();
   await page.getByRole("button", { name: "감사 기록 열기" }).click();
   await page.getByText("3건 조회").waitFor();
   // A separate mock-native scenario checks the full three-mode UI and picker.
@@ -321,6 +328,7 @@ try {
   await page.reload();
   await nav.getByRole("button", { name: "설정" }).click();
   await page.getByText("TEST / 격리 DB / 외부 발송 금지").waitFor();
+  await page.getByRole("tab", { name: "개발자 모드" }).click();
   await page.getByRole("heading", { name: "발주서 오류 검증" }).waitFor();
   await page.getByRole("button", { name: "현재 발주서 검사" }).click();
   await page.getByRole("heading", { name: /기대 조건/ }).waitFor();
