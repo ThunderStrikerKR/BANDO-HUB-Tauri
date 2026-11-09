@@ -698,7 +698,9 @@
   border-bottom: 1px solid #505050;
 }
 .manual-workspace .manual-delivery-table .manual-shipment-heading th:first-child {
-  position: static;
+  position: relative;
+  left: auto;
+  z-index: auto;
   background: #202020;
 }
 .manual-workspace .manual-delivery-table .manual-shipment-heading th:not(:last-child)::after {
