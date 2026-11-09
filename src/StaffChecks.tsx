@@ -2,7 +2,6 @@ import type { StaffBlock } from "./hub-messages";
 export function StaffChecks({
   blocks,
   onSelect,
-  onQuestion,
   onCancelApproval,
   onCandidate,
 }: {
@@ -84,12 +83,6 @@ export function StaffChecks({
                       : "입력 위치로 이동"}
                 </button>
               )}
-              {b.kind !== "PRICE" &&
-                b.kind !== "FREIGHT" &&
-                b.kind !== "ACCOUNT" &&
-                b.kind !== "NOTICE" && (
-                  <button onClick={() => onQuestion?.(b)}>거래처 문의에 추가</button>
-                )}
             </div>
           </article>
         ))}
