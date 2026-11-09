@@ -135,6 +135,19 @@ try {
   assert.ok(!ledText.includes("BD LED-2s"));
   console.log("PASS UI: four BD LED model-first names, correct retail price and no invented colors");
 
+  await page.getByRole("navigation",{name:"업무 메뉴"})
+    .getByRole("button",{name:"거래처 관리"}).click();
+  await page.getByRole("navigation",{name:"거래처 관리 메뉴"})
+    .getByRole("button",{name:"자동 메시지 편집"}).click();
+  const templateEditor=page.getByRole("textbox",{name:"선택한 자동 메시지 편집"});
+  await templateEditor.waitFor();
+  assert.equal(await templateEditor.inputValue(),"{색상}으로 보내드릴게요.");
+  await templateEditor.fill("지정하신 {색상}으로 보내드릴게요.");
+  await page.getByText("지정하신 블랙으로 보내드릴게요.").waitFor();
+  await page.getByRole("button",{name:"기본 문구 복원"}).click();
+  assert.equal(await templateEditor.inputValue(),"{색상}으로 보내드릴게요.");
+  console.log("PASS UI: client-management message editor tab previews and restores color notice without native writes");
+
   assert.deepEqual(errors, []);
   assert.ok(!await page.evaluate(() => window.__ciCalls.includes("state_save")));
   console.log("PASS UI: product manager shows curated names and preserves read-only state");
