@@ -4,6 +4,7 @@ import { groupedCustomerQuestions } from "./customer-questions.js";
 import { customerModel } from "./matching.js";
 import { colorLabel } from "./product-models.js";
 import { appliedDefaultColorNotice } from "./color-guidance.js";
+import { provisionalProductNotice } from "./provisional-product-notices.js";
 import type { Order, Price, State, ValidationIssue } from "./types.js";
 import { orderIssues } from "./validation.js";
 import {
@@ -121,13 +122,6 @@ export function hubMessages(
     }));
     if (shipmentVat(order, r))
       parts.push(renderAutomaticTemplate(state.settings,"paymentVat",{부가세:won(amounts[index].vat)}));
-    if (links.payment)
-      for (const line of [
-        ...new Set(
-          r.items.filter((i) => i.url && validProductUrl(i.url)).map((i) => i.name + "\n" + i.url),
-        ),
-      ])
-        parts.push(line);
     for (const i of r.items)
       if (i.quantityApproval?.quantity === 1 && i.quantity === 1 && i.quantityConfirmed === false)
         parts.push(renderAutomaticTemplate(state.settings,"quantityOne",{
@@ -148,6 +142,17 @@ export function hubMessages(
       })
     : "[입금 계좌 등록 필요]";
   parts.push("", accountLine);
+  // The complete financial breakdown comes first. Employee-authored guidance
+  // appears after the bank account, directly before independently chosen links.
+  const provisionalNotices = recipients.flatMap(r =>
+    r.items.map(i => provisionalProductNotice(i,state)).filter(Boolean));
+  const paymentLinks = links.payment
+    ? [...new Set(recipients.flatMap(r =>
+        r.items.filter(i => i.url && validProductUrl(i.url))
+          .map(i => i.name + "\n" + i.url)))]
+    : [];
+  if (provisionalNotices.length) parts.push("", ...provisionalNotices);
+  if (paymentLinks.length) parts.push("", ...paymentLinks);
   const paymentIssues = generated.paymentIssues.filter(
     (i) => !(amounts.every((a) => a.shipping !== null) && i === "운임 확인 필요"),
   );

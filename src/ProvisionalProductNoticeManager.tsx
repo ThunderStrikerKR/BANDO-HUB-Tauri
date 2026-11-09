@@ -112,8 +112,10 @@ export function ProvisionalProductNoticeManager({
           <div className="card">
             <h3>계좌안내에 표시될 위치</h3>
             <p>상품명, 수량, 금액</p>
+            <p>운임 및 부가세</p>
+            <p>합계, 입금 계좌</p>
             <p style={{whiteSpace:"pre-wrap"}}>{content.trim() || "이 상품에 등록된 안내문이 없습니다."}</p>
-            <p>운임, 합계, 입금 계좌</p>
+            <p>상품 링크 (추가한 경우에만)</p>
           </div>
         </div>
       </> : <p className="muted">상품을 검색해서 선택하면 해당 상품의 전용 안내문을 등록할 수 있습니다.</p>}
