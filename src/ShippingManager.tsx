@@ -24,6 +24,7 @@ import { HelpTooltip } from "./ui/HelpTooltip";
 import { Field, Modal } from "./ui";
 import { PageHeading } from "./ui/PageHeading";
 import { ManagementSearch } from "./ui/ManagementSearch";
+import { Button } from "./ui/Button";
 export function ShippingManager({
   state,
   onSave,
@@ -437,13 +438,15 @@ export function ShippingManager({
             </details>
           </div>
           <div className="new-group">
-            <input
-              aria-label="새 배송 그룹명"
-              placeholder="새 배송 그룹명"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-            />
-            <button
+            <Field label="새 배송 그룹명">
+              <input
+                aria-label="새 배송 그룹명"
+                placeholder="새 배송 그룹명"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+              />
+            </Field>
+            <Button
               disabled={busy || !newName.trim()}
               onClick={async () => {
                 if (shipping.groups.some((g) => g.name === newName.trim())) {
@@ -470,7 +473,7 @@ export function ShippingManager({
               }}
             >
               배송 그룹 추가
-            </button>
+            </Button>
           </div>
           <table className="management-data-table">
             <thead>
@@ -501,7 +504,8 @@ export function ShippingManager({
                     </td>
                     <td>{g.current.at ? new Date(g.current.at).toLocaleDateString("ko-KR") : "-"}</td>
                     <td>
-                      <button
+                      <div className="shipping-group-actions">
+                      <Button size="compact"
                         onClick={async () => {
                           const name = await promptText("배송 그룹명", g.name);
                           if (!name?.trim()) return;
@@ -509,8 +513,8 @@ export function ShippingManager({
                           next.groups.find((x) => x.id === g.id)!.name = name.trim();
                           void save({ ...state, shipping: next }, "배송 그룹명을 변경했습니다.");
                         }}
-                      >이름 수정</button>
-                      <button
+                      >이름 수정</Button>
+                      <Button size="compact"
                         onClick={() =>
                           (setInitialEditing(editableShippingRule(g.current)), setEditing({
                             id: g.id,
@@ -519,11 +523,11 @@ export function ShippingManager({
                         }
                       >
                         운임 수정
-                      </button>
-                      <button className="danger" onClick={() => setDeleting(g.id)}>
+                      </Button>
+                      <Button size="compact" variant="danger" onClick={() => setDeleting(g.id)}>
                         삭제
-                      </button>
-                      <button
+                      </Button>
+                      <Button size="compact"
                         onClick={async () => {
                           if (
                             await confirmAction(
@@ -540,7 +544,8 @@ export function ShippingManager({
                         }}
                       >
                         기준 변경
-                      </button>
+                      </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}
