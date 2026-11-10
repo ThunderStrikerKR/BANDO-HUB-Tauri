@@ -57,9 +57,6 @@
 .source-pane .source-actions {
   flex: none;
 }
-.source-pane .source-actions button {
-  font-size: 12px;
-}
 .source-pane .source-actions small {
   font-size: 11px;
 }
