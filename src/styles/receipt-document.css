@@ -334,3 +334,11 @@
 .app-modal-layer.client-editor-modal .field input[aria-invalid="true"] {
   border-color: #d96969;
 }
+
+/* Restore the old footer breathing room without restoring its removed notice.
+   The action toolbar is kept inside the source pane by HubWorkspace's minimum row. */
+.source-pane .source-footer-space {
+  flex: 0 0 22px;
+  min-height: 22px;
+  pointer-events: none;
+}

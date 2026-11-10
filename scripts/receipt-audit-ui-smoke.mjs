@@ -283,6 +283,26 @@ try {
   await ocrReview.waitFor({ state: "detached" });
   await page.waitForFunction(() =>
     document.querySelector(".source-document")?.textContent?.includes("709B 2개"));
+  // At the minimum Windows layout, the three source actions must remain
+  // inside the source panel instead of being clipped by the 50:50 split.
+  await page.setViewportSize({ width: 1024, height: 700 });
+  await page.waitForFunction(() => {
+    const pane = document.querySelector(".source-pane");
+    const toolbar = pane?.querySelector(".source-actions");
+    return pane && toolbar && toolbar.getBoundingClientRect().height > 30;
+  });
+  for (const label of ["내용 삭제", "수동 분류", "AI 분석"]) {
+    const control = page.locator(".source-pane .source-actions").getByRole("button", { name: label });
+    await control.waitFor();
+    const inside = await control.evaluate((button) => {
+      const panel = button.closest(".source-pane")?.getBoundingClientRect();
+      const rect = button.getBoundingClientRect();
+      return !!panel && rect.height >= 25 &&
+        rect.top >= panel.top && rect.bottom <= panel.bottom + 1;
+    });
+    assert.ok(inside, "Source action is clipped: " + label);
+  }
+  await page.setViewportSize({ width: 1520, height: 1000 });
   await page.evaluate(() => { window.__ocrFailureForTest = true; });
   await captureButton.click();
   const ocrFailure = page.getByRole("dialog", { name: "OCR 실행 오류" });

@@ -326,7 +326,7 @@ export function HubWorkspace(props: Props) {
           <div
             className="hub-reception-stack"
             style={{
-              gridTemplateRows: `minmax(160px,${verticalRatio}fr) 6px minmax(160px,${1 - verticalRatio}fr)`,
+              gridTemplateRows: `minmax(275px,${verticalRatio}fr) 6px minmax(160px,${1 - verticalRatio}fr)`,
             }}
           >
             <div ref={setSource} className="hub-portal-target" />

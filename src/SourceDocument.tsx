@@ -348,6 +348,7 @@ export function SourceDocument({
           )}
         </div>
       )}
+      {formal && <div className="source-footer-space" aria-hidden="true" />}
       {showOcrFailure && (
         <Modal title="OCR 실행 오류" onClose={() => setShowOcrFailure(false)}>
           <p>OCR 실행 중 오류가 발생했습니다. 기존 발주 원문과 주문 데이터는 변경되지 않았습니다.</p>

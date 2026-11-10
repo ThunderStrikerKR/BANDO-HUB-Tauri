@@ -50,8 +50,9 @@
   cursor: default;
 }
 .review-layout {
-  /* Keep the checks area stable; let the recipient form take only its content height. */
-  grid-template-rows: minmax(0, 28%) fit-content(210px) minmax(0, 1fr);
+  /* The recipient panel keeps its allotted space even before parsing finds any recipients.
+     Its own content scrolls rather than moving the freight panel upward. */
+  grid-template-rows: minmax(0, 28%) 210px minmax(0, 1fr);
   gap: 6px;
 }
 .review-layout > .recipient-body > .receipt-panel-content {
