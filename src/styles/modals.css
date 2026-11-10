@@ -67,10 +67,6 @@
   max-height: 320px;
   overflow: auto;
 }
-.app-action-dialog {
-  left: 50%;
-  width: min(560px, calc(100vw - 36px));
-}
 .receipt-client {
   padding: 4px 0 12px;
   margin-bottom: 12px;
