@@ -439,6 +439,89 @@ try {
   await page.getByRole("heading", { name: "복원 검증 통과" }).waitFor();
   await page.waitForFunction(() => window.__testRestoreCount === 1);
   await page.getByText(/TEST DB 전체 내용 및 접수 감사 기록이 백업 시점과 일치/).waitFor();
+  // Temporary regression reproduction: the settings form currently compares
+  // JSON field ordering, so a successful native account edit can be misread
+  // as a concurrent change. Use a separate browser page and synthetic data.
+  const settingsPage = await browser.newPage({ viewport: { width: 1520, height: 1000 } });
+  const settingsErrors = [];
+  settingsPage.on("pageerror", (err) => settingsErrors.push(err.message));
+  const accountFixture = structuredClone(state);
+  accountFixture.settings.accounts = [
+    { bank: "검증은행A", holder: "시험A", id: "ci-account-a", number: "000-0001" },
+    { bank: "검증은행B", holder: "시험B", id: "ci-account-b", number: "000-0002" },
+  ];
+  accountFixture.settings.brandAccounts = {
+    BANDOMALL: "ci-account-b",
+    BANDOSTAND: "ci-account-a",
+  };
+  await settingsPage.addInitScript(({ initial }) => {
+    let current = structuredClone(initial);
+    const normalized = (value) =>
+      Array.isArray(value) ? value.map(normalized) :
+      value && typeof value === "object"
+        ? Object.fromEntries(Object.entries(value).sort(([left], [right]) =>
+            left < right ? -1 : left > right ? 1 : 0)
+          .map(([key, entry]) => [key, normalized(entry)]))
+        : value;
+    current = normalized(current);
+    window.__TAURI_INTERNALS__ = {
+      invoke: async (command, args = {}) => {
+        if (command === "startup_status")
+          return { phase: "READY", attempts: 1, isTest: false };
+        if (command === "startup_metrics")
+          return { windowShownMs: null, databaseMs: 1, dataMs: null, readyMs: 1 };
+        if (command === "workspace_mode") return false;
+        if (command === "state_load") return structuredClone(current);
+        if (command === "dock_status_native")
+          return { active: false, ratio: 0.8 };
+        if (command === "settings_patch") {
+          const before = current.settings;
+          for (const [key, value] of Object.entries(args.changes)) {
+            const equal = (a, b) => JSON.stringify(normalized(a ?? null)) === JSON.stringify(normalized(b ?? null));
+            if (!equal(before[key], args.expected[key]) && !equal(before[key], value))
+              throw Error("실제 저장 시 동시 변경 충돌: " + key);
+          }
+          current.settings = normalized({ ...current.settings, ...args.changes });
+          current.revision = (current.revision ?? 0) + 1;
+          window.__accountSave = { changes: structuredClone(args.changes), saved: true };
+          return structuredClone(current);
+        }
+        throw Error("Unexpected account reproduction IPC: " + command);
+      },
+    };
+  }, { initial: accountFixture });
+
+  await settingsPage.goto(url);
+  const settingsNav = settingsPage.getByRole("navigation", { name: "업무 메뉴" });
+  await settingsNav.getByRole("button", { name: "설정" }).click();
+  await settingsPage.getByRole("tab", { name: "기본 설정" }).waitFor();
+  // Case A: add a third account, then successfully save it.
+  await settingsPage.getByRole("button", { name: /계좌 추가/ }).click();
+  await settingsPage.getByRole("textbox", { name: "은행명 3" }).fill("검증은행C");
+  await settingsPage.getByRole("textbox", { name: "계좌번호 3" }).fill("000-0003");
+  await settingsPage.getByRole("textbox", { name: "예금주 3" }).fill("시험C");
+  await settingsPage.getByRole("button", { name: "설정 저장" }).click();
+  await settingsPage.waitForFunction(() => window.__accountSave?.saved === true);
+  await settingsPage.getByRole("alert").getByText("다른 작업에서 같은 설정이 변경되었습니다.", { exact: false }).waitFor();
+  assert.equal(await settingsPage.getByRole("button", { name: "설정 저장" }).isDisabled(), true);
+  const addChanges = await settingsPage.evaluate(() => window.__accountSave.changes);
+  assert.equal(addChanges.accounts.length, 3);
+  console.log("REPRODUCED: adding a third account saves successfully but shows a false conflict");
+
+  // Case B: reload initial saved fixture; deleting B changes accounts and
+  // rebuilds brandAccounts in insertion order (Rust returns key-sorted JSON).
+  await settingsPage.reload();
+  await settingsNav.getByRole("button", { name: "설정" }).click();
+  await settingsPage.getByRole("button", { name: "계좌 삭제 2" }).click();
+  await settingsPage.getByRole("button", { name: "설정 저장" }).click();
+  await settingsPage.waitForFunction(() => window.__accountSave?.saved === true);
+  await settingsPage.getByRole("alert").getByText("다른 작업에서 같은 설정이 변경되었습니다.", { exact: false }).waitFor();
+  assert.equal(await settingsPage.getByRole("button", { name: "설정 저장" }).isDisabled(), true);
+  const deleteChanges = await settingsPage.evaluate(() => window.__accountSave.changes);
+  assert.equal(deleteChanges.accounts.length, 1);
+  console.log("REPRODUCED: deleting an account saves successfully but shows a false conflict");
+  assert.deepEqual(settingsErrors, [], "Settings page errors: " + settingsErrors.join("\\n"));
+  await settingsPage.close();
   assert.deepEqual(pageErrors, [], "React runtime errors: " + pageErrors.join("\n"));
   console.log("PASS: audit UI, docking, STORE, official URL, isolated developer tests and real Modal (mock IPC)");
 } finally {
