@@ -355,11 +355,7 @@ body,
   gap: 9px;
 }
 .product-title-line span {
-  font-size: calc(15px * var(--ui-scale));
   color: #a3a3a3;
-}
-.product-title-line b {
-  font-size: calc(16px * var(--ui-scale));
 }
 .app-v03 .price-cell input {
   font-size: calc(16px * var(--ui-scale));
