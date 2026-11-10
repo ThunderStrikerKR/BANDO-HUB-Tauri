@@ -188,7 +188,7 @@ nav em {
   align-items: start;
 }
 .card {
-  background: white;
+  /* The shared dark palette is defined in theme.css, not this layout file. */
   border: 1px solid #e4e4e4;
   border-radius: 11px;
   padding: 22px;
@@ -235,7 +235,6 @@ nav em {
 }
 .field > .field-label {
   font-size: 11px;
-  color: #7f7f7f;
   font-weight: 600;
 }
 input:not([type="checkbox"], [type="radio"]),
@@ -867,8 +866,6 @@ nav em {
   color: #c2c2c2;
 }
 .card {
-  background: #212121;
-  border-color: #373737;
   box-shadow: 0 5px 18px #0000000d;
 }
 .card h2,
@@ -878,9 +875,6 @@ nav em {
 .section-title i {
   background: #363636;
   color: #cacaca;
-}
-.field > .field-label {
-  color: #a9a9a9;
 }
 input:not([type="checkbox"], [type="radio"]),
 select,
