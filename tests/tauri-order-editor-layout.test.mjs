@@ -6,9 +6,10 @@ const source = (name) => readFileSync(new URL("../" + name, import.meta.url), "u
 const component = source("src/OrderDesk.tsx");
 const style = source("src/styles/patch-v0808.css");
 
-test("recipient section height follows content and leaves extra room for product and freight", () => {
-  assert.match(style, /grid-template-rows: minmax\(0, 28%\) fit-content\(210px\) minmax\(0, 1fr\)/);
+test("recipient section keeps its own space before parsing, with internal scrolling", () => {
+  assert.match(style, /grid-template-rows: minmax\(0, 28%\) 210px minmax\(0, 1fr\)/);
   assert.match(style, /\.review-layout > \.recipient-body > \.receipt-panel-content\s*\{\s*flex: 0 1 auto;/);
+  assert.match(style, /\.review-layout \.receipt-panel-content\s*\{[^}]*overflow: auto;/s);
   assert.doesNotMatch(style, /minmax\(0, 0\.32fr\)/);
 });
 

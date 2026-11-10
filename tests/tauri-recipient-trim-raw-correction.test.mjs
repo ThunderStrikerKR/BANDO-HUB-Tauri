@@ -13,8 +13,8 @@ test("raw correction is not inserted as an unrequested action in order review", 
   assert.match(desk, /<StaffChecks\s+blocks=\{staffBlocks\}/);
   assert.match(guard, /orderIssues\(o\)\.some\([\s\S]*?rawCorrectableIssue\(i.kind\)/);
 });
-test("recipient line and excessive whitespace are removed, extra area goes to products", () => {
-  assert.match(css, /grid-template-rows: minmax\(0, 28%\) fit-content\(210px\) minmax\(0, 1fr\)/);
+test("recipient form remains compact without collapsing its whole panel", () => {
+  assert.match(css, /grid-template-rows: minmax\(0, 28%\) 210px minmax\(0, 1fr\)/);
   assert.match(css, /\.review-layout > \.recipient-body \.recipient-fields\s*\{[\s\S]*?padding-bottom: 0;[\s\S]*?margin-bottom: 0;[\s\S]*?border-bottom: 0;/);
   assert.match(css, /\.review-layout > \.recipient-body > \.receipt-panel-content\s*\{[\s\S]*?padding: 6px 10px 4px;/);
   assert.match(css, /\.review-layout > \.recipient-body \.recipient-review\s*\{[\s\S]*?padding: 0;[\s\S]*?margin: 0;/);
