@@ -756,7 +756,14 @@ try {
 
   // Product-specific notice: navigation uses the same safe three choices.
   const productSearch=navPage.getByRole("textbox",{name:"안내문을 등록할 상품 검색"});
+  await navPage.waitForTimeout(250);
   await productSearch.fill("BD");
+  await navPage.waitForTimeout(250);
+  if ((await productSearch.inputValue()) !== "BD") {
+    console.log("PRODUCT_NOTICE_SEARCH_RETRY: input reset after initial focus");
+    await productSearch.fill("BD");
+    await navPage.waitForTimeout(150);
+  }
   const firstProductNotice=navPage.locator('[aria-label="잠정 상품 선택 안내"] button.family-list-row').first();
   console.log("PRODUCT_NOTICE_SEARCH",JSON.stringify({
     text:await productSearch.inputValue(),
@@ -778,7 +785,10 @@ try {
   await automaticText.waitFor();
   assert.equal(Object.keys((await mockState()).state.settings.provisionalProductNotices??{}).length,0);
   await productNoticeTab.click();
+  await navPage.waitForTimeout(200);
   await productSearch.fill("BD");
+  await navPage.waitForTimeout(200);
+  if ((await productSearch.inputValue()) !== "BD") await productSearch.fill("BD");
   await firstProductNotice.click();
   await noticeText.fill("검증용 안내문 - 저장합니다");
   await commonTab.click();
