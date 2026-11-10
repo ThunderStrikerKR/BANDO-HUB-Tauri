@@ -984,7 +984,23 @@ try {
   const productSubnav = navPage.getByRole("navigation", {name:"상품 관리 메뉴"});
   await productSubnav.getByRole("button", {name:"브랜드 관리"}).click();
   const brandInput = navPage.getByRole("textbox", {name:"브랜드 공식명"});
-  const brandRow = (name) => navPage.locator("section.card p").filter({hasText:name});
+  const brandLayout = await navPage.locator(".registry-brand-manager").evaluate((root) => {
+    const fields = [...root.querySelectorAll(".registry-edit-form > .field")];
+    const firstRow = root.querySelector(".registry-list .registry-row");
+    const action = firstRow?.querySelector("button");
+    return {
+      fieldCount: fields.length,
+      fieldMargins: fields.map((field) => parseFloat(getComputedStyle(field).marginBottom)),
+      rowHeight: firstRow?.getBoundingClientRect().height ?? 0,
+      buttonHeight: action?.getBoundingClientRect().height ?? 0,
+    };
+  });
+  assert.equal(brandLayout.fieldCount, 4, JSON.stringify(brandLayout));
+  assert.ok(brandLayout.fieldMargins.every((margin) => margin === 0), JSON.stringify(brandLayout));
+  assert.ok(brandLayout.rowHeight <= 60 && brandLayout.buttonHeight <= 40,
+    "Brand rows must stay compact: " + JSON.stringify(brandLayout));
+  const brandRow = (name) => navPage.getByRole("list", {name:"등록된 브랜드"})
+    .getByRole("listitem").filter({hasText:name});
   const editBrand = (name) => brandRow(name).getByRole("button", {name:"정정"}).click();
   await editBrand("CI검증브랜드A");
   await brandInput.fill("CI브랜드수정취소시험");
@@ -1005,7 +1021,20 @@ try {
 
   await productSubnav.getByRole("button", {name:"별칭 관리"}).click();
   const aliasInput = navPage.getByRole("textbox", {name:"관리 별칭"});
-  const editAlias = (name) => navPage.locator(".alias-list article").filter({hasText:name})
+  const aliasLayout = await navPage.locator(".alias-manager").evaluate((root) => {
+    const fields = [...root.querySelectorAll(".registry-edit-form > .field")];
+    const action = root.querySelector(".registry-list .registry-row > button");
+    return {
+      fieldCount: fields.length,
+      fieldMargins: fields.map((field) => parseFloat(getComputedStyle(field).marginBottom)),
+      buttonHeight: action?.getBoundingClientRect().height ?? 0,
+    };
+  });
+  assert.equal(aliasLayout.fieldCount, 2, JSON.stringify(aliasLayout));
+  assert.ok(aliasLayout.fieldMargins.every((margin) => margin === 0), JSON.stringify(aliasLayout));
+  assert.ok(aliasLayout.buttonHeight <= 40, JSON.stringify(aliasLayout));
+  const editAlias = (name) => navPage.getByRole("list", {name:"등록된 별칭"})
+    .getByRole("listitem").filter({hasText:name})
     .getByRole("button", {name:"연결 정정"}).click();
   await editAlias("CI회귀별칭A");
   await aliasInput.fill("CI별칭수정취소시험");
