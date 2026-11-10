@@ -11,6 +11,13 @@
   --manage-cell-y: 6px;
 }
 
+/* The product/client screen previously removed the 20px management padding
+   entirely, shifting its title and toolbar left of every other page. */
+.app-v03 .hub-main-content > .management-container.management-fixed {
+  box-sizing: border-box;
+  padding: 20px;
+}
+
 /* Consistent horizontal origin, title baseline, type hierarchy and rhythm. */
 .app-v03 .management-container > :is(.fixed-manager, .shipping-manager, .excel-workspace, .daily-settlement),
 .app-v03 .management-container > .management-screen {

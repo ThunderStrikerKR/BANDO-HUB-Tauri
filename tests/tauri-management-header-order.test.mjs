@@ -5,7 +5,7 @@ const source=(path)=>readFileSync(new URL("../"+path,import.meta.url),"utf8");
 test("headings, tabs, and searchable tools follow the shared business hierarchy",()=>{
   for(const p of ["src/ProductManager.tsx","src/ClientManager.tsx"]){
     const s=source(p);
-    assert.ok(s.indexOf("<PageHeading")<s.indexOf('<nav className="product-subnav"'));
+    assert.ok(s.indexOf("<PageHeading")<s.indexOf('<nav className="product-subnav'));
     assert.ok(s.indexOf('<nav className="product-subnav')<s.indexOf('<ManagementSearch'));
     assert.ok(s.indexOf('<PageHeading')<s.indexOf('<ManagementSearch'));
   }
