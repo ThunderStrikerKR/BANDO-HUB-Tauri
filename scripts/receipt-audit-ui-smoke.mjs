@@ -722,6 +722,28 @@ try {
       layoutSamples.push({label,search,heading:metrics});
     }else layoutSamples.push({label,heading:metrics});
   }
+  // Child-tab samples use the same real browser and keep the draft state untouched.
+  // Their computed metrics reveal overrides hidden by top-level-only snapshots.
+  await navMenu.getByRole("button",{name:"상품 관리"}).click();
+  for(const label of ["상품 목록","카테고리 관리","대표색상 관리","별칭 관리","브랜드 관리"]){
+    await navPage.getByRole("navigation",{name:"상품 관리 메뉴"}).getByRole("button",{name:label,exact:true}).click();
+    await samplePageStyle("상품 관리 / "+label);
+  }
+  await navMenu.getByRole("button",{name:"운임 관리"}).click();
+  for(const label of ["상품별 기본 운임","동급 배송 그룹 지정","동급 그룹 운임표","조합 / 기준 이력"]){
+    await navPage.getByRole("button",{name:label,exact:true}).click();
+    await samplePageStyle("운임 관리 / "+label);
+  }
+  await navMenu.getByRole("button",{name:"엑셀 관리"}).click();
+  for(const label of ["공장 엑셀 대기","매장 발송 대기","엑셀 작성 이력"]){
+    await navPage.getByRole("button",{name:label,exact:true}).click();
+    await samplePageStyle("엑셀 관리 / "+label);
+  }
+  await navMenu.getByRole("button",{name:"거래처 관리"}).click();
+  for(const label of ["거래처 목록","자동 메시지 편집"]){
+    await navPage.getByRole("button",{name:label,exact:true}).click();
+    await samplePageStyle("거래처 관리 / "+label);
+  }
   const searches=layoutSamples.filter(x=>x.search).map(x=>x.search);
   for(const current of searches.slice(1)){
     for(const property of ["height","background","round","font","paddingLeft"])
