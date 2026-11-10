@@ -7,6 +7,7 @@ import "./styles/index.css";
 import "./styles/v0809.css";
 import "./styles/product-admin-redesign.css";
 import "./styles/tauri-stage2-products.css";
+import "./styles/table-density.css";
 // Resolve the native workspace before React paints its first screen.
 void (async () => {
   try {

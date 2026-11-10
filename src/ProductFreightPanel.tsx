@@ -113,7 +113,7 @@ export function ProductFreightPanel({
   };
   return (
     <>
-      <section className="shipping-card">
+      <section className="shipping-card shipping-product-list">
         <div className="shipping-tools">
           <div className="shipping-search">
             <span>⌕</span>

@@ -103,7 +103,7 @@ export function PriceCell({
         }}
       />
       <small role={error ? "alert" : "status"} title={error || status} aria-live="polite">
-        {error || status || " "}
+        {error || status}
       </small>
     </div>
   );

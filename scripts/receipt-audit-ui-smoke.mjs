@@ -716,6 +716,27 @@ try {
   console.log("PASS: help tooltip mouse-only focus, delayed hover and click-to-pin");
 
   const productRows=navPage.locator(".product-prices tbody tr");
+  await productRows.first().waitFor();
+  const productDensity = await productRows.first().evaluate((row) => {
+    const cell = row.querySelector("td");
+    const price = row.querySelector("input[data-price-cell]");
+    const button = row.querySelector("button");
+    const cellStyle = cell ? getComputedStyle(cell) : null;
+    return {
+      row: row.getBoundingClientRect().height,
+      cellTop: cellStyle ? parseFloat(cellStyle.paddingTop) : -1,
+      cellBottom: cellStyle ? parseFloat(cellStyle.paddingBottom) : -1,
+      price: price ? price.getBoundingClientRect().height : -1,
+      button: button ? button.getBoundingClientRect().height : -1,
+    };
+  });
+  assert.ok(productDensity.row >= 30 && productDensity.row <= 38,
+    "상품관리 상품 행이 지나치게 높음: " + JSON.stringify(productDensity));
+  assert.ok(productDensity.cellTop <= 4 && productDensity.cellBottom <= 4,
+    "상품관리 셀 상하 여백이 지나치게 큼: " + JSON.stringify(productDensity));
+  assert.ok(productDensity.price <= 29 && productDensity.button <= 29,
+    "상품관리 가격 입력창과 상세 버튼 높이가 불일치: " + JSON.stringify(productDensity));
+  console.log("PASS: product pricing rows and aligned action controls are compact");
   await productRows.first().getByRole("button",{name:"상세 관리"}).click();
   const productModal=navPage.getByRole("dialog",{name:"상품 상세 관리"});
   const description=productModal.getByRole("textbox",{name:"상품설명"});
@@ -740,8 +761,30 @@ try {
   assert.ok(productAfter.state.products.some(p=>p.subtitle==="상품설명 저장 완료 검사"));
   console.log("PASS: product detail Save / Discard / Cancel (actual React modal)");
 
-  // Closing a freight editor must prompt while the original dialog is still open.
+  // The freight list should have the same dense vertical rhythm as product pricing.
   await navMenu.getByRole("button",{name:"운임 관리"}).click();
+  const freightRows = navPage.locator(".shipping-product-list .shipping-table-scroll tbody tr");
+  await freightRows.first().waitFor();
+  const freightDensity = await freightRows.first().evaluate((row) => {
+    const cell = row.querySelector("td");
+    const button = row.querySelector("button");
+    const cellStyle = cell ? getComputedStyle(cell) : null;
+    return {
+      row: row.getBoundingClientRect().height,
+      cellTop: cellStyle ? parseFloat(cellStyle.paddingTop) : -1,
+      cellBottom: cellStyle ? parseFloat(cellStyle.paddingBottom) : -1,
+      button: button ? button.getBoundingClientRect().height : -1,
+    };
+  });
+  assert.ok(freightDensity.row >= 30 && freightDensity.row <= 38,
+    "운임관리 상품 행이 지나치게 높음: " + JSON.stringify(freightDensity));
+  assert.ok(freightDensity.cellTop <= 4 && freightDensity.cellBottom <= 4,
+    "운임관리 셀 상하 여백이 지나치게 큼: " + JSON.stringify(freightDensity));
+  assert.ok(freightDensity.button <= 29,
+    "운임관리 기본 운임 버튼이 지나치게 높음: " + JSON.stringify(freightDensity));
+  console.log("PASS: freight product rows match compact vertical rhythm");
+
+  // Closing a freight editor must prompt while the original dialog is still open.
   await navPage.getByRole("button",{name:"기본 운임 설정"}).first().click();
   const freightEditor = navPage.getByRole("dialog",{name:/운임 설정/});
   await freightEditor.getByLabel("최대 묶음 수량").selectOption("2");
