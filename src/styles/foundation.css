@@ -234,7 +234,6 @@ nav em {
   flex: 1;
 }
 .field > .field-label {
-  font-size: 11px;
   font-weight: 600;
 }
 input:not([type="checkbox"], [type="radio"]),
@@ -1359,8 +1358,6 @@ input[type="radio"] {
 }
 .card details {
   margin: 14px 0;
-  font-size: 12px;
-  color: #adadad;
 }
 .card summary {
   cursor: pointer;
