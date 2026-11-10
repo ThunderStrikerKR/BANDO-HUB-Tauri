@@ -473,9 +473,6 @@
   margin: 12px 0 18px;
   align-items: center;
 }
-.manager-filters > input {
-  flex: 1;
-}
 .manager-filters select {
   max-width: 180px;
 }
@@ -496,7 +493,6 @@
   border-color: #707070;
 }
 .price-cell input {
-  width: 100px;
   padding: 6px;
   text-align: right;
 }
