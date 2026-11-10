@@ -522,6 +522,28 @@ try {
   const deleteChanges = await settingsPage.evaluate(() => window.__accountSave.changes);
   assert.equal(deleteChanges.accounts.length, 1);
   console.log("PASS: deleting an account saves with no false conflict");
+  // Page navigation must honor Save / Don't Save / Cancel.
+  const operator = settingsPage.getByRole("textbox", { name: "작업자 이름" });
+  await operator.fill("이동 테스트 담당");
+  await settingsNav.getByRole("button", { name: "상품 관리" }).click();
+  const leaveDialog = settingsPage.getByRole("dialog", { name: "변경사항 저장" });
+  await leaveDialog.waitFor();
+  await leaveDialog.getByRole("button", { name: "취소" }).click();
+  assert.equal(await operator.inputValue(), "이동 테스트 담당");
+  // Save before leaving: only the edited settings key is persisted.
+  await settingsNav.getByRole("button", { name: "상품 관리" }).click();
+  await leaveDialog.getByRole("button", { name: "저장", exact: true }).click();
+  await settingsPage.waitForFunction(() => window.__accountSave?.changes?.operatorName === "이동 테스트 담당");
+  await settingsPage.getByRole("heading", { name: /상품 가격표/ }).waitFor();
+  // Discard before leaving must preserve the last committed value.
+  await settingsNav.getByRole("button", { name: "설정" }).click();
+  const operatorAgain = settingsPage.getByRole("textbox", { name: "작업자 이름" });
+  await operatorAgain.fill("버릴 임시 작업");
+  await settingsNav.getByRole("button", { name: "상품 관리" }).click();
+  await leaveDialog.getByRole("button", { name: "저장 안 함" }).click();
+  await settingsPage.getByRole("heading", { name: /상품 가격표/ }).waitFor();
+  const savedOperator = await settingsPage.evaluate(() => window.__accountSave.changes.operatorName);
+  assert.equal(savedOperator, "이동 테스트 담당");
   assert.deepEqual(settingsErrors, [], "Settings page errors: " + settingsErrors.join("\\n"));
   await settingsPage.close();
   assert.deepEqual(pageErrors, [], "React runtime errors: " + pageErrors.join("\n"));

@@ -27,7 +27,8 @@ test("client editor separates identity, sender and trade terms with a persistent
   }
   assert.match(client, /className="client-editor-body"/);
   assert.match(client, /className="client-editor-footer"/);
-  assert.match(client, /저장하지 않은 변경사항이 있습니다/);
+  assert.match(client, /requestPageLeave\(\(message\) => onNotice\(message, "error"\)\)/);
+  assert.match(client, /usePageLeaveGuard\(\{/);
   assert.match(client, /state\.clients\.some\(\(c\) => c\.id === edit\.id\) \? "변경사항 저장" : "거래처 등록"/);
   assert.match(styles, /\.client-editor-body\s*\{[^}]*overflow: auto;/s);
   assert.match(styles, /\.client-editor-footer\s*\{[^}]*flex: none;/s);
