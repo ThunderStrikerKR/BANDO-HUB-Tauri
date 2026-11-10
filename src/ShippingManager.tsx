@@ -306,7 +306,7 @@ export function ShippingManager({
             </button>
             <HelpTooltip title="배송 그룹 일괄 지정" purpose="선택한 여러 상품을 같은 배송 그룹으로 한꺼번에 지정합니다." when="같은 포장 기준을 사용하는 상품들을 정리할 때 사용합니다." steps={["변경할 상품을 체크합니다.", "적용할 배송 그룹을 선택합니다.", "선택 상품에 적용을 누릅니다.", "아래에서 변경 내용을 확인하고 그룹 지정 저장을 누릅니다."]} result="저장한 상품의 배송 그룹이 변경됩니다." caution="실제 포장 조건이 확인된 상품만 같은 그룹으로 묶습니다." />
           </div>
-          <div className="shipping-table-scroll">
+          <div className={"shipping-table-scroll" + (!rows.length ? " shipping-list-empty" : "")}>
             <ManagementTable>
               <thead>
                 <tr>
