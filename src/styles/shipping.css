@@ -350,7 +350,6 @@
   margin-top: 8px;
   background: #292929;
 }
-.shipping-explanation-footer { justify-content: flex-end; }
 
 /* Dense single-line product names and descriptions; status has its own column. */
 .shipping-product-inline { display: flex; align-items: center; min-width: 0; gap: 8px; white-space: nowrap; overflow: hidden; }
