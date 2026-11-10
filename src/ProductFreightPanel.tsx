@@ -1,4 +1,5 @@
 import { HelpTooltip } from "./ui/HelpTooltip";
+import { ShippingFeeRanges } from "./ShippingFeeRanges";
 import { useState } from "react";
 import { confirmAction } from "./dialogs";
 import { registeredProducts, sortProducts } from "./product-models";
@@ -8,7 +9,6 @@ import { sameValue } from "./shared/draft";
 import { requestPageLeave, usePageLeaveGuard } from "./shared/page-leave";
 
 import {
-  bundleCounts,
   editableShippingRule,
   effectiveShippingRule,
   emptyProductRule,
@@ -59,12 +59,22 @@ export function ProductFreightPanel({
     if (!editing) return true;
     const next = clone(state),
       shipping = next.shipping!;
+    if (Object.entries(editing.rule.fees).some(([count, amount]) =>
+      typeof amount === "number" && editing.rule.maxBundle !== null &&
+      Number(count) > editing.rule.maxBundle)) {
+      onNotice("최대 묶음 수량을 초과하는 운임 구간을 삭제하거나 수량을 다시 설정하세요.", "error");
+      return false;
+    }
     const value = {
       ...editing.rule,
       maxConfirmed: editing.rule.maxBundle !== null,
       version: crypto.randomUUID(),
       at: new Date().toISOString(),
     };
+    delete value.validFrom;
+    delete value.validUntil;
+    delete value.basis;
+    delete value.packable;
     if (editing.groupId) {
       const group = shipping.groups.find((g) => g.id === editing.groupId)!;
       group.history.push(group.current);
@@ -329,88 +339,12 @@ export function ProductFreightPanel({
             </Field>
           </div>
           {!editing.rule.maxBundle && <p className="muted">최대 묶음 수량을 먼저 선택하세요.</p>}
-          <div className="rate-inputs">
-            {bundleCounts(editing.rule.maxBundle).map((n) => (
-              <Field key={n} label={n + "개 묶음 운임"}>
-                <MoneyInput
-                  label={n + "개 묶음 운임"}
-                  value={editing.rule.fees[n] ?? null}
-                  onChange={(v) =>
-                    setEditing({
-                      ...editing,
-                      rule: {
-                        ...editing.rule,
-                        fees: { ...editing.rule.fees, [n]: v },
-                      },
-                    })
-                  }
-                />
-              </Field>
-            ))}
-          </div>
-          <div className="form-row">
-            <Field label="운임 적용 시작일">
-              <input
-                type="date"
-                value={editing.rule.validFrom ?? ""}
-                onChange={(e) =>
-                  setEditing({
-                    ...editing,
-                    rule: {
-                      ...editing.rule,
-                      validFrom: e.target.value || undefined,
-                    },
-                  })
-                }
-              />
-            </Field>
-            <Field label="운임 적용 종료일">
-              <input
-                type="date"
-                value={editing.rule.validUntil ?? ""}
-                onChange={(e) =>
-                  setEditing({
-                    ...editing,
-                    rule: {
-                      ...editing.rule,
-                      validUntil: e.target.value || undefined,
-                    },
-                  })
-                }
-              />
-            </Field>
-          </div>
-          <Field label="운임 적용 기준">
+          <ShippingFeeRanges key={editing.productId + ":" + (editing.groupId ?? "")}
+            rule={editing.rule}
+            onChange={(rule) => setEditing({ ...editing, rule })} />
+          <Field label="직원 참고 메모">
             <input
-              value={editing.rule.basis ?? ""}
-              onChange={(e) =>
-                setEditing({
-                  ...editing,
-                  rule: { ...editing.rule, basis: e.target.value },
-                })
-              }
-            />
-          </Field>
-          <Field label="실제 합포장 가능 여부">
-            <select
-              value={editing.rule.packable == null ? "" : String(editing.rule.packable)}
-              onChange={(e) =>
-                setEditing({
-                  ...editing,
-                  rule: {
-                    ...editing.rule,
-                    packable: e.target.value === "" ? null : e.target.value === "true",
-                  },
-                })
-              }
-            >
-              <option value="">확인 필요</option>
-              <option value="true">가능</option>
-              <option value="false">불가</option>
-            </select>
-          </Field>
-          <Field label="비고">
-            <input
+              placeholder="포장할 때 직원이 참고할 사항 (선택)"
               value={editing.rule.notes}
               onChange={(e) =>
                 setEditing({

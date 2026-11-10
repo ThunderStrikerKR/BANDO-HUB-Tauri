@@ -4,13 +4,13 @@ import { money, won } from "./domain";
 import { internalModel } from "./matching";
 import { colorLabel, registeredProducts, sortProducts } from "./product-models";
 import { ProductFreightPanel } from "./ProductFreightPanel";
+import { ShippingFeeRanges } from "./ShippingFeeRanges";
 import type { NoticeSink } from "./shared/notices";
 import { useAsyncTask } from "./shared/useAsyncTask";
 import { sameValue } from "./shared/draft";
 import { requestPageLeave, usePageLeaveGuard } from "./shared/page-leave";
 
 import {
-  bundleCounts,
   changeShippingBasis,
   combinationCurrent,
   combinationVersions,
@@ -117,12 +117,22 @@ export function ShippingManager({
               const next = structuredClone(shipping),
                 g = next.groups.find((g) => g.id === editing.id)!;
               g.history.push(g.current);
+              if (Object.entries(editing.rule.fees).some(([count, amount]) =>
+                typeof amount === "number" && editing.rule.maxBundle !== null &&
+                Number(count) > editing.rule.maxBundle)) {
+                onNotice("최대 묶음 수량을 초과하는 운임 구간을 확인하세요.", "error");
+                return false;
+              }
               g.current = {
                 ...editing.rule,
                 maxConfirmed: editing.rule.maxBundle !== null,
                 version: crypto.randomUUID(),
                 at: new Date().toISOString(),
               };
+              delete g.current.validFrom;
+              delete g.current.validUntil;
+              delete g.current.basis;
+              delete g.current.packable;
               const ok = await save(
                 { ...state, shipping: next },
                 "운임표를 저장했습니다. 변경 전 기준은 이력으로 보존됩니다.",
@@ -701,7 +711,7 @@ export function ShippingManager({
         >
           <h3 className="shipping-rates-title">
             {shipping.groups.find((g) => g.id === editing.id)?.name} 운임
-            <HelpTooltip title="배송 그룹 운임 수정" purpose="선택한 배송 그룹에 적용할 배송비를 등록하거나 수정합니다." steps={["최대 합포장 수량을 선택합니다.", "실제로 확인한 수량별 운임만 입력합니다.", "필요하면 적용 날짜와 기준을 입력합니다.", "저장 버튼을 눌러 운임을 반영합니다."]} result="그룹에 등록된 상품들이 수정된 운임 기준을 참고할 수 있습니다." caution="확인하지 않은 운임은 빈칸으로 둡니다. 기존 기준을 아예 바꾸려면 기준 변경 작업을 먼저 합니다." />
+            <HelpTooltip title="배송 그룹 운임 수정" purpose="선택한 배송 그룹에 적용할 배송비를 등록하거나 수정합니다." steps={["최대 묶음 수량을 선택합니다.", "운임 구간 추가로 확인한 수량만 등록합니다.", "저장 버튼을 눌러 운임을 반영합니다."]} result="그룹에 등록된 상품들이 수정된 운임 기준을 참고할 수 있습니다." caution="확인하지 않은 운임은 빈칸으로 둡니다. 기존 기준을 아예 바꾸려면 기준 변경 작업을 먼저 합니다." />
           </h3>
           <div className="form-row">
             <label>
@@ -726,97 +736,12 @@ export function ShippingManager({
             </label>
           </div>
           {!editing.rule.maxBundle && <p className="muted">최대 묶음 수량을 먼저 선택하세요.</p>}
-          <div className="rate-inputs">
-            {bundleCounts(editing.rule.maxBundle).map((n) => (
-              <label key={n}>
-                {n}개 운임
-                <input
-                  aria-label={n + "개 운임"}
-                  inputMode="numeric"
-                  value={editing.rule.fees[n] ?? ""}
-                  onChange={(e) => {
-                    const v = e.target.value === "" ? null : Number(e.target.value);
-                    if (v === null || money.safeParse(v).success)
-                      setEditing({
-                        ...editing,
-                        rule: {
-                          ...editing.rule,
-                          fees: { ...editing.rule.fees, [n]: v },
-                        },
-                      });
-                  }}
-                />
-              </label>
-            ))}
-          </div>
-          <div className="form-row">
-            <Field label="운임 적용 시작일">
-              <input
-                type="date"
-                value={editing.rule.validFrom ?? ""}
-                onChange={(e) =>
-                  setEditing({
-                    ...editing,
-                    rule: {
-                      ...editing.rule,
-                      validFrom: e.target.value || undefined,
-                    },
-                  })
-                }
-              />
-            </Field>
-            <Field label="운임 적용 종료일">
-              <input
-                type="date"
-                value={editing.rule.validUntil ?? ""}
-                onChange={(e) =>
-                  setEditing({
-                    ...editing,
-                    rule: {
-                      ...editing.rule,
-                      validUntil: e.target.value || undefined,
-                    },
-                  })
-                }
-              />
-            </Field>
-          </div>
-          <Field label="운임 적용 기준">
-            <input
-              value={editing.rule.basis ?? ""}
-              onChange={(e) =>
-                setEditing({
-                  ...editing,
-                  rule: { ...editing.rule, basis: e.target.value },
-                })
-              }
-            />
-          </Field>
-          <Field label="실제 합포장 가능 여부">
-            <select
-              value={
-                editing.rule.packable === undefined || editing.rule.packable === null
-                  ? ""
-                  : String(editing.rule.packable)
-              }
-              onChange={(e) =>
-                setEditing({
-                  ...editing,
-                  rule: {
-                    ...editing.rule,
-                    packable: e.target.value === "" ? null : e.target.value === "true",
-                  },
-                })
-              }
-            >
-              <option value="">확인 필요</option>
-              <option value="true">가능</option>
-              <option value="false">불가</option>
-            </select>
-          </Field>
+          <ShippingFeeRanges key={editing.id} rule={editing.rule}
+            onChange={(rule) => setEditing({ ...editing, rule })} />
           <label>
-            비고
+            직원 참고 메모
             <input
+              placeholder="포장할 때 직원이 참고할 사항 (선택)"
               value={editing.rule.notes}
               onChange={(e) =>
                 setEditing({
