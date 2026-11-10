@@ -649,8 +649,13 @@ try {
   }, {initial:navFixture});
   const navMenu = navPage.getByRole("navigation", { name: "업무 메뉴" });
   const leave = navPage.getByRole("dialog", {name:"변경사항 저장"});
+  let saveDialogCascadeSampled=false;
   const checkPrompt = async (context) => {
     await leave.waitFor();
+    if(!saveDialogCascadeSampled){
+      await sampleCascade("저장 확인 모달");
+      saveDialogCascadeSampled=true;
+    }
     for (const action of ["저장","저장 안 함","취소"])
       assert.equal(await leave.getByRole("button",{name:action,exact:true}).count(),1,
         context + " missing " + action);
@@ -702,7 +707,7 @@ try {
           findings.push({key:candidate.key,count:elements.length,
             actual:getComputedStyle(elements[0]).getPropertyValue(candidate.property).trim(),
             example:elements[0].tagName.toLowerCase()+
-              (typeof elements[0].className==="string" ? "."+elements[0].className.trim().replace(/\\s+/g,".").slice(0,100) : "")});
+              (typeof elements[0].className==="string" ? "."+elements[0].className.trim().replace(/\s+/g,".").slice(0,100) : "")});
         }catch{
           findings.push({key:candidate.key,unsupportedSelector:true});
         }
@@ -743,6 +748,7 @@ try {
     styleProbe.push({name,...metrics});
     await sampleCascade(name);
   };
+  await sampleCascade("접수 / 기본 화면");
   const views=[
     ["주문 내역","주문 검색"],
     ["엑셀 관리","엑셀 목록 검색"],
@@ -975,6 +981,7 @@ try {
   // Client: Cancel keeps the draft, Discard keeps DB unchanged, Save persists it.
   await navPage.locator(".client-table tbody tr").filter({hasText:"검증악기"}).first().click();
   const clientModal = navPage.getByRole("dialog",{name:"거래처 상세 관리"});
+  await sampleCascade("거래처 상세 관리 모달");
   const clientAddress = clientModal.getByRole("textbox",{name:"거래처 주소"});
   const originalAddress = await clientAddress.inputValue();
   await clientAddress.fill("경기도 검증시 저장확인로 88");
@@ -1068,6 +1075,7 @@ try {
   console.log("PASS: product pricing rows and aligned action controls are compact");
   await productRows.first().getByRole("button",{name:"상세 관리"}).click();
   const productModal=navPage.getByRole("dialog",{name:"상품 상세 관리"});
+  await sampleCascade("상품 상세 관리 모달");
   const description=productModal.getByRole("textbox",{name:"상품설명"});
   const firstProductId=await navPage.evaluate(() => window.__navSaved().state.products[0].id);
   const beforeProduct=await mockState();
