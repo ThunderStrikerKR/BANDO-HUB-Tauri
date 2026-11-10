@@ -104,7 +104,15 @@
 .product-heading-help h2 { margin: 0; }
 .product-excel-panel h3 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
-.client-table { width: 100%; table-layout: fixed; }
+.app-v03 .management-container table.client-table.management-data-table {
+  width: 100%;
+  min-width: 100%;
+  table-layout: fixed;
+}
+.app-v03 .management-container table.client-table.management-data-table :is(th, td) {
+  box-sizing: border-box;
+  min-width: 0;
+}
 .client-table th:first-child { width: 30%; }
 .client-table th:nth-child(2) { width: 38%; }
 .client-table th:nth-child(3) { width: 32%; }
