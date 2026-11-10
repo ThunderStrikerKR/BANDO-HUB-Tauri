@@ -997,7 +997,7 @@ try {
   });
   assert.equal(brandLayout.fieldCount, 4, JSON.stringify(brandLayout));
   assert.ok(brandLayout.fieldMargins.every((margin) => margin === 0), JSON.stringify(brandLayout));
-  assert.ok(brandLayout.rowHeight <= 60 && brandLayout.buttonHeight <= 40,
+  assert.ok(brandLayout.rowHeight <= 60 && brandLayout.buttonHeight <= 34,
     "Brand rows must stay compact: " + JSON.stringify(brandLayout));
   const brandRow = (name) => navPage.getByRole("list", {name:"등록된 브랜드"})
     .getByRole("listitem").filter({hasText:name});
@@ -1032,7 +1032,7 @@ try {
   });
   assert.equal(aliasLayout.fieldCount, 2, JSON.stringify(aliasLayout));
   assert.ok(aliasLayout.fieldMargins.every((margin) => margin === 0), JSON.stringify(aliasLayout));
-  assert.ok(aliasLayout.buttonHeight <= 40, JSON.stringify(aliasLayout));
+  assert.ok(aliasLayout.buttonHeight <= 34, JSON.stringify(aliasLayout));
   const editAlias = (name) => navPage.getByRole("list", {name:"등록된 별칭"})
     .getByRole("listitem").filter({hasText:name})
     .getByRole("button", {name:"연결 정정"}).click();
