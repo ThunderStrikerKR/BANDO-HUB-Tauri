@@ -67,3 +67,19 @@ test("core layout tokens are not overridden from competing legacy files", () => 
   assert.match(components, /font-size: var\(--field-label-size\)/);
   assert.deepEqual(filesFor(".field > .field-label", "font-size"), ["components.css"]);
 });
+
+test("replaced legacy CSS declarations stay removed from their original owners", () => {
+  const report=auditCSS();
+  const owners=(selector,property,context="base")=>[...new Set(report.declarations
+    .filter(r=>r.selector===selector&&r.property===property&&r.context===context)
+    .map(r=>r.path))];
+  assert.deepEqual(owners(".client-table th:first-child","width"),["client-editor.css"]);
+  assert.deepEqual(owners(".client-table th:nth-child(2)","width"),["client-editor.css"]);
+  assert.deepEqual(owners(".app-v03 .flow-footer-actions button","font-size"),["receipt-layout.css"]);
+  assert.deepEqual(owners(".app-v03 .flow-footer-actions button","padding"),["receipt-layout.css"]);
+  assert.deepEqual(owners(".messages-pane > .field","margin"),["reception-manual.css"]);
+  assert.deepEqual(owners(".messages-pane > .field textarea","min-height"),["reception-manual.css"]);
+  assert.deepEqual(owners(".messages-pane > .field textarea","resize"),["reception-manual.css"]);
+  assert.deepEqual(owners(".source-pane .source-actions button","font-size"),["reception-manual.css"]);
+  assert.deepEqual(owners(".app-v03 .management-container h3","font-size"),["management-layout.css"]);
+});
