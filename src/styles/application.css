@@ -10,12 +10,8 @@
 .app-header {
   display: flex;
   align-items: center;
-  gap: 20px;
   padding: 0 20px;
-  height: 66px;
   flex-shrink: 0;
-  background: #1f1f1f;
-  border-bottom: 1px solid #3c3c3c;
 }
 .app-header .wordmark {
   border: 0;
@@ -45,14 +41,8 @@
 .app-header nav button {
   background: transparent;
   border: 0;
-  padding: 12px 14px;
   border-radius: 5px;
-  color: #a5a5a5;
   white-space: nowrap;
-}
-.app-header nav button.current {
-  background: #393939;
-  color: #d5d5d5;
 }
 .app-header nav em {
   font-size: 10px;
@@ -65,7 +55,6 @@
   white-space: nowrap;
 }
 .header-actions button {
-  font-size: 11px;
   padding: 9px;
 }
 .app-notice {
