@@ -659,6 +659,31 @@ try {
   // must share the same dimensions, font, border and placement.
   await navPage.goto(url);
   const layoutSamples=[];
+  const styleProbe=[];
+  const samplePageStyle = async (name) => {
+    const metrics = await navPage.locator(".management-container").evaluate((root) => {
+      const capture = (query, limit=4) => [...root.querySelectorAll(query)].filter((element)=>{
+        const style=getComputedStyle(element);
+        return style.display!=="none" && element.getBoundingClientRect().width>0;
+      }).slice(0,limit).map((element)=>{
+        const css=getComputedStyle(element),box=element.getBoundingClientRect();
+        return {tag:element.tagName.toLowerCase(),className:typeof element.className==="string"?element.className.slice(0,100):"",
+          text:(element.textContent??"").trim().replace(/\\s+/g," ").slice(0,45),
+          font:css.fontSize,line:css.lineHeight,height:Math.round(box.height),
+          paddingY:css.paddingTop+"/"+css.paddingBottom,
+          marginY:css.marginTop+"/"+css.marginBottom,
+          color:css.color,background:css.backgroundColor,
+          overflow:css.overflow,wrap:css.whiteSpace};
+      });
+      return {headings:capture(".page-heading h1"),subheadings:capture("h2",2),
+        fields:capture(".field > .field-label, .field > label",3),
+        buttons:capture(".page-heading button, .management-search-toolbar > button",4),
+        inputs:capture(".management-search-field input, .field input",3),
+        tableCells:capture("table.management-data-table tbody td",3),
+        empties:capture(".empty-state, .detail-empty, .empty",3)};
+    });
+    styleProbe.push({name,...metrics});
+  };
   const views=[
     ["주문 내역","주문 검색"],
     ["엑셀 관리","엑셀 목록 검색"],
@@ -680,6 +705,7 @@ try {
     });
     assert.equal(metrics.text,label,"Wrong title on "+label);
     assert.ok(Math.abs(Number.parseFloat(metrics.size)-20)<2,"Inconsistent title font: "+JSON.stringify(metrics));
+    await samplePageStyle(label);
     if(searchLabel){
       const input=navPage.getByRole("textbox",{name:searchLabel,exact:true});
       const search=await input.evaluate((element)=>{
@@ -706,6 +732,7 @@ try {
   assert.ok(Math.max(...titlePositions)-Math.min(...titlePositions)<=2,
     "Heading x origin inconsistent across pages: "+JSON.stringify(layoutSamples));
   console.log("PASS: 7 management titles and 5 shared search layouts are consistent");
+  console.log("MANAGEMENT_STYLE_PROBE",JSON.stringify(styleProbe));
 
   // Shared tables must retain their native semantics and compress empty results
   // without leaving an oversized scroller behind. This uses the real React UI.
