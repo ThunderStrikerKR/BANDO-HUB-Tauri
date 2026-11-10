@@ -568,6 +568,165 @@ try {
   assert.equal(savedOperator, "이동 테스트 담당");
   assert.deepEqual(settingsErrors, [], "Settings page errors: " + settingsErrors.join("\\n"));
   await settingsPage.close();
+  // Real React navigation tests with isolated synthetic Tauri data. Each choice
+  // is clicked in its real modal; no user data or production SQLite is touched.
+  const navFixture = structuredClone(state);
+  navFixture.shipping ??= {};
+  navFixture.shipping.groups ??= [];
+  navFixture.shipping.groups.push({
+    id: "ci-ui-shipgroup", name: "검증용 배송 그룹", deletedAt: null,
+    current: { version: "ci-1", at: "2026-11-01T00:00:00Z", maxBundle: 2,
+      maxConfirmed: true, fees: { "1": 3000, "2": 4500 }, note: "" },
+    history: [],
+  });
+  const navPage = await browser.newPage({ viewport: { width: 1520, height: 1000 } });
+  navPage.setDefaultTimeout(8000);
+  const navErrors = [];
+  navPage.on("pageerror", (err) => navErrors.push(err.message));
+  await navPage.addInitScript(({ initial }) => {
+    let current = structuredClone(initial);
+    const saveLog = [];
+    window.__navSaved = () => ({ state: structuredClone(current), saves: structuredClone(saveLog) });
+    window.__TAURI_INTERNALS__ = {
+      invoke: async (command, args = {}) => {
+        if (command === "startup_status")
+          return { phase: "READY", attempts: 1, isTest: false };
+        if (command === "startup_metrics")
+          return { windowShownMs: null, databaseMs: 1, dataMs: null, readyMs: 1 };
+        if (command === "workspace_mode") return false;
+        if (command === "state_load") return structuredClone(current);
+        if (command === "dock_status_native") return { active: false, mode: "ORIGINAL", ratio: 0.8 };
+        if (command === "state_save") {
+          if ((args.state.revision ?? 0) !== (current.revision ?? 0))
+            throw Error("Mock rejected stale revision");
+          current = structuredClone(args.state);
+          current.revision = (current.revision ?? 0) + 1;
+          saveLog.push({type:"state_save", revision:current.revision, state:structuredClone(current)});
+          return undefined;
+        }
+        if (command === "settings_patch") {
+          current.settings = { ...current.settings, ...args.changes };
+          current.revision = (current.revision ?? 0) + 1;
+          saveLog.push({type:"settings_patch", revision:current.revision, changes:structuredClone(args.changes)});
+          return structuredClone(current);
+        }
+        if (command === "capture_ocr") return { text:"검증 발주 원문 709B 2개",
+          imageDataUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL/nwAAAABJRU5ErkJggg==",
+          width:1,height:1 };
+        if (command === "product_image") return null;
+        throw Error("Unexpected navigation-test IPC: " + command);
+      },
+    };
+  }, {initial:navFixture});
+  const navMenu = navPage.getByRole("navigation", { name: "업무 메뉴" });
+  const leave = navPage.getByRole("dialog", {name:"변경사항 저장"});
+  const checkPrompt = async (context) => {
+    await leave.waitFor();
+    for (const action of ["저장","저장 안 함","취소"])
+      assert.equal(await leave.getByRole("button",{name:action,exact:true}).count(),1,
+        context + " missing " + action);
+  };
+  const mockState = () => navPage.evaluate(() => window.__navSaved());
+  // Client: Cancel keeps the draft, Discard keeps DB unchanged, Save persists it.
+  await navPage.goto(url);
+  await navMenu.getByRole("button",{name:"거래처 관리"}).click();
+  await navPage.locator(".client-table tbody tr").filter({hasText:"검증악기"}).first().click();
+  const clientModal = navPage.getByRole("dialog",{name:"거래처 상세 관리"});
+  const clientAddress = clientModal.getByRole("textbox",{name:"거래처 주소"});
+  const originalAddress = await clientAddress.inputValue();
+  await clientAddress.fill("경기도 검증시 저장확인로 88");
+  await clientModal.getByRole("button",{name:"취소",exact:true}).click();
+  await checkPrompt("client");
+  await leave.getByRole("button",{name:"취소",exact:true}).click();
+  assert.equal(await clientAddress.inputValue(),"경기도 검증시 저장확인로 88");
+  await clientModal.getByRole("button",{name:"취소",exact:true}).click();
+  await leave.getByRole("button",{name:"저장 안 함"}).click();
+  await clientModal.waitFor({state:"detached"});
+  assert.equal((await mockState()).state.clients.find(c=>c.id==="ci-store-dealer").address,originalAddress);
+  await navPage.locator(".client-table tbody tr").filter({hasText:"검증악기"}).first().click();
+  await clientAddress.fill("경기도 검증시 저장확인로 89");
+  await clientModal.getByRole("button",{name:"취소",exact:true}).click();
+  await leave.getByRole("button",{name:"저장",exact:true}).click();
+  await clientModal.waitFor({state:"detached"});
+  assert.equal((await mockState()).state.clients.find(c=>c.id==="ci-store-dealer").address,"경기도 검증시 저장확인로 89");
+  console.log("PASS: client detail Save / Discard / Cancel (actual React modal)");
+
+  // Product: the existing product editor has the same three-choice leave guard.
+  await navMenu.getByRole("button",{name:"상품 관리"}).click();
+  const productRows=navPage.locator(".product-prices tbody tr");
+  await productRows.first().getByRole("button",{name:"상세 관리"}).click();
+  const productModal=navPage.getByRole("dialog",{name:"상품 상세 관리"});
+  const description=productModal.getByRole("textbox",{name:"상품설명"});
+  const firstProductId=await navPage.evaluate(() => window.__navSaved().state.products[0].id);
+  const beforeProduct=await mockState();
+  await description.fill("상품설명 미저장 취소 검사");
+  await productModal.getByRole("button",{name:"취소",exact:true}).click();
+  await checkPrompt("product");
+  await leave.getByRole("button",{name:"취소",exact:true}).click();
+  assert.equal(await description.inputValue(),"상품설명 미저장 취소 검사");
+  await productModal.getByRole("button",{name:"취소",exact:true}).click();
+  await leave.getByRole("button",{name:"저장 안 함"}).click();
+  await productModal.waitFor({state:"detached"});
+  assert.equal((await mockState()).saves.length,beforeProduct.saves.length);
+  await productRows.first().getByRole("button",{name:"상세 관리"}).click();
+  await description.fill("상품설명 저장 완료 검사");
+  await productModal.getByRole("button",{name:"취소",exact:true}).click();
+  await leave.getByRole("button",{name:"저장",exact:true}).click();
+  await productModal.waitFor({state:"detached"});
+  const productAfter=await mockState();
+  assert.equal(productAfter.saves.length,beforeProduct.saves.length+1);
+  assert.ok(productAfter.state.products.some(p=>p.subtitle==="상품설명 저장 완료 검사"));
+  console.log("PASS: product detail Save / Discard / Cancel (actual React modal)");
+
+  // Shipping: pending group assignment stays on Cancel, vanishes on Discard,
+  // and is recorded only on Save.
+  await navMenu.getByRole("button",{name:"운임 관리"}).click();
+  const assignTab=navPage.getByRole("button",{name:"동급 배송 그룹 지정"});
+  const historyTab=navPage.getByRole("button",{name:"조합 / 기준 이력"});
+  await assignTab.click();
+  const groupSelector=navPage.locator(".shipping-table-scroll tbody select").first();
+  await groupSelector.selectOption("ci-ui-shipgroup");
+  await historyTab.click();
+  await checkPrompt("shipping");
+  await leave.getByRole("button",{name:"취소",exact:true}).click();
+  assert.equal(await groupSelector.inputValue(),"ci-ui-shipgroup");
+  await historyTab.click();
+  await leave.getByRole("button",{name:"저장 안 함"}).click();
+  assert.equal((await mockState()).state.products.some(p=>p.shippingGroupId==="ci-ui-shipgroup"),false);
+  await assignTab.click();
+  await groupSelector.selectOption("ci-ui-shipgroup");
+  await historyTab.click();
+  await leave.getByRole("button",{name:"저장",exact:true}).click();
+  await navPage.getByRole("button",{name:"조합 / 기준 이력","exact":true}).waitFor();
+  await navPage.waitForFunction(() => window.__navSaved().state.products.some(
+    product => product.shippingGroupId === "ci-ui-shipgroup"
+  ));
+  console.log("PASS: shipping group Save / Discard / Cancel (actual React tabs)");
+
+  // New reception is intentionally not saveable until order confirmation.
+  // Cancel keeps its raw text; Save must explain the restriction and stay put;
+  // Discard may navigate away without creating an unconfirmed order.
+  await navPage.reload();
+  await navPage.getByRole("button",{name:"캡처 범위 지정"}).click();
+  const ocr=navPage.getByRole("dialog",{name:"OCR 문자 인식 검토"});
+  await ocr.getByRole("button",{name:"원문 교체"}).click();
+  await navPage.waitForFunction(() => document.querySelector(".source-document")?.textContent?.includes("검증 발주 원문"));
+  await navMenu.getByRole("button",{name:"상품 관리"}).click();
+  await checkPrompt("unconfirmed reception");
+  await leave.getByRole("button",{name:"취소",exact:true}).click();
+  assert.ok((await navPage.locator(".source-document").textContent()).includes("검증 발주 원문"));
+  await navMenu.getByRole("button",{name:"상품 관리"}).click();
+  await leave.getByRole("button",{name:"저장",exact:true}).click();
+  await navPage.getByText(/신규 발주서는 주문 확인 완료 후 저장할 수 있습니다/).waitFor();
+  assert.ok((await navPage.locator(".source-document").textContent()).includes("검증 발주 원문"));
+  await navMenu.getByRole("button",{name:"상품 관리"}).click();
+  await leave.getByRole("button",{name:"저장 안 함"}).click();
+  await navPage.getByRole("heading",{name:/상품 가격표/}).waitFor();
+  assert.equal((await mockState()).state.orders.length,navFixture.orders.length);
+  console.log("PASS: unconfirmed reception Cancel / Save-blocked / Discard (actual React UI)");
+
+  assert.deepEqual(navErrors,[],"Navigation React errors: "+navErrors.join("\n"));
+  await navPage.close();
   assert.deepEqual(pageErrors, [], "React runtime errors: " + pageErrors.join("\n"));
   console.log("PASS: audit UI, docking, STORE, official URL, isolated developer tests and real Modal (mock IPC)");
 } finally {
