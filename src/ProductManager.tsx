@@ -262,9 +262,7 @@ export function ProductManager({
       <div className="management-scroll">
         {section === "상품 목록" && (
           <>
-            <div className="manager-bar">
-              <div>
-                <div className="product-heading-help">
+            <div className="product-heading-help product-list-subheading">
                   <h2>상품 가격표 <span>{products.length}개 상품</span></h2>
                   <HelpTooltip
                     title="상품 가격 수정"
@@ -274,9 +272,6 @@ export function ProductManager({
                     result="저장한 가격이 상품 가격표에 반영됩니다."
                     caution="수정 모드를 켜기 전에는 가격을 바꿀 수 없습니다. 가격이 비어 있으면 등록되지 않은 상태입니다."
                   />
-                </div>
-              </div>
-
             </div>
             {adding && (
               <section className="card">

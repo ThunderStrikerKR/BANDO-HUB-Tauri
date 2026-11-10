@@ -51,3 +51,8 @@
   outline: 2px solid #ddd;
   outline-offset: 2px;
 }
+
+/* A decision dialog should dim an open editor lightly, not hide the editor behind it. */
+body:has(.app-modal-layer[open]) .app-action-dialog::backdrop {
+  background: rgb(0 0 0 / 30%);
+}

@@ -394,3 +394,14 @@
   justify-content: flex-end;
   margin-top: 20px;
 }
+
+/* Shared top-of-page order: heading/actions, search, then subnavigation. */
+.app-v03 .management-container .fixed-manager > .page-heading { margin-bottom: 10px; }
+.app-v03 .management-container .fixed-manager > .management-search { margin: 0 0 10px; }
+.app-v03 .management-container .fixed-manager > .product-subnav { margin-bottom: 10px; }
+.app-v03 .management-container .product-list-subheading { display: flex; align-items: center; gap: 9px; margin: 0 0 11px; }
+.app-v03 .management-container .product-list-subheading h2 { margin: 0; }
+.app-v03 .management-container .excel-workspace > .page-heading { margin-bottom: 10px; }
+.app-v03 .management-container .excel-workspace > input[aria-label="엑셀 목록 검색"] {
+  box-sizing: border-box; display: block; width: 100%; min-width: 0; margin: 0 0 10px;
+}
