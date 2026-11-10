@@ -307,3 +307,66 @@
   .daily-settlement .settlement-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .daily-settlement .settlement-breakdown { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* Registry editors share the same form and list layout. Own these rules here
+   rather than adding another blanket management-layout override. */
+.app-v03 .management-container .registry-edit-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+  align-items: end;
+  gap: 12px 14px;
+  margin: 14px 0 16px;
+}
+.app-v03 .management-container .registry-edit-form > .field {
+  margin: 0;
+  min-width: 0;
+}
+.registry-edit-form > .field :is(input, select) { width: 100%; min-width: 0; }
+.registry-edit-actions {
+  display: flex;
+  align-items: end;
+  justify-content: flex-end;
+  gap: 8px;
+  min-height: var(--control-height);
+}
+.registry-linked-product { display: grid; align-content: end; gap: 6px; min-width: 0; }
+.registry-input-label {
+  color: var(--text-secondary);
+  font-size: calc(13px * var(--ui-scale, 1));
+  font-weight: 600;
+  line-height: 1.35;
+}
+.registry-linked-product > .ui-button { overflow: hidden; text-overflow: ellipsis; }
+.registry-list { display: grid; border-top: 1px solid var(--border-default); }
+.registry-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-default);
+}
+.registry-row-info {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+}
+.registry-row-info strong { font-size: calc(13px * var(--ui-scale, 1)); }
+.registry-row-meta {
+  color: var(--text-secondary);
+  font-size: calc(12px * var(--ui-scale, 1));
+}
+.registry-row-info .warnings { flex-basis: 100%; margin: 0; }
+.registry-row > .ui-button {
+  flex: none;
+  align-self: center;
+  height: var(--control-compact);
+  min-height: var(--control-compact);
+  padding: 6px 10px;
+}
