@@ -733,6 +733,20 @@ try {
   for(const label of ["상품별 기본 운임","동급 배송 그룹 지정","동급 그룹 운임표","조합 / 기준 이력"]){
     await navPage.getByRole("button",{name:label,exact:true}).click();
     await samplePageStyle("운임 관리 / "+label);
+    if(label==="동급 그룹 운임표"){
+      const rateRow=await navPage.locator(".shipping-rates table.management-data-table tbody tr").first().evaluate(row=>{
+        const cell=row.querySelector("td"),button=row.querySelector(".ui-button");
+        return {height:Math.round(row.getBoundingClientRect().height),
+          paddingTop:cell?parseFloat(getComputedStyle(cell).paddingTop):-1,
+          paddingBottom:cell?parseFloat(getComputedStyle(cell).paddingBottom):-1,
+          buttonHeight:button?Math.round(button.getBoundingClientRect().height):-1};
+      });
+      assert.ok(rateRow.paddingTop<=3.1 && rateRow.paddingBottom<=3.1,
+        "Freight rate cells should use compact shared table spacing: "+JSON.stringify(rateRow));
+      assert.ok(rateRow.height<=41,
+        "Freight rate row is taller than other management table rows: "+JSON.stringify(rateRow));
+      console.log("PASS: freight rate table compact computed row geometry",JSON.stringify(rateRow));
+    }
   }
   await navMenu.getByRole("button",{name:"엑셀 관리"}).click();
   for(const label of ["공장 엑셀 대기","매장 발송 대기","엑셀 작성 이력"]){
