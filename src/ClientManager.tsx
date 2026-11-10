@@ -32,6 +32,8 @@ export function ClientManager({
   const [originalEdit, setOriginalEdit] = useState<Client>();
   const [excelOpen, setExcelOpen] = useState(false);
   const [messageDirty, setMessageDirty] = useState(false);
+  // Keep the product-notice search stable while its editor swaps during tab changes.
+  const [noticeSearch, setNoticeSearch] = useState("");
   const [search, setSearch] = useState(""),
     [edit, setEdit] = useState<Client>(),
     [exception, setException] = useState(""),
@@ -116,7 +118,7 @@ export function ClientManager({
           </nav>
           {messageSection==="general"
             ? <AutomaticMessageTemplateManager state={state} onRefresh={onRefresh} onNotice={onNotice} onDirtyChange={setMessageDirty}/>
-            : <ProvisionalProductNoticeManager state={state} onRefresh={onRefresh} onNotice={onNotice} onDirtyChange={setMessageDirty}/>}
+            : <ProvisionalProductNoticeManager state={state} onRefresh={onRefresh} onNotice={onNotice} onDirtyChange={setMessageDirty} query={noticeSearch} onQueryChange={setNoticeSearch}/>}
         </div>
       ) : (<>
       <div className="management-search">

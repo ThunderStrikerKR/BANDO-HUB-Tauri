@@ -10,19 +10,20 @@ import type { State } from "./types";
 
 type NoticeMap = Record<string, string>;
 export function ProvisionalProductNoticeManager({
-  state,onRefresh,onNotice,onDirtyChange,
+  state,onRefresh,onNotice,onDirtyChange,query,onQueryChange,
 }:{
   state: State;
   onRefresh: () => Promise<void>;
   onNotice: NoticeSink;
   onDirtyChange?: (dirty: boolean) => void;
+  query: string;
+  onQueryChange: (value: string) => void;
 }) {
   const [baseline,setBaseline] = useState<NoticeMap | null>(
     () => structuredClone(state.settings.provisionalProductNotices ?? null));
   const [draft,setDraft] = useState<NoticeMap>(
     () => structuredClone(state.settings.provisionalProductNotices ?? {}));
   const [selected,setSelected] = useState("");
-  const [query,setQuery] = useState("");
   const [busy,setBusy] = useState(false);
   const [status,setStatus] = useState("");
   const dirty = !sameValue(draft,baseline ?? {});
@@ -96,7 +97,7 @@ export function ProvisionalProductNoticeManager({
       <div className="family-field">
         <label htmlFor="provisional-notice-product-search">안내문을 등록할 상품 검색</label>
         <input id="provisional-notice-product-search" value={query}
-          placeholder="상품명이나 모델코드 검색" onChange={e=>setQuery(e.target.value)}/>
+          placeholder="상품명이나 모델코드 검색" onChange={e=>onQueryChange(e.target.value)}/>
       </div>
       <div className="family-list-scroll">
         {visible.map(p=><button type="button" key={p.id}
