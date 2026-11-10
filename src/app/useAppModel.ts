@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { confirmAction } from "../dialogs";
+import { confirmAction, askSaveChanges } from "../dialogs";
 import { canQueue, orderClient, reviewIssues, totals } from "../domain";
 import { newReception, persistedReceptionState } from "../orders/reception";
 import { useHasPendingChanges } from "../shared/pending-changes";
@@ -238,6 +238,29 @@ export function useAppModel() {
     setDraft(o);
     setNotice(mode === "queue" ? "공장 목록에 추가했습니다." : "주문을 저장했습니다.");
   };
+  // A new reception cannot be saved until the employee confirms the order.
+  const confirmReceptionDraftLeave = async (): Promise<boolean> => {
+    if (!draft || !dirty) return true;
+    const choice = await askSaveChanges("접수 화면에 저장하지 않은 변경사항이 있습니다. 어떻게 할까요?");
+    if (choice === "cancel") return false;
+    if (choice === "save") {
+      if (!state?.orders.some((order) => order.id === draft.id)) {
+        setNotice("신규 발주서는 주문 확인 완료 후 저장할 수 있습니다. 확인을 마치거나 저장 안 함을 선택하세요.", "error");
+        return false;
+      }
+      try {
+        await saveOrder("save");
+      } catch (error) {
+        setNotice(error instanceof Error ? error.message : String(error), "error");
+        return false;
+      }
+    } else {
+      const persisted = state?.orders.find((order) => order.id === draft.id);
+      setDraft(persisted ? clone(persisted) : newReception());
+      setRawEditDirty(false);
+    }
+    return true;
+  };
   const open = async (o?: Order) => {
     if (o && onlyDeletedGroups(state!, o.id)) {
       setNotice("이 주문의 묶음은 삭제되었습니다. 최초 원문은 설정의 감사 기록에서 확인하세요.");
@@ -252,10 +275,7 @@ export function useAppModel() {
         setNotice("현재 화면에서 변경사항을 저장하거나 취소한 뒤 주문을 열어 주세요.", "error");
         return false;
       }
-    } else if (dirty && !leave.handledDraft) {
-      const confirmed = await confirmAction("저장하지 않은 변경사항이 있습니다. 다른 주문을 열까요?");
-      if (!confirmed) return false;
-    }
+    } else if (!leave.handledDraft && !(await confirmReceptionDraftLeave())) return false;
     setWorkflowSelection(undefined);
     setDraft(o ? clone(o) : newReception());
     setTab("접수");
@@ -350,6 +370,7 @@ export function useAppModel() {
         setNotice("저장하지 않은 편집창이 있습니다. 편집창에서 저장하거나 취소한 뒤 이동하세요.", "error");
         return;
       }
+      if (!leave.handledDraft && !(await confirmReceptionDraftLeave())) return;
     } else {
       const leave = await requestPageLeave((message) => setNotice(message, "error"));
       if (!leave.proceed) return;
@@ -374,8 +395,7 @@ export function useAppModel() {
         setNotice("편집 중인 내용을 저장하거나 취소한 뒤 수신 주문을 열어 주세요.", "error");
         return;
       }
-    } else if (dirty && !leave.handledDraft &&
-      !(await confirmAction("현재 입력을 수신 주문으로 바꿀까요?"))) return;
+    } else if (!leave.handledDraft && !(await confirmReceptionDraftLeave())) return;
     const order = newReception();
     order.raw = entry.text;
     order.photos = entry.photo ? [entry.photo] : [];
