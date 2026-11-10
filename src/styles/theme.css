@@ -12,7 +12,7 @@ body,
 }
 .app-header {
   background: #1c1c1c;
-  border-color: #404040;
+  border-bottom: 1px solid #444;
   gap: 12px;
   height: 64px;
   -webkit-app-region: drag;
@@ -26,12 +26,8 @@ body,
 .app-header nav button {
   color: #bdbdbd;
   font-size: calc(15px * var(--ui-scale));
-  padding: 10px;
 }
-.app-header nav button.current {
-  background: #404040;
-  color: #fff;
-}
+
 .wordmark span {
   color: #ddd;
 }
