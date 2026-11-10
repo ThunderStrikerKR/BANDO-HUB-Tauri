@@ -319,7 +319,7 @@ fn state_save(db: State<'_, Database>, state: Value) -> Result<Value, String> {
     let revision = state["revision"].as_u64().ok_or("변경 이력이 없는 데이터를 저장할 수 없습니다.")?;
     // The committed snapshot already contains the new revision.
     write_snapshot(&mut *lock_db(&db)?, state, revision, true)
-
+}
 
 fn canonical_color_key(value: &str) -> String {
     match value.trim().to_lowercase().as_str() {
