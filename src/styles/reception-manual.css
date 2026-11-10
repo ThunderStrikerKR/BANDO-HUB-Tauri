@@ -33,8 +33,6 @@
 }
 .source-pane .source-actions > button {
   min-height: 32px;
-  font-size: 12px;
-  padding: 5px 8px;
 }
 .source-protection {
   display: block;
