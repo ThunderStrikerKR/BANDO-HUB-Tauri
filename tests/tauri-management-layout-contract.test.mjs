@@ -50,8 +50,11 @@ test("tabbed pages put tabs before their search tools",()=>{
 test("Excel listing keeps its data fields inline and both table types receive suitable columns",()=>{
   const excel=read("src/WorkflowQueue.tsx");
   const css=read("src/styles/management-layout.css");
-  assert.match(excel,/management-data-table excel-history-table/);
-  assert.match(excel,/management-data-table excel-queue-table/);
+  assert.match(excel,/<ManagementTable className="excel-history-table">/);
+  assert.match(excel,/<ManagementTable className="excel-queue-table">/);
+  const table=read("src/ui/ManagementTable.tsx");
+  assert.match(table,/<table \{\.\.\.props\} className=/);
+  assert.match(table,/\["management-data-table", className\]/);
   assert.match(css,/table\.excel-queue-table th:first-child/);
   assert.match(css,/table\.excel-history-table th:first-child/);
   assert.match(css,/td > small/);
@@ -65,8 +68,11 @@ test("long names and item rows remain visible without reducing the reserved Kaka
   assert.match(css,/table-layout: auto/);
   assert.match(css,/\.product-prices table\.management-data-table/);
   assert.doesNotMatch(css,/\.hub-kakao-slot/);
-  assert.match(read("src/ProductManager.tsx"),/className="management-data-table"/);
-  assert.match(read("src/ClientManager.tsx"),/client-table management-data-table/);
+  assert.match(read("src/ProductManager.tsx"),/<ManagementTable>/);
+  assert.match(read("src/ClientManager.tsx"),/<ManagementTable className="client-table">/);
+  assert.match(read("src/ProductFreightPanel.tsx"),/<ManagementTable>/);
+  assert.match(read("src/app/OrderHistory.tsx"),/<ManagementTable>/);
+  assert.match(read("src/app/DailySettlement.tsx"),/<ManagementTable>/);
 });
 
 test("date controls stay on the same toolbar row instead of changing page heading height",()=>{
