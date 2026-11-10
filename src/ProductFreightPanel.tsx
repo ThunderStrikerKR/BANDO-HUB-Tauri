@@ -1,5 +1,7 @@
 import { HelpTooltip } from "./ui/HelpTooltip";
 import { ManagementSearch } from "./ui/ManagementSearch";
+import { EmptyState } from "./ui/PageHeading";
+import { ManagementTable } from "./ui/ManagementTable";
 import { ShippingFeeRanges } from "./ShippingFeeRanges";
 import { useState } from "react";
 import { confirmAction } from "./dialogs";
@@ -187,8 +189,8 @@ export function ProductFreightPanel({
           </button>
           <HelpTooltip title="상품별 운임" purpose="이 상품을 포장해 보낼 때의 배송비를 등록합니다." when="상품별 기본 배송비와 합포장 수량을 확인했을 때 사용합니다." steps={["배송비를 수정할 상품을 찾습니다.", "설정 버튼을 누릅니다.", "확인된 합포장 수량과 배송비를 입력합니다.", "기본 운임 저장을 눌러 적용합니다."]} result="새 주문에서 해당 상품의 운임 기준을 참고할 수 있습니다." caution="확인되지 않은 운임은 임의로 입력하지 않습니다." />
         </div>
-        <div className="shipping-table-scroll">
-          <table className="management-data-table">
+        <div className={"shipping-table-scroll" + (!rows.length ? " shipping-list-empty" : "")}>
+          <ManagementTable>
             <thead>
               <tr>
                 <th />
@@ -285,7 +287,8 @@ export function ProductFreightPanel({
                 );
               })}
             </tbody>
-          </table>
+          </ManagementTable>
+          {!rows.length && <EmptyState compact title={search || onlyMissing ? "조건에 맞는 상품이 없습니다." : "등록된 상품이 없습니다."} />}
         </div>
         <footer className="shipping-savebar shipping-explanation-footer">
           <HelpTooltip
