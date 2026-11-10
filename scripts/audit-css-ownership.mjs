@@ -92,7 +92,26 @@ export function auditCSS() {
   const crossFile = repeated.filter(([, records]) => new Set(records.map((record) => record.path)).size > 1);
   const conflicts = repeated.filter(([, records]) => new Set(records.map((record) => record.value)).size > 1);
   const crossFileConflicts = conflicts.filter(([, records]) => new Set(records.map((record) => record.path)).size > 1);
-  return {files, declarations, repeated, crossFile, conflicts, crossFileConflicts};
+
+  // Same-element candidates that differ only by the app/management scope.
+  // These require computed-style review; unlike exact selectors, their
+  // different specificity means a later file does not necessarily win.
+  const stripScope = (selector) => selector
+    .replace(/^\\.app-v03\\s+\\.management-container\\s+/, "")
+    .replace(/^\\.app-v03\\s+/, "")
+    .replace(/^\\.management-container\\s+/, "");
+  const scoped = new Map();
+  for (const record of declarations) {
+    const normalized = stripScope(record.selector);
+    const key = [record.context, normalized, record.property].join(" | ");
+    const values = scoped.get(key) || [];
+    values.push(record);
+    scoped.set(key, values);
+  }
+  const scopedOverlaps = [...scoped.entries()].filter(([, records]) =>
+    new Set(records.map((record) => record.selector)).size > 1 &&
+    new Set(records.map((record) => record.value)).size > 1);
+  return {files, declarations, repeated, crossFile, conflicts, crossFileConflicts, scopedOverlaps};
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -104,12 +123,14 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     crossFileRepeatedKeys: report.crossFile.length,
     valueConflicts: report.conflicts.length,
     crossFileValueConflicts: report.crossFileConflicts.length,
+    differentSpecificityCandidates: report.scopedOverlaps.length,
   };
   const hot = report.crossFileConflicts.map(([key, entries]) => ({
     key, definitions: entries.map((e) => `${e.path}:${e.line} = ${e.value}`),
   })).sort((a, b) => b.definitions.length - a.definitions.length);
   if (process.argv.includes("--json")) {
-    process.stdout.write(JSON.stringify({summary, crossFileConflicts: hot}, null, 2) + "\n");
+    process.stdout.write(JSON.stringify({summary, crossFileConflicts: hot,
+      scopedOverlaps: report.scopedOverlaps}, null, 2) + "\n");
   } else {
     console.log("CSS audit", JSON.stringify(summary));
     for (const row of hot.slice(0, 40)) console.log(row.key + "\n  " + row.definitions.join("\n  "));
