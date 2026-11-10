@@ -5,6 +5,9 @@ import { won } from "./domain";
 import { registeredProducts, sortProducts } from "./product-models";
 import type { NoticeSink } from "./shared/notices";
 import { useAsyncTask } from "./shared/useAsyncTask";
+import { sameValue } from "./shared/draft";
+import { requestPageLeave, usePageLeaveGuard } from "./shared/page-leave";
+
 import {
   bundleCounts,
   editableShippingRule,
@@ -33,6 +36,7 @@ export function ProductFreightPanel({
       rule: ShippingRule;
       name: string;
     }>();
+  const [initialRule, setInitialRule] = useState<ShippingRule>();
   const rows = sortProducts(
     registeredProducts(state.products).filter(
       (p) => p.catalog !== "DEMO" && !p.variants.some((v) => v.source === "DEMO"),
@@ -52,8 +56,8 @@ export function ProductFreightPanel({
         onNotice(message, "success");
       })
     ).ok;
-  const writeRule = async () => {
-    if (!editing) return;
+  const writeRule = async (): Promise<boolean> => {
+    if (!editing) return true;
     const next = clone(state),
       shipping = next.shipping!;
     const value = {
@@ -77,8 +81,26 @@ export function ProductFreightPanel({
         ];
       shipping.productRules[editing.productId] = value;
     }
-    if (await save(next, "최대 묶음 수량과 운임을 저장했습니다. 이전 기준은 이력으로 보존합니다."))
-      setEditing(undefined);
+    const ok = await save(next, "최대 묶음 수량과 운임을 저장했습니다. 이전 기준은 이력으로 보존합니다.");
+    if (ok) { setEditing(undefined);setInitialRule(undefined); }
+    return ok;
+  };
+  const editingDirty = !!editing && !!initialRule && !sameValue(editing.rule, initialRule);
+  usePageLeaveGuard({
+    label: "상품별 운임",
+    hasChanges: () => editingDirty,
+    busy: () => busy,
+    save: writeRule,
+    discard: () => {setEditing(undefined);setInitialRule(undefined);},
+  });
+  const closeEditing = async () => {
+    if (!editing || busy) return;
+    if (editingDirty) {
+      const leave = await requestPageLeave((message) => onNotice(message, "error"));
+      if (!leave.proceed) return;
+    }
+    setEditing(undefined);
+    setInitialRule(undefined);
   };
   return (
     <>
@@ -219,12 +241,12 @@ export function ProductFreightPanel({
                     <td>
                       <button
                         onClick={() =>
-                          setEditing({
+                          (setInitialRule(editableShippingRule(rule ?? emptyProductRule())), setEditing({
                             productId: p.id,
                             groupId: group?.id,
                             name: group ? group.name + " / 공통 기준" : p.name,
                             rule: editableShippingRule(rule ?? emptyProductRule()),
-                          })
+                          }))
                         }
                       >
                         {group ? "그룹 기준 편집" : "기본 운임 설정"}
@@ -283,7 +305,7 @@ export function ProductFreightPanel({
           draft={editing}
           busy={busy}
           title={editing.name + " 운임 설정"}
-          onClose={() => setEditing(undefined)}
+          onClose={() => void closeEditing()}
         >
           {editing.groupId && (
             <p className="warnings">

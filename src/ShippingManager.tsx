@@ -6,6 +6,9 @@ import { colorLabel, registeredProducts, sortProducts } from "./product-models";
 import { ProductFreightPanel } from "./ProductFreightPanel";
 import type { NoticeSink } from "./shared/notices";
 import { useAsyncTask } from "./shared/useAsyncTask";
+import { sameValue } from "./shared/draft";
+import { requestPageLeave, usePageLeaveGuard } from "./shared/page-leave";
+
 import {
   bundleCounts,
   changeShippingBasis,
@@ -43,6 +46,7 @@ export function ShippingManager({
       rule: ShippingRule;
     }>(),
     [newName, setNewName] = useState("");
+  const [initialEditing, setInitialEditing] = useState<ShippingRule>();
   const products = useMemo(
     () =>
       sortProducts(
@@ -79,6 +83,78 @@ export function ShippingManager({
   const changes = Object.entries(pending).filter(
     ([id, g]) => products.find((p) => p.id === id)?.shippingGroupId !== (g || undefined),
   );
+  const savePending = async (): Promise<boolean> => {
+    if (!changes.length) return true;
+                  const updatedShipping = structuredClone(shipping);
+                  for (const [id, value] of changes)
+                    if (!value) {
+                      updatedShipping.productRules ??= {};
+                      updatedShipping.productHistory ??= {};
+                      const old = updatedShipping.productRules[id];
+                      if (old)
+                        updatedShipping.productHistory[id] = [
+                          ...(updatedShipping.productHistory[id] ?? []),
+                          old,
+                        ];
+                      updatedShipping.productRules[id] = emptyProductRule();
+                    }
+                  const next = {
+                    ...state,
+                    shipping: updatedShipping,
+                    products: state.products.map((p) =>
+                      pending[p.id] !== undefined
+                        ? { ...p, shippingGroupId: pending[p.id] || undefined }
+                        : p,
+                    ),
+                  };
+                  const ok = await save(next, "배송 그룹 지정을 저장했습니다.");
+                  if (ok) { setPending({}); setSelected([]); }
+                  return ok;
+  };
+  const editingDirty = !!editing && !!initialEditing && !sameValue(editing.rule, initialEditing);
+  const saveEditedRule = async (): Promise<boolean> => {
+    if (!editing) return true;
+              const next = structuredClone(shipping),
+                g = next.groups.find((g) => g.id === editing.id)!;
+              g.history.push(g.current);
+              g.current = {
+                ...editing.rule,
+                maxConfirmed: editing.rule.maxBundle !== null,
+                version: crypto.randomUUID(),
+                at: new Date().toISOString(),
+              };
+              const ok = await save(
+                { ...state, shipping: next },
+                "운임표를 저장했습니다. 변경 전 기준은 이력으로 보존됩니다.",
+              );
+              if (ok) { setEditing(undefined); setInitialEditing(undefined); }
+              return ok;
+  };
+  usePageLeaveGuard({
+    label: "운임 관리",
+    hasChanges: () => changes.length > 0 || editingDirty,
+    busy: () => busy,
+    save: async () => {
+      if (editingDirty) return saveEditedRule();
+      return savePending();
+    },
+    discard: () => { setPending({});setSelected([]);setEditing(undefined);setInitialEditing(undefined); },
+  });
+  const chooseTab = async (next: typeof tab) => {
+    if (next === tab) return;
+    const leave = await requestPageLeave((message) => onNotice(message, "error"));
+    if (!leave.proceed) return;
+    setTab(next);
+  };
+  const closeEditing = async () => {
+    if (!editing || busy) return;
+    if (editingDirty) {
+      const leave = await requestPageLeave((message) => onNotice(message, "error"));
+      if (!leave.proceed) return;
+    }
+    setEditing(undefined);
+    setInitialEditing(undefined);
+  };
   return (
     <div className="shipping-manager">
       <PageHeading
@@ -129,28 +205,28 @@ export function ShippingManager({
         <button
           aria-pressed={tab === "products"}
           className={tab === "products" ? "chosen" : ""}
-          onClick={() => setTab("products")}
+          onClick={() => void chooseTab("products")}
         >
           상품별 기본 운임
         </button>
         <button
           aria-pressed={tab === "assign"}
           className={tab === "assign" ? "chosen" : ""}
-          onClick={() => setTab("assign")}
+          onClick={() => void chooseTab("assign")}
         >
           동급 배송 그룹 지정
         </button>
         <button
           aria-pressed={tab === "rates"}
           className={tab === "rates" ? "chosen" : ""}
-          onClick={() => setTab("rates")}
+          onClick={() => void chooseTab("rates")}
         >
           동급 그룹 운임표
         </button>
         <button
           aria-pressed={tab === "history"}
           className={tab === "history" ? "chosen" : ""}
-          onClick={() => setTab("history")}
+          onClick={() => void chooseTab("history")}
         >
           조합 / 기준 이력
         </button>
@@ -312,34 +388,7 @@ export function ShippingManager({
                 className="primary"
                 disabled={!changes.length || busy}
                 onClick={() => {
-                  const updatedShipping = structuredClone(shipping);
-                  for (const [id, value] of changes)
-                    if (!value) {
-                      updatedShipping.productRules ??= {};
-                      updatedShipping.productHistory ??= {};
-                      const old = updatedShipping.productRules[id];
-                      if (old)
-                        updatedShipping.productHistory[id] = [
-                          ...(updatedShipping.productHistory[id] ?? []),
-                          old,
-                        ];
-                      updatedShipping.productRules[id] = emptyProductRule();
-                    }
-                  const next = {
-                    ...state,
-                    shipping: updatedShipping,
-                    products: state.products.map((p) =>
-                      pending[p.id] !== undefined
-                        ? { ...p, shippingGroupId: pending[p.id] || undefined }
-                        : p,
-                    ),
-                  };
-                  void save(next, "배송 그룹 지정을 저장했습니다.").then((ok) => {
-                    if (ok) {
-                      setPending({});
-                      setSelected([]);
-                    }
-                  });
+                  void savePending();
                 }}
               >
                 그룹 지정 저장 {changes.length > 0 && ` / ${changes.length}개`}
@@ -457,10 +506,10 @@ export function ShippingManager({
                     <td>
                       <button
                         onClick={() =>
-                          setEditing({
+                          (setInitialEditing(editableShippingRule(g.current)), setEditing({
                             id: g.id,
                             rule: editableShippingRule(g.current),
-                          })
+                          }))
                         }
                       >
                         운임 수정
@@ -639,7 +688,7 @@ export function ShippingManager({
         <Modal
           title="배송 그룹 운임 수정"
           onClose={() => {
-            if (!busy) setEditing(undefined);
+            if (!busy) void closeEditing();
           }}
         >
           <h3 className="shipping-rates-title">
@@ -773,22 +822,7 @@ export function ShippingManager({
             className="primary"
             disabled={busy}
             onClick={async () => {
-              const next = structuredClone(shipping),
-                g = next.groups.find((g) => g.id === editing.id)!;
-              g.history.push(g.current);
-              g.current = {
-                ...editing.rule,
-                maxConfirmed: editing.rule.maxBundle !== null,
-                version: crypto.randomUUID(),
-                at: new Date().toISOString(),
-              };
-              if (
-                await save(
-                  { ...state, shipping: next },
-                  "운임표를 저장했습니다. 변경 전 기준은 이력에 보존됩니다.",
-                )
-              )
-                setEditing(undefined);
+              await saveEditedRule();
             }}
           >
             확인한 운임 저장
