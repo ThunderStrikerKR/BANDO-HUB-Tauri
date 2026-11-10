@@ -290,16 +290,7 @@ export function ProductFreightPanel({
           </ManagementTable>
           {!rows.length && <EmptyState compact title={search || onlyMissing ? "조건에 맞는 상품이 없습니다." : "등록된 상품이 없습니다."} />}
         </div>
-        <footer className="shipping-savebar shipping-explanation-footer">
-          <HelpTooltip
-            title="합포장 운임 계산"
-            purpose="같은 곳으로 보내는 여러 상품의 배송비를 합포장 기준에 맞춰 계산합니다."
-            when="같은 수취인에게 여러 상품을 한 번에 보낼 때 사용합니다."
-            steps={["상품별 기본 운임과 배송 그룹을 확인합니다.", "같은 그룹으로 묶을 수 있는 상품의 수량을 확인합니다.", "필요한 배송비를 확인하고 주문에 적용합니다."]}
-            result="같은 모델이나 동급 배송 그룹에 속하는 상품의 수량을 함께 계산할 수 있습니다."
-            caution="수취인이나 출고지가 다른 상품은 별도로 계산합니다."
-          />
-        </footer>
+
       </section>
       {editing && (
         <Modal
