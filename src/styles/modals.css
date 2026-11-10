@@ -11,7 +11,7 @@
   max-width: calc(100vw - 36px);
   max-height: calc(100dvh - 36px);
   overflow: visible;
-  font: 400 15px/1.6 var(--font-body);
+  font: 400 calc(13px * var(--ui-scale, 1))/1.5 var(--font-body);
   letter-spacing: normal;
 }
 .app-modal-layer:not([open]) {
@@ -30,7 +30,7 @@
   overflow: auto;
   background: #202020;
   color: #eee;
-  padding: 24px;
+  padding: 16px 18px;
   border: 1px solid #555;
   border-radius: 10px;
   box-shadow: 0 18px 70px #0009;
@@ -39,11 +39,21 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 16px;
-  margin-bottom: 20px;
+  gap: 12px;
+  min-height: var(--control-compact);
+  margin-bottom: 12px;
 }
 .app-modal-layer .modal > header h2 {
+  min-width: 0;
   margin: 0;
+  font-size: calc(18px * var(--ui-scale, 1));
+  line-height: 1.35;
+}
+.app-modal-layer .modal > header > button {
+  flex: 0 0 auto;
+  min-height: var(--control-compact);
+  height: var(--control-compact);
+  padding: 5px 10px;
 }
 .app-modal-layer button,
 .app-modal-layer input,
@@ -51,6 +61,14 @@
 .app-modal-layer textarea {
   font: inherit;
   letter-spacing: normal;
+}
+.app-modal-layer .modal-fields {
+  min-width: 0;
+  max-width: 100%;
+}
+.app-modal-layer .modal-fields :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+  box-sizing: border-box;
+  max-width: 100%;
 }
 .app-modal-layer textarea {
   width: 100%;
