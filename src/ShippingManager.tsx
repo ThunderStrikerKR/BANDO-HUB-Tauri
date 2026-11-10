@@ -481,10 +481,10 @@ export function ShippingManager({
             <thead>
               <tr>
                 <th>배송 그룹</th>
-                <th>합포장</th>
-                {[1, 2, 3, 4, 5, 6].map((n) => (
-                  <th key={n}>{n}개</th>
-                ))}
+                <th>최대 묶음 수량</th>
+                <th>운임 등록 상태</th>
+                <th>직원 참고 메모</th>
+                <th>최근 수정</th>
                 <th>관리</th>
               </tr>
             </thead>
@@ -493,8 +493,19 @@ export function ShippingManager({
                 .filter((g) => !g.deletedAt)
                 .map((g) => (
                   <tr key={g.id}>
+                    <td><b>{g.name}</b></td>
+                    <td>{g.current.maxConfirmed && g.current.maxBundle
+                      ? g.current.maxBundle + "개" : "확인 필요"}</td>
                     <td>
-                      <b>{g.name}</b>
+                      {typeof g.current.perItem === "number" ||
+                        Object.values(g.current.fees).some((fee) => typeof fee === "number")
+                        ? "등록" : "미등록"}
+                    </td>
+                    <td className="shipping-group-notes" title={g.current.notes}>
+                      {g.current.notes || "-"}
+                    </td>
+                    <td>{g.current.at ? new Date(g.current.at).toLocaleDateString("ko-KR") : "-"}</td>
+                    <td>
                       <button
                         onClick={async () => {
                           const name = await promptText("배송 그룹명", g.name);
@@ -503,25 +514,7 @@ export function ShippingManager({
                           next.groups.find((x) => x.id === g.id)!.name = name.trim();
                           void save({ ...state, shipping: next }, "배송 그룹명을 변경했습니다.");
                         }}
-                      >
-                        이름 수정
-                      </button>
-                      <small>{g.current.notes}</small>
-                    </td>
-                    <td>
-                      {g.current.maxBundle ?? "미확정"}
-                      {!g.current.maxConfirmed && " / 잠정"}
-                    </td>
-                    {[1, 2, 3, 4, 5, 6].map((n) => (
-                      <td key={n}>
-                        {won(
-                          g.current.perItem !== null
-                            ? g.current.perItem * n
-                            : (g.current.fees[n] ?? null),
-                        )}
-                      </td>
-                    ))}
-                    <td>
+                      >이름 수정</button>
                       <button
                         onClick={() =>
                           (setInitialEditing(editableShippingRule(g.current)), setEditing({

@@ -347,3 +347,5 @@
 .shipping-fee-add { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 9px; }
 .shipping-fee-add select { flex: 1 1 150px; max-width: 280px; }
 .shipping-fee-ranges .muted { margin: 6px 0 0; font-size: 11px; }
+
+.shipping-group-notes { max-width: 280px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #b8b8b8; }

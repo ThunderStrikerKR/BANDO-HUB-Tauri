@@ -12,6 +12,9 @@ test("freight editors add intervals on demand, without redundant fields",()=>{
   assert.match(shared,/운임 구간 추가/);
   assert.match(shared,/useState<number\[\]>/);
   assert.doesNotMatch(shared,/bundleCounts\(/);
+  assert.doesNotMatch(b,/<th key=\{n\}>\{n\}개<\/th>/);
+  assert.match(b,/<th>운임 등록 상태<\/th>/);
+  assert.match(b,/<th>직원 참고 메모<\/th>/);
 });
 test("the maximum bundle count is sufficient for packability checks",()=>{
   const source=read("src/shipping.ts");

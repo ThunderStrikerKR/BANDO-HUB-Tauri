@@ -387,15 +387,7 @@ export function editableShippingRule(input: ShippingRule): ShippingRule {
   return r;
 }
 
-export function shippingRuleCurrent(
-  rule: ShippingRule | undefined,
-  day = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date()),
-) {
+export function shippingRuleCurrent(rule: ShippingRule | undefined) {
   // Past freight dates no longer control active pricing.
   return !!rule;
 }
