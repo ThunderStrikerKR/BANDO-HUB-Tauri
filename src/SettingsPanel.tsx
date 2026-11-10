@@ -4,12 +4,13 @@ import { uid } from "./domain";
 import type { NoticeSink } from "./shared/notices";
 import { useAsyncTask } from "./shared/useAsyncTask";
 import { useDraft } from "./shared/useDraft";
+import { sameValue } from "./shared/draft";
 import type { State } from "./types";
 import { Field } from "./ui";
 import { AccountPicker } from "./ui/AccountPicker";
 import { HelpTooltip } from "./ui/HelpTooltip";
 
-const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+const same = sameValue;
 function settingsChanges(saved: Record<string, unknown>, edited: Record<string, unknown>) {
   const changes: Record<string, unknown> = {};
   const expected: Record<string, unknown> = {};
