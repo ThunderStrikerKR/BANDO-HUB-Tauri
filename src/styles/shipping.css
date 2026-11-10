@@ -161,8 +161,22 @@
   border-color: #383838;
 }
 .shipping-product-list td:first-child,
-.shipping-product-list th:first-child {
+.shipping-product-list th:first-child,
+.shipping-assignment-list td:first-child,
+.shipping-assignment-list th:first-child {
   width: 42px;
+}
+/* Assignment selectors are editing controls, but share the compact table row rhythm. */
+.app-v03 .management-container .shipping-assignment-list table.management-data-table tbody td {
+  padding-top: 3px;
+  padding-bottom: 3px;
+}
+.app-v03 .management-container .shipping-assignment-list table.management-data-table tbody td select {
+  min-width: 170px;
+  height: var(--control-compact);
+  min-height: var(--control-compact);
+  padding: 4px 8px;
+  font-size: calc(13px * var(--ui-scale, 1));
 }
 .shipping-card table:not(.management-data-table) td strong {
   font-size: 13px;
