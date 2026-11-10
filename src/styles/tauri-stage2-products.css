@@ -308,8 +308,14 @@
   .daily-settlement .settlement-breakdown { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
-/* Registry editors share the same form and list layout. Own these rules here
-   rather than adding another blanket management-layout override. */
+/* Registry editors share the same form, title and list rhythm. The legacy
+   .card h2 margin is intended for standalone cards, not these workspaces. */
+.app-v03 .management-container :is(.alias-manager, .registry-brand-manager) > h2 {
+  margin: 0;
+}
+.app-v03 .management-container :is(.alias-manager, .registry-brand-manager) > p {
+  margin: 8px 0 0;
+}
 .app-v03 .management-container .registry-edit-form {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
