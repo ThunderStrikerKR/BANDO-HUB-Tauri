@@ -756,8 +756,15 @@ try {
 
   // Product-specific notice: navigation uses the same safe three choices.
   const productSearch=navPage.getByRole("textbox",{name:"안내문을 등록할 상품 검색"});
-  await productSearch.fill("BD 707A");
+  await productSearch.fill("BD");
   const firstProductNotice=navPage.locator('[aria-label="잠정 상품 선택 안내"] button.family-list-row').first();
+  console.log("PRODUCT_NOTICE_SEARCH",JSON.stringify({
+    text:await productSearch.inputValue(),
+    buttons:await navPage.locator("button.family-list-row").count(),
+    scoped:await navPage.locator('[aria-label="잠정 상품 선택 안내"] button.family-list-row').count(),
+    notice:await navPage.locator('[aria-label="잠정 상품 선택 안내"]').count(),
+    list:await navPage.locator(".family-list-scroll").allTextContents(),
+  }).slice(0,1500));
   await firstProductNotice.waitFor();
   await firstProductNotice.click();
   const noticeText=navPage.getByRole("textbox",{name:"상품별 잠정 선택 안내문"});
@@ -771,7 +778,7 @@ try {
   await automaticText.waitFor();
   assert.equal(Object.keys((await mockState()).state.settings.provisionalProductNotices??{}).length,0);
   await productNoticeTab.click();
-  await productSearch.fill("BD 707A");
+  await productSearch.fill("BD");
   await firstProductNotice.click();
   await noticeText.fill("검증용 안내문 - 저장합니다");
   await commonTab.click();
