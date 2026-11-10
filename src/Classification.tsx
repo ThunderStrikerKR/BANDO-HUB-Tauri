@@ -6,6 +6,7 @@ import { classifiedProducts, registryKey, validateBrands, type Brand } from "./p
 import type { NoticeSink } from "./shared/notices";
 import type { Product, State } from "./types";
 import { Field } from "./ui";
+import { Button } from "./ui/Button";
 export function ClassificationFilters({
   state,
   major,
@@ -130,52 +131,44 @@ export function RegistrySettings({
   };
   return (
     <>
-      <section className="card">
+      <section className="card registry-brand-manager">
         <h2>브랜드 관리</h2>
         <p>
           공식명 / 한글명 / 검색 별칭을 직원이 확인해 연결합니다. 유사한 이름을 자동 병합하지 않습니다.
         </p>
-        <div className="form-row">
-          <input
-            aria-label="브랜드 공식명"
-            placeholder="공식 브랜드명"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-          <input
-            aria-label="브랜드 한글명"
-            placeholder="확인된 한글 표기"
-            value={korean}
-            onChange={(e) => setKorean(e.target.value)}
-          />
-          <input
-            aria-label="브랜드 검색 별칭"
-            placeholder="별칭 (쉼표 구분)"
-            value={aliases}
-            onChange={(e) => setAliases(e.target.value)}
-          />
-          <input
-            aria-label="브랜드 확인 근거"
-            placeholder="확인 근거 URL"
-            value={evidence}
-            onChange={(e) => setEvidence(e.target.value)}
-          />
-          <button
-            onClick={() => void saveBrand()}
-          >
-            브랜드 저장
-          </button>
+        <div className="registry-edit-form">
+          <Field label="공식 브랜드명">
+            <input aria-label="브랜드 공식명" placeholder="공식 브랜드명" value={name}
+              onChange={(e) => setName(e.target.value)} />
+          </Field>
+          <Field label="한글 표기">
+            <input aria-label="브랜드 한글명" placeholder="확인된 한글 표기" value={korean}
+              onChange={(e) => setKorean(e.target.value)} />
+          </Field>
+          <Field label="검색 별칭">
+            <input aria-label="브랜드 검색 별칭" placeholder="별칭 (쉼표 구분)" value={aliases}
+              onChange={(e) => setAliases(e.target.value)} />
+          </Field>
+          <Field label="확인 근거 URL">
+            <input aria-label="브랜드 확인 근거" placeholder="확인 근거 URL" value={evidence}
+              onChange={(e) => setEvidence(e.target.value)} />
+          </Field>
+          <div className="registry-edit-actions">
+            <Button variant="primary" onClick={() => void saveBrand()}>브랜드 저장</Button>
+          </div>
         </div>
-        {state.brands?.map((b) => (
-          <p key={b.id}>
-            {b.name} / {b.korean} / {b.aliases.join(", ")}{" "}
-            <button
-              onClick={() => void chooseBrand(b)}
-            >
-              정정
-            </button>
-          </p>
-        ))}
+        <div className="registry-list" role="list" aria-label="등록된 브랜드">
+          {state.brands?.map((b) => (
+            <div className="registry-row" role="listitem" key={b.id}>
+              <div className="registry-row-info">
+                <strong>{b.name}</strong>
+                <span className="registry-row-meta">한글 표기: {b.korean || "없음"}</span>
+                <span className="registry-row-meta">검색 별칭: {b.aliases.join(", ") || "없음"}</span>
+              </div>
+              <Button size="compact" onClick={() => void chooseBrand(b)}>정정</Button>
+            </div>
+          ))}
+        </div>
       </section>
       {categories && <CategoriesPanel state={state} onSave={onSave} onError={onNotice} />}
     </>
