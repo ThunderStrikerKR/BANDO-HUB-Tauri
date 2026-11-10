@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { setTimeout as pause } from "node:timers/promises";
 import { chromium } from "playwright";
+import { auditCSS } from "./audit-css-ownership.mjs";
 
 const root = new URL("../", import.meta.url);
 const state = JSON.parse(readFileSync(new URL("../src-tauri/resources/state-seed.json", import.meta.url), "utf8"));
@@ -673,6 +674,50 @@ try {
   console.log("PASS: receipt detail placeholder uses readable left-aligned empty state",JSON.stringify(receiptEmptyStyle));
   const layoutSamples=[];
   const styleProbe=[];
+  const cascadeSources=auditCSS().crossFileConflicts.map(([key,records])=>({
+    key,selector:records[0].selector,property:records[0].property,
+    context:records[0].context,files:records.map(record=>record.path),
+    values:records.map(record=>record.value),
+  }));
+  const cascadeSeen=new Map();
+  const sampleCascade = async (screen) => {
+    const matched=await navPage.evaluate((candidates) => {
+      const activeContext=(context)=>{
+        if(context==="base")return true;
+        return context.split(" / ").every(rule=>{
+          if(rule.startsWith("@media "))return window.matchMedia(rule.slice(7).trim()).matches;
+          if(rule.startsWith("@supports "))return CSS.supports(rule.slice(10).trim());
+          return false;
+        });
+      };
+      const findings=[];
+      for(const candidate of candidates){
+        if(!activeContext(candidate.context))continue;
+        try{
+          const elements=[...document.querySelectorAll(candidate.selector)].filter(element=>{
+            const style=getComputedStyle(element);
+            return style.display!=="none" && element.getBoundingClientRect().width>0;
+          });
+          if(!elements.length)continue;
+          findings.push({key:candidate.key,count:elements.length,
+            actual:getComputedStyle(elements[0]).getPropertyValue(candidate.property).trim(),
+            example:elements[0].tagName.toLowerCase()+
+              (typeof elements[0].className==="string" ? "."+elements[0].className.trim().replace(/\\s+/g,".").slice(0,100) : "")});
+        }catch{
+          findings.push({key:candidate.key,unsupportedSelector:true});
+        }
+      }
+      return findings;
+    }, cascadeSources);
+    for(const row of matched){
+      const current=cascadeSeen.get(row.key)||{screens:new Set(),count:0,actual:new Set(),example:row.example??""};
+      current.screens.add(screen);
+      current.count=Math.max(current.count,row.count||0);
+      if(row.actual)current.actual.add(row.actual);
+      if(row.unsupportedSelector)current.unsupportedSelector=true;
+      cascadeSeen.set(row.key,current);
+    }
+  };
   const samplePageStyle = async (name) => {
     const metrics = await navPage.locator(".management-container").evaluate((root) => {
       const capture = (query, limit=4) => [...root.querySelectorAll(query)].filter((element)=>{
@@ -696,6 +741,7 @@ try {
         empties:capture(".empty-state, .detail-empty, .empty",3)};
     });
     styleProbe.push({name,...metrics});
+    await sampleCascade(name);
   };
   const views=[
     ["주문 내역","주문 검색"],
@@ -809,6 +855,23 @@ try {
     "Heading x origin inconsistent across pages: "+JSON.stringify(layoutSamples));
   console.log("PASS: 7 management titles and 5 shared search layouts are consistent");
   console.log("MANAGEMENT_STYLE_PROBE",JSON.stringify(styleProbe));
+  const cascadeInventory=cascadeSources.map(candidate=>{
+    const observed=cascadeSeen.get(candidate.key);
+    return {key:candidate.key,selector:candidate.selector,property:candidate.property,
+      files:candidate.files,values:candidate.values,
+      category:observed?.count>0 ? "MATCHED_IN_RENDERED_VIEW" :
+        observed?.unsupportedSelector ? "REQUIRES_PSEUDO_ELEMENT_INSPECTION" : "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      count:observed?.count??0,
+      actual:[...(observed?.actual??[])].slice(0,3),
+      screens:[...(observed?.screens??[])].slice(0,5)};
+  });
+  assert.equal(cascadeInventory.length,cascadeSources.length);
+  console.log("CSS_CASCADE_CLASSIFICATION",JSON.stringify(cascadeInventory));
+  console.log("CSS_CASCADE_COUNTS",JSON.stringify({
+    candidates:cascadeInventory.length,observed:cascadeInventory.filter(x=>x.category==="MATCHED_IN_RENDERED_VIEW").length,
+    unobserved:cascadeInventory.filter(x=>x.category==="NOT_OBSERVED_IN_SAMPLED_VIEWS").length,
+    pseudo:cascadeInventory.filter(x=>x.category==="REQUIRES_PSEUDO_ELEMENT_INSPECTION").length,
+    screens:styleProbe.length}));
 
   // Shared tables must retain their native semantics and compress empty results
   // without leaving an oversized scroller behind. This uses the real React UI.
