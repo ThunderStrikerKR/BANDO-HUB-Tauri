@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { sameValue } from "./shared/draft";
+import { usePageLeaveGuard } from "./shared/page-leave";
 import { CategoriesPanel } from "./ManagementUI";
 import { classifiedProducts, registryKey, validateBrands } from "./product-registry";
 import type { NoticeSink } from "./shared/notices";
@@ -82,6 +84,37 @@ export function RegistrySettings({
     [aliases, setAliases] = useState(""),
     [evidence, setEvidence] = useState(""),
     [editing, setEditing] = useState<string>();
+  const [initialForm, setInitialForm] = useState({
+    name:"",korean:"",aliases:"",evidence:"",editing:undefined as string|undefined,
+  });
+  const dirty = !sameValue({name,korean,aliases,evidence,editing},initialForm);
+  const discard = () => {
+    setName(initialForm.name);setKorean(initialForm.korean);setAliases(initialForm.aliases);
+    setEvidence(initialForm.evidence);setEditing(initialForm.editing);
+  };
+  const saveBrand = async (): Promise<boolean> => {
+    try {
+      const official = name.trim();
+      const knownNames = new Map<string,string>();
+      for (const value of aliases.split(",").map((value)=>value.trim()).filter(Boolean))
+        knownNames.set(registryKey(value),value);
+      const brandRow = {
+        id: editing ?? crypto.randomUUID(),name:official,korean:korean.trim(),
+        aliases:[...knownNames.values()],evidenceUrl:evidence.trim(),
+      };
+      const next = {...state,brands:[...(state.brands??[]).filter((brand)=>brand.id!==editing),brandRow]};
+      validateBrands(next,state);
+      await onSave(next);
+      onNotice("브랜드 정보를 저장했습니다. 기존 연결 상품은 유지됩니다.","success");
+      setEditing(undefined);setName("");setKorean("");setAliases("");setEvidence("");
+      setInitialForm({name:"",korean:"",aliases:"",evidence:"",editing:undefined});
+      return true;
+    } catch (error) {
+      onNotice(String(error),"error");
+      return false;
+    }
+  };
+  usePageLeaveGuard({label:"브랜드",hasChanges:()=>dirty,save:saveBrand,discard});
   return (
     <>
       <section className="card">
@@ -115,36 +148,7 @@ export function RegistrySettings({
             onChange={(e) => setEvidence(e.target.value)}
           />
           <button
-            onClick={async () => {
-              try {
-                const official = name.trim();
-                const knownNames = new Map<string, string>();
-                for (const value of aliases.split(",").map((value) => value.trim()).filter(Boolean)) {
-                  knownNames.set(registryKey(value), value);
-                }
-                const brandRow = {
-                  id: editing ?? crypto.randomUUID(),
-                  name: official,
-                  korean: korean.trim(),
-                  aliases: [...knownNames.values()],
-                  evidenceUrl: evidence.trim(),
-                };
-                const next = {
-                  ...state,
-                  brands: [...(state.brands ?? []).filter((brand) => brand.id !== editing), brandRow],
-                };
-                validateBrands(next, state);
-                await onSave(next);
-                onNotice("브랜드 정보를 저장했습니다. 기존 연결 상품은 유지됩니다.", "success");
-                setEditing(undefined);
-                setName("");
-                setKorean("");
-                setAliases("");
-                setEvidence("");
-              } catch (e) {
-                onNotice(String(e), "error");
-              }
-            }}
+            onClick={() => void saveBrand()}
           >
             브랜드 저장
           </button>
@@ -159,6 +163,7 @@ export function RegistrySettings({
                 setKorean(b.korean);
                 setAliases(b.aliases.join(","));
                 setEvidence(b.evidenceUrl);
+                setInitialForm({name:b.name,korean:b.korean,aliases:b.aliases.join(","),evidence:b.evidenceUrl,editing:b.id});
               }}
             >
               정정
