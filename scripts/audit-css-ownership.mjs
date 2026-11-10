@@ -97,9 +97,9 @@ export function auditCSS() {
   // These require computed-style review; unlike exact selectors, their
   // different specificity means a later file does not necessarily win.
   const stripScope = (selector) => selector
-    .replace(/^\\.app-v03\\s+\\.management-container\\s+/, "")
-    .replace(/^\\.app-v03\\s+/, "")
-    .replace(/^\\.management-container\\s+/, "");
+    .replace(/^\.app-v03\s+\.management-container\s+/, "")
+    .replace(/^\.app-v03\s+/, "")
+    .replace(/^\.management-container\s+/, "");
   const scoped = new Map();
   for (const record of declarations) {
     const normalized = stripScope(record.selector);
