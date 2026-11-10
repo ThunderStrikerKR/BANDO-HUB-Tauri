@@ -887,6 +887,71 @@ try {
   const titlePositions=layoutSamples.map(x=>x.heading.relativeLeft);
   assert.ok(Math.max(...titlePositions)-Math.min(...titlePositions)<=2,
     "Heading x origin inconsistent across pages: "+JSON.stringify(layoutSamples));
+  // Full-HD layout contract: the shell and page are height-bounded and the
+  // data table or tab panel owns scrolling. X overflow remains allowed for
+  // the reserved Kakao pane and wide record columns.
+  await navPage.setViewportSize({width:1920,height:1080});
+  const measureFrame=async(label,innerSelector)=>{
+    const m=await navPage.evaluate((innerSelector)=>{
+      const sel=(s)=>document.querySelector(s);
+      const outer=sel(".hub-shell-scroll"),root=sel(".hub-main-content > .management-container"),inner=sel(innerSelector);
+      if(!outer||!root||!inner)return {missing:{outer:!!outer,root:!!root,inner:!!inner}};
+      const rect=(e)=>e.getBoundingClientRect();
+      const rootBox=rect(root),innerBox=rect(inner);
+      return {outerHeight:outer.clientHeight,outerScrollHeight:outer.scrollHeight,
+        rootHeight:root.clientHeight,rootScrollHeight:root.scrollHeight,
+        rootBottom:Math.round(rootBox.bottom),innerBottom:Math.round(innerBox.bottom),
+        innerScroll:inner.scrollHeight,innerHeight:inner.clientHeight,
+        bodyScroll:document.scrollingElement?.scrollHeight??0,viewport:innerHeightForTest()};
+      function innerHeightForTest(){return window.innerHeight}
+    },innerSelector);
+    assert.ok(!m.missing,"Required workspace missing in "+label+": "+JSON.stringify(m));
+    assert.ok(m.outerScrollHeight<=m.outerHeight+2,
+      label+" outer shell has unnecessary vertical scrollbar: "+JSON.stringify(m));
+    assert.ok(m.rootScrollHeight<=m.rootHeight+2,
+      label+" management page overflows viewport: "+JSON.stringify(m));
+    assert.ok(m.innerBottom<=m.rootBottom+2,
+      label+" internal workspace extends beyond page frame: "+JSON.stringify(m));
+    assert.ok(m.bodyScroll<=m.viewport+2,
+      label+" document itself scrolls vertically: "+JSON.stringify(m));
+    return m;
+  };
+  const fullHD=[];
+  const checkFullHD=async(menu,selector)=>{
+    await navMenu.getByRole("button",{name:menu,exact:true}).click();
+    fullHD.push({menu,...await measureFrame(menu,selector)});
+  };
+  await checkFullHD("상품 관리",".product-list-workspace .price-table-scroll");
+  await checkFullHD("운임 관리",".shipping-product-list .shipping-table-scroll");
+  await navPage.getByRole("button",{name:"동급 배송 그룹 지정",exact:true}).click();
+  fullHD.push({menu:"운임 관리 / 동급 배송 그룹 지정",...await measureFrame("배송 그룹 지정",".shipping-assignment-list .shipping-table-scroll")});
+  await checkFullHD("거래처 관리",".management-scroll");
+  const clientWidths=await navPage.locator(".client-table").evaluate(table=>{
+    const heads=[...table.querySelectorAll("thead th")],cells=[...table.querySelectorAll("tbody tr:first-child td")];
+    return {layout:getComputedStyle(table).tableLayout,headers:heads.map(x=>[Math.round(x.getBoundingClientRect().left),Math.round(x.getBoundingClientRect().width)]),
+      data:cells.map(x=>[Math.round(x.getBoundingClientRect().left),Math.round(x.getBoundingClientRect().width)])};
+  });
+  assert.equal(clientWidths.layout,"fixed","Client table layout must be fixed");
+  assert.deepEqual(clientWidths.headers,clientWidths.data,
+    "Client header columns and data cells have different widths: "+JSON.stringify(clientWidths));
+  await checkFullHD("설정",".settings-tab-panels");
+  const settingsColumns=await navPage.locator(".settings-basic-top-grid").evaluate(grid=>{
+    const sections=[...grid.children].map(el=>el.getBoundingClientRect());
+    const sender=[...document.querySelectorAll(".settings-sender-grid > div")].map(el=>el.getBoundingClientRect());
+    return {columns:sections.length,distinctXs:new Set(sections.map(r=>Math.round(r.left))).size,
+      senderCount:sender.length,senderRowY:sender.map(r=>Math.round(r.top))};
+  });
+  assert.equal(settingsColumns.columns,2);
+  assert.equal(settingsColumns.distinctXs,2,
+    "Short basic settings fields should use two columns at 1080p");
+  assert.equal(settingsColumns.senderCount,5);
+  await checkFullHD("엑셀 관리",".excel-table-scroll");
+  await checkFullHD("일일 결산",".daily-settlement");
+  await checkFullHD("주문 내역",".order-history-list");
+  console.log("FULL_HD_LAYOUT",JSON.stringify({fullHD,settingsColumns,clientWidths}));
+  await navPage.setViewportSize({width:1520,height:1000});
+  console.log("PASS: 1080p navigation frames, scrolling ownership and client columns are consistent");
+
   console.log("PASS: 7 management titles and 5 shared search layouts are consistent");
   console.log("MANAGEMENT_STYLE_PROBE",JSON.stringify(styleProbe));
   // Shared tables must retain their native semantics and compress empty results
