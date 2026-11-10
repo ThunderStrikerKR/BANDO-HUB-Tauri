@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { auditCSS } from "../scripts/audit-css-ownership.mjs";
+import { readFileSync } from "node:fs";
 
 test("CSS ownership audit includes every imported stylesheet in actual cascade order", () => {
   const report = auditCSS();
@@ -45,4 +46,24 @@ test("shared management table and empty-state layout have explicit style owners"
     .every((r) => r.path === "management-layout.css"));
   assert.ok(owner(".app-v03 .management-container table.management-data-table tbody td", "padding")
     .every((r) => r.path === "management-layout.css"));
+});
+
+test("core layout tokens are not overridden from competing legacy files", () => {
+  const report = auditCSS();
+  const declarations = (selector, property, context = "base") =>
+    report.declarations.filter((record) =>
+      record.selector === selector && record.property === property && record.context === context);
+  const filesFor = (selector, property) =>
+    [...new Set(declarations(selector, property).map((r) => r.path))];
+  assert.deepEqual(filesFor(".app-header", "background"), ["theme.css"]);
+  assert.deepEqual(filesFor(".app-header", "height"), ["theme.css"]);
+  assert.deepEqual(filesFor(".app-header", "border-bottom"), ["theme.css"]);
+  assert.deepEqual(filesFor(".shipping-stats", "gap"), ["shipping.css"]);
+  assert.deepEqual(filesFor(".shipping-stats", "margin-bottom"), ["shipping.css"]);
+  assert.deepEqual(filesFor(".shipping-table-scroll", "max-height"), ["theme.css"]);
+  const tokenCss = readFileSync(new URL("../src/styles/tokens.css", import.meta.url), "utf8");
+  const components = readFileSync(new URL("../src/styles/components.css", import.meta.url), "utf8");
+  assert.match(tokenCss, /--field-label-size:/);
+  assert.match(components, /font-size: var\(--field-label-size\)/);
+  assert.deepEqual(filesFor(".field > .field-label", "font-size"), ["components.css"]);
 });
