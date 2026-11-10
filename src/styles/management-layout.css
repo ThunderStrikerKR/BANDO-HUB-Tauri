@@ -13,9 +13,29 @@
 
 /* The product/client screen previously removed the 20px management padding
    entirely, shifting its title and toolbar left of every other page. */
-.app-v03 .hub-main-content > .management-container.management-fixed {
+.app-v03 .hub-main-content > .management-container {
   box-sizing: border-box;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
   padding: 20px;
+  overflow: hidden;
+}
+.app-v03 .hub-main-content > .management-container.management-fixed {
+  padding: 20px;
+}
+.app-v03 .management-container > :is(.page-heading, .management-tabbar) {
+  flex: 0 0 auto;
+}
+/* A whole page must never grow the shell: main workspaces either scroll
+   internally or host a bounded scrollable table. */
+.app-v03 .management-container > :is(.order-history-list, .daily-settlement, .management-screen, .settings-tab-panels) {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 /* Consistent horizontal origin, title baseline, type hierarchy and rhythm. */
@@ -209,7 +229,19 @@
   background: #404040;
 }
 .app-v03 .management-container .settings-tab-panels {
+  flex: 1 1 auto;
   min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+}
+.app-v03 .management-container .settings-tab-list {
+  flex: 0 0 auto;
+}
+.app-v03 .management-container .settings-tab-panels > [role="tabpanel"] {
+  min-width: 0;
+  max-width: 100%;
 }
 
 /* Freight search lives inside its card, so it uses a shared control without
@@ -392,6 +424,125 @@
 }
 .app-v03 .management-container .daily-settlement > .card { padding: 14px; }
 .app-v03 .management-container .management-scroll { min-width: 0; }
+/* Price list fills the same available area as freight. Expanded Excel/add
+   forms keep their own existing scrolling instead of clipping controls. */
+.app-v03 .management-container .management-scroll.product-list-workspace {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  padding: 8px 0 0;
+  overflow: hidden;
+}
+.app-v03 .management-container .product-list-workspace > .product-list-subheading {
+  flex: 0 0 auto;
+}
+.app-v03 .management-container .product-list-workspace > .product-prices {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  margin-bottom: 0;
+  overflow: hidden;
+}
+.app-v03 .management-container .product-list-workspace .price-table-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+/* The shipping heading, counters, tabs and save toolbar stay visible.
+   Table rows scroll inside the remaining space. */
+.app-v03 .management-container > .shipping-manager {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+.app-v03 .management-container .shipping-manager > :is(.page-heading, .shipping-stats, .shipping-tabs) {
+  flex: 0 0 auto;
+}
+.app-v03 .management-container .shipping-manager > .shipping-card {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.app-v03 .management-container .shipping-manager > :is(.shipping-product-list, .shipping-assignment-list) {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.app-v03 .management-container .shipping-manager > :is(.shipping-product-list, .shipping-assignment-list) > :is(.shipping-tools, .shipping-bulk, .shipping-savebar) {
+  flex: 0 0 auto;
+}
+.app-v03 .management-container .shipping-manager > :is(.shipping-product-list, .shipping-assignment-list) > .shipping-table-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.app-v03 .management-container .shipping-manager > :is(.shipping-product-list, .shipping-assignment-list) > .shipping-table-scroll.shipping-list-empty {
+  flex: 0 0 auto;
+  min-height: 0;
+  max-height: none;
+}
+/* Use columns proportional to information length, not full-width rows for
+   one short value. Do not alter field values or draft-save behavior. */
+.app-v03 .management-container .settings-basic-top-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: 12px 16px;
+  align-items: start;
+}
+.app-v03 .management-container .settings-basic-cell,
+.app-v03 .management-container .settings-sender-section {
+  min-width: 0;
+}
+.app-v03 .management-container .settings-basic-cell > .settings-help-heading,
+.app-v03 .management-container .settings-sender-section > .settings-help-heading {
+  margin: 0 0 8px;
+}
+.app-v03 .management-container .settings-sender-section {
+  margin-top: 14px;
+}
+.app-v03 .management-container .settings-sender-grid {
+  display: grid;
+  grid-template-columns: minmax(140px, 1.1fr) minmax(180px, 1.6fr) minmax(100px, .8fr);
+  gap: 10px 14px;
+}
+.app-v03 .management-container .settings-sender-grid > * {
+  min-width: 0;
+}
+.app-v03 .management-container .settings-sender-address {
+  grid-column: span 2;
+}
+.app-v03 .management-container .settings-basic-top-grid .field,
+.app-v03 .management-container .settings-sender-grid .field {
+  min-width: 0;
+  margin: 0;
+}
+@media (max-width: 1120px) {
+  .app-v03 .management-container .settings-sender-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .app-v03 .management-container .settings-sender-address {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 760px) {
+  .app-v03 .management-container .settings-basic-top-grid,
+  .app-v03 .management-container .settings-sender-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .app-v03 .management-container .settings-sender-address {
+    grid-column: auto;
+  }
+}
 
 /* When the reserved Kakao panel leaves a narrow working area, toolbar elements
    wrap as groups; tab labels and important text do not split mid-word. */
