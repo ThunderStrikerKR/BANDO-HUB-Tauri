@@ -23,4 +23,6 @@
   --control-compact: calc(32px * var(--ui-scale, 1));
   --field-label-size: calc(14px * var(--ui-scale, 1));
   --field-label-color: #c4c4c4;
+  --manage-product-name-size: calc(13px * var(--ui-scale, 1));
+  --manage-product-description-size: calc(12px * var(--ui-scale, 1));
 }
