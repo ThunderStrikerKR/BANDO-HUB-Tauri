@@ -8,6 +8,7 @@ import type { Order, State } from "../types";
 import { ManagementSearch } from "../ui/ManagementSearch";
 import { HelpTooltip } from "../ui/HelpTooltip";
 import { EmptyState, PageHeading } from "../ui/PageHeading";
+import { ManagementTable } from "../ui/ManagementTable";
 import { orderHistory } from "./order-history";
 import type { NoticeSink } from "../shared/notices";
 export function OrderHistory({
@@ -40,7 +41,7 @@ export function OrderHistory({
           <small className="result-count">{rows.length}건</small>
         </div>
         <div className="table-scroll">
-          <table className="management-data-table">
+          <ManagementTable>
             <thead>
               <tr>
                 <th>접수일</th>
@@ -152,10 +153,10 @@ export function OrderHistory({
                 </tr>
               ))}
             </tbody>
-          </table>
+          </ManagementTable>
         </div>
         {!rows.length && (
-          <EmptyState
+          <EmptyState compact
             title={query || date ? "조건에 맞는 주문이 없습니다." : "저장된 주문이 없습니다."}
             description={query || date ? "날짜나 검색어를 바꾸어 확인하세요." : undefined}
           />
