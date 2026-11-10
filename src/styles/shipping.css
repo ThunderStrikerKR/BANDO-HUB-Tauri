@@ -235,6 +235,8 @@
   padding: 10px 14px;
 }
 .shipping-rates {
+  /* Use the shared table cell rule with the compact rate-row rhythm. */
+  --manage-cell-y: 3px;
   padding: 22px;
   overflow: auto;
 }
