@@ -905,6 +905,9 @@ try {
       cellTop: cellStyle ? parseFloat(cellStyle.paddingTop) : -1,
       cellBottom: cellStyle ? parseFloat(cellStyle.paddingBottom) : -1,
       price: price ? price.getBoundingClientRect().height : -1,
+      priceWidth: price ? Math.round(price.getBoundingClientRect().width) : -1,
+      priceParentWidth: price?.parentElement ? Math.round(price.parentElement.getBoundingClientRect().width) : -1,
+      priceFont: price ? Number.parseFloat(getComputedStyle(price).fontSize) : -1,
       button: button ? button.getBoundingClientRect().height : -1,
     };
   });
@@ -914,6 +917,11 @@ try {
     "상품관리 셀 상하 여백이 지나치게 큼: " + JSON.stringify(productDensity));
   assert.ok(productDensity.price <= 29 && productDensity.button <= 29,
     "상품관리 가격 입력창과 상세 버튼 높이가 불일치: " + JSON.stringify(productDensity));
+  assert.ok(productDensity.priceWidth > 0 &&
+    productDensity.priceWidth <= productDensity.priceParentWidth + 1,
+    "가격 입력창의 구형 고정 폭이 셀을 넘어서 적용됨: " + JSON.stringify(productDensity));
+  assert.ok(productDensity.priceFont >= 11 && productDensity.priceFont <= 14,
+    "가격 입력창에 구형 큰 글씨가 적용됨: " + JSON.stringify(productDensity));
   console.log("PASS: product pricing rows and aligned action controls are compact");
   await productRows.first().getByRole("button",{name:"상세 관리"}).click();
   const productModal=navPage.getByRole("dialog",{name:"상품 상세 관리"});
