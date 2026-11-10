@@ -234,16 +234,32 @@
 }
 .shipping-rates .new-group {
   display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
   gap: 10px;
-  margin: 20px 0;
+  margin: 14px 0 16px;
 }
-.shipping-rates .new-group input {
-  max-width: 300px;
+.app-v03 .management-container .shipping-rates .new-group > .field {
+  flex: 1 1 240px;
+  max-width: 360px;
+  margin: 0;
 }
-.shipping-rates td button {
-  font-size: 10px;
-  padding: 7px;
-  margin: 2px;
+.shipping-rates .new-group > .ui-button {
+  flex: none;
+  align-self: flex-end;
+}
+.shipping-rates .shipping-group-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.app-v03 .management-container .shipping-group-actions .ui-button {
+  height: var(--control-compact);
+  min-height: var(--control-compact);
+  padding: 5px 9px;
+  margin: 0;
+  font-size: calc(12px * var(--ui-scale, 1));
 }
 .rate-inputs {
   display: grid;
