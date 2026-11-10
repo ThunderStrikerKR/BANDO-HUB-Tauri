@@ -750,6 +750,22 @@ try {
     "Empty freight table still reserves excessive vertical space");
   await checkCompactEmpty(".shipping-table-scroll .empty-state-compact","freight");
   await navPage.getByRole("textbox",{name:"배송 그룹 상품 검색"}).fill("");
+  const freightRowSize=await navPage.locator(".shipping-assignment-list .shipping-table-scroll tbody tr").first().evaluate(row=>{
+    const select=row.querySelector("select");
+    return {height:row.getBoundingClientRect().height,
+      selectHeight:select?.getBoundingClientRect().height??0};
+  });
+  assert.ok(freightRowSize.height <= 45 && freightRowSize.selectHeight <= 34,
+    "Freight assignment table should match compact row controls: " + JSON.stringify(freightRowSize));
+
+  await navPage.getByRole("button",{name:"상품별 기본 운임"}).click();
+  await navPage.getByRole("textbox",{name:"상품별 운임 검색"}).fill("__CI_EMPTY_BASE_FREIGHT__");
+  const baseFreightEmpty=navPage.locator(".shipping-product-list .shipping-table-scroll.shipping-list-empty");
+  await baseFreightEmpty.waitFor();
+  assert.ok(await baseFreightEmpty.evaluate(el=>el.getBoundingClientRect().height) <= 150,
+    "Base freight empty table still reserves excessive vertical space");
+  await checkCompactEmpty(".shipping-product-list .empty-state-compact","base freight");
+  await navPage.getByRole("textbox",{name:"상품별 운임 검색"}).fill("");
 
   await navMenu.getByRole("button",{name:"엑셀 관리"}).click();
   await navPage.getByRole("button",{name:"엑셀 작성 이력"}).click();
