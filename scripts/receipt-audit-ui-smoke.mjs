@@ -647,6 +647,34 @@ try {
       },
     };
   }, {initial:navFixture});
+  const auditModalLayout=async(dialog,name)=>{
+    const measured=await dialog.evaluate(el=>{
+      const panel=el.querySelector(":scope > .modal");
+      const head=panel?.querySelector(":scope > header");
+      const title=head?.querySelector("h2"),close=head?.querySelector("button");
+      const fields=panel?.querySelector(".modal-fields");
+      const box=(node)=>node?.getBoundingClientRect();
+      const p=box(panel),f=box(fields),h=box(head);
+      return {titleSize:title?Number.parseFloat(getComputedStyle(title).fontSize):0,
+        closeHeight:close?Math.round(box(close).height):0,
+        panelTop:p?Math.round(p.top):-1,panelBottom:p?Math.round(p.bottom):-1,
+        fieldsBottom:f?Math.round(f.bottom):-1,headerBottom:h?Math.round(h.bottom):-1,
+        viewport:window.innerHeight,scroll:fields?getComputedStyle(fields).overflowY:"",
+        panelPadding:panel?getComputedStyle(panel).paddingLeft:"",
+        width:p?Math.round(p.width):0};
+    });
+    assert.ok(measured.titleSize>=17 && measured.titleSize<=20,
+      name+" title is not using common modal typography: "+JSON.stringify(measured));
+    assert.ok(measured.closeHeight>=28 && measured.closeHeight<=36,
+      name+" close control is not compact: "+JSON.stringify(measured));
+    assert.ok(measured.panelTop>=0 && measured.panelBottom<=measured.viewport+1,
+      name+" panel clipped by viewport: "+JSON.stringify(measured));
+    assert.ok(measured.fieldsBottom<=measured.panelBottom+1,
+      name+" form fields extend below modal: "+JSON.stringify(measured));
+    assert.ok(measured.scroll==="auto" || measured.scroll==="scroll",
+      name+" fields do not own their scroll: "+JSON.stringify(measured));
+    console.log("MODAL_UI_GEOMETRY",name,JSON.stringify(measured));
+  };
   const navMenu = navPage.getByRole("navigation", { name: "업무 메뉴" });
   const leave = navPage.getByRole("dialog", {name:"변경사항 저장"});
   let saveDialogCascadeSampled=false;
@@ -922,7 +950,15 @@ try {
     fullHD.push({menu,...await measureFrame(menu,selector)});
   };
   await checkFullHD("상품 관리",".product-list-workspace .price-table-scroll");
+  const productNamePx=await navPage.locator(".product-prices .product-title-line b").first()
+    .evaluate(el=>Number.parseFloat(getComputedStyle(el).fontSize));
   await checkFullHD("운임 관리",".shipping-product-list .shipping-table-scroll");
+  const freightNamePx=await navPage.locator(".shipping-product-list .shipping-product-name > strong").first()
+    .evaluate(el=>Number.parseFloat(getComputedStyle(el).fontSize));
+  assert.equal(productNamePx,13,"Product manager list name must be 13px");
+  assert.equal(freightNamePx,13,"Freight manager list name must be 13px");
+  assert.equal(await navPage.locator(".shipping-explanation-footer").count(),0,
+    "Unrelated bundle freight help footer must not occupy the list bottom");
   await navPage.getByRole("button",{name:"동급 배송 그룹 지정",exact:true}).click();
   fullHD.push({menu:"운임 관리 / 동급 배송 그룹 지정",...await measureFrame("배송 그룹 지정",".shipping-assignment-list .shipping-table-scroll")});
   await checkFullHD("거래처 관리",".management-scroll");
@@ -948,7 +984,7 @@ try {
   await checkFullHD("엑셀 관리",".excel-table-scroll");
   await checkFullHD("일일 결산",".daily-settlement");
   await checkFullHD("주문 내역",".order-history-list");
-  console.log("FULL_HD_LAYOUT",JSON.stringify({fullHD,settingsColumns,clientWidths}));
+  console.log("FULL_HD_LAYOUT",JSON.stringify({fullHD,settingsColumns,clientWidths,productNamePx,freightNamePx}));
   await navPage.setViewportSize({width:1520,height:1000});
   console.log("PASS: 1080p navigation frames, scrolling ownership and client columns are consistent");
 
@@ -1056,6 +1092,7 @@ try {
   // Client: Cancel keeps the draft, Discard keeps DB unchanged, Save persists it.
   await navPage.locator(".client-table tbody tr").filter({hasText:"검증악기"}).first().click();
   const clientModal = navPage.getByRole("dialog",{name:"거래처 상세 관리"});
+  await auditModalLayout(clientModal,"거래처 상세 관리");
   await sampleCascade("거래처 상세 관리 모달");
   const clientAddress = clientModal.getByRole("textbox",{name:"거래처 주소"});
   const originalAddress = await clientAddress.inputValue();
@@ -1150,6 +1187,7 @@ try {
   console.log("PASS: product pricing rows and aligned action controls are compact");
   await productRows.first().getByRole("button",{name:"상세 관리"}).click();
   const productModal=navPage.getByRole("dialog",{name:"상품 상세 관리"});
+  await auditModalLayout(productModal,"상품 상세 관리");
   await sampleCascade("상품 상세 관리 모달");
   const description=productModal.getByRole("textbox",{name:"상품설명"});
   const firstProductId=await navPage.evaluate(() => window.__navSaved().state.products[0].id);
