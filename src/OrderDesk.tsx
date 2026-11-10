@@ -246,7 +246,7 @@ export function OrderDesk(props: OrderDeskProps) {
                   </header>
                   <div className="receipt-panel-content">
                     {!draft.recipients.length && (
-                      <p className="detail-empty">발주 원문을 입력하거나 배송 건을 선택하세요.</p>
+                      <p className="empty detail-empty">발주 원문을 입력하거나 배송 건을 선택하세요.</p>
                     )}
                     {draft.recipients
                       .filter((r) => r.id === shownRecipient)

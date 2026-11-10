@@ -307,3 +307,12 @@
     outline-color 180ms ease,
     background-color 180ms ease;
 }
+
+/* Use the shared empty-state text treatment without excessive inner spacing. */
+.receipt-panel-content > .detail-empty {
+  margin: 0;
+  padding: 12px 8px;
+  font: 400 12px/1.6 var(--font-body);
+  color: #9c9c9c;
+  text-align: center;
+}

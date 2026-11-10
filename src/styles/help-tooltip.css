@@ -65,3 +65,13 @@
 .settlement-review-summary { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 10px 0; font-size: 12px; color: #d2d2d2; }
 
 .source-help-heading { display: inline-flex; align-items: center; gap: 5px; flex-wrap: nowrap; }
+
+/* The page-heading button padding must not push this help icon below its title. */
+.source-help-heading .help-tooltip-anchor { align-self: center; line-height: 1; }
+.source-help-heading .help-tooltip-trigger {
+  box-sizing: border-box;
+  width: 22px; height: 22px; min-width: 22px; min-height: 22px;
+  padding: 0; margin: 0; font-size: 12px; line-height: 20px;
+  display: inline-flex; align-items: center; justify-content: center;
+  vertical-align: middle;
+}
