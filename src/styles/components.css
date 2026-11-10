@@ -12,7 +12,6 @@
   letter-spacing: 0;
 }
 .app-v03 .management-container h3 {
-  font-size: calc(16px * var(--ui-scale, 1));
   line-height: 1.4;
   margin: 12px 0;
 }
