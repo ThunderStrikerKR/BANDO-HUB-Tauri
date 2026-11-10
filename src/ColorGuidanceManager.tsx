@@ -6,6 +6,8 @@ import { uid } from "./domain";
 import { validateColorGuidance } from "./color-guidance";
 import { colorLabel, registeredProducts } from "./product-models";
 import type { State } from "./types";
+import { Field } from "./ui";
+import { Button } from "./ui/Button";
 
 export function ColorGuidanceManager({state,onRefresh,query=""}: {
   state:State;onRefresh:(committed?:State)=>Promise<void>;query?:string;
@@ -95,11 +97,12 @@ export function ColorGuidanceManager({state,onRefresh,query=""}: {
         <h2>직원 등록 그룹</h2>
         <p>자동으로 묶지 않습니다. 직원이 같은 규격과 가격에 색상만 다른 독립 상품을 묶어 대표색상을 등록하세요.</p>
       </header>
-      <div className="family-field">
-        <label htmlFor="new-color-group">새 그룹 이름</label>
-        <input id="new-color-group" placeholder="직원이 알아보기 쉬운 이름" value={name}
-          onChange={e=>setName(e.target.value)}/>
-        <button type="button" onClick={add} disabled={busy}>그룹 생성</button>
+      <div className="family-create-form">
+        <Field label="새 그룹 이름">
+          <input id="new-color-group" placeholder="직원이 알아보기 쉬운 이름" value={name}
+            onChange={e=>setName(e.target.value)}/>
+        </Field>
+        <Button onClick={add} disabled={busy}>그룹 생성</Button>
       </div>
       <div className="family-list-scroll">
         {rows.filter(g=>!query.trim()||(g.name+" "+g.productIds.map(id=>
@@ -117,21 +120,22 @@ export function ColorGuidanceManager({state,onRefresh,query=""}: {
       {active?<>
         <header className="family-editor-heading">
           <h2>대표색상 안내 설정</h2>
-          <button type="button" className="danger" disabled={busy}
+          <Button variant="danger" disabled={busy}
             onClick={()=>void (async()=>{
               if(await confirmAction("이 그룹을 삭제할까요? 기존 주문과 상품은 유지됩니다.")){
                 edit(g=>{delete g[activeId];});setSelected("");
               }
-            })()}>그룹 삭제</button>
+            })()}>그룹 삭제</Button>
         </header>
         <div className="family-editor-scroll">
-          <div className="family-field">
-            <label htmlFor="color-group-name">그룹 이름</label>
-            <input id="color-group-name" value={active.name}
-              onChange={e=>edit(g=>{g[activeId].name=e.target.value;})}/>
-            <label htmlFor="representative-color">대표색상</label>
-            <select id="representative-color" value={active.representativeColor}
-              onChange={e=>edit(g=>{g[activeId].representativeColor=e.target.value;})}>
+          <div className="family-detail-fields">
+            <Field label="그룹 이름">
+              <input id="color-group-name" value={active.name}
+                onChange={e=>edit(g=>{g[activeId].name=e.target.value;})}/>
+            </Field>
+            <Field label="대표색상">
+              <select id="representative-color" value={active.representativeColor}
+                onChange={e=>edit(g=>{g[activeId].representativeColor=e.target.value;})}>
               <option value="">등록된 상품의 색상 선택</option>
               {[...new Map(active.productIds.flatMap(id=>{
                 const product=draft.products.find(p=>p.id===id);
@@ -141,7 +145,8 @@ export function ColorGuidanceManager({state,onRefresh,query=""}: {
               })).entries()].map(([color,label])=>(
                 <option key={color} value={color}>{label}</option>
               ))}
-            </select>
+              </select>
+            </Field>
             <p className="family-help">직원이 사전에 등록한 대표색상은 발주서의 옵션 오류 창에서 직접 선택할 때만 주문에 적용됩니다. 이후 복사용 안내문에 적용 색상을 통보합니다.</p>
           </div>
           <div className="family-members-section">
@@ -151,9 +156,9 @@ export function ColorGuidanceManager({state,onRefresh,query=""}: {
                 const p=draft.products.find(p=>p.id===id);
                 return <div className="family-member" key={id}>
                   <div className="family-member-name"><strong>{p?.name??"확인할 상품"}</strong><span>{p?.subtitle}</span></div>
-                  <button type="button" disabled={busy} onClick={()=>edit(g=>{
+                  <Button size="compact" disabled={busy} onClick={()=>edit(g=>{
                     g[activeId].productIds=g[activeId].productIds.filter(x=>x!==id);
-                  })}>제외</button>
+                  })}>제외</Button>
                 </div>;
               })}
               {!active.productIds.length&&<p className="muted">상품을 검색해 추가하세요.</p>}
@@ -170,9 +175,9 @@ export function ColorGuidanceManager({state,onRefresh,query=""}: {
                   <span>{p.subtitle}</span>
                   {memberships.has(p.id)&&<small>현재 그룹: {memberships.get(p.id)}</small>}
                 </div>
-                <button type="button" disabled={busy||memberships.has(p.id)} onClick={()=>edit(g=>{
+                <Button size="compact" disabled={busy||memberships.has(p.id)} onClick={()=>edit(g=>{
                   g[activeId].productIds.push(p.id);
-                })}>추가</button>
+                })}>추가</Button>
               </div>)}
               {search.trim()&&!choices.length&&<p className="muted">일치하는 상품이 없습니다.</p>}
             </div>
@@ -182,11 +187,11 @@ export function ColorGuidanceManager({state,onRefresh,query=""}: {
       <footer className="family-editor-footer">
         <span role="status" className="muted">{status||(unsaved?"저장하지 않은 변경사항 있음":"변경사항 없음")}</span>
         <div className="family-footer-actions">
-          <button type="button" disabled={!unsaved||busy} onClick={()=>{
+          <Button disabled={!unsaved||busy} onClick={()=>{
             setDraft(structuredClone(state));setBaseline(structuredClone(state));setSelected("");setStatus("");
-          }}>변경 취소</button>
-          <button type="button" className="primary" disabled={!unsaved||busy}
-            onClick={()=>void save()}>{busy?"저장 중":"변경사항 저장"}</button>
+          }}>변경 취소</Button>
+          <Button variant="primary" disabled={!unsaved||busy}
+            onClick={()=>void save()}>{busy?"저장 중":"변경사항 저장"}</Button>
         </div>
       </footer>
     </div>
