@@ -10,23 +10,51 @@ export type HelpTooltipText = {
 };
 
 /**
- * Beginner-friendly help. Native popover keeps the full explanation above
- * modal dialogs and scrolling panels instead of clipping it.
+ * Mouse-only help. Hovering for 500ms previews it; clicking pins it until
+ * the next action outside the help (including keyboard input or page scroll).
  */
 export function HelpTooltip({ title, purpose, when, steps, result, caution }: HelpTooltipText & { title: string }) {
   const id = useId();
   const trigger = useRef<HTMLButtonElement>(null);
   const panel = useRef<HTMLDivElement>(null);
+  const hoverOpening = useRef<ReturnType<typeof setTimeout> | null>(null);
   const closing = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pinned = useRef(false);
   const [open, setOpen] = useState(false);
 
+  const cancelHoverOpen = () => {
+    if (hoverOpening.current !== null) clearTimeout(hoverOpening.current);
+    hoverOpening.current = null;
+  };
   const cancelClose = () => {
     if (closing.current !== null) clearTimeout(closing.current);
     closing.current = null;
   };
-  const scheduleClose = () => {
+  const dismiss = () => {
+    pinned.current = false;
+    cancelHoverOpen();
     cancelClose();
-    closing.current = setTimeout(() => setOpen(false), 180);
+    setOpen(false);
+  };
+  const scheduleClose = () => {
+    if (pinned.current) return;
+    cancelClose();
+    closing.current = setTimeout(() => {
+      closing.current = null;
+      if (!pinned.current) setOpen(false);
+    }, 180);
+  };
+  const previewOnHover = () => {
+    cancelClose();
+    if (open || pinned.current || hoverOpening.current !== null) return;
+    hoverOpening.current = setTimeout(() => {
+      hoverOpening.current = null;
+      setOpen(true);
+    }, 500);
+  };
+  const leaveTrigger = () => {
+    cancelHoverOpen();
+    scheduleClose();
   };
 
   useEffect(() => {
@@ -47,32 +75,50 @@ export function HelpTooltip({ title, purpose, when, steps, result, caution }: He
 
     if (!help.matches(":popover-open")) help.showPopover();
     position();
-    const dismiss = (event: PointerEvent) => {
+    const outsidePointer = (event: PointerEvent) => {
       const target = event.target;
       if (target instanceof Node && !button.contains(target) && !help.contains(target))
-        setOpen(false);
+        dismiss();
     };
-    const keydown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setOpen(false);
-        event.stopPropagation();
+    // Keyboard navigation and typing should never activate or retain mouse help.
+    const keyboardAction = () => dismiss();
+    const otherInput = (event: Event) => {
+      if (event.target instanceof Node && !help.contains(event.target)) dismiss();
+    };
+    const onScroll = (event: Event) => {
+      if (pinned.current && !(event.target instanceof Node && help.contains(event.target))) {
+        dismiss();
+      } else {
+        position();
       }
     };
-    document.addEventListener("pointerdown", dismiss, true);
-    document.addEventListener("keydown", keydown, true);
-    window.addEventListener("resize", position);
-    window.addEventListener("scroll", position, true);
+    const onWheel = (event: WheelEvent) => {
+      if (pinned.current && !(event.target instanceof Node && help.contains(event.target)))
+        dismiss();
+    };
+    const onResize = () => dismiss();
+    document.addEventListener("pointerdown", outsidePointer, true);
+    document.addEventListener("keydown", keyboardAction, true);
+    document.addEventListener("input", otherInput, true);
+    document.addEventListener("change", otherInput, true);
+    document.addEventListener("wheel", onWheel, true);
+    window.addEventListener("resize", onResize);
+    window.addEventListener("scroll", onScroll, true);
     return () => {
-      document.removeEventListener("pointerdown", dismiss, true);
-      document.removeEventListener("keydown", keydown, true);
-      window.removeEventListener("resize", position);
-      window.removeEventListener("scroll", position, true);
+      document.removeEventListener("pointerdown", outsidePointer, true);
+      document.removeEventListener("keydown", keyboardAction, true);
+      document.removeEventListener("input", otherInput, true);
+      document.removeEventListener("change", otherInput, true);
+      document.removeEventListener("wheel", onWheel, true);
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("scroll", onScroll, true);
       if (help.matches(":popover-open")) help.hidePopover();
     };
   }, [open]);
 
   useEffect(() => () => {
-    if (closing.current !== null) clearTimeout(closing.current);
+    cancelHoverOpen();
+    cancelClose();
   }, []);
 
   return (
@@ -80,15 +126,25 @@ export function HelpTooltip({ title, purpose, when, steps, result, caution }: He
       <button
         ref={trigger}
         type="button"
+        tabIndex={-1}
         className="help-tooltip-trigger"
         aria-label={title + " 도움말"}
         aria-describedby={open ? id : undefined}
         aria-expanded={open}
-        onPointerEnter={() => { cancelClose(); setOpen(true); }}
-        onPointerLeave={scheduleClose}
-        onFocus={() => { cancelClose(); setOpen(true); }}
-        onBlur={scheduleClose}
-        onClick={() => { cancelClose(); setOpen(true); }}
+        onMouseEnter={previewOnHover}
+        onMouseLeave={leaveTrigger}
+        onClick={(event) => {
+          // Keyboard-generated click events have detail 0. Help is mouse-only.
+          if (event.detail === 0) return;
+          cancelHoverOpen();
+          cancelClose();
+          if (pinned.current) dismiss();
+          else {
+            pinned.current = true;
+            setOpen(true);
+          }
+          event.currentTarget.blur();
+        }}
       >?</button>
       {createPortal(
         <div
@@ -97,10 +153,8 @@ export function HelpTooltip({ title, purpose, when, steps, result, caution }: He
           popover="manual"
           role="tooltip"
           className="help-tooltip-panel"
-          onPointerEnter={cancelClose}
-          onPointerLeave={scheduleClose}
-          onFocus={cancelClose}
-          onBlur={scheduleClose}
+          onMouseEnter={cancelClose}
+          onMouseLeave={scheduleClose}
         >
           <strong className="help-tooltip-title">{title}</strong>
           <p>{purpose}</p>

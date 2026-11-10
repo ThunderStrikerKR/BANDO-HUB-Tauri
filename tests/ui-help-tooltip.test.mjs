@@ -15,7 +15,16 @@ test("shared beginner help shows purpose, usage steps and results above dialogs"
   assert.match(help, /role="tooltip"/);
   assert.match(help, /popover="manual"/);
   assert.match(help, /help\.showPopover\(\)/);
-  assert.match(help, /onFocus=/);
+  assert.match(help, /tabIndex=\{-1\}/);
+  assert.doesNotMatch(help, /onFocus=/);
+  assert.doesNotMatch(help, /onBlur=/);
+  assert.match(help, /onMouseEnter=\{previewOnHover\}/);
+  assert.match(help, /onMouseLeave=\{leaveTrigger\}/);
+  assert.match(help, /\}, 500\)/);
+  assert.match(help, /event\.detail === 0/);
+  assert.match(help, /pinned\.current = true/);
+  assert.match(help, /document\.addEventListener\("keydown", keyboardAction, true\)/);
+  assert.match(help, /document\.addEventListener\("pointerdown", outsidePointer, true\)/);
   assert.match(styles, /max-height: min\(70dvh, 500px\)/);
 });
 

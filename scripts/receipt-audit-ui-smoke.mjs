@@ -686,6 +686,33 @@ try {
 
   // Product: the existing product editor has the same three-choice leave guard.
   await navMenu.getByRole("button",{name:"상품 관리"}).click();
+  // Mouse help opens only after 500ms, is excluded from Tab order,
+  // and stays pinned until the next unrelated pointer or keyboard action.
+  const productHelp = navPage.getByRole("button", { name: "상품 가격 수정 도움말" });
+  const visibleHelp = navPage.locator(".help-tooltip-panel:popover-open");
+  assert.equal(await productHelp.getAttribute("tabindex"), "-1");
+  await productHelp.hover();
+  await navPage.waitForTimeout(220);
+  await navPage.mouse.move(4, 4);
+  await navPage.waitForTimeout(370);
+  assert.equal(await visibleHelp.count(), 0, "Hover below 500ms must not open help");
+  await productHelp.hover();
+  await navPage.waitForTimeout(260);
+  assert.equal(await visibleHelp.count(), 0, "Help opened before 500ms");
+  await visibleHelp.waitFor({state:"visible",timeout:2000});
+  await productHelp.click();
+  await navPage.mouse.move(4, 4);
+  await navPage.waitForTimeout(240);
+  assert.equal(await visibleHelp.count(), 1, "Clicked help must stay pinned on mouse leave");
+  await navPage.keyboard.press("Tab");
+  assert.equal(await visibleHelp.count(), 0, "Keyboard action must dismiss pinned help");
+  assert.equal(await navPage.evaluate(() => document.activeElement?.classList.contains("help-tooltip-trigger")), false);
+  await productHelp.click();
+  assert.equal(await visibleHelp.count(), 1);
+  await navPage.getByRole("textbox", { name: "상품 검색" }).click();
+  assert.equal(await visibleHelp.count(), 0, "Clicking another control must dismiss pinned help");
+  console.log("PASS: help tooltip mouse-only focus, delayed hover and click-to-pin");
+
   const productRows=navPage.locator(".product-prices tbody tr");
   await productRows.first().getByRole("button",{name:"상세 관리"}).click();
   const productModal=navPage.getByRole("dialog",{name:"상품 상세 관리"});
