@@ -1,6 +1,7 @@
 import { FactoryReplyHistory } from "./FactoryReplyHistory";
 import { HelpTooltip } from "./ui/HelpTooltip";
 import { PageHeading } from "./ui/PageHeading";
+import { ManagementSearch } from "./ui/ManagementSearch";
 import { FactoryReplyImport } from "./FactoryReplyImport";
 import { ActualFreightField } from "./ActualFreightField";
 import { actualFreightOf, recordActualFreight } from "./actual-freight";
@@ -104,13 +105,7 @@ export function WorkflowQueue({
   return (
     <section className="excel-workspace">
       <PageHeading title="엑셀 관리" actions={<HelpTooltip title="발송 Excel 관리" purpose="공장이나 매장에서 발송할 주문을 모아 배송용 Excel 파일을 만듭니다." when="주문 확인과 입금 처리 후 물품을 발송하기 위한 자료가 필요할 때 사용합니다." steps={["공장 엑셀 대기 또는 매장 발송 대기 탭을 선택합니다.", "발송할 주문을 검색하고 확인합니다.", "대상 주문을 선택합니다.", "아래 Excel 작성 버튼을 눌러 파일을 만듭니다."]} result="선택한 발송 건을 Excel 파일로 저장해 출고 업무에 사용할 수 있습니다." caution="Excel 파일을 만들었다고 실제로 상품이 포장되거나 발송 완료되는 것은 아닙니다." />} />
-      <input
-        aria-label="엑셀 목록 검색"
-        value={query}
-        placeholder="거래처 / 수취인 / 상품 검색"
-        onChange={(e) => setQuery(e.target.value)}
-      />
-      <div className="workflow-queue-tabs">
+      <div className="workflow-queue-tabs management-tabbar">
         {(["FACTORY", "STORE", "HISTORY"] as const).map((value, index) => (
           <button
             key={value}
@@ -128,13 +123,17 @@ export function WorkflowQueue({
           </button>
         ))}
       </div>
+      <div className="management-search-toolbar">
+        <ManagementSearch label="엑셀 목록 검색" value={query}
+          placeholder="거래처 / 수취인 / 상품 검색" onChange={setQuery}/>
+      </div>
 
       {scope === "HISTORY" && (
         <FactoryReplyImport onSave={onSave} onRefresh={onRefresh} onNotice={onNotice} />
       )}
       <div className="excel-table-scroll">
         {scope === "HISTORY" ? (
-          <table>
+          <table className="management-data-table excel-history-table">
             <thead>
               <tr>
                 <th>작성 날짜</th>
@@ -246,7 +245,7 @@ export function WorkflowQueue({
             </tbody>
           </table>
         ) : (
-          <table>
+          <table className="management-data-table excel-queue-table">
             <thead>
               <tr>
                 <th>

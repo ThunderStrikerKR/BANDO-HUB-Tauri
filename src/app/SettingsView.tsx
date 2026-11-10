@@ -76,7 +76,7 @@ export function SettingsView({
   return (
     <>
       <PageHeading title="설정" />
-      <div className="settings-tab-list" role="tablist" aria-label="설정 분류"
+      <div className="settings-tab-list management-tabbar" role="tablist" aria-label="설정 분류"
         onKeyDown={(event) => {
           if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
           event.preventDefault();

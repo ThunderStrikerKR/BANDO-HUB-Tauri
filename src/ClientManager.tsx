@@ -16,6 +16,7 @@ import { Field, Modal, MoneyInput, clone } from "./ui";
 import { AccountPicker } from "./ui/AccountPicker";
 import { HelpTooltip } from "./ui/HelpTooltip";
 import { PageHeading } from "./ui/PageHeading";
+import { ManagementSearch } from "./ui/ManagementSearch";
 export function ClientManager({
   state,
   onSave,
@@ -131,23 +132,20 @@ export function ClientManager({
           </button>
         </>
       ) : undefined} />
-      {section === "clients" && (
-      <div className="management-search">
-        <input
-          aria-label="거래처 관리 검색"
-          placeholder="상호 / 주소 / 전화번호 / 별칭 검색"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-      </div>
-      )}
-      <nav className="product-subnav" aria-label="거래처 관리 메뉴">
+      <nav className="product-subnav management-tabbar" aria-label="거래처 관리 메뉴">
         <button type="button" aria-current={section==="clients"?"page":undefined} onClick={()=>void switchSection("clients")}>거래처 목록</button>
         <button type="button" aria-current={section==="messages"?"page":undefined} onClick={()=>void switchSection("messages")}>자동 메시지 편집</button>
       </nav>
+      {section === "clients" && (
+        <div className="management-search-toolbar">
+          <ManagementSearch label="거래처 관리 검색"
+            placeholder="상호 / 주소 / 전화번호 / 별칭 검색"
+            value={search} onChange={setSearch}/>
+        </div>
+      )}
       {section==="messages" ? (
         <div className="management-scroll">
-          <nav className="product-subnav" aria-label="자동 메시지 편집 종류">
+          <nav className="product-subnav management-tabbar management-tabbar-secondary" aria-label="자동 메시지 편집 종류">
             <button type="button" aria-current={messageSection==="general"?"page":undefined}
               onClick={()=>void switchMessageSection("general")}>상황별 공통 안내</button>
             <button type="button" aria-current={messageSection==="provisional"?"page":undefined}
@@ -166,7 +164,7 @@ export function ClientManager({
           </section>
         )}
         <section className="card">
-          <table className="client-table">
+          <table className="client-table management-data-table">
             <thead>
               <tr>
                 <th>거래처</th>

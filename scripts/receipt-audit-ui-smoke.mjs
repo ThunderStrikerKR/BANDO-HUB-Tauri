@@ -653,9 +653,78 @@ try {
         context + " missing " + action);
   };
   const mockState = () => navPage.evaluate(() => window.__navSaved());
-  // Client: Cancel keeps the draft, Discard keeps DB unchanged, Save persists it.
+  // UI contract audit at desktop width: all primary headings and search controls
+  // must share the same dimensions, font, border and placement.
   await navPage.goto(url);
+  const layoutSamples=[];
+  const views=[
+    ["주문 내역","주문 검색"],
+    ["엑셀 관리","엑셀 목록 검색"],
+    ["일일 결산",null],
+    ["상품 관리","상품 검색"],
+    ["운임 관리","상품별 운임 검색"],
+    ["거래처 관리","거래처 관리 검색"],
+    ["설정",null],
+  ];
+  for(const [label,searchLabel] of views){
+    await navMenu.getByRole("button",{name:label,exact:true}).click();
+    const heading=navPage.locator(".management-container .page-heading h1").first();
+    await heading.waitFor();
+    const metrics=await heading.evaluate((h)=>{
+      const style=getComputedStyle(h),rect=h.getBoundingClientRect();
+      const parent=document.querySelector(".management-container");
+      return {text:h.textContent?.trim(),size:style.fontSize,left:Math.round(rect.left),
+        relativeLeft:Math.round(rect.left-(parent?.getBoundingClientRect().left??0))};
+    });
+    assert.equal(metrics.text,label,"Wrong title on "+label);
+    assert.ok(Math.abs(Number.parseFloat(metrics.size)-20)<2,"Inconsistent title font: "+JSON.stringify(metrics));
+    if(searchLabel){
+      const input=navPage.getByRole("textbox",{name:searchLabel,exact:true});
+      const search=await input.evaluate((element)=>{
+        const inputStyle=getComputedStyle(element);
+        const field=element.closest(".management-search-field");
+        const rect=element.getBoundingClientRect();
+        return {height:Math.round(rect.height),width:Math.round(rect.width),
+          background:inputStyle.backgroundColor,round:inputStyle.borderRadius,
+          font:inputStyle.fontSize,paddingLeft:inputStyle.paddingLeft,
+          tool:!!field,icon:!!field?.querySelector(".management-search-icon")};
+      });
+      assert.ok(search.tool && search.icon,"Shared search missing on "+label);
+      assert.ok(search.width>=180,"Unexpectedly narrow search: "+JSON.stringify(search));
+      layoutSamples.push({label,search,heading:metrics});
+    }else layoutSamples.push({label,heading:metrics});
+  }
+  const searches=layoutSamples.filter(x=>x.search).map(x=>x.search);
+  for(const current of searches.slice(1)){
+    for(const property of ["height","background","round","font","paddingLeft"])
+      assert.equal(current[property],searches[0][property],
+        "Management search "+property+" differs from freight reference: "+JSON.stringify(layoutSamples));
+  }
+  const titlePositions=layoutSamples.map(x=>x.heading.relativeLeft);
+  assert.ok(Math.max(...titlePositions)-Math.min(...titlePositions)<=2,
+    "Heading x origin inconsistent across pages: "+JSON.stringify(layoutSamples));
+  console.log("PASS: 7 management titles and 5 shared search layouts are consistent");
+
+  // Excel: a small caption must not take its own line while ample width remains.
+  await navMenu.getByRole("button",{name:"엑셀 관리"}).click();
+  await navPage.getByRole("button",{name:"매장 발송 대기"}).click();
+  const excelRow=navPage.locator(".excel-table-scroll .excel-queue-table tbody tr").filter({hasText:"매장시험수취인"}).first();
+  await excelRow.waitFor();
+  const excelLayout=await excelRow.evaluate((row)=>{
+    const table=row.closest("table"),middle=row.querySelector("td:nth-child(3)");
+    const caption=middle?.querySelector("small"),details=row.querySelector("details:not([open])");
+    return {tableWidth:Math.round(table?.getBoundingClientRect().width??0),
+      captionDisplay:caption?getComputedStyle(caption).display:null,
+      captionMargin:caption?getComputedStyle(caption).marginTop:null,
+      detailsDisplay:details?getComputedStyle(details).display:null,
+      rowHeight:Math.round(row.getBoundingClientRect().height)};
+  });
+  assert.equal(excelLayout.captionDisplay,"inline",JSON.stringify(excelLayout));
+  assert.ok(excelLayout.rowHeight<=55,
+    "Excel list wraps despite available horizontal space: "+JSON.stringify(excelLayout));
+  console.log("PASS: Excel main table shows related information without forced extra rows");
   await navMenu.getByRole("button",{name:"거래처 관리"}).click();
+  // Client: Cancel keeps the draft, Discard keeps DB unchanged, Save persists it.
   await navPage.locator(".client-table tbody tr").filter({hasText:"검증악기"}).first().click();
   const clientModal = navPage.getByRole("dialog",{name:"거래처 상세 관리"});
   const clientAddress = clientModal.getByRole("textbox",{name:"거래처 주소"});

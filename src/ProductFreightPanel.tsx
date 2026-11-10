@@ -1,4 +1,5 @@
 import { HelpTooltip } from "./ui/HelpTooltip";
+import { ManagementSearch } from "./ui/ManagementSearch";
 import { ShippingFeeRanges } from "./ShippingFeeRanges";
 import { useState } from "react";
 import { confirmAction } from "./dialogs";
@@ -114,16 +115,10 @@ export function ProductFreightPanel({
   return (
     <>
       <section className="shipping-card shipping-product-list">
-        <div className="shipping-tools">
-          <div className="shipping-search">
-            <span>⌕</span>
-            <input
-              aria-label="상품별 운임 검색"
-              placeholder="모델명 / 상품명 검색"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
+        <div className="shipping-tools management-search-toolbar">
+          <ManagementSearch label="상품별 운임 검색"
+            placeholder="모델명 / 상품명 검색"
+            value={search} onChange={setSearch}/>
           <label className="check">
             <input
               type="checkbox"
@@ -193,7 +188,7 @@ export function ProductFreightPanel({
           <HelpTooltip title="상품별 운임" purpose="이 상품을 포장해 보낼 때의 배송비를 등록합니다." when="상품별 기본 배송비와 합포장 수량을 확인했을 때 사용합니다." steps={["배송비를 수정할 상품을 찾습니다.", "설정 버튼을 누릅니다.", "확인된 합포장 수량과 배송비를 입력합니다.", "기본 운임 저장을 눌러 적용합니다."]} result="새 주문에서 해당 상품의 운임 기준을 참고할 수 있습니다." caution="확인되지 않은 운임은 임의로 입력하지 않습니다." />
         </div>
         <div className="shipping-table-scroll">
-          <table>
+          <table className="management-data-table">
             <thead>
               <tr>
                 <th />

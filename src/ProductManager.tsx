@@ -33,6 +33,7 @@ import type { Product, State, Variant } from "./types";
 import { Field, Modal, MoneyInput, clone } from "./ui";
 import { HelpTooltip } from "./ui/HelpTooltip";
 import { PageHeading } from "./ui/PageHeading";
+import { ManagementSearch } from "./ui/ManagementSearch";
 export function ProductManager({
   state,
   onSave,
@@ -231,17 +232,7 @@ export function ProductManager({
                 <button className="primary" onClick={() => setAdding(!adding)}>상품 추가</button>
         </>
       ) : undefined} />
-      {["상품 목록", "카테고리 관리", "대표색상 관리"].includes(section) && (
-      <div className="management-search">
-        <input
-          aria-label="상품 검색"
-          placeholder={section === "카테고리 관리" ? "카테고리 이름 또는 전체 경로 검색" : section === "대표색상 관리" ? "그룹 이름 또는 상품명 검색" : "모델명 또는 상품명 검색"}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-      </div>
-      )}
-      <nav className="product-subnav" aria-label="상품 관리 메뉴">
+      <nav className="product-subnav management-tabbar" aria-label="상품 관리 메뉴">
         {[
           "상품 목록",
           "카테고리 관리",
@@ -259,6 +250,13 @@ export function ProductManager({
           </button>
         ))}
       </nav>
+      {["상품 목록", "카테고리 관리", "대표색상 관리"].includes(section) && (
+        <div className="management-search-toolbar">
+          <ManagementSearch label="상품 검색"
+            placeholder={section === "카테고리 관리" ? "카테고리 이름 또는 전체 경로 검색" : section === "대표색상 관리" ? "그룹 이름 또는 상품명 검색" : "모델명 또는 상품명 검색"}
+            value={search} onChange={setSearch}/>
+        </div>
+      )}
       <div className="management-scroll">
         {section === "상품 목록" && (
           <>
@@ -316,7 +314,7 @@ export function ProductManager({
                 </label>
               </div>
               <div className="price-table-scroll">
-                <table>
+                <table className="management-data-table">
                   <thead>
                     <tr>
                       <th>상품명 / 상품설명</th>
