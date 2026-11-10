@@ -4,6 +4,7 @@ import type { NoticeSink } from "../shared/notices";
 import type { State } from "../types";
 
 import { EmptyState, PageHeading } from "../ui/PageHeading";
+import { ManagementTable } from "../ui/ManagementTable";
 import { DateNavigator } from "./DateNavigator";
 import { HelpTooltip } from "../ui/HelpTooltip";
 import { orderHistory } from "./order-history";
@@ -53,7 +54,7 @@ export function DailySettlement({
           <HelpTooltip title="미수금과 실제 운임" purpose="아직 받지 못한 돈과 실제 배송비 중 확인되지 않은 항목을 찾아 점검합니다." when="주문이나 운임이 확정되지 않아 금액을 확인해야 할 때 사용합니다." steps={["미수 미확정 건수와 실제 운임 미확정 건수를 확인합니다.", "아래 주문 내역에서 미확정 항목을 찾습니다.", "확인된 내용을 해당 주문에 반영합니다."]} result="현재 저장된 주문과 배송 자료를 기준으로 미수금과 실제 운임을 확인할 수 있습니다." caution="현재 미수금과 실제 운임은 선택 날짜에 실제로 입금되거나 지급된 돈과 같지 않을 수 있습니다." />
         </div>
         <div className="table-scroll settlement-scroll">
-          <table className="management-data-table">
+          <ManagementTable>
             <thead>
               <tr><th>거래처</th><th>결제 방식</th><th>상품대금</th>
                 <th>청구 배송비</th><th>부가세</th><th>청구 합계</th>
@@ -73,9 +74,9 @@ export function DailySettlement({
                 </tr>
               ))}
             </tbody>
-          </table>
+          </ManagementTable>
         </div>
-        {!report.orderRows.length && <EmptyState title="해당 날짜에 접수한 주문이 없습니다." />}
+        {!report.orderRows.length && <EmptyState compact title="해당 날짜에 접수한 주문이 없습니다." />}
       </section>
       <section className="card">
         <h3>실제 입금 내역 / 입금 일시 기준</h3>
@@ -85,7 +86,7 @@ export function DailySettlement({
           <span>미배분 입금액 <b>{won(report.unallocatedCash)}</b></span>
         </div>
         <div className="table-scroll settlement-scroll">
-          <table className="management-data-table">
+          <ManagementTable>
             <thead><tr><th>입금 일시</th><th>거래처</th><th>계좌</th>
               <th>실제 입금액</th><th>배분액</th><th>미배분</th><th>메모</th></tr></thead>
             <tbody>
@@ -100,9 +101,9 @@ export function DailySettlement({
                 </tr>
               ))}
             </tbody>
-          </table>
+          </ManagementTable>
         </div>
-        {!report.paymentRows.length && <EmptyState title="해당 날짜의 실제 입금 기록이 없습니다." />}
+        {!report.paymentRows.length && <EmptyState compact title="해당 날짜의 실제 입금 기록이 없습니다." />}
       </section>
       {report.warnings.length > 0 && (
         <section className="card">
