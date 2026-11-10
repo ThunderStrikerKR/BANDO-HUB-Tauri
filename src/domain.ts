@@ -429,7 +429,7 @@ export function repriceOrder(order: Order, client: Client, state: State): Order 
 }
 export function orderClient(o: Order, state: State) {
   if (o.orderType === "RETAIL") return o.clientSnapshot ?? companyParty(state.settings);
-  return o.pricesLocked && o.clientSnapshot
+  return (o.confirmedAt || o.pricesLocked) && o.clientSnapshot
     ? o.clientSnapshot
     : (state.clients.find((c) => c.id === o.clientId) ?? o.clientSnapshot);
 }

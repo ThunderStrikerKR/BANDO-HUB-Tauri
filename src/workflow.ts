@@ -223,11 +223,11 @@ export function groupAccount(state: State, id: string) {
       },
       state.settings,
       state.products,
-      state.clients.find((c) => c.id === order.clientId) ?? order.clientSnapshot,
+      orderParty(order, state),
     );
   const active = groupOrder(state, id);
   return recommendAccount(active, state.settings, state.products,
-    state.clients.find((c) => c.id === active.clientId) ?? active.clientSnapshot);
+    orderParty(active, state));
 }
 const accountKey = (a: Account | undefined) =>
   a ? JSON.stringify([a.id, a.bank.trim(), a.number.trim(), a.holder.trim()]) : "";
@@ -404,6 +404,9 @@ export function reconcileWorkflow(input: State, draft?: Order): State {
       const info = information(order, r, senderFor(order, state)),
         reco = freight(state, order, r);
       let s = w.shipments.find((s) => s.orderId === order.id && s.recipientId === r.id);
+      // A confirmed shipment keeps the quote that was already on the order.
+      // Only a genuinely new shipment may pick up revised master freight rates.
+      const frozenMasterBasis = Boolean(s && (order.confirmedAt || order.pricesLocked));
       if (!s) {
         if (r.vatDefault === undefined)
           r.vatDefault = input.orders.some((o) => o.id === order.id)
@@ -431,7 +434,8 @@ export function reconcileWorkflow(input: State, draft?: Order): State {
         downgrade(state, s, 0, "수취인 / 상품 / 수량 / 가격 / 출고지 / 송하인 변경");
         s.infoSignature = info;
       }
-      if (s.freightVersion !== reco.version && !(s.step >= 2 && s.chargeMode === "MANUAL")) {
+      if (!frozenMasterBasis &&
+          s.freightVersion !== reco.version && !(s.step >= 2 && s.chargeMode === "MANUAL")) {
         downgrade(state, s, 1, "적용 운임 기준 변경");
         s.freightVersion = reco.version;
       }
@@ -448,7 +452,7 @@ export function reconcileWorkflow(input: State, draft?: Order): State {
       if (r.shippingCharges) {
         s.chargeMode = "MANUAL";
         for (const origin of os) s.charges[origin] = r.shippingCharges[origin] ?? null;
-      } else if (s.chargeMode === "AUTO")
+      } else if (s.chargeMode === "AUTO" && !frozenMasterBasis)
         for (const origin of os)
           s.charges[origin] = reco.bundles.find((b) => b.origin === origin)?.recommendation ?? null;
       if (c.shippingFeeExcluded) for (const origin of os) s.charges[origin] = 0;
@@ -929,9 +933,14 @@ export function advanceGroup(
     if (next === 1) s.sender = clone(senderFor(order, state));
     if (next === 2) {
       const adjustmentContext = shipmentContext(state, s),
-        recommended = freight(state, adjustmentContext.order, adjustmentContext.recipient).total,
-        confirmed = feeTotal(s, adjustmentContext.recipient, adjustmentContext.order);
+        recommendation = freight(state, adjustmentContext.order, adjustmentContext.recipient),
+        recommended = recommendation.total,
+        confirmed = feeTotal(s, adjustmentContext.recipient, adjustmentContext.order),
+        basisIsCurrent = s.freightVersion === recommendation.version;
+      // A newer tariff is not evidence that staff manually overrode the frozen
+      // rate. An adjustment is only valid against the same tariff version.
       if (
+        basisIsCurrent &&
         state.shipping &&
         shipmentFreightCode(adjustmentContext.order, adjustmentContext.recipient) !== "020" &&
         !client.shippingFeeExcluded &&
@@ -972,12 +981,13 @@ export function advanceGroup(
       s.confirmedFreightVersion = s.freightVersion;
       s.appliedEpoch = state.shipping?.epoch ?? 1;
       const ctx = shipmentContext(state, s);
-      s.appliedBundles = freight(state, ctx.order, ctx.recipient).bundles.map((b) => ({
-        origin: b.origin,
-        key: b.key,
-        versions: clone(b.versions),
-        description: b.description,
-      }));
+      if (basisIsCurrent)
+        s.appliedBundles = recommendation.bundles.map((b) => ({
+          origin: b.origin,
+          key: b.key,
+          versions: clone(b.versions),
+          description: b.description,
+        }));
     }
     if (next === 3) s.billingSignature = billing(state, s);
     if (s.step < next) {

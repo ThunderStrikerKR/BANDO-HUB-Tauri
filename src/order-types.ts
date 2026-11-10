@@ -32,9 +32,12 @@ export function senderFor(order: Order, state: State) {
   );
 }
 export function orderParty(order: Order, state: State) {
-  return order.orderType === "RETAIL"
-    ? (order.clientSnapshot ?? companyParty(state.settings))
-    : (state.clients.find((c) => c.id === order.clientId) ?? order.clientSnapshot);
+  if (order.orderType === "RETAIL") return order.clientSnapshot ?? companyParty(state.settings);
+  // Confirmed orders retain the dealer terms at confirmation, even when the
+  // current client record changes before the shipment is transferred to Excel.
+  if ((order.confirmedAt || order.pricesLocked) && order.clientSnapshot)
+    return order.clientSnapshot;
+  return state.clients.find((c) => c.id === order.clientId) ?? order.clientSnapshot;
 }
 
 export const companyParty = (settings: Settings): Client => ({
