@@ -613,6 +613,7 @@ try {
         if (command === "capture_ocr") return { text:"검증 발주 원문 709B 2개",
           imageDataUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL/nwAAAABJRU5ErkJggg==",
           width:1,height:1 };
+        if (command === "backup_create") return "C:\\BANDO_CI\\navigation-backup.sqlite";
         if (command === "product_image") return null;
         throw Error("Unexpected navigation-test IPC: " + command);
       },
@@ -725,6 +726,60 @@ try {
   assert.equal((await mockState()).state.orders.length,navFixture.orders.length);
   console.log("PASS: unconfirmed reception Cancel / Save-blocked / Discard (actual React UI)");
 
+  // Automatic-message sub-tabs are independent editors. Switching without
+  // saving must not silently discard text (the previous unmount bug).
+  await navPage.reload();
+  await navMenu.getByRole("button",{name:"거래처 관리"}).click();
+  const clientSubnav=navPage.getByRole("navigation",{name:"거래처 관리 메뉴"});
+  await clientSubnav.getByRole("button",{name:"자동 메시지 편집"}).click();
+  const messageSubnav=navPage.getByRole("navigation",{name:"자동 메시지 편집 종류"});
+  const commonTab=messageSubnav.getByRole("button",{name:"상황별 공통 안내"});
+  const productNoticeTab=messageSubnav.getByRole("button",{name:"잠정 상품 선택 안내"});
+  const automaticText=navPage.getByRole("textbox",{name:"선택한 자동 메시지 편집"});
+  const originalTemplate=await automaticText.inputValue();
+  await automaticText.fill(originalTemplate+"\n검증 전용 문장");
+  await productNoticeTab.click();
+  await checkPrompt("automatic-message internal tab");
+  await leave.getByRole("button",{name:"취소",exact:true}).click();
+  assert.equal(await automaticText.inputValue(),originalTemplate+"\n검증 전용 문장");
+  await productNoticeTab.click();
+  await leave.getByRole("button",{name:"저장 안 함"}).click();
+  await navPage.getByRole("heading",{name:/상품별 안내문 등록/}).waitFor();
+  assert.equal((await mockState()).state.settings.automaticMessageTemplates?.colorDefault?.includes("검증 전용 문장")??false,false);
+  await commonTab.click();
+  await automaticText.fill(originalTemplate+"\n저장 검증 문장");
+  await productNoticeTab.click();
+  await leave.getByRole("button",{name:"저장",exact:true}).click();
+  await navPage.getByRole("heading",{name:/상품별 안내문 등록/}).waitFor();
+  assert.equal((await mockState()).state.settings.automaticMessageTemplates?.colorDefault?.includes("저장 검증 문장"),true);
+  console.log("PASS: automatic-message subtab Save / Discard / Cancel");
+
+  // Product-specific notice: navigation uses the same safe three choices.
+  const productSearch=navPage.getByRole("textbox",{name:"안내문을 등록할 상품 검색"});
+  await productSearch.fill("BD 707A");
+  const firstProductNotice=navPage.locator('[aria-label="잠정 상품 선택 안내"] button.family-list-row').first();
+  await firstProductNotice.waitFor();
+  await firstProductNotice.click();
+  const noticeText=navPage.getByRole("textbox",{name:"상품별 잠정 선택 안내문"});
+  await noticeText.fill("검증용 안내문 - 저장하지 마세요");
+  await commonTab.click();
+  await checkPrompt("product-specific notice subtab");
+  await leave.getByRole("button",{name:"취소",exact:true}).click();
+  assert.equal(await noticeText.inputValue(),"검증용 안내문 - 저장하지 마세요");
+  await commonTab.click();
+  await leave.getByRole("button",{name:"저장 안 함"}).click();
+  await automaticText.waitFor();
+  assert.equal(Object.keys((await mockState()).state.settings.provisionalProductNotices??{}).length,0);
+  await productNoticeTab.click();
+  await productSearch.fill("BD 707A");
+  await firstProductNotice.click();
+  await noticeText.fill("검증용 안내문 - 저장합니다");
+  await commonTab.click();
+  await leave.getByRole("button",{name:"저장",exact:true}).click();
+  await automaticText.waitFor();
+  assert.ok(Object.values((await mockState()).state.settings.provisionalProductNotices??{})
+    .some(value=>value==="검증용 안내문 - 저장합니다"));
+  console.log("PASS: product-specific notice subtab Save / Discard / Cancel");
   assert.deepEqual(navErrors,[],"Navigation React errors: "+navErrors.join("\n"));
   await navPage.close();
   assert.deepEqual(pageErrors, [], "React runtime errors: " + pageErrors.join("\n"));
