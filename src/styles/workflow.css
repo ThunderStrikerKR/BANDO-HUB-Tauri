@@ -270,12 +270,6 @@
 .client-table td {
   vertical-align: middle;
 }
-.client-table th:first-child {
-  width: 16%;
-}
-.client-table th:nth-child(2) {
-  width: 28%;
-}
 @media (prefers-reduced-motion: reduce) {
   .workflow-shipment:before,
   ::view-transition-old(recipient-details),
