@@ -130,11 +130,11 @@
   border-radius: var(--radius-panel);
   border-color: var(--border-default);
 }
-.app-v03 .management-container table {
+.app-v03 .management-container table:not(.management-data-table) {
   width: 100%;
   border-collapse: collapse;
 }
-.app-v03 .management-container th {
+.app-v03 .management-container table:not(.management-data-table) th {
   font-size: 13px;
   font-weight: 600;
   line-height: 1.4;
@@ -143,7 +143,7 @@
   padding: 11px 12px;
   background: #242424;
 }
-.app-v03 .management-container td {
+.app-v03 .management-container table:not(.management-data-table) td {
   padding: 10px 12px;
   line-height: 1.45;
   vertical-align: middle;
@@ -191,6 +191,19 @@
 .empty-state button {
   margin-top: 6px;
 }
+/* Management lists should not reserve the height of a full-page empty state. */
+.empty-state-compact {
+  min-height: 0;
+  justify-items: start;
+  justify-content: start;
+  gap: 4px;
+  padding: 12px 14px;
+  text-align: left;
+  font-size: calc(13px * var(--ui-scale, 1));
+  line-height: 1.4;
+}
+.empty-state-compact p { font-size: inherit; line-height: inherit; }
+.empty-state-compact small { font-size: calc(12px * var(--ui-scale, 1)); }
 .form-error {
   padding: 12px;
   margin: 0 0 16px;
@@ -298,8 +311,8 @@
   .settings-layout {
     grid-template-columns: minmax(0, 1fr);
   }
-  .app-v03 .management-container td,
-  .app-v03 .management-container th {
+  .app-v03 .management-container table:not(.management-data-table) td,
+  .app-v03 .management-container table:not(.management-data-table) th {
     padding: 9px 8px;
   }
 }
