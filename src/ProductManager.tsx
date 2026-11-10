@@ -32,7 +32,8 @@ import { requestPageLeave, usePageLeaveGuard } from "./shared/page-leave";
 import type { Product, State, Variant } from "./types";
 import { Field, Modal, MoneyInput, clone } from "./ui";
 import { HelpTooltip } from "./ui/HelpTooltip";
-import { PageHeading } from "./ui/PageHeading";
+import { EmptyState, PageHeading } from "./ui/PageHeading";
+import { ManagementTable } from "./ui/ManagementTable";
 import { ManagementSearch } from "./ui/ManagementSearch";
 export function ProductManager({
   state,
@@ -314,7 +315,7 @@ export function ProductManager({
                 </label>
               </div>
               <div className="price-table-scroll">
-                <table className="management-data-table">
+                <ManagementTable>
                   <thead>
                     <tr>
                       <th>상품명 / 상품설명</th>
@@ -360,8 +361,8 @@ export function ProductManager({
                       )),
                     )}
                   </tbody>
-                </table>
-                {!products.length && <p className="empty">등록된 상품이 없습니다.</p>}
+                </ManagementTable>
+                {!products.length && <EmptyState compact title={search || missing || major || minor || brand ? "조건에 맞는 상품이 없습니다." : "등록된 상품이 없습니다."} />}
               </div>
             </section>
           </>
