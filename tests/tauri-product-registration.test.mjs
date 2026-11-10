@@ -12,7 +12,8 @@ test("Registration UI is connected to the real preview and version-checked state
   assert.ok(ui.indexOf("await window.bando!.backup()") < ui.indexOf("await onSave(result.next)"));
   assert.match(ui, /confirmAction\(/);
   assert.match(ui, /state\.registrationBatches\?\.at\(-1\)/);
-  assert.match(ui, /await onRefresh\(\)/);
+  assert.doesNotMatch(ui, /await onRefresh\(\)/);
+  assert.match(read("src/app/useAppModel.ts"), /lastCommitted\.current = committed/);
   assert.doesNotMatch(ui, /window\.bando!\.registrationCommit/);
 });
 

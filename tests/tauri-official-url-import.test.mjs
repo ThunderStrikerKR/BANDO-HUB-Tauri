@@ -43,7 +43,8 @@ test("Official import saves only after review, backup and revision validation", 
   assert.match(component, /confirmAction\(/);
   assert.match(component, /window\.bando!\.backup\(\)/);
   assert.match(component, /await onSave\(result\.next\)/);
-  assert.match(component, /await onRefresh\(\)/);
+  assert.doesNotMatch(component, /await onRefresh\(\)/);
+  assert.match(read("src/app/useAppModel.ts"), /await refresh\(committed\)/);
 });
 test("Tauri preview replaces previous not-ready bridge and leaves non-product methods untouched", () => {
   const bridge = read("src/tauri-bridge.ts");
