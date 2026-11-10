@@ -979,15 +979,16 @@ export function advanceGroup(
       s.chargeMode = "MANUAL";
       shipmentContext(state, s).recipient.shippingCharges = clone(s.charges);
       s.confirmedFreightVersion = s.freightVersion;
-      s.appliedEpoch = state.shipping?.epoch ?? 1;
-      const ctx = shipmentContext(state, s);
-      if (basisIsCurrent)
+      // Do not label a historical quote as if it used today's tariff epoch.
+      if (basisIsCurrent) {
+        s.appliedEpoch = state.shipping?.epoch ?? 1;
         s.appliedBundles = recommendation.bundles.map((b) => ({
           origin: b.origin,
           key: b.key,
           versions: clone(b.versions),
           description: b.description,
         }));
+      }
     }
     if (next === 3) s.billingSignature = billing(state, s);
     if (s.step < next) {
