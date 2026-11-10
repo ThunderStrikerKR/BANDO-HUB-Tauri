@@ -105,6 +105,8 @@ export const SettingsPanel = forwardRef<SettingsPanelHandle, {
         </div>
       )}
       <div hidden={section !== "basic"}>
+      <div className="settings-basic-top-grid">
+        <section className="settings-basic-cell">
       <h2 className="settings-help-heading">화면 글자 크기 <HelpTooltip title="화면 글자 크기" purpose="반도허브에 표시되는 글자와 버튼 크기를 보기 편하게 조절합니다." when="글씨가 너무 작거나 화면에 정보가 잘 들어오지 않을 때 사용합니다." steps={["전체 UI 크기 목록에서 원하는 크기를 선택합니다.", "화면에 적용된 크기를 확인합니다."]} result="프로그램의 글씨와 입력창 크기가 선택한 비율로 조절됩니다." /></h2>
       <Field label="전체 UI 크기">
         <select
@@ -130,6 +132,8 @@ export const SettingsPanel = forwardRef<SettingsPanelHandle, {
           저장하지 않은 설정이 있습니다.
         </small>
       )}
+        </section>
+        <section className="settings-basic-cell">
       <h2 className="settings-help-heading">작업 이력 <HelpTooltip title="작업 이력" purpose="누가 주문이나 입금 정보를 처리했는지 기록할 직원 이름을 설정합니다." steps={["작업자 이름을 입력합니다.", "설정 저장을 누릅니다."]} result="이후 작업 기록에 입력한 이름을 남길 수 있습니다." /></h2>
       <Field label="작업자 이름">
         <input
@@ -138,11 +142,16 @@ export const SettingsPanel = forwardRef<SettingsPanelHandle, {
           onChange={(e) => setS({ ...s, operatorName: e.target.value })}
         />
       </Field>
+        </section>
+      </div>
+      <section className="settings-sender-section">
       <h2 className="settings-help-heading">반도스탠드 정보 <HelpTooltip title="반도스탠드 정보" purpose="반도스탠드에서 직접 보내는 택배의 보내는 사람 정보를 등록합니다." when="매장 발송이나 대리점 납품에 사용할 회사 정보가 바뀌었을 때 사용합니다." steps={["상호명, 주소, 우편번호와 연락처를 입력합니다.", "설정 저장을 누릅니다."]} result="매장 발송이나 직접 입력 주문에 필요한 발송인 정보로 사용됩니다." caution="거래처가 보내는 사람으로 표시되는 대리발송에서는 해당 거래처 정보를 사용합니다." /></h2>
+      <div className="settings-sender-grid">
       {(
         ["senderName", "senderAddress", "senderPostcode", "senderPhone", "senderMobile"] as const
       ).map((field, index) => (
-        <Field key={field} label={["상호명", "주소", "우편번호", "전화번호", "휴대폰 번호"][index]}>
+        <div className={field === "senderAddress" ? "settings-sender-address" : "settings-sender-item"} key={field}>
+        <Field label={["상호명", "주소", "우편번호", "전화번호", "휴대폰 번호"][index]}>
           <input
             aria-label={
               "반도스탠드 " + ["상호명", "주소", "우편번호", "전화번호", "휴대폰 번호"][index]
@@ -151,7 +160,10 @@ export const SettingsPanel = forwardRef<SettingsPanelHandle, {
             onChange={(e) => setS({ ...s, [field]: e.target.value })}
           />
         </Field>
+        </div>
       ))}
+      </div>
+      </section>
       </div>
       <div hidden={section !== "files"}>
       <h2 className="settings-help-heading">Excel 보관함 위치 <HelpTooltip title="Excel 보관함 위치" purpose="반도허브에서 만든 Excel 파일을 컴퓨터의 어느 폴더에 저장할지 정합니다." steps={["보관함 폴더 선택 버튼을 누릅니다.", "사용할 폴더를 선택합니다.", "설정 저장을 누릅니다."]} result="공장 발송, 매장 발송, 공장 회신, 상품 관리, 거래처 관리 파일을 구분하고 날짜별 폴더에 보관합니다." caution="기존 파일을 덮어쓰지 않도록 새 파일을 저장합니다." /></h2>
