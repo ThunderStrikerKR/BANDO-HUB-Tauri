@@ -506,9 +506,6 @@
 .product-table-scroll {
   overflow: auto;
 }
-.management-container .card {
-  margin-bottom: 18px;
-}
 .danger {
   color: #c4c4c4;
   border-color: #5b5b5b;
