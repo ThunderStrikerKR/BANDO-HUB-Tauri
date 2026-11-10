@@ -349,3 +349,9 @@
 .shipping-fee-ranges .muted { margin: 6px 0 0; font-size: 11px; }
 
 .shipping-group-notes { max-width: 280px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #b8b8b8; }
+
+/* Keep the summary visible without pushing the active work table down. */
+.shipping-stats { gap: 10px; margin-bottom: 14px; }
+.shipping-stats article { padding: 11px 14px; }
+.shipping-stats b { font-size: 22px; }
+.shipping-tabs { gap: 16px; margin-bottom: 12px; }

@@ -172,7 +172,7 @@ export function ShippingManager({
   return (
     <div className="shipping-manager">
       <PageHeading
-        title="배송 그룹 관리"
+        title="운임 관리"
         actions={<div className="shipping-heading-help">
           <HelpTooltip
             title="운임 관리"

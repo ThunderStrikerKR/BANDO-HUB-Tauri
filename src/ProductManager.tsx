@@ -32,6 +32,7 @@ import { requestPageLeave, usePageLeaveGuard } from "./shared/page-leave";
 import type { Product, State, Variant } from "./types";
 import { Field, Modal, MoneyInput, clone } from "./ui";
 import { HelpTooltip } from "./ui/HelpTooltip";
+import { PageHeading } from "./ui/PageHeading";
 export function ProductManager({
   state,
   onSave,
@@ -217,6 +218,29 @@ export function ProductManager({
   };
   return (
     <div className="fixed-manager">
+      <PageHeading title="상품 관리" actions={section === "상품 목록" ? (
+        <>
+          <button type="button" aria-expanded={excelOpen} onClick={() => setExcelOpen((open) => !open)}>Excel 관리</button>
+                <button
+                  aria-pressed={priceMode}
+                  className={priceMode ? "primary" : ""}
+                  onClick={() => setPriceMode(!priceMode)}
+                >
+                  {priceMode ? "가격 수정 모드 종료" : "가격 수정 모드 켜기"}
+                </button>
+                <button className="primary" onClick={() => setAdding(!adding)}>상품 추가</button>
+        </>
+      ) : undefined} />
+      {["상품 목록", "카테고리 관리", "대표색상 관리"].includes(section) && (
+      <div className="management-search">
+        <input
+          aria-label="상품 검색"
+          placeholder={section === "카테고리 관리" ? "카테고리 이름 또는 전체 경로 검색" : section === "대표색상 관리" ? "그룹 이름 또는 상품명 검색" : "모델명 또는 상품명 검색"}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
+      )}
       <nav className="product-subnav" aria-label="상품 관리 메뉴">
         {[
           "상품 목록",
@@ -235,14 +259,6 @@ export function ProductManager({
           </button>
         ))}
       </nav>
-      <div className="management-search">
-        <input
-          aria-label="상품 검색"
-          placeholder={section === "카테고리 관리" ? "카테고리 이름 또는 전체 경로 검색" : section === "대표색상 관리" ? "그룹 이름 또는 상품명 검색" : "모델명 또는 상품명 검색"}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-      </div>
       <div className="management-scroll">
         {section === "상품 목록" && (
           <>
@@ -260,17 +276,7 @@ export function ProductManager({
                   />
                 </div>
               </div>
-              <div className="actions">
-                <button type="button" aria-expanded={excelOpen} onClick={() => setExcelOpen((open) => !open)}>Excel 관리</button>
-                <button
-                  aria-pressed={priceMode}
-                  className={priceMode ? "primary" : ""}
-                  onClick={() => setPriceMode(!priceMode)}
-                >
-                  {priceMode ? "가격 수정 모드 종료" : "가격 수정 모드 켜기"}
-                </button>
-                <button className="primary" onClick={() => setAdding(!adding)}>상품 추가</button>
-              </div>
+
             </div>
             {adding && (
               <section className="card">
