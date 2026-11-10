@@ -21,4 +21,6 @@
   --radius-panel: 9px;
   --control-height: calc(40px * var(--ui-scale, 1));
   --control-compact: calc(32px * var(--ui-scale, 1));
+  --field-label-size: calc(14px * var(--ui-scale, 1));
+  --field-label-color: #c4c4c4;
 }
