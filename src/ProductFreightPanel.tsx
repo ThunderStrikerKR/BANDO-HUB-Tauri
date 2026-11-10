@@ -1,7 +1,6 @@
 import { HelpTooltip } from "./ui/HelpTooltip";
 import { useState } from "react";
 import { confirmAction } from "./dialogs";
-import { won } from "./domain";
 import { registeredProducts, sortProducts } from "./product-models";
 import type { NoticeSink } from "./shared/notices";
 import { useAsyncTask } from "./shared/useAsyncTask";
@@ -188,11 +187,12 @@ export function ProductFreightPanel({
             <thead>
               <tr>
                 <th />
-                <th>상품 / 적용 기준</th>
+                <th>상품명</th>
+                <th>동급 배송그룹</th>
                 <th>최대 묶음 수량</th>
-                {[1, 2, 3, 4, 5, 6].map((n) => (
-                  <th key={n}>{n}개 운임</th>
-                ))}
+                <th>운임 등록 상태</th>
+                <th>합포장</th>
+                <th>최근 수정</th>
                 <th>설정</th>
               </tr>
             </thead>
@@ -215,29 +215,22 @@ export function ProductFreightPanel({
                         }
                       />
                     </td>
+                    <td className="shipping-product-name" title={p.name}>
+                      <strong>{p.name}</strong>
+                    </td>
+                    <td>{group ? group.name : "미소속"}</td>
+                    <td>{rule?.maxConfirmed && rule.maxBundle ? rule.maxBundle + "개" : "확인 필요"}</td>
                     <td>
-                      <b>{p.name}</b>
-                      <small>
-                        {group
-                          ? "동급 그룹 / " + group.name
-                          : rule
-                            ? "상품별 개별 기준"
-                            : "기준 미등록"}
-                      </small>
+                      {rule && (typeof rule.perItem === "number" ||
+                        Object.values(rule.fees).some((amount) => typeof amount === "number"))
+                        ? "등록"
+                        : "미등록"}
                     </td>
                     <td>
-                      {rule?.maxBundle ? rule.maxBundle + "개" : "확인 필요"}
-                      {rule?.maxBundle && !rule.maxConfirmed && <small>잠정 / 확인 필요</small>}
+                      {!rule?.maxConfirmed || !rule.maxBundle
+                        ? "확인 필요" : rule.maxBundle === 1 ? "개별 포장" : "합포장 가능"}
                     </td>
-                    {[1, 2, 3, 4, 5, 6].map((n) => (
-                      <td key={n}>
-                        {won(
-                          rule?.perItem !== null && rule?.perItem !== undefined
-                            ? rule.perItem * n
-                            : (rule?.fees[n] ?? null),
-                        )}
-                      </td>
-                    ))}
+                    <td>{rule?.at ? new Date(rule.at).toLocaleDateString("ko-KR") : "-"}</td>
                     <td>
                       <button
                         onClick={() =>

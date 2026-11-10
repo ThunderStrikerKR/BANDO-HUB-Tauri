@@ -324,3 +324,12 @@
   background: #292929;
 }
 .shipping-explanation-footer { justify-content: flex-end; }
+
+/* Dense single-line product names and descriptions; status has its own column. */
+.shipping-product-inline { display: flex; align-items: center; min-width: 0; gap: 8px; white-space: nowrap; overflow: hidden; }
+.shipping-product-inline > strong { flex: none; white-space: nowrap; }
+.shipping-product-description { display: inline-block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: #a9a9a9; }
+.shipping-product-name { max-width: 500px; }
+.shipping-product-name > strong { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; }
+.shipping-card th, .shipping-card td { padding-top: 9px; padding-bottom: 9px; }
+.shipping-card td button { margin-right: 7px; }

@@ -3,12 +3,9 @@ import { useLayoutEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { usePendingChanges } from "../shared/pending-changes";
 const modalStack: HTMLDialogElement[] = [];
+// Keep the editing dialog open while a native decision dialog is stacked above it.
 export function pauseModalLayer() {
-  const el = modalStack.at(-1);
-  el?.close();
-  return () => {
-    if (el?.isConnected && modalStack.at(-1) === el && !el.open) el.showModal();
-  };
+  return () => {};
 }
 export function Modal({
   title,
@@ -35,16 +32,15 @@ export function Modal({
   useLayoutEffect(() => {
     const el = ref.current!,
       previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    modalStack.at(-1)?.close();
     modalStack.push(el);
     el.showModal();
     return () => {
       const top = modalStack.at(-1) === el;
-      modalStack.splice(modalStack.indexOf(el), 1);
+      const index = modalStack.indexOf(el);
+      if (index >= 0) modalStack.splice(index, 1);
       el.close();
       if (top) {
         const parent = modalStack.at(-1);
-        if (parent?.isConnected && !parent.open) parent.showModal();
         if (previous?.isConnected && (!parent || parent.contains(previous)))
           previous.focus({ preventScroll: true });
       }

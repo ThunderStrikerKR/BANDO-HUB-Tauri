@@ -318,7 +318,7 @@ export function ProductManager({
                 <table>
                   <thead>
                     <tr>
-                      <th>상품명 / 부제</th>
+                      <th>상품명 / 상품설명</th>
                       <th>도매가</th>
                       <th>반도매가</th>
                       <th>소매가</th>

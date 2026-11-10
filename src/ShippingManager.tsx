@@ -304,7 +304,7 @@ export function ShippingManager({
               <thead>
                 <tr>
                   <th />
-                  <th>상품명 / 부제</th>
+                  <th>상품명 / 상품설명</th>
                   <th>카테고리</th>
                   <th>색상 / 옵션</th>
                   <th>배송 그룹</th>
@@ -333,8 +333,12 @@ export function ShippingManager({
                         />
                       </td>
                       <td>
-                        <strong>{internalModel(p.name)}</strong>
-                        <small>{p.subtitle || p.originalName || p.name}</small>
+                        <span className="shipping-product-inline" title={[internalModel(p.name), p.subtitle].filter(Boolean).join(" / ")}>
+                          <strong>{internalModel(p.name)}</strong>
+                          {p.subtitle?.trim() && p.subtitle !== p.name && (
+                            <span className="shipping-product-description">{p.subtitle}</span>
+                          )}
+                        </span>
                       </td>
                       <td>
                         <span className="category-label">{p.category || "분류 미지정"}</span>

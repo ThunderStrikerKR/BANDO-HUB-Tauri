@@ -663,6 +663,8 @@ try {
   await clientAddress.fill("경기도 검증시 저장확인로 88");
   await clientModal.getByRole("button",{name:"취소",exact:true}).click();
   await checkPrompt("client");
+  assert.equal(await clientModal.evaluate((dialog) => dialog.open), true,
+    "The edited client must stay open underneath the unsaved-changes dialog");
   await leave.getByRole("button",{name:"취소",exact:true}).click();
   assert.equal(await clientAddress.inputValue(),"경기도 검증시 저장확인로 88");
   await clientModal.getByRole("button",{name:"취소",exact:true}).click();
@@ -737,6 +739,21 @@ try {
   assert.equal(productAfter.saves.length,beforeProduct.saves.length+1);
   assert.ok(productAfter.state.products.some(p=>p.subtitle==="상품설명 저장 완료 검사"));
   console.log("PASS: product detail Save / Discard / Cancel (actual React modal)");
+
+  // Closing a freight editor must prompt while the original dialog is still open.
+  await navMenu.getByRole("button",{name:"운임 관리"}).click();
+  await navPage.getByRole("button",{name:"기본 운임 설정"}).first().click();
+  const freightEditor = navPage.getByRole("dialog",{name:/운임 설정/});
+  await freightEditor.getByLabel("최대 묶음 수량").selectOption("2");
+  await freightEditor.getByRole("button",{name:"닫기 ×"}).click();
+  await checkPrompt("freight modal close");
+  assert.equal(await freightEditor.evaluate((dialog) => dialog.open),true);
+  await leave.getByRole("button",{name:"취소",exact:true}).click();
+  assert.equal(await freightEditor.evaluate((dialog) => dialog.open),true);
+  await freightEditor.getByRole("button",{name:"닫기 ×"}).click();
+  await leave.getByRole("button",{name:"저장 안 함"}).click();
+  await freightEditor.waitFor({state:"detached"});
+  console.log("PASS: freight editor stays open until Save / Discard / Cancel decision");
 
   // Shipping: pending group assignment stays on Cancel, vanishes on Discard,
   // and is recorded only on Save.

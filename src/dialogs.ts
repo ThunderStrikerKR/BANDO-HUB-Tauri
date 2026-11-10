@@ -1,4 +1,3 @@
-import { pauseModalLayer } from "./ui";
 let pending = false;
 function ask(
   message: string,
@@ -8,7 +7,6 @@ function ask(
   if (pending) return Promise.resolve(null);
   pending = true;
   const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-  const resumeModal = pauseModalLayer();
   const dialog = document.createElement("dialog");
   dialog.className = "app-action-dialog";
   dialog.setAttribute("aria-label", value === undefined ? "작업 확인" : "값 입력");
@@ -48,7 +46,6 @@ function ask(
       dialog.close();
       dialog.remove();
       pending = false;
-      resumeModal();
       if (previous?.isConnected) previous.focus({ preventScroll: true });
       resolve(result);
     };
@@ -91,7 +88,6 @@ export function askSaveChanges(message = "변경사항이 저장되지 않았습
   if (pending) return Promise.resolve("cancel");
   pending = true;
   const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-  const resumeModal = pauseModalLayer();
   const dialog = document.createElement("dialog");
   dialog.className = "app-action-dialog";
   dialog.setAttribute("aria-label", "변경사항 저장");
@@ -122,7 +118,6 @@ export function askSaveChanges(message = "변경사항이 저장되지 않았습
       dialog.close();
       dialog.remove();
       pending = false;
-      resumeModal();
       if (previous?.isConnected) previous.focus({ preventScroll: true });
       resolve(choice);
     };
