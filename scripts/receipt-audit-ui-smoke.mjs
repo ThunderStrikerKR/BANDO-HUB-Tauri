@@ -653,6 +653,28 @@ try {
   const checkPrompt = async (context) => {
     await leave.waitFor();
     if(!saveDialogCascadeSampled){
+      const savedInline=await navPage.evaluate(()=>{
+        const root=document.documentElement;
+        const previous=root.style.getPropertyValue("--kakao-reserved-width");
+        root.style.setProperty("--kakao-reserved-width","320px");
+        return previous;
+      });
+      try{
+        const placement=await leave.evaluate(el=>{
+          const r=el.getBoundingClientRect();
+          return {center:Math.round(r.left+r.width/2),width:Math.round(r.width),
+            viewport:window.innerWidth};
+        });
+        const expectedCenter=320+(placement.viewport-320)/2;
+        assert.ok(Math.abs(placement.center-expectedCenter)<=2,
+          "Decision modal disregards Kakao-reserved width: "+JSON.stringify({placement,expectedCenter}));
+        console.log("PASS: decision dialog centers in app workspace excluding reserved Kakao panel",JSON.stringify(placement));
+      } finally {
+        await navPage.evaluate((previous)=>{
+          if(previous)document.documentElement.style.setProperty("--kakao-reserved-width",previous);
+          else document.documentElement.style.removeProperty("--kakao-reserved-width");
+        },savedInline);
+      }
       await sampleCascade("저장 확인 모달");
       saveDialogCascadeSampled=true;
     }
