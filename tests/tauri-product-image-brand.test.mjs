@@ -28,9 +28,9 @@ test("Image preprocessing cleans up temporary object URLs even on decoding failu
 test("Brands are validated for cross-brand aliases and evidence URLs before UI save", () => {
   const manager = read("src/Classification.tsx");
   const registry = read("src/product-registry.ts");
-  assert.match(manager, /validateBrands\(next, state\)/);
+  assert.match(manager, /validateBrands\(next,\s*state\)/);
   assert.match(manager, /await onSave\(next\)/);
-  assert.match(manager, /knownNames\.set\(registryKey\(value\), value\)/);
+  assert.match(manager, /knownNames\.set\(registryKey\(value\),\s*value\)/);
   assert.match(registry, /export function validateBrands/);
   assert.match(registry, /evidence\.protocol !== "https:"/);
   assert.match(registry, /brand\.name, brand\.korean, \.\.\.brand\.aliases/);
