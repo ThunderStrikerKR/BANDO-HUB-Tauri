@@ -25,6 +25,7 @@ export type SettingsPanelHandle = {
   hasUnsavedChanges: () => boolean;
   isBusy: () => boolean;
   save: () => Promise<boolean>;
+  discard: () => void;
 };
 
 export const SettingsPanel = forwardRef<SettingsPanelHandle, {
@@ -66,6 +67,7 @@ export const SettingsPanel = forwardRef<SettingsPanelHandle, {
     hasUnsavedChanges: () => dirty,
     isBusy: () => saving,
     save: saveSettings,
+    discard: reset,
   }));
   const remove = (id: string) => {
     const users = state.clients.filter((c) => !c.deletedAt && c.preferredAccountId === id);

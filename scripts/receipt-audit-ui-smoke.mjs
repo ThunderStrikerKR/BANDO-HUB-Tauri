@@ -439,9 +439,7 @@ try {
   await page.getByRole("heading", { name: "복원 검증 통과" }).waitFor();
   await page.waitForFunction(() => window.__testRestoreCount === 1);
   await page.getByText(/TEST DB 전체 내용 및 접수 감사 기록이 백업 시점과 일치/).waitFor();
-  // Temporary regression reproduction: the settings form currently compares
-  // JSON field ordering, so a successful native account edit can be misread
-  // as a concurrent change. Use a separate browser page and synthetic data.
+  // Account add/delete must save without a false conflict after Rust JSON reorders object keys.
   const settingsPage = await browser.newPage({ viewport: { width: 1520, height: 1000 } });
   const settingsErrors = [];
   settingsPage.on("pageerror", (err) => settingsErrors.push(err.message));
@@ -502,11 +500,13 @@ try {
   await settingsPage.getByRole("textbox", { name: "예금주 3" }).fill("시험C");
   await settingsPage.getByRole("button", { name: "설정 저장" }).click();
   await settingsPage.waitForFunction(() => window.__accountSave?.saved === true);
-  await settingsPage.getByRole("alert").getByText("다른 작업에서 같은 설정이 변경되었습니다.", { exact: false }).waitFor();
-  assert.equal(await settingsPage.getByRole("button", { name: "설정 저장" }).isDisabled(), true);
+  await settingsPage.waitForFunction(() => !document.body.textContent?.includes("저장하지 않은 설정이 있습니다.") &&
+    !document.body.textContent?.includes("다른 작업에서 같은 설정이 변경되었습니다."));
+  assert.equal(await settingsPage.getByRole("alert").count(), 0);
+  assert.equal(await settingsPage.getByRole("button", { name: "설정 저장" }).isDisabled(), false);
   const addChanges = await settingsPage.evaluate(() => window.__accountSave.changes);
   assert.equal(addChanges.accounts.length, 3);
-  console.log("REPRODUCED: adding a third account saves successfully but shows a false conflict");
+  console.log("PASS: adding a third account saves with no false conflict");
 
   // Case B: reload initial saved fixture; deleting B changes accounts and
   // rebuilds brandAccounts in insertion order (Rust returns key-sorted JSON).
@@ -515,11 +515,13 @@ try {
   await settingsPage.getByRole("button", { name: "계좌 삭제 2" }).click();
   await settingsPage.getByRole("button", { name: "설정 저장" }).click();
   await settingsPage.waitForFunction(() => window.__accountSave?.saved === true);
-  await settingsPage.getByRole("alert").getByText("다른 작업에서 같은 설정이 변경되었습니다.", { exact: false }).waitFor();
-  assert.equal(await settingsPage.getByRole("button", { name: "설정 저장" }).isDisabled(), true);
+  await settingsPage.waitForFunction(() => !document.body.textContent?.includes("저장하지 않은 설정이 있습니다.") &&
+    !document.body.textContent?.includes("다른 작업에서 같은 설정이 변경되었습니다."));
+  assert.equal(await settingsPage.getByRole("alert").count(), 0);
+  assert.equal(await settingsPage.getByRole("button", { name: "설정 저장" }).isDisabled(), false);
   const deleteChanges = await settingsPage.evaluate(() => window.__accountSave.changes);
   assert.equal(deleteChanges.accounts.length, 1);
-  console.log("REPRODUCED: deleting an account saves successfully but shows a false conflict");
+  console.log("PASS: deleting an account saves with no false conflict");
   assert.deepEqual(settingsErrors, [], "Settings page errors: " + settingsErrors.join("\\n"));
   await settingsPage.close();
   assert.deepEqual(pageErrors, [], "React runtime errors: " + pageErrors.join("\n"));

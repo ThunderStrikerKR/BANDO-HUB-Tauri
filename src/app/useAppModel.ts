@@ -3,6 +3,7 @@ import { confirmAction } from "../dialogs";
 import { canQueue, orderClient, reviewIssues, totals } from "../domain";
 import { newReception, persistedReceptionState } from "../orders/reception";
 import { useHasPendingChanges } from "../shared/pending-changes";
+import { requestPageLeave } from "../shared/page-leave";
 import { useAsyncTask } from "../shared/useAsyncTask";
 import { useNotice } from "../shared/useNotice";
 import type { DockStatus, DockWindow, InboxEntry, Order, StartupStatus, State } from "../types";
@@ -244,10 +245,17 @@ export function useAppModel() {
     }
     const leave = await confirmOrderLeave();
     if (!leave.proceed) return false;
-    if (
-      dirty && !leave.handledDraft &&
-      !(await confirmAction("저장하지 않은 변경사항이 있습니다. 다른 주문을 열까요?"))
-    ) return false;
+    if (tab !== "접수") {
+      const pageLeave = await requestPageLeave((message) => setNotice(message, "error"));
+      if (!pageLeave.proceed) return false;
+      if (hasPendingChanges && !pageLeave.handled) {
+        setNotice("현재 화면에서 변경사항을 저장하거나 취소한 뒤 주문을 열어 주세요.", "error");
+        return false;
+      }
+    } else if (dirty && !leave.handledDraft) {
+      const confirmed = await confirmAction("저장하지 않은 변경사항이 있습니다. 다른 주문을 열까요?");
+      if (!confirmed) return false;
+    }
     setWorkflowSelection(undefined);
     setDraft(o ? clone(o) : newReception());
     setTab("접수");
@@ -334,12 +342,21 @@ export function useAppModel() {
     setWorkflowSelection(selection);
   };
   const navigate = async (page: PageId) => {
-    if (page !== tab) {
+    if (page === tab) return;
+    if (tab === "접수") {
       const leave = await confirmOrderLeave();
       if (!leave.proceed) return;
-      if (hasPendingChanges &&
-        !(await confirmAction("저장하지 않은 입력이 있습니다. 다른 화면으로 이동할까요?")))
+      if (hasPendingChanges && !leave.handledDraft) {
+        setNotice("저장하지 않은 편집창이 있습니다. 편집창에서 저장하거나 취소한 뒤 이동하세요.", "error");
         return;
+      }
+    } else {
+      const leave = await requestPageLeave((message) => setNotice(message, "error"));
+      if (!leave.proceed) return;
+      if (hasPendingChanges && !leave.handled) {
+        setNotice("저장하지 않은 편집 내용이 있습니다. 현재 화면에서 저장하거나 취소한 뒤 이동하세요.", "error");
+        return;
+      }
     }
     setTab(page);
     setQuery("");
@@ -350,7 +367,14 @@ export function useAppModel() {
   const receive = async (entry: InboxEntry) => {
     const leave = await confirmOrderLeave();
     if (!leave.proceed) return;
-    if (dirty && !leave.handledDraft &&
+    if (tab !== "접수") {
+      const pageLeave = await requestPageLeave((message) => setNotice(message, "error"));
+      if (!pageLeave.proceed) return;
+      if (hasPendingChanges && !pageLeave.handled) {
+        setNotice("편집 중인 내용을 저장하거나 취소한 뒤 수신 주문을 열어 주세요.", "error");
+        return;
+      }
+    } else if (dirty && !leave.handledDraft &&
       !(await confirmAction("현재 입력을 수신 주문으로 바꿀까요?"))) return;
     const order = newReception();
     order.raw = entry.text;
@@ -361,9 +385,18 @@ export function useAppModel() {
   };
   const windowAction = async (action: "minimize" | "maximize" | "close") => {
     if (action === "close") {
-      const leave = await confirmOrderLeave();
+      if (tab === "접수") {
+        const leave = await confirmOrderLeave();
+        if (!leave.proceed) return;
+        return window.bando!.requestClose(dirty && !leave.handledDraft);
+      }
+      const leave = await requestPageLeave((message) => setNotice(message, "error"));
       if (!leave.proceed) return;
-      return window.bando!.requestClose(dirty && !leave.handledDraft);
+      if (hasPendingChanges && !leave.handled) {
+        setNotice("편집 중인 내용을 저장하거나 취소한 뒤 종료하세요.", "error");
+        return;
+      }
+      return window.bando!.requestClose(false);
     }
     await window.bando!.windowControl(action);
     setDock(await window.bando!.dockStatus());

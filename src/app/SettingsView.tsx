@@ -8,6 +8,7 @@ import type { State } from "../types";
 import { Modal } from "../ui";
 import { PageHeading } from "../ui/PageHeading";
 import { HelpTooltip } from "../ui/HelpTooltip";
+import { usePageLeaveGuard } from "../shared/page-leave";
 import { DeveloperLab } from "../developer/DeveloperLab";
 
 declare const __BANDO_VERSION__: string;
@@ -37,6 +38,14 @@ export function SettingsView({
   const [requestedTab, setRequestedTab] = useState<SettingsTab | null>(null);
   const [savingBeforeLeave, setSavingBeforeLeave] = useState(false);
   const editor = useRef<SettingsPanelHandle>(null);
+
+  usePageLeaveGuard({
+    label: "설정",
+    hasChanges: () => editor.current?.hasUnsavedChanges() ?? false,
+    busy: () => editor.current?.isBusy() ?? savingBeforeLeave,
+    save: async () => await editor.current?.save() ?? false,
+    discard: () => editor.current?.discard(),
+  });
 
   const chooseTab = (next: SettingsTab) => {
     if (next === activeTab || requestedTab || savingBeforeLeave) return;
