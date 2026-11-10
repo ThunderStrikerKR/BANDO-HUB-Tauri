@@ -14,6 +14,7 @@ test("CSS ownership audit includes every imported stylesheet in actual cascade o
     styles: report.files.length, declarations: report.declarations.length,
     repeated: report.repeated.length, crossFile: report.crossFile.length,
     differingValues: report.conflicts.length, crossFileDifferingValues: report.crossFileConflicts.length,
+    differingSpecificity: report.scopedOverlaps.length,
   };
   console.log("CSS_AUDIT_TOTAL", JSON.stringify(summary));
   const priority = report.crossFileConflicts
@@ -23,6 +24,12 @@ test("CSS ownership audit includes every imported stylesheet in actual cascade o
       key, definitions: records.map(r => r.path + ":" + r.line + "=" + r.value),
     }));
   console.log("CSS_AUDIT_PRIORITY", JSON.stringify(priority));
+  const scoped = report.scopedOverlaps
+    .filter(([key]) => /field|card|management|table|button|input|empty/.test(key))
+    .slice(0, 14).map(([key, records]) => ({
+      key, definitions: records.map(r => r.selector + " @ " + r.path + ":" + r.line + "=" + r.value),
+    }));
+  console.log("CSS_AUDIT_SCOPED", JSON.stringify(scoped));
 });
 
 test("shared management table and empty-state layout have explicit style owners", () => {
