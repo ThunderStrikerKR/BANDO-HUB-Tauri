@@ -80,10 +80,11 @@
   display: grid;
   gap: 6px;
 }
-.field > .field-label {
-  font-size: calc(13px * var(--ui-scale, 1));
+.field > .field-label,
+.field > label {
+  font-size: var(--field-label-size);
   font-weight: 600;
-  color: var(--text-secondary);
+  color: var(--field-label-color);
   line-height: 1.35;
   min-width: 0;
 }
