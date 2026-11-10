@@ -861,24 +861,6 @@ try {
     "Heading x origin inconsistent across pages: "+JSON.stringify(layoutSamples));
   console.log("PASS: 7 management titles and 5 shared search layouts are consistent");
   console.log("MANAGEMENT_STYLE_PROBE",JSON.stringify(styleProbe));
-  const cascadeInventory=cascadeSources.map(candidate=>{
-    const observed=cascadeSeen.get(candidate.key);
-    return {key:candidate.key,selector:candidate.selector,property:candidate.property,
-      files:candidate.files,values:candidate.values,
-      category:observed?.count>0 ? "MATCHED_IN_RENDERED_VIEW" :
-        observed?.unsupportedSelector ? "REQUIRES_PSEUDO_ELEMENT_INSPECTION" : "NOT_OBSERVED_IN_SAMPLED_VIEWS",
-      count:observed?.count??0,
-      actual:[...(observed?.actual??[])].slice(0,3),
-      screens:[...(observed?.screens??[])].slice(0,5)};
-  });
-  assert.equal(cascadeInventory.length,cascadeSources.length);
-  console.log("CSS_CASCADE_CLASSIFICATION",JSON.stringify(cascadeInventory));
-  console.log("CSS_CASCADE_COUNTS",JSON.stringify({
-    candidates:cascadeInventory.length,observed:cascadeInventory.filter(x=>x.category==="MATCHED_IN_RENDERED_VIEW").length,
-    unobserved:cascadeInventory.filter(x=>x.category==="NOT_OBSERVED_IN_SAMPLED_VIEWS").length,
-    pseudo:cascadeInventory.filter(x=>x.category==="REQUIRES_PSEUDO_ELEMENT_INSPECTION").length,
-    screens:styleProbe.length}));
-
   // Shared tables must retain their native semantics and compress empty results
   // without leaving an oversized scroller behind. This uses the real React UI.
   const checkCompactEmpty = async (selector, label) => {
@@ -1422,6 +1404,27 @@ try {
   await navPage.waitForFunction(() => window.__navSaved().state.workflow.shipments
     .find(s=>s.id==="ci-store-ship").actualFreight?.STORE===4100);
   console.log("PASS: actual freight survives filtering and supports Save / Discard / Cancel");
+
+  const cascadeInventory=cascadeSources.map(candidate=>{
+    const observed=cascadeSeen.get(candidate.key);
+    return {key:candidate.key,selector:candidate.selector,property:candidate.property,
+      files:candidate.files,values:candidate.values,
+      category:observed?.count>0 ? "MATCHED_IN_RENDERED_VIEW" :
+        observed?.unsupportedSelector ? "REQUIRES_PSEUDO_ELEMENT_INSPECTION" : "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      count:observed?.count??0,
+      actual:[...(observed?.actual??[])].slice(0,3),
+      screens:[...(observed?.screens??[])].slice(0,5)};
+  });
+  assert.equal(cascadeInventory.length,cascadeSources.length);
+  console.log("CSS_CASCADE_CLASSIFICATION",JSON.stringify(cascadeInventory));
+  console.log("CSS_CASCADE_COUNTS",JSON.stringify({
+    candidates:cascadeInventory.length,observed:cascadeInventory.filter(x=>x.category==="MATCHED_IN_RENDERED_VIEW").length,
+    unobserved:cascadeInventory.filter(x=>x.category==="NOT_OBSERVED_IN_SAMPLED_VIEWS").length,
+    pseudo:cascadeInventory.filter(x=>x.category==="REQUIRES_PSEUDO_ELEMENT_INSPECTION").length,
+    screens:styleProbe.length,
+    observedStates:[...new Set([...cascadeSeen.values()].flatMap(e=>[...e.screens]))].length}));
+  assert.ok(cascadeInventory.length>=100,"Cross-file CSS collision inventory unexpectedly incomplete");
+
 
   assert.deepEqual(navErrors,[],"Navigation React errors: "+navErrors.join("\n"));
   await navPage.close();
