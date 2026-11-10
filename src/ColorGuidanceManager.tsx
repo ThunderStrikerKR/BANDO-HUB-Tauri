@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { usePageLeaveGuard } from "./shared/page-leave";
+import { sameValue } from "./shared/draft";
 import { confirmAction } from "./dialogs";
 import { uid } from "./domain";
 import { validateColorGuidance } from "./color-guidance";
@@ -19,8 +21,8 @@ export function ColorGuidanceManager({state,onRefresh,query=""}: {
   const rows=Object.entries(groups).map(([id,g])=>({id,...g}));
   const activeId=groups[selected]?selected:(rows[0]?.id??"");
   const active=groups[activeId];
-  const unsaved=JSON.stringify(draft.settings.colorGuidanceGroups??{})!==
-    JSON.stringify(baseline.settings.colorGuidanceGroups??{});
+  const unsaved=!sameValue(draft.settings.colorGuidanceGroups??{},
+    baseline.settings.colorGuidanceGroups??{});
   useEffect(()=>{
     if(!unsaved){setDraft(structuredClone(state));setBaseline(structuredClone(state));}
     // Reset clean drafts on incoming state, but preserve edits until saved.
@@ -50,8 +52,8 @@ export function ColorGuidanceManager({state,onRefresh,query=""}: {
     (p.name+" "+p.code+" "+(p.subtitle??"")).toLocaleLowerCase()
       .includes(search.trim().toLocaleLowerCase())
   ).slice(0,30);
-  const save=async()=>{
-    if(busy||!unsaved)return;
+  const save=async(): Promise<boolean>=>{
+    if(busy||!unsaved)return !unsaved && !busy;
     setBusy(true);setStatus("");
     try{
       validateColorGuidance(draft);
@@ -68,9 +70,19 @@ export function ColorGuidanceManager({state,onRefresh,query=""}: {
       setDraft(structuredClone(updated));setBaseline(structuredClone(updated));
       await onRefresh();
       setStatus("대표색상 설정만 저장했습니다. 기존 상품과 주문은 변경하지 않았습니다.");
-    }catch(error){setStatus(String(error));}
+      return true;
+    }catch(error){setStatus(String(error));return false;}
     finally{setBusy(false);}
   };
+  usePageLeaveGuard({
+    label: "대표색상",
+    hasChanges: () => unsaved,
+    busy: () => busy,
+    save,
+    discard: () => {
+      setDraft(structuredClone(state));setBaseline(structuredClone(state));setSelected("");setStatus("");
+    },
+  });
   return <section className="family-admin-workspace" aria-label="대표색상 관리">
     <aside className="family-list-panel">
       <header className="family-list-heading">

@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { HelpTooltip } from "./ui/HelpTooltip";
 import { usePendingChanges } from "./shared/pending-changes";
+import { usePageLeaveGuard } from "./shared/page-leave";
+import { sameValue } from "./shared/draft";
 import {
   AUTOMATIC_MESSAGE_TEMPLATES, AUTOMATIC_TEMPLATE_IDS,
   previewAutomaticTemplate, validateAutomaticMessageTemplates,
@@ -19,7 +21,7 @@ export function AutomaticMessageTemplateManager({
   const [selected,setSelected]=useState<AutomaticTemplateId>("colorDefault");
   const [status,setStatus]=useState("");
   const [busy,setBusy]=useState(false);
-  const dirty=JSON.stringify(baseline)!==JSON.stringify(draft);
+  const dirty=!sameValue(baseline,draft);
   usePendingChanges(dirty);
   useEffect(()=>{onDirtyChange?.(dirty);},[dirty,onDirtyChange]);
   useEffect(()=>{
@@ -43,8 +45,8 @@ export function AutomaticMessageTemplateManager({
       return next;
     });setStatus("");
   };
-  const save=async()=>{
-    if(busy||!dirty)return;
+  const save = async (): Promise<boolean> => {
+    if (busy || !dirty) return !dirty && !busy;
     setBusy(true);setStatus("");
     try{
       validateAutomaticMessageTemplates(draft);
@@ -64,11 +66,20 @@ export function AutomaticMessageTemplateManager({
       await onRefresh();
       setStatus("상황별 자동 메시지를 저장했습니다.");
       onNotice("자동 메시지 설정을 저장했습니다.","success");
+      return true;
     }catch(error){
       setStatus(String(error));
       onNotice(String(error),"error");
+      return false;
     }finally{setBusy(false);}
   };
+  usePageLeaveGuard({
+    label: "상황별 자동 메시지",
+    hasChanges: () => dirty,
+    busy: () => busy,
+    save,
+    discard: () => { setDraft(structuredClone(baseline)); setStatus(""); },
+  });
   return <section className="family-admin-workspace" aria-label="자동 메시지 편집">
     <aside className="family-list-panel">
       <header className="family-list-heading">

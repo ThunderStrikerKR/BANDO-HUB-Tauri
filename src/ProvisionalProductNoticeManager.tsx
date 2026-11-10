@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { HelpTooltip } from "./ui/HelpTooltip";
 import { usePendingChanges } from "./shared/pending-changes";
+import { usePageLeaveGuard } from "./shared/page-leave";
+import { sameValue } from "./shared/draft";
 import { registeredProducts } from "./product-models";
 import { validateProvisionalProductNotices } from "./provisional-product-notices";
 import type { NoticeSink } from "./shared/notices";
@@ -23,7 +25,7 @@ export function ProvisionalProductNoticeManager({
   const [query,setQuery] = useState("");
   const [busy,setBusy] = useState(false);
   const [status,setStatus] = useState("");
-  const dirty = JSON.stringify(draft) !== JSON.stringify(baseline ?? {});
+  const dirty = !sameValue(draft,baseline ?? {});
   usePendingChanges(dirty);
   useEffect(() => {onDirtyChange?.(dirty);}, [dirty,onDirtyChange]);
   useEffect(() => {
@@ -53,8 +55,8 @@ export function ProvisionalProductNoticeManager({
     });
     setStatus("");
   };
-  const save = async () => {
-    if (busy || !dirty) return;
+  const save = async (): Promise<boolean> => {
+    if (busy || !dirty) return !dirty && !busy;
     setBusy(true);setStatus("");
     try {
       if (!window.bando?.patchSettings) throw Error("설정 저장 기능을 사용할 수 없습니다.");
@@ -72,11 +74,20 @@ export function ProvisionalProductNoticeManager({
       await onRefresh();
       setStatus("상품별 잠정 선택 안내문을 저장했습니다.");
       onNotice("상품별 잠정 선택 안내문을 저장했습니다.","success");
+      return true;
     } catch (error) {
       setStatus(String(error));
       onNotice(String(error),"error");
+      return false;
     } finally {setBusy(false);}
   };
+  usePageLeaveGuard({
+    label: "상품별 잠정 선택 안내문",
+    hasChanges: () => dirty,
+    busy: () => busy,
+    save,
+    discard: () => { setDraft(structuredClone(baseline??{})); setStatus(""); },
+  });
   return <section className="family-admin-workspace" aria-label="잠정 상품 선택 안내">
     <aside className="family-list-panel">
       <header className="family-list-heading">
