@@ -412,15 +412,17 @@
 
 /* The Kakao slot exists on every page, before and after native connection. */
 .hub-shell-scroll {
+  box-sizing: border-box;
   flex: 1;
   min-height: 0;
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: hidden;
   padding: 12px;
 }
 .hub-shell {
   display: grid;
   height: 100%;
-  min-height: 500px;
+  min-height: 0;
   min-width: 1380px;
   gap: 0;
 }
