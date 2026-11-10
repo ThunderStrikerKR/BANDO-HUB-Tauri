@@ -22,7 +22,8 @@ import {
 import type { ShippingRule, ShippingState, State } from "./types";
 import { HelpTooltip } from "./ui/HelpTooltip";
 import { Field, Modal } from "./ui";
-import { PageHeading } from "./ui/PageHeading";
+import { EmptyState, PageHeading } from "./ui/PageHeading";
+import { ManagementTable } from "./ui/ManagementTable";
 import { ManagementSearch } from "./ui/ManagementSearch";
 import { Button } from "./ui/Button";
 export function ShippingManager({
@@ -306,7 +307,7 @@ export function ShippingManager({
             <HelpTooltip title="배송 그룹 일괄 지정" purpose="선택한 여러 상품을 같은 배송 그룹으로 한꺼번에 지정합니다." when="같은 포장 기준을 사용하는 상품들을 정리할 때 사용합니다." steps={["변경할 상품을 체크합니다.", "적용할 배송 그룹을 선택합니다.", "선택 상품에 적용을 누릅니다.", "아래에서 변경 내용을 확인하고 그룹 지정 저장을 누릅니다."]} result="저장한 상품의 배송 그룹이 변경됩니다." caution="실제 포장 조건이 확인된 상품만 같은 그룹으로 묶습니다." />
           </div>
           <div className="shipping-table-scroll">
-            <table className="management-data-table">
+            <ManagementTable>
               <thead>
                 <tr>
                   <th />
@@ -381,8 +382,8 @@ export function ShippingManager({
                   );
                 })}
               </tbody>
-            </table>
-            {!rows.length && <p className="empty">검색 조건에 맞는 상품이 없습니다.</p>}
+            </ManagementTable>
+            {!rows.length && <EmptyState compact title="검색 조건에 맞는 상품이 없습니다." />}
           </div>
           <footer className="shipping-savebar">
             <span>
@@ -475,7 +476,7 @@ export function ShippingManager({
               배송 그룹 추가
             </Button>
           </div>
-          <table className="management-data-table">
+          <ManagementTable>
             <thead>
               <tr>
                 <th>배송 그룹</th>
@@ -550,13 +551,13 @@ export function ShippingManager({
                   </tr>
                 ))}
             </tbody>
-          </table>
+          </ManagementTable>
         </section>
       )}
       {tab === "history" && (
         <section className="shipping-card shipping-rates">
           <h3>확인된 배송 조합</h3>
-          <table className="management-data-table">
+          <ManagementTable>
             <thead>
               <tr>
                 <th>조합</th>
@@ -627,9 +628,9 @@ export function ShippingManager({
                   </tr>
                 ))}
             </tbody>
-          </table>
+          </ManagementTable>
           {!shipping.combinations.length && (
-            <p className="empty">실제 배송 완료 후 검증한 운임 조합이 여기에 표시됩니다.</p>
+            <EmptyState compact title="실제 배송 완료 후 검증한 운임 조합이 여기에 표시됩니다." />
           )}
           <h3>이전 그룹 운임 기준</h3>
           {shipping.groups
