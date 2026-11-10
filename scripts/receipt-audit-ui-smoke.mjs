@@ -658,6 +658,19 @@ try {
   // UI contract audit at desktop width: all primary headings and search controls
   // must share the same dimensions, font, border and placement.
   await navPage.goto(url);
+  // No-order receipt placeholder must not regress to 12px centred legacy text.
+  const receiptEmpty=navPage.locator(".receipt-panel-content > .detail-empty").first();
+  await receiptEmpty.waitFor();
+  const receiptEmptyStyle=await receiptEmpty.evaluate(element=>{
+    const style=getComputedStyle(element),rect=element.getBoundingClientRect();
+    return {font:parseFloat(style.fontSize),align:style.textAlign,
+      color:style.color,height:Math.round(rect.height),text:(element.textContent??"").trim()};
+  });
+  assert.equal(receiptEmptyStyle.align,"left",
+    "Receipt placeholder must align with ordinary content: "+JSON.stringify(receiptEmptyStyle));
+  assert.ok(receiptEmptyStyle.font >= 13 && receiptEmptyStyle.font <= 15,
+    "Receipt placeholder should not use superseded 12px font: "+JSON.stringify(receiptEmptyStyle));
+  console.log("PASS: receipt detail placeholder uses readable left-aligned empty state",JSON.stringify(receiptEmptyStyle));
   const layoutSamples=[];
   const styleProbe=[];
   const samplePageStyle = async (name) => {
