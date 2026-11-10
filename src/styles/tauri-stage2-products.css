@@ -363,7 +363,7 @@
   font-size: calc(12px * var(--ui-scale, 1));
 }
 .registry-row-info .warnings { flex-basis: 100%; margin: 0; }
-.registry-row > .ui-button {
+.app-v03 .management-container .registry-row > .ui-button {
   flex: none;
   align-self: center;
   height: var(--control-compact);
