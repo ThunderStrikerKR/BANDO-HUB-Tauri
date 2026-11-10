@@ -1,6 +1,7 @@
 import { FactoryReplyHistory } from "./FactoryReplyHistory";
 import { HelpTooltip } from "./ui/HelpTooltip";
-import { PageHeading } from "./ui/PageHeading";
+import { EmptyState, PageHeading } from "./ui/PageHeading";
+import { ManagementTable } from "./ui/ManagementTable";
 import { ManagementSearch } from "./ui/ManagementSearch";
 import { FactoryReplyImport } from "./FactoryReplyImport";
 import { ActualFreightField } from "./ActualFreightField";
@@ -92,6 +93,22 @@ export function WorkflowQueue({
   const visible = rows.map((q) => q.id),
     chosen = selected.filter((id) => visible.includes(id)),
     all = !!visible.length && chosen.length === visible.length;
+  const exportHistoryRows = state.exports
+    .filter(
+      (e) =>
+        e.filename.includes(query) ||
+        e.orderIds.some((id) =>
+          state.orders.find((o) => o.id === id)?.clientSnapshot?.name?.includes(query),
+        ),
+    )
+    .slice()
+    .reverse();
+  const hasReplyHistory = (state.factoryReplies ?? []).some(
+    (reply) => (reply.filename + " " + reply.businessDate).includes(query),
+  );
+  const excelListEmpty = scope === "HISTORY"
+    ? exportHistoryRows.length === 0 && !hasReplyHistory
+    : rows.length === 0 && legacy.length === 0;
   const companyMissing = chosen.some((id) => {
     const q = state.workflow?.queue.find((row) => row.id === id),
       ship = state.workflow?.shipments.find((s) => s.id === q?.shipmentId),
@@ -131,9 +148,9 @@ export function WorkflowQueue({
       {scope === "HISTORY" && (
         <FactoryReplyImport onSave={onSave} onRefresh={onRefresh} onNotice={onNotice} />
       )}
-      <div className="excel-table-scroll">
+      <div className={"excel-table-scroll" + (excelListEmpty ? " excel-list-empty" : "")}>
         {scope === "HISTORY" ? (
-          <table className="management-data-table excel-history-table">
+          <ManagementTable className="excel-history-table">
             <thead>
               <tr>
                 <th>작성 날짜</th>
@@ -143,16 +160,7 @@ export function WorkflowQueue({
               </tr>
             </thead>
             <tbody>
-              {state.exports
-                .filter(
-                  (e) =>
-                    e.filename.includes(query) ||
-                    e.orderIds.some((id) =>
-                      state.orders.find((o) => o.id === id)?.clientSnapshot?.name?.includes(query),
-                    ),
-                )
-                .slice()
-                .reverse()
+              {exportHistoryRows
                 .map((e) => (
                   <tr key={e.id}>
                     <td>{new Date(e.at).toLocaleString("ko-KR")}</td>
@@ -243,9 +251,9 @@ export function WorkflowQueue({
                   </tr>
                 ))}
             </tbody>
-          </table>
+          </ManagementTable>
         ) : (
-          <table className="management-data-table excel-queue-table">
+          <ManagementTable className="excel-queue-table">
             <thead>
               <tr>
                 <th>
@@ -377,7 +385,13 @@ export function WorkflowQueue({
                 </tr>
               ))}
             </tbody>
-          </table>
+          </ManagementTable>
+        )}
+        {scope === "HISTORY" && !exportHistoryRows.length && (
+          <EmptyState compact title={query ? "검색 조건에 맞는 Excel 작성 이력이 없습니다." : "Excel 작성 이력이 없습니다."} />
+        )}
+        {scope !== "HISTORY" && !rows.length && !legacy.length && (
+          <EmptyState compact title={query ? "검색 조건에 맞는 발송 대기 건이 없습니다." : "발송 대기 건이 없습니다."} />
         )}
         {scope === "HISTORY" && (
           <FactoryReplyHistory state={state} query={query} onOpen={onOpen}
