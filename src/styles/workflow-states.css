@@ -169,13 +169,8 @@
   border-radius: 4px;
   font-size: 15px;
 }
-.messages-pane > .field {
-  margin: 0 8px 7px;
-}
 .messages-pane > .field textarea {
-  min-height: 60px;
   max-height: 140px;
-  resize: vertical;
   font-size: 14px;
 }
 .messages-pane > .row-end {
