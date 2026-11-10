@@ -18,8 +18,16 @@
 5. 열이 실제로 많아지면 표 콘텐츠를 억지로 여러 줄로 압축하지 않고 해당 표의 가로 스크롤을 제공한다.
 6. 임의의 데이터 생략이나 숨김은 금지한다. 선택한 상세 보기로 늘어나는 내용은 사용자가 확장했을 때 표시한다.
 
-## 유지보수
-- 공유 스타일 파일 `src/styles/management-layout.css`을 마지막에 적용하여 개별 구 버전 CSS와 충돌하지 않도록 한다.
-- 새 관리 페이지를 추가할 때 기존 `PageHeading`, `ManagementSearch`, `management-search-toolbar`, `management-tabbar`, `management-data-table`을 활용한다.
-- JSX/CSS 구조 검사뿐 아니라 실제 브라우저에서 입력 높이, 제목 크기, 표 줄바꿈, 탭 순서를 검증한다.
+## 유지보수와 스타일 소유권
+- 디자인 토큰(`src/styles/tokens.css`)과 공통 컨트롤(`src/styles/components.css`)을 기본으로 한다. 제목과 검색/탭/공통 표의 화면 배치는 `src/styles/management-layout.css`이 담당한다.
+- 상품관리 고유 패널과 대표색상 폼의 레이아웃은 `src/styles/product-admin-redesign.css`, 운임관리 고유 폼 및 그룹별 액션 레이아웃은 `src/styles/shipping.css`에서 관리한다.
+- **최종 CSS 파일에 덮어쓰기 규칙만 추가하는 방식은 완료 기준이 아니다.** 동일 요소를 제어하는 기존 선언을 확인하고, 중복 선언을 원래 소유 파일에서 제거하거나 공통 컴포넌트 스타일로 이동한다. 임시 우선순위 추가가 필요하다면 해당 충돌 원인과 제거 조건을 남긴다.
+- 공통 `PageHeading`, `ManagementSearch`, `Button`, `Field`, `EmptyState` 및 `management-search-toolbar`, `management-tabbar`, `management-data-table`을 우선 재사용한다. 사용자 선택 자체가 기능인 트리 행과 같은 특수 조작 요소는 무조건 `Button`으로 교체하지 않는다.
+- 입력 폼은 레이블과 컨트롤을 `Field`로 연결하고, 동일한 역할의 버튼은 `Button`의 용도별 변형을 사용한다. 폼 행과 목록 행의 여백은 해당 레이아웃의 소유 CSS에서 정한다.
+- JSX/CSS 구조 검사뿐 아니라 **실제 렌더링의 계산된 크기와 좌표**, 입력 및 저장 동작, 창 폭에 따른 줄바꿈을 확인한다.
 - 기능 및 데이터 저장 정책은 화면 구조를 변경한다는 이유로 변경하지 않는다.
+
+## 단계별 적용 현황
+- 1단계: 브랜드 및 별칭 관리 입력 폼, 등록 목록, 정정 버튼을 공통화. 미저장 전환 테스트와 실제 행 간격 검사 추가.
+- 2단계: 대표색상 관리와 운임 그룹 관리의 새 그룹 입력, 공통 버튼, 목록 조작 높이와 여백을 적용. 검증 완료 여부는 해당 GitHub Actions 실행 결과로 판정.
+- **미완료:** 다른 관리 화면의 공통 컴포넌트 전환, CSS 중복 선택자 전수 제거, 전 하위 탭의 스크린샷 비교 및 Windows EXE 육안 검수. 이 문서는 전체 UI 정규화 완료를 의미하지 않는다.
