@@ -26,6 +26,9 @@ import { optimizeProductImage } from "./product-image-preprocess";
 import { RegistrationManager } from "./RegistrationManager";
 import type { NoticeSink } from "./shared/notices";
 import { useAsyncTask } from "./shared/useAsyncTask";
+import { sameValue } from "./shared/draft";
+import { requestPageLeave, usePageLeaveGuard } from "./shared/page-leave";
+
 import type { Product, State, Variant } from "./types";
 import { Field, Modal, MoneyInput, clone } from "./ui";
 import { HelpTooltip } from "./ui/HelpTooltip";
@@ -47,6 +50,7 @@ export function ProductManager({
   const [search, setSearch] = useState(""),
     [missing, setMissing] = useState(false),
     [edit, setEdit] = useState<Product>(),
+    [originalEdit, setOriginalEdit] = useState<Product>(),
     [section, setSection] = useState("상품 목록"),
     [adding, setAdding] = useState(false),
     [excelOpen, setExcelOpen] = useState(false),
@@ -95,7 +99,7 @@ export function ProductManager({
     setDetailPriceMode(false);
     setCategoryPicker(false);
     const at = new Date().toISOString();
-    setEdit({
+    const fresh: Product = {
       id: uid(),
       code: "",
       name: "",
@@ -121,11 +125,13 @@ export function ProductManager({
       ],
       createdAt: at,
       updatedAt: at,
-    });
+    };
+    setEdit(fresh);
+    setOriginalEdit(clone(fresh));
   };
-  const save = async () => {
-    if (!edit) return;
-    await runSave(async () => {
+  const save = async (): Promise<boolean> => {
+    if (!edit) return true;
+    const result = await runSave(async () => {
       const p = clone(edit);
       p.code = normalizeModel(p.manufacturerCode?.trim() || p.code || p.name);
       p.name = normalizeModel(p.name || p.code);
@@ -153,13 +159,40 @@ export function ProductManager({
       else next.products.push(p);
       await onSave(next);
       setEdit(undefined);
+      setOriginalEdit(undefined);
       onNotice("상품 상세 정보를 저장했습니다.", "success");
     });
+    return result.ok;
+  };
+  usePageLeaveGuard({
+    label: "상품",
+    hasChanges: () => !!edit && !!originalEdit && !sameValue(edit, originalEdit),
+    busy: () => savingView,
+    save,
+    discard: () => { setEdit(undefined); setOriginalEdit(undefined); setCategoryPicker(false); },
+  });
+  const closeDetail = async () => {
+    if (!edit || savingView) return;
+    if (originalEdit && !sameValue(edit, originalEdit)) {
+      const leave = await requestPageLeave((message) => onNotice(message, "error"));
+      if (!leave.proceed) return;
+    }
+    setEdit(undefined);
+    setOriginalEdit(undefined);
+    setCategoryPicker(false);
+  };
+  const chooseSection = async (next: string) => {
+    if (next === section) return;
+    const leave = await requestPageLeave((message) => onNotice(message, "error"));
+    if (!leave.proceed) return;
+    setSection(next);
+    setSearch("");
   };
   const openDetail = (p: Product) => {
     setDetailPriceMode(false);
     setCategoryPicker(false);
     setEdit(clone(p));
+    setOriginalEdit(clone(p));
   };
   const remove = async (p: Product) => {
     if (
@@ -176,6 +209,7 @@ export function ProductManager({
       next.aliases = next.aliases.filter((a) => a.productId !== p.id);
       await onSave(next);
       setEdit(undefined);
+      setOriginalEdit(undefined);
       onNotice("상품을 삭제하고 과거 기록은 보존했습니다.");
     } catch (e) {
       onNotice(String(e), "error");
@@ -195,7 +229,7 @@ export function ProductManager({
           <button
             key={label}
             aria-current={section === label ? "page" : undefined}
-            onClick={() => { setSection(label); setSearch(""); }}
+            onClick={() => void chooseSection(label)}
           >
             {label}
           </button>
@@ -354,7 +388,7 @@ export function ProductManager({
             busy={savingView}
             className="product-detail-dialog"
             title={state.products.some((item) => item.id === edit.id) ? "상품 상세 관리" : "상품 등록"}
-            onClose={() => { if (!savingView) { setEdit(undefined); setCategoryPicker(false); } }}
+            onClose={() => void closeDetail()}
           >
             <div className="product-detail-body">
               <div className="product-detail-top">
@@ -506,7 +540,7 @@ export function ProductManager({
               </details>
             </div>
             <div className="product-detail-footer">
-              <button type="button" disabled={savingView} onClick={() => setEdit(undefined)}>취소</button>
+              <button type="button" disabled={savingView} onClick={() => void closeDetail()}>취소</button>
               <button type="button" className="primary" disabled={savingView} onClick={() => void save()}>
                 {savingView ? "저장 중" : "변경사항 저장"}
               </button>

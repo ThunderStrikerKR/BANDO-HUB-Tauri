@@ -8,6 +8,9 @@ import { ClientWorkbookTools } from "./ClientWorkbookTools";
 import { colorLabel, registeredProducts } from "./product-models";
 import type { NoticeSink } from "./shared/notices";
 import { useAsyncTask } from "./shared/useAsyncTask";
+import { sameValue } from "./shared/draft";
+import { requestPageLeave, usePageLeaveGuard } from "./shared/page-leave";
+
 import type { Client, State } from "./types";
 import { Field, Modal, MoneyInput, clone } from "./ui";
 import { AccountPicker } from "./ui/AccountPicker";
@@ -42,31 +45,37 @@ export function ClientManager({
   };
   const closeEdit = async () => {
     if (!edit || savingView) return;
-    if (originalEdit && JSON.stringify(edit) !== JSON.stringify(originalEdit) &&
-      !(await confirmAction("저장하지 않은 변경사항이 있습니다. 저장하지 않고 닫을까요?"))) return;
+    if (originalEdit && !sameValue(edit, originalEdit)) {
+      const leave = await requestPageLeave((message) => onNotice(message, "error"));
+      if (!leave.proceed) return;
+    }
     setEdit(undefined);
     setOriginalEdit(undefined);
   };
   const switchSection = async (next: "clients" | "messages") => {
     if (section === next) return;
-    if (section === "messages" && messageDirty &&
-        !(await confirmAction("자동 메시지를 저장하지 않았습니다. 변경 내용을 버리고 이동할까요?"))) return;
+    if (section === "messages" && messageDirty) {
+      const leave = await requestPageLeave((message) => onNotice(message, "error"));
+      if (!leave.proceed) return;
+    }
     setMessageDirty(false);
     setSection(next);
   };
   const switchMessageSection = async (next: "general" | "provisional") => {
     if (messageSection === next) return;
-    if (messageDirty &&
-        !(await confirmAction("자동 메시지에 저장하지 않은 내용이 있습니다. 변경 내용을 버리고 이동할까요?"))) return;
+    if (messageDirty) {
+      const leave = await requestPageLeave((message) => onNotice(message, "error"));
+      if (!leave.proceed) return;
+    }
     setMessageDirty(false);
     setMessageSection(next);
   };
   const rows = search
     ? clientCandidates(search, state.clients)
     : state.clients.filter((c) => !c.deletedAt);
-  const save = async () => {
-    if (!edit) return;
-    await runSave(async () => {
+  const save = async (): Promise<boolean> => {
+    if (!edit) return true;
+    const result = await runSave(async () => {
       if (!edit.name.trim()) throw Error("거래처명을 입력하세요.");
       if (!edit.address?.trim()) throw Error("거래처 주소를 입력하세요.");
       if (!(edit.phone?.trim() || edit.mobile?.trim()))
@@ -79,9 +88,18 @@ export function ClientManager({
       else next.clients.push(edit);
       await onSave(next);
       setEdit(undefined);
+      setOriginalEdit(undefined);
       onNotice("거래처를 저장했습니다.", "success");
     });
+    return result.ok;
   };
+  usePageLeaveGuard({
+    label: "거래처",
+    hasChanges: () => !!edit && !!originalEdit && !sameValue(edit, originalEdit),
+    busy: () => savingView,
+    save,
+    discard: () => { setEdit(undefined); setOriginalEdit(undefined); },
+  });
   return (
     <div className="fixed-manager">
       <nav className="product-subnav" aria-label="거래처 관리 메뉴">
