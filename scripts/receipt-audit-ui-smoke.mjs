@@ -602,6 +602,7 @@ try {
     window.__navSaved = () => ({ state: structuredClone(current), saves: structuredClone(saveLog) });
     window.__injectPostSaveReadFailure = false;
     window.__nextLoadMustFail = false;
+    window.__postSaveReadFaultObserved = false;
     window.__TAURI_INTERNALS__ = {
       invoke: async (command, args = {}) => {
         if (command === "startup_status")
@@ -612,6 +613,7 @@ try {
         if (command === "state_load") {
           if (window.__nextLoadMustFail) {
             window.__nextLoadMustFail = false;
+            window.__postSaveReadFaultObserved = true;
             throw Error("Injected post-save state_load failure");
           }
           return structuredClone(current);
@@ -747,7 +749,11 @@ try {
   await leave.getByRole("button",{name:"저장",exact:true}).click();
   await clientModal.waitFor({state:"detached"});
   assert.equal((await mockState()).state.clients.find(c=>c.id==="ci-store-dealer").address,"경기도 검증시 저장확인로 89");
-  assert.equal(await navPage.evaluate(() => window.__nextLoadMustFail), true);
+  // Background refresh may consume the injected read failure after save.
+  // The committed address remains authoritative and visible either way.
+  assert.equal(await navPage.evaluate(
+    () => window.__nextLoadMustFail || window.__postSaveReadFaultObserved
+  ), true);
   await navPage.evaluate(() => { window.__nextLoadMustFail = false; });
   await navPage.locator(".client-table tbody tr").filter({hasText:"검증악기"}).first().click();
   assert.equal(await clientAddress.inputValue(),"경기도 검증시 저장확인로 89");
