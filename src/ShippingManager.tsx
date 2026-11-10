@@ -132,13 +132,17 @@ export function ShippingManager({
   };
   usePageLeaveGuard({
     label: "운임 관리",
-    hasChanges: () => changes.length > 0 || editingDirty,
+    hasChanges: () => changes.length > 0 || editingDirty || newName.length > 0,
     busy: () => busy,
     save: async () => {
+      if (newName.length > 0) {
+        onNotice("새 배송 그룹을 등록하려면 배송 그룹 추가를 눌러 주세요. 등록 전의 이름은 자동 저장하지 않습니다.", "error");
+        return false;
+      }
       if (editingDirty) return saveEditedRule();
       return savePending();
     },
-    discard: () => { setPending({});setSelected([]);setEditing(undefined);setInitialEditing(undefined); },
+    discard: () => { setPending({});setSelected([]);setEditing(undefined);setInitialEditing(undefined);setNewName(""); },
   });
   const chooseTab = async (next: typeof tab) => {
     if (next === tab) return;

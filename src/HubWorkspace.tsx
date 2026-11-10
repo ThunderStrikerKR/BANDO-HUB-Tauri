@@ -2,11 +2,13 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ComponentPro
 import { createPortal, flushSync } from "react-dom";
 import { HubPanels, defaultPanels } from "./HubPanels";
 import { askSaveChanges } from "./dialogs";
+import { requestPageLeave } from "./shared/page-leave";
 import { LinkContext } from "./LinkedText";
 import { MessageWorkspace } from "./MessageWorkspace";
 import { OrderDesk } from "./OrderDesk";
 import { WorkflowBoard, type WorkflowSelection } from "./WorkflowBoard";
 import { newReception } from "./orders/reception";
+import { retainUnsavedOrderEdits } from "./order-edit-snapshots";
 import type { Order } from "./types";
 import { groupShipments, reconcileWorkflow } from "./workflow";
 import { activeShipments, validSelection } from "./workspace-selection";
@@ -69,13 +71,17 @@ export function HubWorkspace(props: Props) {
       | ((previous: WorkflowSelection | undefined) => WorkflowSelection | undefined),
   ) => {
     const next = typeof value === "function" ? value(selected) : value;
-    if (selected?.orderId && next?.orderId && selected.orderId !== next.orderId) {
-      void leaveGuardRef.current().then(({ proceed }) => {
-        if (proceed) applySelection(next);
-      }).catch((error) => props.onNotice(String(error), "error"));
-      return;
-    }
-    applySelection(next);
+    if (next?.shipmentId === selected?.shipmentId && next?.orderId === selected?.orderId && next?.groupId === selected?.groupId) return;
+    void (async () => {
+      // In-place shipment changes can unmount an actual-freight editor too.
+      const fields = await requestPageLeave((message) => props.onNotice(message, "error"));
+      if (!fields.proceed) return;
+      if (selected?.orderId && next?.orderId && selected.orderId !== next.orderId) {
+        const leave = await leaveGuardRef.current();
+        if (!leave.proceed) return;
+      }
+      applySelection(next);
+    })().catch((error) => props.onNotice(String(error), "error"));
   };
   useEffect(() => {
     if (!selected?.shipmentId) return;
@@ -125,7 +131,6 @@ export function HubWorkspace(props: Props) {
         state.orders.find((o) => o.id === selected.orderId && !o.deletedAt))
     : undefined;
   const onSave = async (next: typeof state) => {
-    const savingEdits = edits;
     const removed =
       next.workflow?.groups.filter(
         (g) => g.deletedAt && !state.workflow?.groups.find((old) => old.id === g.id)?.deletedAt,
@@ -137,16 +142,8 @@ export function HubWorkspace(props: Props) {
     const removedCurrent = removed.some((g) => g.id === selected?.groupId);
     if (removedCurrent) deletedSelection.current = selected;
     await props.onWorkflowSave(next);
-    setEdits((previous) =>
-      Object.fromEntries(
-        Object.entries(previous).filter(
-          ([id, o]) =>
-            activeShipments(next).some((s) => s.orderId === id) &&
-            (!next.orders.find((n) => n.id === id) ||
-              JSON.stringify(o) !== JSON.stringify(savingEdits[id])),
-        ),
-      ),
-    );
+    // A workflow save for another order must not discard this order's unsaved edits.
+    setEdits((previous) => retainUnsavedOrderEdits(previous, next.orders));
     if (removed.length || restored.length) {
       props.onNotice("");
       const target = validSelection(

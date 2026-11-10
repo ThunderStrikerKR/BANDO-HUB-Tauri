@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { sameValue } from "./shared/draft";
-import { usePageLeaveGuard } from "./shared/page-leave";
+import { requestPageLeave, usePageLeaveGuard } from "./shared/page-leave";
 import { uid } from "./domain";
 import { aliasProblems, internalModel, saveAlias } from "./matching";
 import { ProductSearchDialog } from "./ProductSearchDialog";
@@ -39,6 +39,18 @@ export function AliasManager({
     } catch (error) {onNotice(String(error), "error");return false;}
   };
   usePageLeaveGuard({ label: "상품 별칭", hasChanges: () => dirty, save: saveEntry, discard });
+  const chooseAlias = async (alias: State["aliases"][number]) => {
+    if (editing === alias.id) return;
+    if (dirty) {
+      const leave = await requestPageLeave((message) => onNotice(message, "error"));
+      if (!leave.proceed) return;
+    }
+    setEditing(alias.id);
+    setText(alias.text);
+    setTarget(alias.productId);
+    setScope(alias.clientId ?? "common");
+    setOriginalForm({text:alias.text,target:alias.productId,scope:alias.clientId ?? "common",editing:alias.id});
+  };
   return (
     <section className="card alias-manager">
       <h2>공통 / 거래처 별칭 관리</h2>
@@ -82,13 +94,7 @@ export function AliasManager({
                 </p>
               )}
               <button
-                onClick={() => {
-                  setEditing(a.id);
-                  setText(a.text);
-                  setTarget(a.productId);
-                  setScope(a.clientId ?? "common");
-                  setOriginalForm({text:a.text,target:a.productId,scope:a.clientId ?? "common",editing:a.id});
-                }}
+                onClick={() => void chooseAlias(a)}
               >
                 연결 정정
               </button>

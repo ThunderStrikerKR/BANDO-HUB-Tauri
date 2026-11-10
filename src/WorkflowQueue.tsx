@@ -2,6 +2,8 @@ import { FactoryReplyHistory } from "./FactoryReplyHistory";
 import { HelpTooltip } from "./ui/HelpTooltip";
 import { FactoryReplyImport } from "./FactoryReplyImport";
 import { ActualFreightField } from "./ActualFreightField";
+import { actualFreightOf, recordActualFreight } from "./actual-freight";
+import { requestPageLeave, usePageLeaveGuard } from "./shared/page-leave";
 import { createFactoryWorkbook, previewFactoryExport, recordFactoryExport } from "./factory-export";
 import { createStoreWorkbook, previewStoreExport, recordStoreExport } from "./store-export";
 import { confirmAction } from "./dialogs";
@@ -11,7 +13,7 @@ import { won } from "./domain";
 import { internalModel } from "./matching";
 import type { NoticeSink } from "./shared/notices";
 import { useAsyncTask } from "./shared/useAsyncTask";
-import type { State } from "./types";
+import type { Origin, Price, State } from "./types";
 import { markStoreSent, restoreShipment, shipmentContext } from "./workflow";
 export function WorkflowQueue({
   state,
@@ -32,6 +34,35 @@ export function WorkflowQueue({
     [scope, setScope] = useState<"FACTORY" | "STORE" | "HISTORY">("FACTORY"),
     [selected, setSelected] = useState<string[]>([]),
     [query, setQuery] = useState("");
+  const [freightDrafts, setFreightDrafts] = useState<Record<string, { shipmentId: string; origin: Origin; value: Price }>>({});
+  const pendingFreight = Object.values(freightDrafts).filter(({shipmentId, origin, value}) => {
+    const ship = state.workflow?.shipments.find((s) => s.id === shipmentId);
+    const row = state.orders.find((o) => o.id === ship?.orderId)
+      ?.recipients.find((r) => r.id === ship?.recipientId);
+    return !ship || !row || actualFreightOf(ship, row, origin) !== value;
+  });
+  const saveFreightDrafts = async (): Promise<boolean> => {
+    if (busy) return false;
+    if (!pendingFreight.length) return true;
+    try {
+      let latest = await window.bando!.load();
+      for (const { shipmentId, origin, value } of pendingFreight)
+        latest = recordActualFreight(latest, shipmentId, origin, value);
+      await onSave(latest);
+      setFreightDrafts({});
+      return true;
+    } catch (error) {
+      onNotice(String(error), "error");
+      return false;
+    }
+  };
+  usePageLeaveGuard({
+    label: "실제 출고 운임",
+    hasChanges: () => pendingFreight.length > 0,
+    busy: () => busy,
+    save: saveFreightDrafts,
+    discard: () => setFreightDrafts({}),
+  });
   const rows = (state.workflow?.queue ?? [])
     .filter((q) => q.status === "QUEUED" && q.origin === scope)
     .filter((q) => {
@@ -77,11 +108,14 @@ export function WorkflowQueue({
           <button
             key={value}
             aria-pressed={scope === value}
-            onClick={() => {
+            onClick={() => void (async () => {
+              if (scope === value) return;
+              const leave = await requestPageLeave((message) => onNotice(message, "error"));
+              if (!leave.proceed) return;
               setScope(value);
               setSelected([]);
               setQuery("");
-            }}
+            })()}
           >
             {["공장 엑셀 대기", "매장 발송 대기", "엑셀 작성 이력"][index]}
           </button>
@@ -286,6 +320,16 @@ export function WorkflowQueue({
                           shipmentId={ship.id}
                           origin={q.origin}
                           onSave={onSave}
+                          draftValue={freightDrafts[q.origin + ":" + ship.id]?.value}
+                          onDraftChange={(value) => setFreightDrafts((previous) => ({
+                            ...previous,
+                            [q.origin + ":" + ship.id]: { shipmentId: ship.id, origin: q.origin, value },
+                          }))}
+                          onDraftSaved={() => setFreightDrafts((previous) => {
+                            const next = { ...previous };
+                            delete next[q.origin + ":" + ship.id];
+                            return next;
+                          })}
                         />
                         <button
                           disabled={busy || ctx.order.orderType === "RETAIL"}

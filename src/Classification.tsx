@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { sameValue } from "./shared/draft";
-import { usePageLeaveGuard } from "./shared/page-leave";
+import { requestPageLeave, usePageLeaveGuard } from "./shared/page-leave";
 import { CategoriesPanel } from "./ManagementUI";
-import { classifiedProducts, registryKey, validateBrands } from "./product-registry";
+import { classifiedProducts, registryKey, validateBrands, type Brand } from "./product-registry";
 import type { NoticeSink } from "./shared/notices";
 import type { Product, State } from "./types";
 import { Field } from "./ui";
@@ -115,6 +115,19 @@ export function RegistrySettings({
     }
   };
   usePageLeaveGuard({label:"브랜드",hasChanges:()=>dirty,save:saveBrand,discard});
+  const chooseBrand = async (brand: Brand) => {
+    if (editing === brand.id) return;
+    if (dirty) {
+      const leave = await requestPageLeave((message) => onNotice(message, "error"));
+      if (!leave.proceed) return;
+    }
+    setEditing(brand.id);
+    setName(brand.name);
+    setKorean(brand.korean);
+    setAliases(brand.aliases.join(","));
+    setEvidence(brand.evidenceUrl);
+    setInitialForm({name:brand.name,korean:brand.korean,aliases:brand.aliases.join(","),evidence:brand.evidenceUrl,editing:brand.id});
+  };
   return (
     <>
       <section className="card">
@@ -157,14 +170,7 @@ export function RegistrySettings({
           <p key={b.id}>
             {b.name} / {b.korean} / {b.aliases.join(", ")}{" "}
             <button
-              onClick={() => {
-                setEditing(b.id);
-                setName(b.name);
-                setKorean(b.korean);
-                setAliases(b.aliases.join(","));
-                setEvidence(b.evidenceUrl);
-                setInitialForm({name:b.name,korean:b.korean,aliases:b.aliases.join(","),evidence:b.evidenceUrl,editing:b.id});
-              }}
+              onClick={() => void chooseBrand(b)}
             >
               정정
             </button>

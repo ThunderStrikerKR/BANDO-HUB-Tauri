@@ -76,11 +76,17 @@ export function ColorGuidanceManager({state,onRefresh,query=""}: {
   };
   usePageLeaveGuard({
     label: "대표색상",
-    hasChanges: () => unsaved,
+    hasChanges: () => unsaved || name.length > 0,
     busy: () => busy,
-    save,
+    save: async () => {
+      if (name.length > 0) {
+        setStatus("새 그룹 이름을 입력했습니다. 그룹 생성으로 등록하거나 저장 안 함을 선택하세요.");
+        return false;
+      }
+      return save();
+    },
     discard: () => {
-      setDraft(structuredClone(state));setBaseline(structuredClone(state));setSelected("");setStatus("");
+      setDraft(structuredClone(state));setBaseline(structuredClone(state));setSelected("");setName("");setStatus("");
     },
   });
   return <section className="family-admin-workspace" aria-label="대표색상 관리">
