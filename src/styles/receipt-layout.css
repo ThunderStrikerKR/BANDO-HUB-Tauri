@@ -308,11 +308,12 @@
     background-color 180ms ease;
 }
 
-/* Use the shared empty-state text treatment without excessive inner spacing. */
+/* Detail placeholder uses the same readable, left-aligned empty text rhythm
+   as management lists; do not restore the older 12px centered variant. */
 .receipt-panel-content > .detail-empty {
   margin: 0;
   padding: 12px 8px;
-  font: 400 12px/1.6 var(--font-body);
-  color: #9c9c9c;
-  text-align: center;
+  font: 400 calc(13px * var(--ui-scale, 1))/1.4 var(--font-body);
+  color: var(--text-secondary);
+  text-align: left;
 }
