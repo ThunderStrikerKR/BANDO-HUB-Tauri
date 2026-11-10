@@ -757,8 +757,27 @@ try {
   // Product-specific notice: navigation uses the same safe three choices.
   const productSearch=navPage.getByRole("textbox",{name:"안내문을 등록할 상품 검색"});
   // The first keystroke must survive the tab transition without waiting or retrying.
+  await navPage.evaluate(() => {
+    const input = document.getElementById("provisional-notice-product-search");
+    const manager = input?.closest(".fixed-manager");
+    window.__noticeSearchProbe = { input, manager, events: [] };
+    input?.addEventListener("input", () => window.__noticeSearchProbe.events.push({ value: input.value }));
+  });
   await productSearch.fill("BD");
+  const beforeSearchWait=await navPage.evaluate(() => ({
+    value:document.getElementById("provisional-notice-product-search")?.value,
+    events:window.__noticeSearchProbe.events,
+  }));
   await navPage.waitForTimeout(350);
+  const afterSearchWait=await navPage.evaluate(() => ({
+    value:document.getElementById("provisional-notice-product-search")?.value,
+    inputConnected:window.__noticeSearchProbe.input.isConnected,
+    sameInput:window.__noticeSearchProbe.input===document.getElementById("provisional-notice-product-search"),
+    managerConnected:window.__noticeSearchProbe.manager.isConnected,
+    sameManager:window.__noticeSearchProbe.manager===document.getElementById("provisional-notice-product-search")?.closest(".fixed-manager"),
+    events:window.__noticeSearchProbe.events,
+  }));
+  console.log("NOTICE_SEARCH_TRACE",JSON.stringify({beforeSearchWait,afterSearchWait}));
   assert.equal(await productSearch.inputValue(),"BD",
     "The first product-notice search input must not reset after the editor mounts");
   const firstProductNotice=navPage.locator('[aria-label="잠정 상품 선택 안내"] button.family-list-row').first();
