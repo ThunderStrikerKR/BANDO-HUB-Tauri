@@ -4,6 +4,8 @@ import { replyNeedsReview } from "./factory-replies";
 import { useAsyncTask } from "./shared/useAsyncTask";
 import type { NoticeSink } from "./shared/notices";
 import type { State } from "./types";
+import { EmptyState } from "./ui/PageHeading";
+import { ManagementTable } from "./ui/ManagementTable";
 
 export function FactoryReplyHistory({
   state, query, onOpen, onRefresh, onNotice,
@@ -34,9 +36,9 @@ export function FactoryReplyHistory({
     <section className="factory-reply-history">
       <h3>공장 회신 이력</h3>
       {!records.length ? (
-        <p>공장 회신 이력이 없습니다.</p>
+        <EmptyState compact title={query ? "검색 조건에 맞는 공장 회신 이력이 없습니다." : "공장 회신 이력이 없습니다."} />
       ) : (
-        <table>
+        <ManagementTable className="factory-reply-data-table">
           <thead>
             <tr>
               <th>업무 날짜</th>
@@ -92,7 +94,7 @@ export function FactoryReplyHistory({
               </tr>
             ))}
           </tbody>
-        </table>
+        </ManagementTable>
       )}
     </section>
   );
