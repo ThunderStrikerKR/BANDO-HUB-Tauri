@@ -334,6 +334,11 @@
   overflow: auto;
   border: 1px solid #444;
 }
+.excel-table-scroll.excel-list-empty {
+  flex: 0 0 auto;
+  min-height: 0;
+  max-height: min(320px, 45dvh);
+}
 .excel-table-scroll thead {
   position: sticky;
   top: 0;
