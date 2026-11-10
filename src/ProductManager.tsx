@@ -40,7 +40,7 @@ export function ProductManager({
 }: {
   state: State;
   onSave: (state: State) => Promise<void>;
-  onRefresh: () => Promise<void>;
+  onRefresh: (committed?: State) => Promise<void>;
   onNotice: NoticeSink;
 }) {
   const { busy: savingView, run: runSave } = useAsyncTask(onNotice);
@@ -348,8 +348,8 @@ export function ProductManager({
                                 value={v[tier]}
                                 label={`${p.name} ${variantLabel(v)} ${{ wholesale: "도매가", semi: "반도매가", retail: "소매가" }[tier]}`}
                                 onSave={async (n, expected) => {
-                                  await window.bando!.setPrice(p.id, v.id, tier, n, expected);
-                                  await onRefresh();
+                                  const committed = await window.bando!.setPrice(p.id, v.id, tier, n, expected);
+                                  await onRefresh(committed);
                                 }}
                               />
                             </td>

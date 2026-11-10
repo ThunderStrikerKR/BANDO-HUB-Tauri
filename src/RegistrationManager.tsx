@@ -11,7 +11,7 @@ import type { State } from "./types";
 import { Modal } from "./ui";
 
 export function RegistrationManager({
-  state, onSave, onRefresh, onNotice,
+  state, onSave, onNotice,
 }: {
   state: State;
   onSave: (value: State) => Promise<void>;
@@ -56,7 +56,7 @@ export function RegistrationManager({
     await window.bando!.backup();
     // Existing revision-checked application save performs SQLite validation atomically.
     await onSave(result.next);
-    await onRefresh();
+    // The common save already applied the committed SQLite snapshot.
     setPreview(undefined);
     setApproved(false);
     onNotice("신규 상품 " + result.created + "개 등록, 미등록 " + result.skipped + "행. 기존 가격은 유지했습니다.", "success");

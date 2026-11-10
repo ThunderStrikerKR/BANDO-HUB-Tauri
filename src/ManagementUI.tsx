@@ -136,7 +136,6 @@ export function ClientPicker({
 export function CatalogPanel({
   state,
   onSave,
-  onRefresh,
   onError,
 }: {
   state: State;
@@ -170,7 +169,6 @@ export function CatalogPanel({
     const { next, updated } = applyCatalogPriceSync(current, report, review);
     await window.bando!.backup();
     await onSave(next);
-    await onRefresh();
     setReview(undefined);
     setReport(undefined);
     setApproved(false);

@@ -216,7 +216,7 @@ try {
             state.revision = (state.revision ?? 0) + 1;
             window.__storeCommit = structuredClone(state.workflow.queue.find(
               (q) => q.id === "ci-store-queue"));
-            return undefined;
+            return structuredClone(state);
           }
           if (command === "receipt_archive") return structuredClone(auditRecords);
           if (command === "capture_ocr") {
@@ -600,6 +600,8 @@ try {
     let current = structuredClone(initial);
     const saveLog = [];
     window.__navSaved = () => ({ state: structuredClone(current), saves: structuredClone(saveLog) });
+    window.__injectPostSaveReadFailure = false;
+    window.__nextLoadMustFail = false;
     window.__TAURI_INTERNALS__ = {
       invoke: async (command, args = {}) => {
         if (command === "startup_status")
@@ -607,7 +609,13 @@ try {
         if (command === "startup_metrics")
           return { windowShownMs: null, databaseMs: 1, dataMs: null, readyMs: 1 };
         if (command === "workspace_mode") return false;
-        if (command === "state_load") return structuredClone(current);
+        if (command === "state_load") {
+          if (window.__nextLoadMustFail) {
+            window.__nextLoadMustFail = false;
+            throw Error("Injected post-save state_load failure");
+          }
+          return structuredClone(current);
+        }
         if (command === "dock_status_native") return { active: false, mode: "ORIGINAL", ratio: 0.8 };
         if (command === "state_save") {
           if ((args.state.revision ?? 0) !== (current.revision ?? 0))
@@ -615,7 +623,11 @@ try {
           current = structuredClone(args.state);
           current.revision = (current.revision ?? 0) + 1;
           saveLog.push({type:"state_save", revision:current.revision, state:structuredClone(current)});
-          return undefined;
+          if (window.__injectPostSaveReadFailure) {
+            window.__nextLoadMustFail = true;
+            window.__injectPostSaveReadFailure = false;
+          }
+          return structuredClone(current);
         }
         if (command === "settings_patch") {
           current.settings = { ...current.settings, ...args.changes };
@@ -658,12 +670,19 @@ try {
   await clientModal.waitFor({state:"detached"});
   assert.equal((await mockState()).state.clients.find(c=>c.id==="ci-store-dealer").address,originalAddress);
   await navPage.locator(".client-table tbody tr").filter({hasText:"검증악기"}).first().click();
+  await navPage.evaluate(() => { window.__injectPostSaveReadFailure = true; });
   await clientAddress.fill("경기도 검증시 저장확인로 89");
   await clientModal.getByRole("button",{name:"취소",exact:true}).click();
   await leave.getByRole("button",{name:"저장",exact:true}).click();
   await clientModal.waitFor({state:"detached"});
   assert.equal((await mockState()).state.clients.find(c=>c.id==="ci-store-dealer").address,"경기도 검증시 저장확인로 89");
-  console.log("PASS: client detail Save / Discard / Cancel (actual React modal)");
+  assert.equal(await navPage.evaluate(() => window.__nextLoadMustFail), true);
+  await navPage.evaluate(() => { window.__nextLoadMustFail = false; });
+  await navPage.locator(".client-table tbody tr").filter({hasText:"검증악기"}).first().click();
+  assert.equal(await clientAddress.inputValue(),"경기도 검증시 저장확인로 89");
+  await clientModal.getByRole("button",{name:"취소",exact:true}).click();
+  await clientModal.waitFor({state:"detached"});
+  console.log("PASS: committed client state displays without a post-save SQLite read");
 
   // Product: the existing product editor has the same three-choice leave guard.
   await navMenu.getByRole("button",{name:"상품 관리"}).click();

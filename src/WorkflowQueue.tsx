@@ -207,7 +207,6 @@ export function WorkflowQueue({
                                       "이 매장 발송 파일의 상품을 실제 발송했나요? 파일 작성만으로 발송 완료 처리하지 않습니다."
                                     ))) return;
                                     await onSave(markStoreSent(state, q!.id));
-                                    await onRefresh();
                                   })}
                                 >
                                   매장 발송 확인
@@ -410,7 +409,6 @@ export function WorkflowQueue({
                     const latest = await window.bando!.load();
                     const result = recordStoreExport(latest, preview, savedPath);
                     await onSave(result.next);
-                    await onRefresh();
                     setSelected([]);
                     onNotice("매장 발송 " + preview.rows.length +
                       "건의 출력 이력을 저장했습니다. 실제 발송은 별도 확인해야 합니다.", "success");
@@ -434,7 +432,6 @@ export function WorkflowQueue({
                   const latest = await window.bando!.load();
                   const result = recordFactoryExport(latest, preview, savedPath);
                   await onSave(result.next);
-                  await onRefresh();
                   setSelected([]);
                   onNotice("공장 발송 " + preview.rows.length + "건의 출력 이력을 저장했습니다. 실제 공장 전달은 별도로 확인해 주세요.", "success");
                 } catch (error) {

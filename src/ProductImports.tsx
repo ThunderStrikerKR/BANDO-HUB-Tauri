@@ -8,7 +8,7 @@ import type { ImportPreview, OfficialLink, State } from "./types";
 import { Field } from "./ui";
 
 export function ProductImports({
-  state, onSave, onRefresh, onNotice,
+  state, onSave, onNotice,
 }: {
   state: State;
   onSave: (s: State) => Promise<void>;
@@ -44,7 +44,7 @@ export function ProductImports({
     // Keep a consistent copy of user data before changing the canonical state.
     await window.bando!.backup();
     await onSave(result.next);
-    await onRefresh();
+    // The common save already applied the committed SQLite snapshot.
     setPreview(undefined);
     onNotice(result.created
       ? "공식 상품을 새로 등록했습니다. 미등록 단가와 옵션은 상품 상세에서 확인하세요."

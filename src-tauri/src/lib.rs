@@ -307,7 +307,7 @@ fn initialize_database(path: &Path) -> Result<Connection, String> {
 fn state_load(db: State<'_, Database>) -> Result<Value, String> { get_snapshot(&*lock_db(&db)?) }
 
 #[tauri::command]
-fn state_save(db: State<'_, Database>, state: Value) -> Result<(), String> {
+fn state_save(db: State<'_, Database>, state: Value) -> Result<Value, String> {
     if db.is_test {
         let protected_root = canonical_excel_directory(&db.base.join("Excel"))?;
         let submitted = state["settings"]["excelDirectory"].as_str()
@@ -317,9 +317,9 @@ fn state_save(db: State<'_, Database>, state: Value) -> Result<(), String> {
         }
     }
     let revision = state["revision"].as_u64().ok_or("변경 이력이 없는 데이터를 저장할 수 없습니다.")?;
-    write_snapshot(&mut *lock_db(&db)?, state, revision, true)?;
-    Ok(())
-}
+    // The committed snapshot already contains the new revision.
+    write_snapshot(&mut *lock_db(&db)?, state, revision, true)
+
 
 fn canonical_color_key(value: &str) -> String {
     match value.trim().to_lowercase().as_str() {

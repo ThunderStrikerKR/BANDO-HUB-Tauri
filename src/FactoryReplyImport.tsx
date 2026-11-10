@@ -11,7 +11,7 @@ import { Modal } from "./ui";
 import { HelpTooltip } from "./ui/HelpTooltip";
 
 export function FactoryReplyImport({
-  onSave, onRefresh, onNotice, previewOnly = false,
+  onSave, onNotice, previewOnly = false,
 }: {
   onSave: (state: State) => Promise<void>;
   onRefresh: () => Promise<void>;
@@ -60,7 +60,7 @@ export function FactoryReplyImport({
     } catch (error) {
       throw Error("회신 원본 파일은 보관됐으나 DB 반영에 실패했습니다. 재확인 후 다시 업로드하세요: " + String(error));
     }
-    await onRefresh();
+    // The common save already applied the committed SQLite snapshot.
     setReview(undefined);
     setFile(undefined);
     setAccepted(false);

@@ -13,7 +13,7 @@ export function ProvisionalProductNoticeManager({
   state,onRefresh,onNotice,onDirtyChange,query,onQueryChange,
 }:{
   state: State;
-  onRefresh: () => Promise<void>;
+  onRefresh: (committed?: State) => Promise<void>;
   onNotice: NoticeSink;
   onDirtyChange?: (dirty: boolean) => void;
   query: string;
@@ -72,7 +72,7 @@ export function ProvisionalProductNoticeManager({
       );
       setBaseline(structuredClone(updated.settings.provisionalProductNotices ?? null));
       setDraft(structuredClone(updated.settings.provisionalProductNotices ?? {}));
-      await onRefresh();
+      await onRefresh(updated);
       setStatus("상품별 잠정 선택 안내문을 저장했습니다.");
       onNotice("상품별 잠정 선택 안내문을 저장했습니다.","success");
       return true;

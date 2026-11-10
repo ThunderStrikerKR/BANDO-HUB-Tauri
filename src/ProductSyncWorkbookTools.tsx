@@ -12,7 +12,7 @@ import type { State } from "./types";
 import { Modal } from "./ui";
 
 export function ProductSyncWorkbookTools({
-  onSave, onRefresh, onNotice,
+  onSave, onNotice,
 }: {
   onSave: (state: State) => Promise<void>;
   onRefresh: () => Promise<void>;
@@ -61,7 +61,7 @@ export function ProductSyncWorkbookTools({
     const result = applyUnifiedProductWorkbook(state, review);
     await window.bando!.backup();
     await onSave(result.next);
-    await onRefresh();
+    // The common save already applied the committed SQLite snapshot.
     onNotice("상품 Excel 변경사항을 저장했습니다. 기존 데이터는 백업했습니다.", "success");
     setReview(undefined);
     setApproved(false);

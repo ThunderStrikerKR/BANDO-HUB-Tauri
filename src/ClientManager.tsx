@@ -23,7 +23,7 @@ export function ClientManager({
 }: {
   state: State;
   onSave: (s: State) => Promise<void>;
-  onRefresh: () => Promise<void>;
+  onRefresh: (committed?: State) => Promise<void>;
   onNotice: NoticeSink;
 }) {
   const { busy: savingView, run: runSave } = useAsyncTask(onNotice);

@@ -121,8 +121,8 @@ export function useAppModel() {
           .then(async (next) => {
             next.settings.panelRatios = [20, 30, 30, 20];
             next.settings.receptionVerticalRatio = 0.5;
-            await window.bando!.save(next);
-            setState(await window.bando!.load());
+            const committed = await window.bando!.save(next);
+            await refresh(committed);
           })
           .catch((e) => setNotice(String(e), "error"));
       }),
@@ -148,14 +148,19 @@ export function useAppModel() {
     const timer = setInterval(() => {
       void window
         .bando!.load()
-        .then((next) => setState((old) => (old && next.revision !== old.revision ? next : old)))
+        .then((next) => setState((old) => (!old || (next.revision ?? 0) > (old.revision ?? 0) ? next : old)))
         .catch(() => {});
     }, 4000);
     return () => clearInterval(timer);
   }, [startup.phase]);
   const commitGuard = useRef(false);
-  const refresh = async () => {
-    setState(await window.bando!.load());
+  const lastCommitted = useRef<State>();
+  // Native write commands return an authoritative snapshot after the transaction.
+  const refresh = async (committed?: State) => {
+    const result = committed ?? await window.bando!.load();
+    setState((previous) =>
+      !previous || (result.revision ?? 0) >= (previous.revision ?? 0) ? result : previous,
+    );
   };
   const commit = async (next: State) => {
     if (commitGuard.current) throw Error("다른 변경을 저장 중입니다. 잠시 후 다시 시도하세요.");
@@ -167,11 +172,15 @@ export function useAppModel() {
       );
       const persistent = persistedReceptionState(state!, next);
       if (JSON.stringify(persistent) === JSON.stringify(state)) {
+        lastCommitted.current = state;
         if (prepared) setDraft(clone(prepared));
         return;
       }
-      await window.bando!.save(persistent);
-      setState(await window.bando!.load());
+      // A successful native response proves the write committed.
+      // No post-commit state_load is required to update the visible state.
+      const committed = await window.bando!.save(persistent);
+      lastCommitted.current = committed;
+      await refresh(committed);
       if (prepared) setDraft(clone(prepared));
     } finally {
       commitGuard.current = false;
@@ -329,7 +338,7 @@ export function useAppModel() {
       return;
     }
     if (!includesDraft) return;
-    const loaded = await window.bando!.load();
+    const loaded = lastCommitted.current!;
     const current = loaded.orders.find((o) => o.id === draft.id);
     if (current) {
       const all =

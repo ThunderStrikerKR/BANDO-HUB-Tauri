@@ -14,7 +14,7 @@ import type { NoticeSink } from "./shared/notices";
 export function AutomaticMessageTemplateManager({
   state,onRefresh,onNotice,onDirtyChange,
 }:{
-  state:State;onRefresh:()=>Promise<void>;onNotice:NoticeSink;onDirtyChange?:(dirty:boolean)=>void;
+  state:State;onRefresh:(committed?:State)=>Promise<void>;onNotice:NoticeSink;onDirtyChange?:(dirty:boolean)=>void;
 }) {
   const [baseline,setBaseline]=useState<AutomaticTemplateEdits>(()=>structuredClone(state.settings.automaticMessageTemplates??{}));
   const [draft,setDraft]=useState<AutomaticTemplateEdits>(()=>structuredClone(state.settings.automaticMessageTemplates??{}));
@@ -63,7 +63,7 @@ export function AutomaticMessageTemplateManager({
       );
       const saved=structuredClone(updated.settings.automaticMessageTemplates??{});
       setBaseline(saved);setDraft(structuredClone(saved));
-      await onRefresh();
+      await onRefresh(updated);
       setStatus("상황별 자동 메시지를 저장했습니다.");
       onNotice("자동 메시지 설정을 저장했습니다.","success");
       return true;

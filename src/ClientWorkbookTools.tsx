@@ -11,7 +11,7 @@ import { Modal } from "./ui";
 import { HelpTooltip } from "./ui/HelpTooltip";
 
 export function ClientWorkbookTools({
-  onSave, onRefresh, onNotice,
+  onSave, onNotice,
 }: {
   onSave: (value: State) => Promise<void>;
   onRefresh: () => Promise<void>;
@@ -58,7 +58,7 @@ export function ClientWorkbookTools({
     const { next, created, updated } = applyClientWorkbook(current, preview);
     await window.bando!.backup();
     await onSave(next);
-    await onRefresh();
+    // The common save already applied the committed SQLite snapshot.
     setPreview(undefined);
     setAccepted(false);
     onNotice("거래처 신규 " + created + "건, 수정 " + updated + "건 저장했습니다. 기존 주문과 특수 단가는 유지했습니다.", "success");

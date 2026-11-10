@@ -621,7 +621,7 @@ export interface Api {
   windowControl: (action: "minimize" | "maximize" | "close") => Promise<void>;
   dockSelect: (handle: string) => Promise<DockStatus>;
   load: () => Promise<State>;
-  save: (state: State) => Promise<void>;
+  save: (state: State) => Promise<State>;
   patchSettings?: (changes: Record<string, unknown>, expected: Record<string, unknown>) => Promise<State>;
   chooseExcelDirectory: () => Promise<string | undefined>;
   openExcelDirectory: () => Promise<void>;

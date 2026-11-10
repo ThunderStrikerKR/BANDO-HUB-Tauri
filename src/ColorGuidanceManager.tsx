@@ -8,7 +8,7 @@ import { colorLabel, registeredProducts } from "./product-models";
 import type { State } from "./types";
 
 export function ColorGuidanceManager({state,onRefresh,query=""}: {
-  state:State;onRefresh:()=>Promise<void>;query?:string;
+  state:State;onRefresh:(committed?:State)=>Promise<void>;query?:string;
 }) {
   const [draft,setDraft]=useState<State>(()=>structuredClone(state));
   const [baseline,setBaseline]=useState<State>(()=>structuredClone(state));
@@ -68,7 +68,7 @@ export function ColorGuidanceManager({state,onRefresh,query=""}: {
         {colorGuidanceGroups:baseline.settings.colorGuidanceGroups??null}
       );
       setDraft(structuredClone(updated));setBaseline(structuredClone(updated));
-      await onRefresh();
+      await onRefresh(updated);
       setStatus("대표색상 설정만 저장했습니다. 기존 상품과 주문은 변경하지 않았습니다.");
       return true;
     }catch(error){setStatus(String(error));return false;}

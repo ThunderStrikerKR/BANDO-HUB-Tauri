@@ -33,7 +33,7 @@ const api: Api = {
   saveClientWorkbook: (bytes) => invoke<string | null>("save_client_workbook", { bytes }),
   saveRegistrationWorkbook: (kind, bytes) => invoke<string | null>("save_registration_workbook", { kind, bytes }),
   load: () => invoke<State>("state_load"),
-  save: (state) => invoke<void>("state_save", { state }),
+  save: (state) => invoke<State>("state_save", { state }),
   patchSettings: (changes, expected) => invoke<State>("settings_patch", { changes, expected }),
   setPrice: (productId, variantId, tier, price, expected) =>
     invoke<State>("price_set", { productId, variantId, tier, price, expected }),
