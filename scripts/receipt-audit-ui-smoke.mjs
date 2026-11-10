@@ -579,6 +579,19 @@ try {
       maxConfirmed: true, fees: { "1": 3000, "2": 4500 }, note: "" },
     history: [],
   });
+  navFixture.brands ??= [];
+  navFixture.brands.push(
+    { id:"ci-brand-a", name:"CI검증브랜드A", korean:"", aliases:[], evidenceUrl:"https://example.org/ci-a" },
+    { id:"ci-brand-b", name:"CI검증브랜드B", korean:"", aliases:[], evidenceUrl:"https://example.org/ci-b" },
+  );
+  const aliasProduct = navFixture.products.find(p => p.catalog !== "DEMO" && p.variants?.length);
+  navFixture.aliases ??= [];
+  navFixture.aliases.push(
+    { id:"ci-alias-a", text:"CI회귀별칭A", productId:aliasProduct.id,
+      variantId:aliasProduct.variants[0].id, clientId:null, actor:"CI", createdAt:"2026-11-10T00:00:00Z" },
+    { id:"ci-alias-b", text:"CI회귀별칭B", productId:aliasProduct.id,
+      variantId:aliasProduct.variants[0].id, clientId:null, actor:"CI", createdAt:"2026-11-10T00:00:00Z" },
+  );
   const navPage = await browser.newPage({ viewport: { width: 1520, height: 1000 } });
   navPage.setDefaultTimeout(8000);
   const navErrors = [];
@@ -785,6 +798,112 @@ try {
   assert.ok(Object.values((await mockState()).state.settings.provisionalProductNotices??{})
     .some(value=>value==="검증용 안내문 - 저장합니다"));
   console.log("PASS: product-specific notice subtab Save / Discard / Cancel");
+  // In-place edits must ask before switching records, even when the page does not change.
+  await navMenu.getByRole("button", {name:"상품 관리"}).click();
+  const productSubnav = navPage.getByRole("navigation", {name:"상품 관리 메뉴"});
+  await productSubnav.getByRole("button", {name:"브랜드 관리"}).click();
+  const brandInput = navPage.getByRole("textbox", {name:"브랜드 공식명"});
+  const brandRow = (name) => navPage.locator("section.card p").filter({hasText:name});
+  const editBrand = (name) => brandRow(name).getByRole("button", {name:"정정"}).click();
+  await editBrand("CI검증브랜드A");
+  await brandInput.fill("CI브랜드수정취소시험");
+  await editBrand("CI검증브랜드B");
+  await checkPrompt("brand switch");
+  await leave.getByRole("button", {name:"취소",exact:true}).click();
+  assert.equal(await brandInput.inputValue(),"CI브랜드수정취소시험");
+  await editBrand("CI검증브랜드B");
+  await leave.getByRole("button", {name:"저장 안 함"}).click();
+  assert.equal(await brandInput.inputValue(),"CI검증브랜드B");
+  await editBrand("CI검증브랜드A");
+  await brandInput.fill("CI검증브랜드A-저장");
+  await editBrand("CI검증브랜드B");
+  await leave.getByRole("button", {name:"저장",exact:true}).click();
+  assert.equal(await brandInput.inputValue(),"CI검증브랜드B");
+  assert.equal((await mockState()).state.brands.find(b => b.id==="ci-brand-a").name,"CI검증브랜드A-저장");
+  console.log("PASS: brand target switch Save / Discard / Cancel");
+
+  await productSubnav.getByRole("button", {name:"별칭 관리"}).click();
+  const aliasInput = navPage.getByRole("textbox", {name:"관리 별칭"});
+  const editAlias = (name) => navPage.locator(".alias-list article").filter({hasText:name})
+    .getByRole("button", {name:"연결 정정"}).click();
+  await editAlias("CI회귀별칭A");
+  await aliasInput.fill("CI별칭수정취소시험");
+  await editAlias("CI회귀별칭B");
+  await checkPrompt("alias switch");
+  await leave.getByRole("button", {name:"취소",exact:true}).click();
+  assert.equal(await aliasInput.inputValue(),"CI별칭수정취소시험");
+  await editAlias("CI회귀별칭B");
+  await leave.getByRole("button", {name:"저장 안 함"}).click();
+  assert.equal(await aliasInput.inputValue(),"CI회귀별칭B");
+  await editAlias("CI회귀별칭A");
+  await aliasInput.fill("CI회귀별칭A저장검사");
+  await editAlias("CI회귀별칭B");
+  await leave.getByRole("button", {name:"저장",exact:true}).click();
+  assert.equal(await aliasInput.inputValue(),"CI회귀별칭B");
+  assert.equal((await mockState()).state.aliases.find(a => a.id==="ci-alias-a").text,"CI회귀별칭A저장검사");
+  console.log("PASS: alias target switch Save / Discard / Cancel");
+
+  await productSubnav.getByRole("button", {name:"대표색상 관리"}).click();
+  const colorName = navPage.locator("#new-color-group");
+  await colorName.fill("CI 미등록 대표색상");
+  await navMenu.getByRole("button", {name:"거래처 관리"}).click();
+  await checkPrompt("unregistered color group name");
+  await leave.getByRole("button", {name:"취소",exact:true}).click();
+  assert.equal(await colorName.inputValue(),"CI 미등록 대표색상");
+  await navMenu.getByRole("button", {name:"거래처 관리"}).click();
+  await leave.getByRole("button", {name:"저장",exact:true}).click();
+  assert.equal(await colorName.inputValue(),"CI 미등록 대표색상");
+  await navMenu.getByRole("button", {name:"거래처 관리"}).click();
+  await leave.getByRole("button", {name:"저장 안 함"}).click();
+  assert.equal((await mockState()).state.settings.colorGuidanceGroups?.length ?? 0,0);
+  console.log("PASS: unregistered color-group name cannot vanish or auto-create");
+
+  await navMenu.getByRole("button", {name:"운임 관리"}).click();
+  await navPage.getByRole("button", {name:"동급 그룹 운임표"}).click();
+  const shippingName = navPage.getByRole("textbox", {name:"새 배송 그룹명"});
+  await shippingName.fill("CI 미등록 운임 그룹");
+  await navMenu.getByRole("button", {name:"상품 관리"}).click();
+  await checkPrompt("unregistered shipping group name");
+  await leave.getByRole("button", {name:"취소",exact:true}).click();
+  assert.equal(await shippingName.inputValue(),"CI 미등록 운임 그룹");
+  await navMenu.getByRole("button", {name:"상품 관리"}).click();
+  await leave.getByRole("button", {name:"저장",exact:true}).click();
+  assert.equal(await shippingName.inputValue(),"CI 미등록 운임 그룹");
+  await navMenu.getByRole("button", {name:"상품 관리"}).click();
+  await leave.getByRole("button", {name:"저장 안 함"}).click();
+  assert.equal((await mockState()).state.shipping.groups.some(g => g.name==="CI 미등록 운임 그룹"),false);
+  console.log("PASS: unregistered shipping-group name cannot vanish or auto-create");
+
+  await navMenu.getByRole("button", {name:"엑셀 관리"}).click();
+  await navPage.getByRole("button", {name:"매장 발송 대기"}).click();
+  const freightRow=navPage.locator('[data-queue-id="ci-store-queue"]');
+  await freightRow.getByText("관리", {exact:true}).click();
+  const freightAmount=freightRow.locator(".actual-freight-field input.money-input");
+  await freightAmount.fill("5300");
+  const excelSearch=navPage.getByRole("textbox", {name:"엑셀 목록 검색"});
+  await excelSearch.fill("일치하지 않는 검증어");
+  await freightRow.waitFor({state:"detached"});
+  await excelSearch.fill("");
+  await freightRow.getByText("관리", {exact:true}).click();
+  assert.equal((await freightAmount.inputValue()).replaceAll(",",""),"5300");
+  await navMenu.getByRole("button", {name:"상품 관리"}).click();
+  await checkPrompt("freight draft after filtering");
+  await leave.getByRole("button", {name:"취소",exact:true}).click();
+  assert.equal((await freightAmount.inputValue()).replaceAll(",",""),"5300");
+  await navMenu.getByRole("button", {name:"상품 관리"}).click();
+  await leave.getByRole("button", {name:"저장 안 함"}).click();
+  assert.equal((await mockState()).state.workflow.shipments.find(s=>s.id==="ci-store-ship").actualFreight?.STORE,undefined);
+  await navMenu.getByRole("button", {name:"엑셀 관리"}).click();
+  await navPage.getByRole("button", {name:"매장 발송 대기"}).click();
+  await freightRow.getByText("관리", {exact:true}).click();
+  await freightAmount.fill("4100");
+  await navPage.getByRole("button", {name:"엑셀 작성 이력"}).click();
+  await checkPrompt("freight save on internal tab");
+  await leave.getByRole("button", {name:"저장",exact:true}).click();
+  await navPage.waitForFunction(() => window.__navSaved().state.workflow.shipments
+    .find(s=>s.id==="ci-store-ship").actualFreight?.STORE===4100);
+  console.log("PASS: actual freight survives filtering and supports Save / Discard / Cancel");
+
   assert.deepEqual(navErrors,[],"Navigation React errors: "+navErrors.join("\n"));
   await navPage.close();
   assert.deepEqual(pageErrors, [], "React runtime errors: " + pageErrors.join("\n"));

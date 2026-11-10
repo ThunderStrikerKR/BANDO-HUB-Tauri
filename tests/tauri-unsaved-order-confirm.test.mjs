@@ -23,7 +23,9 @@ test("leaving selected order with edits saves or discards before changing select
   assert.match(hub, /await onSave\(reconcileWorkflow\(state, pending\)\)/);
   assert.match(hub, /props\.onChange\(structuredClone\(persisted\)\)/);
   assert.match(hub, /delete next\[orderId\]/);
-  assert.match(hub, /if \(proceed\) applySelection\(next\)/);
+  assert.match(hub, /const leave = await leaveGuardRef\.current\(\)/);
+  assert.match(hub, /if \(!leave\.proceed\) return/);
+  assert.match(hub, /applySelection\(next\)/);
   assert.match(hub, /setDiscardRevision/);
 });
 test("top-level navigation and window close respect unsaved-order decision", () => {
