@@ -1067,12 +1067,15 @@ try {
     return {
       fieldCount: fields.length,
       fieldMargins: fields.map((field) => parseFloat(getComputedStyle(field).marginBottom)),
+      labelSizes: fields.map((field) => parseFloat(getComputedStyle(field.querySelector("label")).fontSize)),
       rowHeight: firstRow?.getBoundingClientRect().height ?? 0,
       buttonHeight: action?.getBoundingClientRect().height ?? 0,
     };
   });
   assert.equal(brandLayout.fieldCount, 4, JSON.stringify(brandLayout));
   assert.ok(brandLayout.fieldMargins.every((margin) => margin === 0), JSON.stringify(brandLayout));
+  assert.ok(brandLayout.labelSizes.every((size) => size === 14),
+    "Brand fields must use common label size: " + JSON.stringify(brandLayout));
   assert.ok(brandLayout.rowHeight <= 60 && brandLayout.buttonHeight <= 34,
     "Brand rows must stay compact: " + JSON.stringify(brandLayout));
   const brandRow = (name) => navPage.getByRole("list", {name:"등록된 브랜드"})
@@ -1177,6 +1180,7 @@ try {
       labelFor: label?.htmlFor,
       inputId: input?.id,
       marginBottom: field ? getComputedStyle(field).marginBottom : "",
+      labelSize: label ? parseFloat(getComputedStyle(label).fontSize) : 0,
       inputBottom: input?.getBoundingClientRect().bottom ?? 0,
       buttonBottom: button?.getBoundingClientRect().bottom ?? 0,
       actionHeight: action?.getBoundingClientRect().height ?? null,
@@ -1185,6 +1189,7 @@ try {
   });
   assert.equal(shippingForm.labelFor, shippingForm.inputId, JSON.stringify(shippingForm));
   assert.equal(shippingForm.marginBottom, "0px", JSON.stringify(shippingForm));
+  assert.equal(shippingForm.labelSize, 14, "Shipping form label differs from registry fields");
   assert.ok(Math.abs(shippingForm.inputBottom - shippingForm.buttonBottom) <= 2,
     JSON.stringify(shippingForm));
   if (shippingForm.actionHeight !== null)
