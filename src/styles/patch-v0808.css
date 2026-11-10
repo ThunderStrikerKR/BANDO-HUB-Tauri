@@ -29,9 +29,6 @@
   background: #294457 !important;
   color: #fff;
 }
-.app-header {
-  border-bottom: 1px solid #444;
-}
 .hub-management > .pane-heading {
   gap: 6px;
   min-height: 48px;
