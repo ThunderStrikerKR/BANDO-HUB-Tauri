@@ -732,7 +732,8 @@ try {
           });
           if(!elements.length)continue;
           findings.push({key:candidate.key,count:elements.length,
-            actual:getComputedStyle(elements[0],pseudo).getPropertyValue(candidate.property).trim(),
+            actual:(pseudo ? getComputedStyle(elements[0],pseudo) : getComputedStyle(elements[0]))
+              .getPropertyValue(candidate.property).trim(),
             example:elements[0].tagName.toLowerCase()+
               (typeof elements[0].className==="string" ? "."+elements[0].className.trim().replace(/\s+/g,".").slice(0,100) : "")+(pseudo??"")});
         }catch{
