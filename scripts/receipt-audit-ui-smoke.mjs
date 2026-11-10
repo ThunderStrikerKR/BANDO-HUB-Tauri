@@ -653,14 +653,17 @@ try {
       const head=panel?.querySelector(":scope > header");
       const title=head?.querySelector("h2"),close=head?.querySelector("button");
       const fields=panel?.querySelector(".modal-fields");
+      // Product and client editors intentionally scroll a nested body while
+      // pinning their footer; generic modals scroll the fieldset itself.
+      const scrollOwner=panel?.querySelector(".client-editor-body, .product-detail-body")??fields;
       const box=(node)=>node?.getBoundingClientRect();
       const p=box(panel),f=box(fields),h=box(head);
       return {titleSize:title?Number.parseFloat(getComputedStyle(title).fontSize):0,
         closeHeight:close?Math.round(box(close).height):0,
         panelTop:p?Math.round(p.top):-1,panelBottom:p?Math.round(p.bottom):-1,
         fieldsBottom:f?Math.round(f.bottom):-1,headerBottom:h?Math.round(h.bottom):-1,
-        viewport:window.innerHeight,scroll:fields?getComputedStyle(fields).overflowY:"",
-        panelPadding:panel?getComputedStyle(panel).paddingLeft:"",
+        viewport:window.innerHeight,scroll:scrollOwner?getComputedStyle(scrollOwner).overflowY:"",
+        scrollOwner:scrollOwner?.className??"",panelPadding:panel?getComputedStyle(panel).paddingLeft:"",
         width:p?Math.round(p.width):0};
     });
     assert.ok(measured.titleSize>=17 && measured.titleSize<=20,
