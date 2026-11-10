@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { sameValue } from "./shared/draft";
+import { usePageLeaveGuard } from "./shared/page-leave";
 import { uid } from "./domain";
 import { aliasProblems, internalModel, saveAlias } from "./matching";
 import { ProductSearchDialog } from "./ProductSearchDialog";
@@ -18,6 +20,25 @@ export function AliasManager({
     [scope, setScope] = useState("common"),
     [search, setSearch] = useState(false),
     [editing, setEditing] = useState<string>();
+  const [originalForm, setOriginalForm] = useState({ text: "", target: "", scope: "common", editing: undefined as string | undefined });
+  const dirty = !sameValue({ text, target, scope, editing }, originalForm);
+  const discard = () => {
+    setText(originalForm.text);setTarget(originalForm.target);setScope(originalForm.scope);setEditing(originalForm.editing);
+  };
+  const saveEntry = async (): Promise<boolean> => {
+    try {
+      await onSave(saveAlias(state, {
+        id: editing ?? uid(), text, productId: target,
+        variantId: state.products.find((p) => p.id === target)?.variants[0]?.id,
+        clientId: scope === "common" ? null : scope,
+        actor: state.settings.operatorName || "직원", createdAt: new Date().toISOString(),
+      }));
+      setEditing(undefined);setText("");setTarget("");
+      setOriginalForm({text:"",target:"",scope,editing:undefined});
+      return true;
+    } catch (error) {onNotice(String(error), "error");return false;}
+  };
+  usePageLeaveGuard({ label: "상품 별칭", hasChanges: () => dirty, save: saveEntry, discard });
   return (
     <section className="card alias-manager">
       <h2>공통 / 거래처 별칭 관리</h2>
@@ -42,27 +63,7 @@ export function AliasManager({
           : "등록 상품 선택"}
       </button>
       <button
-        onClick={async () => {
-          try {
-            await onSave(
-              saveAlias(state, {
-                id: editing ?? uid(),
-                text,
-                productId: target,
-                // Compatibility identifier is internal only; a selected sale product is complete.
-                variantId: state.products.find((p) => p.id === target)?.variants[0]?.id,
-                clientId: scope === "common" ? null : scope,
-                actor: state.settings.operatorName || "직원",
-                createdAt: new Date().toISOString(),
-              }),
-            );
-            setEditing(undefined);
-            setText("");
-            setTarget("");
-          } catch (e) {
-            onNotice(String(e), "error");
-          }
-        }}
+        onClick={() => void saveEntry()}
       >
         별칭 저장
       </button>
@@ -86,6 +87,7 @@ export function AliasManager({
                   setText(a.text);
                   setTarget(a.productId);
                   setScope(a.clientId ?? "common");
+                  setOriginalForm({text:a.text,target:a.productId,scope:a.clientId ?? "common",editing:a.id});
                 }}
               >
                 연결 정정
