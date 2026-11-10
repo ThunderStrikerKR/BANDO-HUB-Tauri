@@ -258,7 +258,7 @@ export function ProductManager({
             value={search} onChange={setSearch}/>
         </div>
       )}
-      <div className="management-scroll">
+      <div className={"management-scroll" + (section === "상품 목록" && !adding && !excelOpen ? " product-list-workspace" : "")}>
         {section === "상품 목록" && (
           <>
             <div className="product-heading-help product-list-subheading">
