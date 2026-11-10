@@ -1,0 +1,2464 @@
+{
+  "schema": "bando-css-cascade-stage6/v1",
+  "source": {
+    "repository": "ThunderStrikerKR/BANDO-HUB-Tauri",
+    "branch": "feature/tauri-product-bulk-registration",
+    "codeCommit": "27255da36a46e02b634ea9ac93123eec23a3064f",
+    "workflowRunId": 42911261363,
+    "jobId": 130162271698,
+    "cssFiles": 26,
+    "managementViewSamples": 21,
+    "distinctObservedStates": 25
+  },
+  "summary": {
+    "candidates": 120,
+    "observed": 41,
+    "unobserved": 78,
+    "conditionalNotObserved": 0,
+    "unsupportedSelectors": 1,
+    "screens": 21,
+    "observedStates": 25
+  },
+  "interpretation": {
+    "MATCHED_IN_RENDERED_VIEW": "At least one rendered element matching the selector was observed; this is NOT proof that the overlapping definitions are a visual defect.",
+    "NOT_OBSERVED_IN_SAMPLED_VIEWS": "Not matched in sampled screens, tabs or dialogs; this does NOT establish that the selector is unused or safe to remove.",
+    "UNSUPPORTED_SELECTOR": "Browser DOM selector sampling could not inspect this selector; review separately, especially global pseudo elements.",
+    "CONDITIONAL_NOT_OBSERVED": "Conditioned rule was not observed in the sampled viewport or UI state."
+  },
+  "confirmedFixes": [
+    {
+      "issue": "Decision dialog ignored reserved Kakao width",
+      "location": "src/styles/modals.css",
+      "behavior": "Removed left/width override; dialogs.css computes reserved-pane-aware center",
+      "test": "320px reserve at 1520px viewport -> 920px dialog center"
+    },
+    {
+      "issue": "Legacy exact-selector declarations superseded by later files",
+      "locations": [
+        "src/styles/theme.css",
+        "src/styles/workflow.css",
+        "src/styles/workflow-states.css",
+        "src/styles/receipt-document.css",
+        "src/styles/components.css",
+        "src/styles/reception-manual.css"
+      ],
+      "behavior": "Removed earlier ineffective font/spacing/width declarations while preserving final cascade"
+    }
+  ],
+  "candidates": [
+    {
+      "key": "base | .hub-slot-3 .workflow-board | flex",
+      "selector": ".hub-slot-3 .workflow-board",
+      "property": "flex",
+      "context": "base",
+      "files": [
+        "shell.css",
+        "workflow.css",
+        "workflow-states.css"
+      ],
+      "values": [
+        "1",
+        "1 1 0",
+        "1"
+      ],
+      "category": "MATCHED_IN_RENDERED_VIEW",
+      "count": 1,
+      "actual": [
+        "1 1 0%"
+      ],
+      "screens": [
+        "접수 / 기본 화면"
+      ]
+    },
+    {
+      "key": "base | .hub-slot-3 .workflow-shipment | grid-template-columns",
+      "selector": ".hub-slot-3 .workflow-shipment",
+      "property": "grid-template-columns",
+      "context": "base",
+      "files": [
+        "shell.css",
+        "workflow-states.css"
+      ],
+      "values": [
+        "minmax(65px, 1fr) minmax(90px, 1.8fr)",
+        "64px minmax(0, 1fr) 68px"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .hub-slot-3 .workflow-shipment | min-height",
+      "selector": ".hub-slot-3 .workflow-shipment",
+      "property": "min-height",
+      "context": "base",
+      "files": [
+        "shell.css",
+        "workflow-states.css"
+      ],
+      "values": [
+        "35px",
+        "39px"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .hub-shell | min-width",
+      "selector": ".hub-shell",
+      "property": "min-width",
+      "context": "base",
+      "files": [
+        "shell.css",
+        "workflow-states.css",
+        "reception-manual.css"
+      ],
+      "values": [
+        "1380px",
+        "1230px",
+        "0"
+      ],
+      "category": "MATCHED_IN_RENDERED_VIEW",
+      "count": 1,
+      "actual": [
+        "0px"
+      ],
+      "screens": [
+        "접수 / 기본 화면",
+        "주문 내역",
+        "엑셀 관리",
+        "일일 결산",
+        "상품 관리"
+      ]
+    },
+    {
+      "key": "base | .hub-shell .hub-panels | min-width",
+      "selector": ".hub-shell .hub-panels",
+      "property": "min-width",
+      "context": "base",
+      "files": [
+        "shell.css",
+        "workflow-states.css",
+        "reception-manual.css"
+      ],
+      "values": [
+        "982px",
+        "832px",
+        "0"
+      ],
+      "category": "MATCHED_IN_RENDERED_VIEW",
+      "count": 1,
+      "actual": [
+        "762px"
+      ],
+      "screens": [
+        "접수 / 기본 화면"
+      ]
+    },
+    {
+      "key": "base | .assignment-badge.assigned | color",
+      "selector": ".assignment-badge.assigned",
+      "property": "color",
+      "context": "base",
+      "files": [
+        "shipping.css",
+        "theme.css"
+      ],
+      "values": [
+        "#bfbfbf",
+        "#eee"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .assignment-badge.assigned | background",
+      "selector": ".assignment-badge.assigned",
+      "property": "background",
+      "context": "base",
+      "files": [
+        "shipping.css",
+        "theme.css"
+      ],
+      "values": [
+        "#343434",
+        "#303030"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .app-v03 | background",
+      "selector": ".app-v03",
+      "property": "background",
+      "context": "base",
+      "files": [
+        "application.css",
+        "theme.css"
+      ],
+      "values": [
+        "#161616",
+        "#101010"
+      ],
+      "category": "MATCHED_IN_RENDERED_VIEW",
+      "count": 1,
+      "actual": [
+        "rgb(16, 16, 16) none repeat scroll 0% 0% / auto padding-box border-box"
+      ],
+      "screens": [
+        "접수 / 기본 화면",
+        "주문 내역",
+        "엑셀 관리",
+        "일일 결산",
+        "상품 관리"
+      ]
+    },
+    {
+      "key": "base | .app-v03 | color",
+      "selector": ".app-v03",
+      "property": "color",
+      "context": "base",
+      "files": [
+        "application.css",
+        "theme.css"
+      ],
+      "values": [
+        "#e2e2e2",
+        "#f5f5f5"
+      ],
+      "category": "MATCHED_IN_RENDERED_VIEW",
+      "count": 1,
+      "actual": [
+        "rgb(245, 245, 245)"
+      ],
+      "screens": [
+        "접수 / 기본 화면",
+        "주문 내역",
+        "엑셀 관리",
+        "일일 결산",
+        "상품 관리"
+      ]
+    },
+    {
+      "key": "base | .wordmark span | color",
+      "selector": ".wordmark span",
+      "property": "color",
+      "context": "base",
+      "files": [
+        "application.css",
+        "theme.css"
+      ],
+      "values": [
+        "#b7b7b7",
+        "#ddd"
+      ],
+      "category": "MATCHED_IN_RENDERED_VIEW",
+      "count": 1,
+      "actual": [
+        "rgb(221, 221, 221)"
+      ],
+      "screens": [
+        "접수 / 기본 화면",
+        "주문 내역",
+        "엑셀 관리",
+        "일일 결산",
+        "상품 관리"
+      ]
+    },
+    {
+      "key": "base | .app-notice | right",
+      "selector": ".app-notice",
+      "property": "right",
+      "context": "base",
+      "files": [
+        "application.css",
+        "receipt-document.css"
+      ],
+      "values": [
+        "18px",
+        "16px"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .app-notice | top",
+      "selector": ".app-notice",
+      "property": "top",
+      "context": "base",
+      "files": [
+        "application.css",
+        "receipt-document.css"
+      ],
+      "values": [
+        "75px",
+        "auto"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .app-notice | z-index",
+      "selector": ".app-notice",
+      "property": "z-index",
+      "context": "base",
+      "files": [
+        "application.css",
+        "theme.css"
+      ],
+      "values": [
+        "100",
+        "140"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .app-notice | background",
+      "selector": ".app-notice",
+      "property": "background",
+      "context": "base",
+      "files": [
+        "application.css",
+        "theme.css"
+      ],
+      "values": [
+        "#3f3f3f",
+        "#333"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .app-notice | max-width",
+      "selector": ".app-notice",
+      "property": "max-width",
+      "context": "base",
+      "files": [
+        "application.css",
+        "receipt-document.css"
+      ],
+      "values": [
+        "620px",
+        "520px"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .app-notice | font-size",
+      "selector": ".app-notice",
+      "property": "font-size",
+      "context": "base",
+      "files": [
+        "application.css",
+        "theme.css"
+      ],
+      "values": [
+        "12px",
+        "calc(14px * var(--ui-scale))"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .desk-grid | grid-template-columns",
+      "selector": ".desk-grid",
+      "property": "grid-template-columns",
+      "context": "base",
+      "files": [
+        "application.css",
+        "theme.css"
+      ],
+      "values": [
+        "minmax(235px, 0.8fr) minmax(400px, 1.5fr) minmax(280px, 1fr)",
+        "minmax(250px, 0.9fr) minmax(310px, 1.05fr) minmax(445px, 1.5fr)"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .desk-grid | gap",
+      "selector": ".desk-grid",
+      "property": "gap",
+      "context": "base",
+      "files": [
+        "application.css",
+        "theme.css"
+      ],
+      "values": [
+        "12px",
+        "10px"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .desk-pane | background",
+      "selector": ".desk-pane",
+      "property": "background",
+      "context": "base",
+      "files": [
+        "application.css",
+        "theme.css"
+      ],
+      "values": [
+        "#212121",
+        "#1c1c1c"
+      ],
+      "category": "MATCHED_IN_RENDERED_VIEW",
+      "count": 4,
+      "actual": [
+        "rgb(28, 28, 28) none repeat scroll 0% 0% / auto padding-box border-box"
+      ],
+      "screens": [
+        "접수 / 기본 화면"
+      ]
+    },
+    {
+      "key": "base | .pane-heading | padding",
+      "selector": ".pane-heading",
+      "property": "padding",
+      "context": "base",
+      "files": [
+        "application.css",
+        "theme.css"
+      ],
+      "values": [
+        "14px 16px",
+        "12px 14px"
+      ],
+      "category": "MATCHED_IN_RENDERED_VIEW",
+      "count": 3,
+      "actual": [
+        "10px"
+      ],
+      "screens": [
+        "접수 / 기본 화면"
+      ]
+    },
+    {
+      "key": "base | .pane-heading h2 | font-size",
+      "selector": ".pane-heading h2",
+      "property": "font-size",
+      "context": "base",
+      "files": [
+        "application.css",
+        "theme.css"
+      ],
+      "values": [
+        "15px",
+        "calc(18px * var(--ui-scale))"
+      ],
+      "category": "MATCHED_IN_RENDERED_VIEW",
+      "count": 3,
+      "actual": [
+        "16px"
+      ],
+      "screens": [
+        "접수 / 기본 화면"
+      ]
+    },
+    {
+      "key": "base | .pane-heading small | font-size",
+      "selector": ".pane-heading small",
+      "property": "font-size",
+      "context": "base",
+      "files": [
+        "application.css",
+        "theme.css"
+      ],
+      "values": [
+        "10px",
+        "calc(13px * var(--ui-scale))"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .pane-heading small | color",
+      "selector": ".pane-heading small",
+      "property": "color",
+      "context": "base",
+      "files": [
+        "application.css",
+        "theme.css"
+      ],
+      "values": [
+        "#9e9e9e",
+        "#a3a3a3"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .source-top .client-results | max-height",
+      "selector": ".source-top .client-results",
+      "property": "max-height",
+      "context": "base",
+      "files": [
+        "application.css",
+        "theme.css"
+      ],
+      "values": [
+        "180px",
+        "220px"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .policy-line | font-size",
+      "selector": ".policy-line",
+      "property": "font-size",
+      "context": "base",
+      "files": [
+        "application.css",
+        "theme.css"
+      ],
+      "values": [
+        "10px",
+        "calc(13px * var(--ui-scale))"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .policy-line | color",
+      "selector": ".policy-line",
+      "property": "color",
+      "context": "base",
+      "files": [
+        "application.css",
+        "theme.css"
+      ],
+      "values": [
+        "#b3b3b3",
+        "#a3a3a3"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .source-actions | gap",
+      "selector": ".source-actions",
+      "property": "gap",
+      "context": "base",
+      "files": [
+        "application.css",
+        "patch-v0808.css"
+      ],
+      "values": [
+        "10px",
+        "5px !important"
+      ],
+      "category": "MATCHED_IN_RENDERED_VIEW",
+      "count": 1,
+      "actual": [
+        "5px"
+      ],
+      "screens": [
+        "접수 / 기본 화면"
+      ]
+    },
+    {
+      "key": "base | .source-actions small | font-size",
+      "selector": ".source-actions small",
+      "property": "font-size",
+      "context": "base",
+      "files": [
+        "application.css",
+        "theme.css"
+      ],
+      "values": [
+        "10px",
+        "calc(13px * var(--ui-scale))"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .review-toolbar small | font-size",
+      "selector": ".review-toolbar small",
+      "property": "font-size",
+      "context": "base",
+      "files": [
+        "application.css",
+        "theme.css"
+      ],
+      "values": [
+        "10px",
+        "calc(13px * var(--ui-scale))"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .review-toolbar small | color",
+      "selector": ".review-toolbar small",
+      "property": "color",
+      "context": "base",
+      "files": [
+        "application.css",
+        "theme.css"
+      ],
+      "values": [
+        "#a2a2a2",
+        "#a3a3a3"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .recipient-review h3 | font-size",
+      "selector": ".recipient-review h3",
+      "property": "font-size",
+      "context": "base",
+      "files": [
+        "application.css",
+        "theme.css"
+      ],
+      "values": [
+        "12px",
+        "calc(16px * var(--ui-scale))"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .item-color | font-size",
+      "selector": ".item-color",
+      "property": "font-size",
+      "context": "base",
+      "files": [
+        "application.css",
+        "theme.css"
+      ],
+      "values": [
+        "10px",
+        "calc(13px * var(--ui-scale))"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .item-color | color",
+      "selector": ".item-color",
+      "property": "color",
+      "context": "base",
+      "files": [
+        "application.css",
+        "theme.css"
+      ],
+      "values": [
+        "#ababab",
+        "#a3a3a3"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .item-figures | grid-template-columns",
+      "selector": ".item-figures",
+      "property": "grid-template-columns",
+      "context": "base",
+      "files": [
+        "application.css",
+        "theme.css"
+      ],
+      "values": [
+        "55px 1fr 1fr 100px",
+        "70px 1fr 1fr"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .item-figures > div small | font-size",
+      "selector": ".item-figures > div small",
+      "property": "font-size",
+      "context": "base",
+      "files": [
+        "application.css",
+        "theme.css"
+      ],
+      "values": [
+        "9px",
+        "calc(13px * var(--ui-scale))"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .item-figures > div b | font-size",
+      "selector": ".item-figures > div b",
+      "property": "font-size",
+      "context": "base",
+      "files": [
+        "application.css",
+        "theme.css"
+      ],
+      "values": [
+        "12px",
+        "calc(16px * var(--ui-scale))"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .review-footer | background",
+      "selector": ".review-footer",
+      "property": "background",
+      "context": "base",
+      "files": [
+        "application.css",
+        "theme.css"
+      ],
+      "values": [
+        "#2c2c2c",
+        "#222"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .freight-reason | font-size",
+      "selector": ".freight-reason",
+      "property": "font-size",
+      "context": "base",
+      "files": [
+        "application.css",
+        "theme.css"
+      ],
+      "values": [
+        "9px",
+        "calc(13px * var(--ui-scale))"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .freight-reason | color",
+      "selector": ".freight-reason",
+      "property": "color",
+      "context": "base",
+      "files": [
+        "application.css",
+        "theme.css"
+      ],
+      "values": [
+        "#bcbcbc",
+        "#a3a3a3"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .freight-reason | max-height",
+      "selector": ".freight-reason",
+      "property": "max-height",
+      "context": "base",
+      "files": [
+        "application.css",
+        "theme.css"
+      ],
+      "values": [
+        "28px",
+        "45px"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .desk-totals small | font-size",
+      "selector": ".desk-totals small",
+      "property": "font-size",
+      "context": "base",
+      "files": [
+        "application.css",
+        "theme.css"
+      ],
+      "values": [
+        "10px",
+        "calc(13px * var(--ui-scale))"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .desk-totals small | color",
+      "selector": ".desk-totals small",
+      "property": "color",
+      "context": "base",
+      "files": [
+        "application.css",
+        "theme.css"
+      ],
+      "values": [
+        "#afafaf",
+        "#a3a3a3"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .desk-totals b | font-size",
+      "selector": ".desk-totals b",
+      "property": "font-size",
+      "context": "base",
+      "files": [
+        "application.css",
+        "theme.css"
+      ],
+      "values": [
+        "14px",
+        "calc(16px * var(--ui-scale))"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .desk-totals .check | font-size",
+      "selector": ".desk-totals .check",
+      "property": "font-size",
+      "context": "base",
+      "files": [
+        "application.css",
+        "theme.css"
+      ],
+      "values": [
+        "10px",
+        "calc(13px * var(--ui-scale))"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .queue-action select | font-size",
+      "selector": ".queue-action select",
+      "property": "font-size",
+      "context": "base",
+      "files": [
+        "application.css",
+        "theme.css"
+      ],
+      "values": [
+        "11px",
+        "calc(14px * var(--ui-scale))"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .desk-message | padding",
+      "selector": ".desk-message",
+      "property": "padding",
+      "context": "base",
+      "files": [
+        "application.css",
+        "theme.css"
+      ],
+      "values": [
+        "13px",
+        "12px"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .desk-message h3 | font-size",
+      "selector": ".desk-message h3",
+      "property": "font-size",
+      "context": "base",
+      "files": [
+        "application.css",
+        "theme.css"
+      ],
+      "values": [
+        "13px",
+        "calc(16px * var(--ui-scale))"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .desk-message header b | font-size",
+      "selector": ".desk-message header b",
+      "property": "font-size",
+      "context": "base",
+      "files": [
+        "application.css",
+        "theme.css"
+      ],
+      "values": [
+        "14px",
+        "calc(16px * var(--ui-scale))"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .desk-message header b | color",
+      "selector": ".desk-message header b",
+      "property": "color",
+      "context": "base",
+      "files": [
+        "application.css",
+        "theme.css"
+      ],
+      "values": [
+        "#cccccc",
+        "#f5f5f5"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .desk-message > .check | font-size",
+      "selector": ".desk-message > .check",
+      "property": "font-size",
+      "context": "base",
+      "files": [
+        "application.css",
+        "theme.css"
+      ],
+      "values": [
+        "10px",
+        "calc(13px * var(--ui-scale))"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .message-account small | font-size",
+      "selector": ".message-account small",
+      "property": "font-size",
+      "context": "base",
+      "files": [
+        "application.css",
+        "theme.css"
+      ],
+      "values": [
+        "9px",
+        "calc(13px * var(--ui-scale))"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .message-account small | color",
+      "selector": ".message-account small",
+      "property": "color",
+      "context": "base",
+      "files": [
+        "application.css",
+        "theme.css"
+      ],
+      "values": [
+        "#a5a5a5",
+        "#a3a3a3"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .message-account select | font-size",
+      "selector": ".message-account select",
+      "property": "font-size",
+      "context": "base",
+      "files": [
+        "application.css",
+        "theme.css"
+      ],
+      "values": [
+        "10px",
+        "calc(14px * var(--ui-scale))"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .message-warning | font-size",
+      "selector": ".message-warning",
+      "property": "font-size",
+      "context": "base",
+      "files": [
+        "application.css",
+        "foundation.css",
+        "foundation.css",
+        "theme.css"
+      ],
+      "values": [
+        "9px",
+        "10px",
+        "10px",
+        "calc(13px * var(--ui-scale))"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .message-warning | max-height",
+      "selector": ".message-warning",
+      "property": "max-height",
+      "context": "base",
+      "files": [
+        "application.css",
+        "foundation.css",
+        "foundation.css",
+        "theme.css"
+      ],
+      "values": [
+        "30px",
+        "45px",
+        "34px",
+        "65px"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .docked .desk-grid | grid-template-columns",
+      "selector": ".docked .desk-grid",
+      "property": "grid-template-columns",
+      "context": "base",
+      "files": [
+        "application.css",
+        "theme.css"
+      ],
+      "values": [
+        "minmax(170px, 0.75fr) minmax(280px, 1.35fr) minmax(210px, 1fr)",
+        "minmax(170px, 0.8fr) minmax(230px, 1fr) minmax(320px, 1.4fr)"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .docked .pane-heading h2 | font-size",
+      "selector": ".docked .pane-heading h2",
+      "property": "font-size",
+      "context": "base",
+      "files": [
+        "application.css",
+        "theme.css"
+      ],
+      "values": [
+        "12px",
+        "calc(17px * var(--ui-scale))"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .docked .source-text | font-size",
+      "selector": ".docked .source-text",
+      "property": "font-size",
+      "context": "base",
+      "files": [
+        "application.css",
+        "theme.css"
+      ],
+      "values": [
+        "11px",
+        "calc(16px * var(--ui-scale))"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .docked .item-figures | grid-template-columns",
+      "selector": ".docked .item-figures",
+      "property": "grid-template-columns",
+      "context": "base",
+      "files": [
+        "application.css",
+        "theme.css"
+      ],
+      "values": [
+        "45px 1fr 1fr",
+        "60px 1fr"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .docked .desk-message textarea | font-size",
+      "selector": ".docked .desk-message textarea",
+      "property": "font-size",
+      "context": "base",
+      "files": [
+        "application.css",
+        "theme.css"
+      ],
+      "values": [
+        "11px",
+        "calc(16px * var(--ui-scale))"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .docked .policy-line | font-size",
+      "selector": ".docked .policy-line",
+      "property": "font-size",
+      "context": "base",
+      "files": [
+        "application.css",
+        "theme.css"
+      ],
+      "values": [
+        "9px",
+        "calc(13px * var(--ui-scale))"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .muted | color",
+      "selector": ".muted",
+      "property": "color",
+      "context": "base",
+      "files": [
+        "foundation.css",
+        "foundation.css",
+        "theme.css"
+      ],
+      "values": [
+        "#8e8e8e",
+        "#a6a6a6",
+        "#a3a3a3"
+      ],
+      "category": "MATCHED_IN_RENDERED_VIEW",
+      "count": 3,
+      "actual": [
+        "rgb(163, 163, 163)",
+        "rgb(165, 165, 165)"
+      ],
+      "screens": [
+        "접수 / 기본 화면",
+        "엑셀 관리",
+        "상품 관리 / 카테고리 관리",
+        "상품 관리 / 대표색상 관리",
+        "엑셀 관리 / 공장 엑셀 대기"
+      ]
+    },
+    {
+      "key": "base | .muted | font-size",
+      "selector": ".muted",
+      "property": "font-size",
+      "context": "base",
+      "files": [
+        "foundation.css",
+        "theme.css"
+      ],
+      "values": [
+        "12px",
+        "calc(13px * var(--ui-scale))"
+      ],
+      "category": "MATCHED_IN_RENDERED_VIEW",
+      "count": 3,
+      "actual": [
+        "13px",
+        "12px"
+      ],
+      "screens": [
+        "접수 / 기본 화면",
+        "엑셀 관리",
+        "상품 관리 / 카테고리 관리",
+        "상품 관리 / 대표색상 관리",
+        "엑셀 관리 / 공장 엑셀 대기"
+      ]
+    },
+    {
+      "key": "base | .overlay | background",
+      "selector": ".overlay",
+      "property": "background",
+      "context": "base",
+      "files": [
+        "foundation.css",
+        "foundation.css",
+        "theme.css"
+      ],
+      "values": [
+        "#27272788",
+        "#080808d9",
+        "#000c"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .modal | background",
+      "selector": ".modal",
+      "property": "background",
+      "context": "base",
+      "files": [
+        "foundation.css",
+        "foundation.css",
+        "theme.css"
+      ],
+      "values": [
+        "white",
+        "#212121",
+        "#1c1c1c"
+      ],
+      "category": "MATCHED_IN_RENDERED_VIEW",
+      "count": 1,
+      "actual": [
+        "rgb(32, 32, 32) none repeat scroll 0% 0% / auto padding-box border-box"
+      ],
+      "screens": [
+        "거래처 상세 관리 모달",
+        "저장 확인 모달",
+        "상품 상세 관리 모달"
+      ]
+    },
+    {
+      "key": "base | .loading p | color",
+      "selector": ".loading p",
+      "property": "color",
+      "context": "base",
+      "files": [
+        "foundation.css",
+        "foundation.css",
+        "theme.css"
+      ],
+      "values": [
+        "#808080",
+        "#b2b2b2",
+        "#a3a3a3"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | :root | color",
+      "selector": ":root",
+      "property": "color",
+      "context": "base",
+      "files": [
+        "foundation.css",
+        "theme.css"
+      ],
+      "values": [
+        "#e4e4e4",
+        "#f5f5f5"
+      ],
+      "category": "MATCHED_IN_RENDERED_VIEW",
+      "count": 1,
+      "actual": [
+        "rgb(245, 245, 245)"
+      ],
+      "screens": [
+        "접수 / 기본 화면",
+        "주문 내역",
+        "엑셀 관리",
+        "일일 결산",
+        "상품 관리"
+      ]
+    },
+    {
+      "key": "base | :root | background",
+      "selector": ":root",
+      "property": "background",
+      "context": "base",
+      "files": [
+        "foundation.css",
+        "theme.css"
+      ],
+      "values": [
+        "#141414",
+        "#101010"
+      ],
+      "category": "MATCHED_IN_RENDERED_VIEW",
+      "count": 1,
+      "actual": [
+        "rgb(16, 16, 16) none repeat scroll 0% 0% / auto padding-box border-box"
+      ],
+      "screens": [
+        "접수 / 기본 화면",
+        "주문 내역",
+        "엑셀 관리",
+        "일일 결산",
+        "상품 관리"
+      ]
+    },
+    {
+      "key": "base | .modal | color",
+      "selector": ".modal",
+      "property": "color",
+      "context": "base",
+      "files": [
+        "foundation.css",
+        "theme.css"
+      ],
+      "values": [
+        "#e4e4e4",
+        "#f5f5f5"
+      ],
+      "category": "MATCHED_IN_RENDERED_VIEW",
+      "count": 1,
+      "actual": [
+        "rgb(238, 238, 238)"
+      ],
+      "screens": [
+        "거래처 상세 관리 모달",
+        "저장 확인 모달",
+        "상품 상세 관리 모달"
+      ]
+    },
+    {
+      "key": "base | ::selection | background",
+      "selector": "::selection",
+      "property": "background",
+      "context": "base",
+      "files": [
+        "foundation.css",
+        "theme.css"
+      ],
+      "values": [
+        "#636363",
+        "#525252"
+      ],
+      "category": "UNSUPPORTED_SELECTOR",
+      "count": 0,
+      "actual": [],
+      "screens": [
+        "접수 / 기본 화면",
+        "주문 내역",
+        "엑셀 관리",
+        "일일 결산",
+        "상품 관리"
+      ]
+    },
+    {
+      "key": "base | .tier-wholesale | background",
+      "selector": ".tier-wholesale",
+      "property": "background",
+      "context": "base",
+      "files": [
+        "foundation.css",
+        "theme.css"
+      ],
+      "values": [
+        "#424242 !important",
+        "#234c37 !important"
+      ],
+      "category": "MATCHED_IN_RENDERED_VIEW",
+      "count": 1,
+      "actual": [
+        "rgb(35, 76, 55) none repeat scroll 0% 0% / auto padding-box border-box"
+      ],
+      "screens": [
+        "거래처 관리",
+        "거래처 관리 / 거래처 목록",
+        "거래처 상세 관리 모달",
+        "저장 확인 모달"
+      ]
+    },
+    {
+      "key": "base | .tier-wholesale | color",
+      "selector": ".tier-wholesale",
+      "property": "color",
+      "context": "base",
+      "files": [
+        "foundation.css",
+        "theme.css"
+      ],
+      "values": [
+        "#dbdbdb !important",
+        "#a6edc0 !important"
+      ],
+      "category": "MATCHED_IN_RENDERED_VIEW",
+      "count": 1,
+      "actual": [
+        "rgb(166, 237, 192)"
+      ],
+      "screens": [
+        "거래처 관리",
+        "거래처 관리 / 거래처 목록",
+        "거래처 상세 관리 모달",
+        "저장 확인 모달"
+      ]
+    },
+    {
+      "key": "base | .tier-semi | background",
+      "selector": ".tier-semi",
+      "property": "background",
+      "context": "base",
+      "files": [
+        "foundation.css",
+        "theme.css"
+      ],
+      "values": [
+        "#454545 !important",
+        "#53451c !important"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .tier-semi | color",
+      "selector": ".tier-semi",
+      "property": "color",
+      "context": "base",
+      "files": [
+        "foundation.css",
+        "theme.css"
+      ],
+      "values": [
+        "#e3e3e3 !important",
+        "#ffe393 !important"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .tier-retail | background",
+      "selector": ".tier-retail",
+      "property": "background",
+      "context": "base",
+      "files": [
+        "foundation.css",
+        "theme.css"
+      ],
+      "values": [
+        "#353535 !important",
+        "#542c30 !important"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .tier-retail | color",
+      "selector": ".tier-retail",
+      "property": "color",
+      "context": "base",
+      "files": [
+        "foundation.css",
+        "theme.css"
+      ],
+      "values": [
+        "#c3c3c3 !important",
+        "#ffb2b9 !important"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .tier-special | background",
+      "selector": ".tier-special",
+      "property": "background",
+      "context": "base",
+      "files": [
+        "foundation.css",
+        "theme.css"
+      ],
+      "values": [
+        "#373737 !important",
+        "#44305c !important"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .tier-special | color",
+      "selector": ".tier-special",
+      "property": "color",
+      "context": "base",
+      "files": [
+        "foundation.css",
+        "theme.css"
+      ],
+      "values": [
+        "#c2c2c2 !important",
+        "#dab5ff !important"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .selected-client small | font-size",
+      "selector": ".selected-client small",
+      "property": "font-size",
+      "context": "base",
+      "files": [
+        "foundation.css",
+        "theme.css"
+      ],
+      "values": [
+        "11px",
+        "calc(13px * var(--ui-scale))"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .client-result small | font-size",
+      "selector": ".client-result small",
+      "property": "font-size",
+      "context": "base",
+      "files": [
+        "foundation.css",
+        "theme.css"
+      ],
+      "values": [
+        "11px",
+        "calc(13px * var(--ui-scale))"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .client-result | background",
+      "selector": ".client-result",
+      "property": "background",
+      "context": "base",
+      "files": [
+        "foundation.css",
+        "theme.css"
+      ],
+      "values": [
+        "#282828",
+        "#262626"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .catalog-stats | display",
+      "selector": ".catalog-stats",
+      "property": "display",
+      "context": "base",
+      "files": [
+        "foundation.css",
+        "product-admin-redesign.css"
+      ],
+      "values": [
+        "flex",
+        "grid"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .catalog-stats | gap",
+      "selector": ".catalog-stats",
+      "property": "gap",
+      "context": "base",
+      "files": [
+        "foundation.css",
+        "product-admin-redesign.css"
+      ],
+      "values": [
+        "15px",
+        "11px"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .flow-recheck | display",
+      "selector": ".flow-recheck",
+      "property": "display",
+      "context": "base",
+      "files": [
+        "theme.css",
+        "workflow-states.css"
+      ],
+      "values": [
+        "block",
+        "flex"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .flow-recheck | color",
+      "selector": ".flow-recheck",
+      "property": "color",
+      "context": "base",
+      "files": [
+        "theme.css",
+        "workflow-states.css"
+      ],
+      "values": [
+        "#f1cd86",
+        "#fbbf24"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .app-action-dialog::backdrop | background",
+      "selector": ".app-action-dialog::backdrop",
+      "property": "background",
+      "context": "base",
+      "files": [
+        "dialogs.css",
+        "modals.css"
+      ],
+      "values": [
+        "#0009",
+        "rgb(0 0 0 / 65%)"
+      ],
+      "category": "MATCHED_IN_RENDERED_VIEW",
+      "count": 1,
+      "actual": [
+        "rgba(0, 0, 0, 0.3) none repeat scroll 0% 0% / auto padding-box border-box"
+      ],
+      "screens": [
+        "저장 확인 모달"
+      ]
+    },
+    {
+      "key": "base | .review-layout | grid-template-rows",
+      "selector": ".review-layout",
+      "property": "grid-template-rows",
+      "context": "base",
+      "files": [
+        "receipt-layout.css",
+        "workflow-states.css",
+        "patch-v0808.css"
+      ],
+      "values": [
+        "minmax(0, 3fr) minmax(0, 7fr)",
+        "minmax(0, 3fr) minmax(0, 7fr)",
+        "minmax(0, 28%) 210px minmax(0, 1fr)"
+      ],
+      "category": "MATCHED_IN_RENDERED_VIEW",
+      "count": 1,
+      "actual": [
+        "239.109px 210px 392.891px"
+      ],
+      "screens": [
+        "접수 / 기본 화면"
+      ]
+    },
+    {
+      "key": "base | .hub-slot-3 .workflow-group.selected | border-left-color",
+      "selector": ".hub-slot-3 .workflow-group.selected",
+      "property": "border-left-color",
+      "context": "base",
+      "files": [
+        "receipt-layout.css",
+        "workflow.css"
+      ],
+      "values": [
+        "#60a5fa",
+        "transparent"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .hub-slot-3 .workflow-group.selected | background",
+      "selector": ".hub-slot-3 .workflow-group.selected",
+      "property": "background",
+      "context": "base",
+      "files": [
+        "receipt-layout.css",
+        "workflow.css"
+      ],
+      "values": [
+        "#192739",
+        "transparent"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .hub-slot-3 .workflow-group.selected .flow-group-name b | color",
+      "selector": ".hub-slot-3 .workflow-group.selected .flow-group-name b",
+      "property": "color",
+      "context": "base",
+      "files": [
+        "receipt-layout.css",
+        "workflow.css"
+      ],
+      "values": [
+        "#60a5fa",
+        "inherit"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .hub-slot-3 .workflow-shipment.chosen | box-shadow",
+      "selector": ".hub-slot-3 .workflow-shipment.chosen",
+      "property": "box-shadow",
+      "context": "base",
+      "files": [
+        "workflow.css",
+        "reception-manual.css"
+      ],
+      "values": [
+        "none !important",
+        "inset 0 -1px #414141 !important"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .hub-slot-3 .workflow-shipment.linked-active | box-shadow",
+      "selector": ".hub-slot-3 .workflow-shipment.linked-active",
+      "property": "box-shadow",
+      "context": "base",
+      "files": [
+        "workflow.css",
+        "reception-manual.css"
+      ],
+      "values": [
+        "none !important",
+        "inset 0 -1px #414141 !important"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .hub-panels .compact-review > .order-grand-total | display",
+      "selector": ".hub-panels .compact-review > .order-grand-total",
+      "property": "display",
+      "context": "base",
+      "files": [
+        "workflow.css",
+        "patch-v0808.css"
+      ],
+      "values": [
+        "flex",
+        "grid"
+      ],
+      "category": "MATCHED_IN_RENDERED_VIEW",
+      "count": 1,
+      "actual": [
+        "grid"
+      ],
+      "screens": [
+        "접수 / 기본 화면"
+      ]
+    },
+    {
+      "key": "base | .hub-panels .compact-review > .order-grand-total | align-items",
+      "selector": ".hub-panels .compact-review > .order-grand-total",
+      "property": "align-items",
+      "context": "base",
+      "files": [
+        "workflow.css",
+        "patch-v0808.css"
+      ],
+      "values": [
+        "baseline",
+        "center"
+      ],
+      "category": "MATCHED_IN_RENDERED_VIEW",
+      "count": 1,
+      "actual": [
+        "center"
+      ],
+      "screens": [
+        "접수 / 기본 화면"
+      ]
+    },
+    {
+      "key": "base | .hub-panels .compact-review > .order-grand-total | gap",
+      "selector": ".hub-panels .compact-review > .order-grand-total",
+      "property": "gap",
+      "context": "base",
+      "files": [
+        "workflow.css",
+        "patch-v0808.css"
+      ],
+      "values": [
+        "7px",
+        "1px 6px"
+      ],
+      "category": "MATCHED_IN_RENDERED_VIEW",
+      "count": 1,
+      "actual": [
+        "1px 6px"
+      ],
+      "screens": [
+        "접수 / 기본 화면"
+      ]
+    },
+    {
+      "key": "base | .hub-panels .compact-review > .order-grand-total | padding",
+      "selector": ".hub-panels .compact-review > .order-grand-total",
+      "property": "padding",
+      "context": "base",
+      "files": [
+        "workflow.css",
+        "patch-v0808.css"
+      ],
+      "values": [
+        "12px 8px",
+        "6px 8px"
+      ],
+      "category": "MATCHED_IN_RENDERED_VIEW",
+      "count": 1,
+      "actual": [
+        "6px 8px"
+      ],
+      "screens": [
+        "접수 / 기본 화면"
+      ]
+    },
+    {
+      "key": "base | .hub-panels .compact-review > .order-grand-total | font-size",
+      "selector": ".hub-panels .compact-review > .order-grand-total",
+      "property": "font-size",
+      "context": "base",
+      "files": [
+        "workflow.css",
+        "patch-v0808.css"
+      ],
+      "values": [
+        "18px",
+        "13px"
+      ],
+      "category": "MATCHED_IN_RENDERED_VIEW",
+      "count": 1,
+      "actual": [
+        "13px"
+      ],
+      "screens": [
+        "접수 / 기본 화면"
+      ]
+    },
+    {
+      "key": "base | .recipient-section-heading | padding",
+      "selector": ".recipient-section-heading",
+      "property": "padding",
+      "context": "base",
+      "files": [
+        "workflow-states.css",
+        "patch-v0808.css"
+      ],
+      "values": [
+        "9px 0",
+        "8px !important"
+      ],
+      "category": "MATCHED_IN_RENDERED_VIEW",
+      "count": 2,
+      "actual": [
+        "8px"
+      ],
+      "screens": [
+        "접수 / 기본 화면"
+      ]
+    },
+    {
+      "key": "base | .stage-message-preview | border",
+      "selector": ".stage-message-preview",
+      "property": "border",
+      "context": "base",
+      "files": [
+        "workflow-states.css",
+        "receipt-document.css"
+      ],
+      "values": [
+        "1px solid #444",
+        "0"
+      ],
+      "category": "MATCHED_IN_RENDERED_VIEW",
+      "count": 1,
+      "actual": [
+        "0px none rgb(245, 245, 245)"
+      ],
+      "screens": [
+        "접수 / 기본 화면"
+      ]
+    },
+    {
+      "key": "base | .stage-message-preview | border-radius",
+      "selector": ".stage-message-preview",
+      "property": "border-radius",
+      "context": "base",
+      "files": [
+        "workflow-states.css",
+        "receipt-document.css"
+      ],
+      "values": [
+        "4px",
+        "0"
+      ],
+      "category": "MATCHED_IN_RENDERED_VIEW",
+      "count": 1,
+      "actual": [
+        "0px"
+      ],
+      "screens": [
+        "접수 / 기본 화면"
+      ]
+    },
+    {
+      "key": "base | .messages-pane > .empty | font-size",
+      "selector": ".messages-pane > .empty",
+      "property": "font-size",
+      "context": "base",
+      "files": [
+        "workflow-states.css",
+        "reception-manual.css"
+      ],
+      "values": [
+        "14px",
+        "12px"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .source-pane .source-top | flex",
+      "selector": ".source-pane .source-top",
+      "property": "flex",
+      "context": "base",
+      "files": [
+        "receipt-document.css",
+        "reception-manual.css"
+      ],
+      "values": [
+        "none",
+        "0 0 82px"
+      ],
+      "category": "MATCHED_IN_RENDERED_VIEW",
+      "count": 1,
+      "actual": [
+        "0 0 82px"
+      ],
+      "screens": [
+        "접수 / 기본 화면"
+      ]
+    },
+    {
+      "key": "base | .receipt-client | padding",
+      "selector": ".receipt-client",
+      "property": "padding",
+      "context": "base",
+      "files": [
+        "receipt-document.css",
+        "modals.css"
+      ],
+      "values": [
+        "5px 0",
+        "4px 0 12px"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .source-pane .source-actions | flex",
+      "selector": ".source-pane .source-actions",
+      "property": "flex",
+      "context": "base",
+      "files": [
+        "receipt-document.css",
+        "reception-manual.css",
+        "reception-manual.css",
+        "patch-v0808.css"
+      ],
+      "values": [
+        "none",
+        "0 0 42px",
+        "0 0 48px",
+        "0 0 82px"
+      ],
+      "category": "MATCHED_IN_RENDERED_VIEW",
+      "count": 1,
+      "actual": [
+        "0 0 82px"
+      ],
+      "screens": [
+        "접수 / 기본 화면"
+      ]
+    },
+    {
+      "key": "base | .resolver-actions | justify-content",
+      "selector": ".resolver-actions",
+      "property": "justify-content",
+      "context": "base",
+      "files": [
+        "receipt-document.css",
+        "patch-v0808.css"
+      ],
+      "values": [
+        "space-between",
+        "flex-end"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .resolver-actions | gap",
+      "selector": ".resolver-actions",
+      "property": "gap",
+      "context": "base",
+      "files": [
+        "receipt-document.css",
+        "patch-v0808.css"
+      ],
+      "values": [
+        "10px",
+        "8px"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .app-modal-layer | color",
+      "selector": ".app-modal-layer",
+      "property": "color",
+      "context": "base",
+      "files": [
+        "modals.css",
+        "components.css"
+      ],
+      "values": [
+        "#eee",
+        "var(--text-primary)"
+      ],
+      "category": "MATCHED_IN_RENDERED_VIEW",
+      "count": 1,
+      "actual": [
+        "rgb(237, 237, 237)"
+      ],
+      "screens": [
+        "거래처 상세 관리 모달",
+        "저장 확인 모달",
+        "상품 상세 관리 모달"
+      ]
+    },
+    {
+      "key": "base | .app-modal-layer > .modal | overflow",
+      "selector": ".app-modal-layer > .modal",
+      "property": "overflow",
+      "context": "base",
+      "files": [
+        "modals.css",
+        "patch-v0808.css"
+      ],
+      "values": [
+        "auto",
+        "hidden"
+      ],
+      "category": "MATCHED_IN_RENDERED_VIEW",
+      "count": 1,
+      "actual": [
+        "hidden"
+      ],
+      "screens": [
+        "거래처 상세 관리 모달",
+        "저장 확인 모달",
+        "상품 상세 관리 모달"
+      ]
+    },
+    {
+      "key": "base | .app-modal-layer button | letter-spacing",
+      "selector": ".app-modal-layer button",
+      "property": "letter-spacing",
+      "context": "base",
+      "files": [
+        "modals.css",
+        "components.css"
+      ],
+      "values": [
+        "normal",
+        "0"
+      ],
+      "category": "MATCHED_IN_RENDERED_VIEW",
+      "count": 14,
+      "actual": [
+        "normal"
+      ],
+      "screens": [
+        "거래처 상세 관리 모달",
+        "저장 확인 모달",
+        "상품 상세 관리 모달"
+      ]
+    },
+    {
+      "key": "base | .app-modal-layer textarea | letter-spacing",
+      "selector": ".app-modal-layer textarea",
+      "property": "letter-spacing",
+      "context": "base",
+      "files": [
+        "modals.css",
+        "components.css"
+      ],
+      "values": [
+        "normal",
+        "0"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .app-modal-layer textarea | border-radius",
+      "selector": ".app-modal-layer textarea",
+      "property": "border-radius",
+      "context": "base",
+      "files": [
+        "modals.css",
+        "components.css"
+      ],
+      "values": [
+        "5px",
+        "var(--radius-control)"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .source-pane .source-actions | display",
+      "selector": ".source-pane .source-actions",
+      "property": "display",
+      "context": "base",
+      "files": [
+        "reception-manual.css",
+        "patch-v0808.css"
+      ],
+      "values": [
+        "flex",
+        "grid"
+      ],
+      "category": "MATCHED_IN_RENDERED_VIEW",
+      "count": 1,
+      "actual": [
+        "grid"
+      ],
+      "screens": [
+        "접수 / 기본 화면"
+      ]
+    },
+    {
+      "key": "base | .source-pane .source-actions | gap",
+      "selector": ".source-pane .source-actions",
+      "property": "gap",
+      "context": "base",
+      "files": [
+        "reception-manual.css",
+        "reception-manual.css",
+        "patch-v0808.css"
+      ],
+      "values": [
+        "6px",
+        "4px",
+        "4px"
+      ],
+      "category": "MATCHED_IN_RENDERED_VIEW",
+      "count": 1,
+      "actual": [
+        "5px"
+      ],
+      "screens": [
+        "접수 / 기본 화면"
+      ]
+    },
+    {
+      "key": "base | .source-pane .source-actions | padding",
+      "selector": ".source-pane .source-actions",
+      "property": "padding",
+      "context": "base",
+      "files": [
+        "reception-manual.css",
+        "reception-manual.css",
+        "patch-v0808.css"
+      ],
+      "values": [
+        "6px 8px",
+        "4px 8px",
+        "5px 6px"
+      ],
+      "category": "MATCHED_IN_RENDERED_VIEW",
+      "count": 1,
+      "actual": [
+        "5px 6px"
+      ],
+      "screens": [
+        "접수 / 기본 화면"
+      ]
+    },
+    {
+      "key": "base | .manual-grid-scroll th:nth-child(8) | width",
+      "selector": ".manual-grid-scroll th:nth-child(8)",
+      "property": "width",
+      "context": "base",
+      "files": [
+        "reception-manual.css",
+        "patch-v0808.css"
+      ],
+      "values": [
+        "76px",
+        "120px"
+      ],
+      "category": "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+      "count": 0,
+      "actual": [],
+      "screens": []
+    },
+    {
+      "key": "base | .source-pane .source-actions | height",
+      "selector": ".source-pane .source-actions",
+      "property": "height",
+      "context": "base",
+      "files": [
+        "reception-manual.css",
+        "reception-manual.css",
+        "patch-v0808.css"
+      ],
+      "values": [
+        "42px",
+        "48px",
+        "82px"
+      ],
+      "category": "MATCHED_IN_RENDERED_VIEW",
+      "count": 1,
+      "actual": [
+        "82px"
+      ],
+      "screens": [
+        "접수 / 기본 화면"
+      ]
+    },
+    {
+      "key": "base | .app-modal-layer.product-detail-dialog > .modal | background",
+      "selector": ".app-modal-layer.product-detail-dialog > .modal",
+      "property": "background",
+      "context": "base",
+      "files": [
+        "product-admin-redesign.css",
+        "tauri-stage2-products.css"
+      ],
+      "values": [
+        "#24282e",
+        "#202020"
+      ],
+      "category": "MATCHED_IN_RENDERED_VIEW",
+      "count": 1,
+      "actual": [
+        "rgb(32, 32, 32) none repeat scroll 0% 0% / auto padding-box border-box"
+      ],
+      "screens": [
+        "상품 상세 관리 모달"
+      ]
+    },
+    {
+      "key": "base | .catalog-admin-workspace | display",
+      "selector": ".catalog-admin-workspace",
+      "property": "display",
+      "context": "base",
+      "files": [
+        "product-admin-redesign.css",
+        "tauri-stage2-products.css"
+      ],
+      "values": [
+        "grid",
+        "block"
+      ],
+      "category": "MATCHED_IN_RENDERED_VIEW",
+      "count": 1,
+      "actual": [
+        "block"
+      ],
+      "screens": [
+        "상품 관리 / 카테고리 관리"
+      ]
+    },
+    {
+      "key": "base | .catalog-admin-workspace | min-height",
+      "selector": ".catalog-admin-workspace",
+      "property": "min-height",
+      "context": "base",
+      "files": [
+        "product-admin-redesign.css",
+        "tauri-stage2-products.css"
+      ],
+      "values": [
+        "630px",
+        "440px"
+      ],
+      "category": "MATCHED_IN_RENDERED_VIEW",
+      "count": 1,
+      "actual": [
+        "440px"
+      ],
+      "screens": [
+        "상품 관리 / 카테고리 관리"
+      ]
+    },
+    {
+      "key": "base | .catalog-admin-workspace | background",
+      "selector": ".catalog-admin-workspace",
+      "property": "background",
+      "context": "base",
+      "files": [
+        "product-admin-redesign.css",
+        "tauri-stage2-products.css"
+      ],
+      "values": [
+        "#1d1d1d",
+        "#202020"
+      ],
+      "category": "MATCHED_IN_RENDERED_VIEW",
+      "count": 1,
+      "actual": [
+        "rgb(32, 32, 32) none repeat scroll 0% 0% / auto padding-box border-box"
+      ],
+      "screens": [
+        "상품 관리 / 카테고리 관리"
+      ]
+    }
+  ]
+}
