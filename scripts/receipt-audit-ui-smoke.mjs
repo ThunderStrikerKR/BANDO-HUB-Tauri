@@ -525,7 +525,13 @@ try {
   // Page navigation must honor Save / Don't Save / Cancel.
   const operator = settingsPage.getByRole("textbox", { name: "작업자 이름" });
   await operator.fill("이동 테스트 담당");
-  await settingsPage.getByText("저장하지 않은 설정이 있습니다.").waitFor();
+  console.log("NAV_BEFORE", JSON.stringify({
+    typed: await operator.inputValue(),
+    dirtyCount: await settingsPage.locator(".draft-status").count(),
+    dirtyText: await settingsPage.locator(".draft-status").allTextContents(),
+    visibleDirty: await settingsPage.getByText("저장하지 않은 설정이 있습니다.").isVisible(),
+    settingsTab: await settingsPage.getByRole("tab", { name: "기본 설정" }).getAttribute("aria-selected"),
+  }));
   await settingsNav.getByRole("button", { name: "상품 관리" }).click();
   const leaveDialog = settingsPage.getByRole("dialog", { name: "변경사항 저장" });
   try {
