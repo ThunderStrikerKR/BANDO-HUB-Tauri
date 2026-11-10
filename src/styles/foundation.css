@@ -592,9 +592,6 @@ h3 {
 .settings {
   max-width: 850px;
 }
-.settings h2:not(:first-child) {
-  margin-top: 35px;
-}
 .override-list {
   max-height: 280px;
   overflow: auto;
