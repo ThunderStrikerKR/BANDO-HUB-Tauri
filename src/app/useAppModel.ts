@@ -154,7 +154,7 @@ export function useAppModel() {
     return () => clearInterval(timer);
   }, [startup.phase]);
   const commitGuard = useRef(false);
-  const lastCommitted = useRef<State>();
+  const lastCommitted = useRef<State | undefined>(undefined);
   // Native write commands return an authoritative snapshot after the transaction.
   const refresh = async (committed?: State) => {
     const result = committed ?? await window.bando!.load();
