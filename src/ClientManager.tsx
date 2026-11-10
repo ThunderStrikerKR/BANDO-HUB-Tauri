@@ -166,6 +166,7 @@ export function ClientManager({
         )}
         <section className="card">
           <ManagementTable className="client-table">
+            <colgroup><col style={{ width: "30%" }} /><col style={{ width: "38%" }} /><col style={{ width: "32%" }} /></colgroup>
             <thead>
               <tr>
                 <th>거래처</th>
