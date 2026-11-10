@@ -707,6 +707,66 @@ try {
     "Heading x origin inconsistent across pages: "+JSON.stringify(layoutSamples));
   console.log("PASS: 7 management titles and 5 shared search layouts are consistent");
 
+  // Shared tables must retain their native semantics and compress empty results
+  // without leaving an oversized scroller behind. This uses the real React UI.
+  const checkCompactEmpty = async (selector, label) => {
+    const metrics = await navPage.locator(selector).evaluate((empty) => {
+      const rect = empty.getBoundingClientRect();
+      const style = getComputedStyle(empty);
+      return {height:Math.round(rect.height),align:style.textAlign,
+        font:parseFloat(style.fontSize),padding:parseFloat(style.paddingTop)};
+    });
+    assert.ok(metrics.height > 20 && metrics.height <= 80,
+      label + " unexpectedly tall: " + JSON.stringify(metrics));
+    assert.equal(metrics.align,"left",label + " must align list status left");
+    assert.ok(metrics.font >= 12 && metrics.font <= 15,
+      label + " uses an inconsistent type size: " + JSON.stringify(metrics));
+  };
+
+  await navMenu.getByRole("button",{name:"상품 관리"}).click();
+  await navPage.getByRole("textbox",{name:"상품 검색"}).fill("__CI_EMPTY_PRODUCT__");
+  assert.equal(await navPage.locator(".product-prices table.management-data-table").count(),1);
+  await checkCompactEmpty(".product-prices .empty-state-compact","product");
+  await navPage.getByRole("textbox",{name:"상품 검색"}).fill("");
+
+  await navMenu.getByRole("button",{name:"거래처 관리"}).click();
+  await navPage.getByRole("textbox",{name:"거래처 관리 검색"}).fill("__CI_EMPTY_CLIENT__");
+  assert.equal(await navPage.locator(".client-table.management-data-table").count(),1);
+  await checkCompactEmpty(".client-table + .empty-state-compact","client");
+  await navPage.getByRole("textbox",{name:"거래처 관리 검색"}).fill("");
+
+  await navMenu.getByRole("button",{name:"주문 내역"}).click();
+  await navPage.getByRole("textbox",{name:"주문 검색"}).fill("__CI_EMPTY_ORDER__");
+  assert.equal(await navPage.locator(".order-history-list table.management-data-table").count(),1);
+  await checkCompactEmpty(".order-history-list > .empty-state-compact","order history");
+  await navPage.getByRole("textbox",{name:"주문 검색"}).fill("");
+
+  await navMenu.getByRole("button",{name:"운임 관리"}).click();
+  await navPage.getByRole("button",{name:"동급 배송 그룹 지정"}).click();
+  await navPage.getByRole("textbox",{name:"배송 그룹 상품 검색"}).fill("__CI_EMPTY_FREIGHT__");
+  const freightEmpty=navPage.locator(".shipping-table-scroll.shipping-list-empty");
+  await freightEmpty.waitFor();
+  assert.ok(await freightEmpty.evaluate(el=>el.getBoundingClientRect().height)<=130,
+    "Empty freight table still reserves excessive vertical space");
+  await checkCompactEmpty(".shipping-table-scroll .empty-state-compact","freight");
+  await navPage.getByRole("textbox",{name:"배송 그룹 상품 검색"}).fill("");
+
+  await navMenu.getByRole("button",{name:"엑셀 관리"}).click();
+  await navPage.getByRole("button",{name:"엑셀 작성 이력"}).click();
+  await navPage.getByRole("textbox",{name:"엑셀 목록 검색"}).fill("__CI_EMPTY_EXCEL__");
+  const excelEmpty=navPage.locator(".excel-table-scroll.excel-list-empty");
+  await excelEmpty.waitFor();
+  assert.ok(await excelEmpty.evaluate(el=>el.getBoundingClientRect().height)<=320,
+    "Excel table/response history reserves excessive space with zero results");
+  assert.equal(await navPage.locator(".factory-reply-data-table").count(),0);
+  await checkCompactEmpty(".excel-table-scroll > .empty-state-compact","Excel export");
+  await checkCompactEmpty(".factory-reply-history .empty-state-compact","factory reply history");
+  await navPage.setViewportSize({width:1120,height:800});
+  await checkCompactEmpty(".excel-table-scroll > .empty-state-compact","Excel at narrow viewport");
+  await navPage.setViewportSize({width:1520,height:1000});
+  await navPage.getByRole("textbox",{name:"엑셀 목록 검색"}).fill("");
+  console.log("PASS: native management tables and compact empty states across six screens");
+
   // Excel: a small caption must not take its own line while ample width remains.
   await navMenu.getByRole("button",{name:"엑셀 관리"}).click();
   await navPage.getByRole("button",{name:"매장 발송 대기"}).click();
