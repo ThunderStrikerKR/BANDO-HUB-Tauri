@@ -146,11 +146,6 @@ body,
   background: transparent;
   color: #c4c4c4;
 }
-.app-v03 .field > .field-label,
-.app-v03 .field > label {
-  font-size: calc(14px * var(--ui-scale));
-  color: #c4c4c4;
-}
 .app-v03 .field {
   min-width: 0;
 }
