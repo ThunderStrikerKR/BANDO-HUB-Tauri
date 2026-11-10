@@ -706,6 +706,19 @@ try {
     assert.equal(metrics.text,label,"Wrong title on "+label);
     assert.ok(Math.abs(Number.parseFloat(metrics.size)-20)<2,"Inconsistent title font: "+JSON.stringify(metrics));
     await samplePageStyle(label);
+    if(label==="설정"){
+      const settingSections=await navPage.locator(".settings > div:not([hidden]) > h2.settings-help-heading")
+        .evaluateAll((headings)=>headings.map(h=>{
+          const style=getComputedStyle(h);
+          return {text:h.textContent?.trim().slice(0,28),
+            marginTop:parseFloat(style.marginTop),marginBottom:parseFloat(style.marginBottom)};
+        }));
+      assert.ok(settingSections.length>=2,
+        "Settings heading audit did not find the section hierarchy");
+      assert.ok(settingSections.every(h=>h.marginTop<=16),
+        "Legacy settings heading gap exceeds standard rhythm: "+JSON.stringify(settingSections));
+      console.log("PASS: settings section headings use shared compact spacing",JSON.stringify(settingSections));
+    }
     if(searchLabel){
       const input=navPage.getByRole("textbox",{name:searchLabel,exact:true});
       const search=await input.evaluate((element)=>{
