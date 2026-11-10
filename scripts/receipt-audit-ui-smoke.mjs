@@ -721,15 +721,20 @@ try {
       for(const candidate of candidates){
         if(!activeContext(candidate.context))continue;
         try{
-          const elements=[...document.querySelectorAll(candidate.selector)].filter(element=>{
+          // querySelectorAll cannot select pseudo-elements; resolve their owning
+          // DOM element and ask getComputedStyle for the pseudo-element directly.
+          const match=candidate.selector.match(/(::[a-z-]+)$/);
+          const pseudo=match?.[1]??null;
+          const selector=pseudo ? candidate.selector.slice(0,-pseudo.length) : candidate.selector;
+          const elements=[...document.querySelectorAll(selector)].filter(element=>{
             const style=getComputedStyle(element);
             return style.display!=="none" && element.getBoundingClientRect().width>0;
           });
           if(!elements.length)continue;
           findings.push({key:candidate.key,count:elements.length,
-            actual:getComputedStyle(elements[0]).getPropertyValue(candidate.property).trim(),
+            actual:getComputedStyle(elements[0],pseudo).getPropertyValue(candidate.property).trim(),
             example:elements[0].tagName.toLowerCase()+
-              (typeof elements[0].className==="string" ? "."+elements[0].className.trim().replace(/\s+/g,".").slice(0,100) : "")});
+              (typeof elements[0].className==="string" ? "."+elements[0].className.trim().replace(/\s+/g,".").slice(0,100) : "")+(pseudo??"")});
         }catch{
           findings.push({key:candidate.key,unsupportedSelector:true});
         }
@@ -1430,9 +1435,10 @@ try {
   const cascadeInventory=cascadeSources.map(candidate=>{
     const observed=cascadeSeen.get(candidate.key);
     return {key:candidate.key,selector:candidate.selector,property:candidate.property,
-      files:candidate.files,values:candidate.values,
+      context:candidate.context,files:candidate.files,values:candidate.values,
       category:observed?.count>0 ? "MATCHED_IN_RENDERED_VIEW" :
-        observed?.unsupportedSelector ? "REQUIRES_PSEUDO_ELEMENT_INSPECTION" : "NOT_OBSERVED_IN_SAMPLED_VIEWS",
+        observed?.unsupportedSelector ? "UNSUPPORTED_SELECTOR" :
+        candidate.context!=="base" ? "CONDITIONAL_NOT_OBSERVED" : "NOT_OBSERVED_IN_SAMPLED_VIEWS",
       count:observed?.count??0,
       actual:[...(observed?.actual??[])].slice(0,3),
       screens:[...(observed?.screens??[])].slice(0,5)};
@@ -1442,7 +1448,8 @@ try {
   console.log("CSS_CASCADE_COUNTS",JSON.stringify({
     candidates:cascadeInventory.length,observed:cascadeInventory.filter(x=>x.category==="MATCHED_IN_RENDERED_VIEW").length,
     unobserved:cascadeInventory.filter(x=>x.category==="NOT_OBSERVED_IN_SAMPLED_VIEWS").length,
-    pseudo:cascadeInventory.filter(x=>x.category==="REQUIRES_PSEUDO_ELEMENT_INSPECTION").length,
+    conditionalNotObserved:cascadeInventory.filter(x=>x.category==="CONDITIONAL_NOT_OBSERVED").length,
+    unsupportedSelectors:cascadeInventory.filter(x=>x.category==="UNSUPPORTED_SELECTOR").length,
     screens:styleProbe.length,
     observedStates:[...new Set([...cascadeSeen.values()].flatMap(e=>[...e.screens]))].length}));
   assert.ok(cascadeInventory.length>=100,"Cross-file CSS collision inventory unexpectedly incomplete");
