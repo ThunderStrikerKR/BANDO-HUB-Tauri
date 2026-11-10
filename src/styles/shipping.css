@@ -137,7 +137,11 @@
   min-height: 260px;
   overflow: auto;
 }
-.shipping-card table {
+.shipping-table-scroll.shipping-list-empty {
+  min-height: 0;
+  max-height: none;
+}
+.shipping-card table:not(.management-data-table) {
   font-size: 12px;
 }
 .shipping-card thead {
@@ -145,31 +149,31 @@
   top: 0;
   z-index: 2;
 }
-.shipping-card th {
+.shipping-card table:not(.management-data-table) th {
   background: #1e1e1e;
   color: #a2a2a2;
   font-size: 10px;
   letter-spacing: 0.2px;
   padding: 13px 18px;
 }
-.shipping-card td {
+.shipping-card table:not(.management-data-table) td {
   padding: 15px 18px;
   border-color: #383838;
 }
-.shipping-card td:first-child,
-.shipping-card th:first-child {
+.shipping-product-list td:first-child,
+.shipping-product-list th:first-child {
   width: 42px;
 }
-.shipping-card td strong {
+.shipping-card table:not(.management-data-table) td strong {
   font-size: 13px;
   color: #e8e8e8;
 }
-.shipping-card td small {
+.shipping-card table:not(.management-data-table) td small {
   font-size: 10px;
   color: #959595;
   max-width: 420px;
 }
-.shipping-card td select {
+.shipping-card table:not(.management-data-table) td select {
   min-width: 170px;
   padding: 8px 10px;
   font-size: 11px;
@@ -286,8 +290,8 @@
   .shipping-bulk small {
     display: none;
   }
-  .shipping-card th,
-  .shipping-card td {
+  .shipping-card table:not(.management-data-table) th,
+  .shipping-card table:not(.management-data-table) td {
     padding-left: 12px;
     padding-right: 12px;
   }
@@ -347,8 +351,8 @@
 .shipping-product-description { display: inline-block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: #a9a9a9; }
 .shipping-product-name { max-width: 500px; }
 .shipping-product-name > strong { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; }
-.shipping-card th, .shipping-card td { padding-top: 9px; padding-bottom: 9px; }
-.shipping-card td button { margin-right: 7px; }
+.shipping-card table:not(.management-data-table) th, .shipping-card table:not(.management-data-table) td { padding-top: 9px; padding-bottom: 9px; }
+.shipping-card table:not(.management-data-table) td button { margin-right: 7px; }
 
 /* Explicitly chosen fee intervals, independent of maximum-bundle changes. */
 .shipping-fee-ranges { margin: 14px 0; padding: 12px 0; border-top: 1px solid #474747; border-bottom: 1px solid #474747; }
