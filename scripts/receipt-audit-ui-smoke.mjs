@@ -741,6 +741,20 @@ try {
   for(const label of ["상품 목록","카테고리 관리","대표색상 관리","별칭 관리","브랜드 관리"]){
     await navPage.getByRole("navigation",{name:"상품 관리 메뉴"}).getByRole("button",{name:label,exact:true}).click();
     await samplePageStyle("상품 관리 / "+label);
+    if(label==="별칭 관리" || label==="브랜드 관리"){
+      const rootSelector=label==="별칭 관리" ? ".alias-manager" : ".registry-brand-manager";
+      const titleLayout=await navPage.locator(rootSelector).evaluate(root=>{
+        const h2=root.querySelector(":scope > h2"),intro=root.querySelector(":scope > p");
+        const hs=h2?getComputedStyle(h2):null,ps=intro?getComputedStyle(intro):null;
+        return {title: h2?.textContent?.trim(),bottom:hs?parseFloat(hs.marginBottom):-1,
+          introTop:ps?parseFloat(ps.marginTop):-1};
+      });
+      assert.equal(titleLayout.bottom,0,
+        "Legacy card heading has excessive spacing: "+JSON.stringify(titleLayout));
+      assert.ok(titleLayout.introTop>=0 && titleLayout.introTop<=8,
+        "Registry introduction spacing differs from management hierarchy: "+JSON.stringify(titleLayout));
+      console.log("PASS: registry heading and introduction rhythm",label,JSON.stringify(titleLayout));
+    }
   }
   await navMenu.getByRole("button",{name:"운임 관리"}).click();
   for(const label of ["상품별 기본 운임","동급 배송 그룹 지정","동급 그룹 운임표","조합 / 기준 이력"]){
@@ -871,12 +885,16 @@ try {
       captionDisplay:caption?getComputedStyle(caption).display:null,
       captionMargin:caption?getComputedStyle(caption).marginTop:null,
       detailsDisplay:details?getComputedStyle(details).display:null,
-      rowHeight:Math.round(row.getBoundingClientRect().height)};
+      rowHeight:Math.round(row.getBoundingClientRect().height),
+      cellTop:row.querySelector("td") ? parseFloat(getComputedStyle(row.querySelector("td")).paddingTop) : -1,
+      cellBottom:row.querySelector("td") ? parseFloat(getComputedStyle(row.querySelector("td")).paddingBottom) : -1};
   });
   assert.equal(excelLayout.captionDisplay,"inline",JSON.stringify(excelLayout));
-  assert.ok(excelLayout.rowHeight<=55,
-    "Excel list wraps despite available horizontal space: "+JSON.stringify(excelLayout));
-  console.log("PASS: Excel main table shows related information without forced extra rows");
+  assert.ok(excelLayout.rowHeight<=39,
+    "Excel test row is unnecessarily tall at available width: "+JSON.stringify(excelLayout));
+  assert.ok(excelLayout.cellTop<=3.1 && excelLayout.cellBottom<=3.1,
+    "Excel table uses superseded 6px cell padding: "+JSON.stringify(excelLayout));
+  console.log("PASS: Excel table uses compact rows and preserves inline information",JSON.stringify(excelLayout));
   await navMenu.getByRole("button",{name:"거래처 관리"}).click();
   // Client: Cancel keeps the draft, Discard keeps DB unchanged, Save persists it.
   await navPage.locator(".client-table tbody tr").filter({hasText:"검증악기"}).first().click();
