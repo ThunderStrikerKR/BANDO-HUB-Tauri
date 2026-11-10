@@ -363,7 +363,6 @@ body,
 }
 .app-v03 .price-cell input {
   font-size: calc(16px * var(--ui-scale));
-  width: 125px;
   background: #262626;
 }
 .app-v03 td small {
