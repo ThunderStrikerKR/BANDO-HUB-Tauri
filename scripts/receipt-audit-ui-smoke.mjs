@@ -1055,6 +1055,25 @@ try {
 
   await productSubnav.getByRole("button", {name:"대표색상 관리"}).click();
   const colorName = navPage.locator("#new-color-group");
+  const colorForm = await navPage.locator(".family-create-form").evaluate((form) => {
+    const field = form.querySelector(".field");
+    const label = field?.querySelector("label");
+    const input = field?.querySelector("input");
+    const button = form.querySelector("button");
+    return {
+      labelFor: label?.htmlFor,
+      inputId: input?.id,
+      marginBottom: field ? getComputedStyle(field).marginBottom : "",
+      inputRight: input?.getBoundingClientRect().right ?? 0,
+      buttonLeft: button?.getBoundingClientRect().left ?? 0,
+      buttonHeight: button?.getBoundingClientRect().height ?? 0,
+      gap: getComputedStyle(form).columnGap,
+    };
+  });
+  assert.equal(colorForm.labelFor, colorForm.inputId, JSON.stringify(colorForm));
+  assert.equal(colorForm.marginBottom, "0px", JSON.stringify(colorForm));
+  assert.ok(colorForm.buttonHeight >= 32 && colorForm.buttonHeight <= 44, JSON.stringify(colorForm));
+  assert.ok(colorForm.buttonLeft >= colorForm.inputRight, JSON.stringify(colorForm));
   await colorName.fill("CI 미등록 대표색상");
   await navMenu.getByRole("button", {name:"거래처 관리"}).click();
   await checkPrompt("unregistered color group name");
@@ -1071,6 +1090,29 @@ try {
   await navMenu.getByRole("button", {name:"운임 관리"}).click();
   await navPage.getByRole("button", {name:"동급 그룹 운임표"}).click();
   const shippingName = navPage.getByRole("textbox", {name:"새 배송 그룹명"});
+  const shippingForm = await navPage.locator(".shipping-rates .new-group").evaluate((form) => {
+    const field = form.querySelector(".field");
+    const label = field?.querySelector("label");
+    const input = field?.querySelector("input");
+    const button = form.querySelector("button");
+    const actions = form.closest(".shipping-rates")?.querySelector(".shipping-group-actions");
+    const action = actions?.querySelector("button");
+    return {
+      labelFor: label?.htmlFor,
+      inputId: input?.id,
+      marginBottom: field ? getComputedStyle(field).marginBottom : "",
+      inputBottom: input?.getBoundingClientRect().bottom ?? 0,
+      buttonBottom: button?.getBoundingClientRect().bottom ?? 0,
+      actionHeight: action?.getBoundingClientRect().height ?? null,
+      actionGap: actions ? getComputedStyle(actions).columnGap : null,
+    };
+  });
+  assert.equal(shippingForm.labelFor, shippingForm.inputId, JSON.stringify(shippingForm));
+  assert.equal(shippingForm.marginBottom, "0px", JSON.stringify(shippingForm));
+  assert.ok(Math.abs(shippingForm.inputBottom - shippingForm.buttonBottom) <= 2,
+    JSON.stringify(shippingForm));
+  if (shippingForm.actionHeight !== null)
+    assert.ok(shippingForm.actionHeight <= 34, JSON.stringify(shippingForm));
   await shippingName.fill("CI 미등록 운임 그룹");
   await navMenu.getByRole("button", {name:"상품 관리"}).click();
   await checkPrompt("unregistered shipping group name");
