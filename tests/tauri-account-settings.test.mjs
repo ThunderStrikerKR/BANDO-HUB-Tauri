@@ -27,7 +27,10 @@ test("Client per-account preference is stored and affects outbound billing", () 
   assert.match(domain, /if \(o\.accountMode === "MANUAL"\)/);
   assert.match(domain, /client\?\.preferredAccountId/);
   assert.match(domain, /recommendAccount\(o, s, products, c\)/);
-  assert.match(workflow, /state\.clients\.find\(\(c\) => c\.id === active\.clientId\)/);
+  // Before confirmation, account recommendations use the live dealer;
+  // confirmed orders must keep their captured preferred account setting.
+  assert.match(workflow, /orderParty\(active, state\)/);
+  assert.match(workflow, /orderParty\(order, state\)/);
 });
 
 test("Required sender information is validated at UI and Rust save boundary", () => {
