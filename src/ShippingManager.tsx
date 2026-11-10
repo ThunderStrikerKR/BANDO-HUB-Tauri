@@ -252,7 +252,7 @@ export function ShippingManager({
         <ProductFreightPanel state={{ ...state, shipping }} onSave={onSave} onNotice={onNotice} />
       )}
       {tab === "assign" && (
-        <section className="shipping-card">
+        <section className="shipping-card shipping-assignment-list">
           <div className="shipping-tools management-search-toolbar">
             <ManagementSearch label="배송 그룹 상품 검색"
               placeholder="모델명 / 상품명 / 카테고리 검색"
