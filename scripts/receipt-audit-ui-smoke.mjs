@@ -1237,6 +1237,7 @@ try {
   // Closing a freight editor must prompt while the original dialog is still open.
   await navPage.getByRole("button",{name:"기본 운임 설정"}).first().click();
   const freightEditor = navPage.getByRole("dialog",{name:/운임 설정/});
+  await auditModalLayout(freightEditor,"상품별 운임 설정");
   await freightEditor.getByLabel("최대 묶음 수량").selectOption("2");
   await freightEditor.getByRole("button",{name:"닫기 ×"}).click();
   await checkPrompt("freight modal close");
