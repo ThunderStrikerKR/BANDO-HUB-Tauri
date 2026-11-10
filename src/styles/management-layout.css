@@ -226,6 +226,19 @@
   max-width: 280px;
 }
 
+/* Consistent product identity typography in the pricing and freight lists.
+   Retain each screen's existing single-line/truncation and column policies. */
+.app-v03 .management-container .product-prices .product-title-line b,
+.app-v03 .management-container .shipping-product-list .shipping-product-name > strong {
+  font-size: var(--manage-product-name-size);
+  line-height: 1.3;
+}
+.app-v03 .management-container .product-prices .product-title-line span,
+.app-v03 .management-container .shipping-product-list .shipping-product-description {
+  font-size: var(--manage-product-description-size);
+  line-height: 1.3;
+}
+
 /* Explicit list tables:
    - allocate columns from content, not arbitrary fixed width;
    - do not wrap short labels into several lines while horizontal space remains;
