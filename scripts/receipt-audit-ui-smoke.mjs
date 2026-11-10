@@ -828,7 +828,7 @@ try {
     assert.ok(Math.abs(Number.parseFloat(metrics.size)-20)<2,"Inconsistent title font: "+JSON.stringify(metrics));
     await samplePageStyle(label);
     if(label==="설정"){
-      const settingSections=await navPage.locator(".settings > div:not([hidden]) > h2.settings-help-heading")
+      const settingSections=await navPage.locator(".settings > div:not([hidden]) .settings-help-heading")
         .evaluateAll((headings)=>headings.map(h=>{
           const style=getComputedStyle(h);
           return {text:h.textContent?.trim().slice(0,28),
