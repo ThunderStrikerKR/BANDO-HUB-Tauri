@@ -15,7 +15,8 @@ import type { Client, State } from "./types";
 import { Field, Modal, MoneyInput, clone } from "./ui";
 import { AccountPicker } from "./ui/AccountPicker";
 import { HelpTooltip } from "./ui/HelpTooltip";
-import { PageHeading } from "./ui/PageHeading";
+import { EmptyState, PageHeading } from "./ui/PageHeading";
+import { ManagementTable } from "./ui/ManagementTable";
 import { ManagementSearch } from "./ui/ManagementSearch";
 export function ClientManager({
   state,
@@ -164,7 +165,7 @@ export function ClientManager({
           </section>
         )}
         <section className="card">
-          <table className="client-table management-data-table">
+          <ManagementTable className="client-table">
             <thead>
               <tr>
                 <th>거래처</th>
@@ -206,8 +207,8 @@ export function ClientManager({
                 </tr>
               ))}
             </tbody>
-          </table>
-          {!rows.length && <p className="empty">검색 결과가 없습니다.</p>}
+          </ManagementTable>
+          {!rows.length && <EmptyState compact title={search ? "검색 결과가 없습니다." : "등록된 거래처가 없습니다."} />}
         </section>
         {edit && (
           <Modal
