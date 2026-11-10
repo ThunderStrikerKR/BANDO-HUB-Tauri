@@ -523,6 +523,10 @@ try {
   assert.equal(deleteChanges.accounts.length, 1);
   console.log("PASS: deleting an account saves with no false conflict");
   // Page navigation must honor Save / Don't Save / Cancel.
+  // Reload after the account persistence cases to test navigation with a settled baseline.
+  await settingsPage.reload();
+  await settingsNav.getByRole("button", { name: "설정" }).click();
+  await settingsPage.getByRole("tab", { name: "기본 설정" }).waitFor();
   const operator = settingsPage.getByRole("textbox", { name: "작업자 이름" });
   await operator.fill("이동 테스트 담당");
   console.log("NAV_BEFORE", JSON.stringify({
