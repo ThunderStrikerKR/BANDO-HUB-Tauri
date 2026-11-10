@@ -525,9 +525,21 @@ try {
   // Page navigation must honor Save / Don't Save / Cancel.
   const operator = settingsPage.getByRole("textbox", { name: "작업자 이름" });
   await operator.fill("이동 테스트 담당");
+  await settingsPage.getByText("저장하지 않은 설정이 있습니다.").waitFor();
   await settingsNav.getByRole("button", { name: "상품 관리" }).click();
   const leaveDialog = settingsPage.getByRole("dialog", { name: "변경사항 저장" });
-  await leaveDialog.waitFor();
+  try {
+    await leaveDialog.waitFor({ timeout: 4500 });
+  } catch (error) {
+    console.log("NAV_DEBUG", JSON.stringify({
+      settingsText: await settingsPage.getByText("저장하지 않은 설정이 있습니다.").count(),
+      notices: await settingsPage.locator(".app-notice").allTextContents(),
+      dialogs: await settingsPage.locator("dialog").count(),
+      productHeader: await settingsPage.getByRole("heading", { name: /상품 가격표/ }).count(),
+      operator: await operator.inputValue().catch(() => "unmounted"),
+    }));
+    throw error;
+  }
   await leaveDialog.getByRole("button", { name: "취소" }).click();
   assert.equal(await operator.inputValue(), "이동 테스트 담당");
   // Save before leaving: only the edited settings key is persisted.
