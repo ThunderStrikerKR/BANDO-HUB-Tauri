@@ -713,6 +713,22 @@ try {
     for (const action of ["저장","저장 안 함","취소"])
       assert.equal(await leave.getByRole("button",{name:action,exact:true}).count(),1,
         context + " missing " + action);
+    const decision=await leave.evaluate(el=>{
+      const heading=el.querySelector("h2"),body=el.querySelector("p");
+      const buttons=[...el.querySelectorAll(".dialog-actions button")];
+      const bounds=el.getBoundingClientRect();
+      return {titleFont:heading?parseFloat(getComputedStyle(heading).fontSize):0,
+        bodyFont:body?parseFloat(getComputedStyle(body).fontSize):0,
+        buttonHeights:buttons.map(button=>Math.round(button.getBoundingClientRect().height)),
+        buttonFonts:buttons.map(button=>parseFloat(getComputedStyle(button).fontSize)),
+        top:Math.round(bounds.top),bottom:Math.round(bounds.bottom),viewport:window.innerHeight};
+    });
+    assert.equal(decision.titleFont,18,"Decision title must match edit-modal title: "+JSON.stringify(decision));
+    assert.equal(decision.bodyFont,13,"Decision body should use shared 13px text: "+JSON.stringify(decision));
+    assert.ok(decision.buttonHeights.every(height=>height>=30 && height<=40),
+      "Decision action button dimensions differ: "+JSON.stringify(decision));
+    assert.ok(decision.top>=0&&decision.bottom<=decision.viewport,
+      "Decision dialog extends beyond viewport: "+JSON.stringify(decision));
   };
   const mockState = () => navPage.evaluate(() => window.__navSaved());
   // UI contract audit at desktop width: all primary headings and search controls
