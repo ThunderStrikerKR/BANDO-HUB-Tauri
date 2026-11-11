@@ -4,6 +4,7 @@ import { uid } from "./domain";
 import type { NoticeSink } from "./shared/notices";
 import { useAsyncTask } from "./shared/useAsyncTask";
 import { useDraft } from "./shared/useDraft";
+import { sameSettingsEditor, visibleSettings } from "./shared/meaningful-changes";
 import { sameValue } from "./shared/draft";
 import type { State } from "./types";
 import { Field } from "./ui";
@@ -14,8 +15,10 @@ const same = sameValue;
 function settingsChanges(saved: Record<string, unknown>, edited: Record<string, unknown>) {
   const changes: Record<string, unknown> = {};
   const expected: Record<string, unknown> = {};
+  const comparableSaved = visibleSettings(saved as State["settings"]) as Record<string, unknown>;
+  const comparableEdited = visibleSettings(edited as State["settings"]) as Record<string, unknown>;
   for (const key of new Set([...Object.keys(saved), ...Object.keys(edited)])) {
-    if (same(saved[key], edited[key])) continue;
+    if (same(comparableSaved[key], comparableEdited[key])) continue;
     changes[key] = edited[key] ?? null;
     expected[key] = saved[key] ?? null;
   }
@@ -45,7 +48,10 @@ export const SettingsPanel = forwardRef<SettingsPanelHandle, {
     conflicts,
     reset,
     dirty,
-  } = useDraft({ ...state.settings, senderName: state.settings.senderName || "반도스탠드" });
+  } = useDraft(
+    { ...state.settings, senderName: state.settings.senderName || "반도스탠드" },
+    sameSettingsEditor,
+  );
   const { busy: saving, run } = useAsyncTask(onNotice);
   const saveSettings = async (): Promise<boolean> => {
     if (saving) return false;
