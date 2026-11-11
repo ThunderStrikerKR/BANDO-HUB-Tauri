@@ -126,7 +126,7 @@ export function DeveloperModalWorkbench({ state, raw, onNotice, onRecorded }: {
           <input id="developer-preview-input" aria-invalid={mode === "ERROR"}
             placeholder="시험 입력" value={text} onChange={(event) => setText(event.target.value)} />
           {mode === "LONG" && <p className="developer-long-text">
-            {"길이가 긴 입력과 안내 문구도 모달 크기를 넘지 않고 스크롤되어야 합니다. ".repeat(65)}
+            {"길이가 긴 입력과 안내 문구도 모달 크기를 넘지 않고 스크롤되어야 합니다. ".repeat(180)}
           </p>}
           {mode === "CANCEL" && <p>값을 변경한 뒤 취소, X, ESC를 각각 눌러 미저장 상태 동작을 확인하세요.</p>}
         </>}
