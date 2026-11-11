@@ -255,7 +255,37 @@ const fixtures=[
     ],
     "legacy": true,
     "source": "src/domain.ts"
-  }
+  },
+{
+  "id": "P03-C",
+  "label": "two destinations: personal names and institution endings must not split or merge",
+  "raw": "BD 709 (블랙) 1개\n김민수\n010-1234-5678\n서울특별시 송파구 석촌호수로 162 가상교회\nBD 709 (블랙) 2개\n박수호\n010-2345-6789\n경기도 성남시 분당구 불정로 6 중앙도서관",
+  "names": [
+    "김민수",
+    "박수호"
+  ],
+  "addresses": [
+    "석촌호수로 162 가상교회",
+    "불정로 6 중앙도서관"
+  ],
+  "legacy": false,
+  "source": "src/parser.ts"
+},
+{
+  "id": "E04-C",
+  "label": "independent institution recipient and person recipient remain two deliveries",
+  "raw": "BD 709 (블랙) 1개\n한빛중앙교회\n서울특별시 송파구 석촌호수로 162\n010-1234-5678\nBD 709 (블랙) 2개\n박민지\n경기도 성남시 분당구 불정로 6\n010-2345-6789",
+  "names": [
+    "한빛중앙교회",
+    "박민지"
+  ],
+  "addresses": [
+    "석촌호수로 162",
+    "불정로 6"
+  ],
+  "legacy": false,
+  "source": "src/order-evidence.ts"
+}
 ];
 
 const coreIds=[...new Set(fixtures.map(c=>c.id.split("-")[0]))].sort();
