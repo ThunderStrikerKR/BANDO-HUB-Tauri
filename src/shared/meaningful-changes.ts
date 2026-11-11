@@ -13,7 +13,14 @@ const optionalText = (value: string | null | undefined) => value ?? "";
  */
 export function sameFreightEditor(a: ShippingRule, b: ShippingRule): boolean {
   const visible = (rule: ShippingRule) => ({
+    // Exclude only the generated revision metadata. Keep all current and
+    // future business rule attributes in the comparison.
+    ...Object.fromEntries(
+      Object.entries(rule).filter(([key]) => key !== "version" && key !== "at"),
+    ),
     maxBundle: rule.maxBundle ?? null,
+    maxConfirmed: rule.maxConfirmed ?? false,
+    perItem: rule.perItem ?? null,
     notes: optionalText(rule.notes),
     fees: Object.fromEntries(
       Object.entries(rule.fees ?? {})
