@@ -118,6 +118,16 @@ try {
     .filter({hasText:"과거단가보존"});
   await historicalRow.waitFor();
   await historicalRow.getByRole("button",{name:"주문 열기"}).click();
+  await pause(350);
+  const afterOpen=await page.evaluate(()=>({
+    heading:[...document.querySelectorAll("h1,h2")].map(n=>n.textContent?.trim()).slice(0,16),
+    visibleWorkspace:[...document.querySelectorAll(".hub-live-workspace")]
+      .map(n=>({visible:!!n.getClientRects().length,outer:n.parentElement?.outerHTML.slice(0,350)})),
+    notices:[...document.querySelectorAll('[role="alert"], [role="dialog"]')]
+      .map(n=>n.textContent?.trim().slice(0,450)),
+    body:document.body.innerText.slice(0,2500),
+  }));
+  console.log("RECEPTION_PRICING_OPEN_DIAG",JSON.stringify({afterOpen,errors}));
   await page.locator(".hub-live-workspace").waitFor({state:"visible"});
   // Let mounted effects and nested workflow previews settle before navigation.
   await pause(350);
