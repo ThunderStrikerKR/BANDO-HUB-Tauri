@@ -1806,6 +1806,145 @@ try {
     "Stage7 modal workbench inventory changed without audit coverage");
   console.log("PASS: developer workbench common modes and all 12 popup entries audited");
 
+  // Stage 8: exercise the REAL settings control that drives --ui-scale. Check
+  // the whole outer frame, semantic list owner, and native modal boundaries.
+  const stage8ViewportSizes=[
+    {width:1920,height:1080},
+    {width:1600,height:900},
+    {width:1280,height:800},
+    {width:1024,height:700},
+  ];
+  const stage8Scales=[90,100,110,125];
+  const stage8Screens=[
+    ["상품 관리",".product-list-workspace .price-table-scroll"],
+    ["운임 관리",".shipping-product-list .shipping-table-scroll"],
+    ["거래처 관리",".management-scroll"],
+    ["설정",".settings-tab-panels"],
+    ["엑셀 관리",".excel-table-scroll"],
+    ["일일 결산",".daily-settlement"],
+    ["주문 내역",".order-history-list"],
+  ];
+  const stage8Results=[];
+  const stage8Measure=async(context,innerSelector)=>{
+    const actual=await navPage.evaluate((selector)=>{
+      const box=(s)=>document.querySelector(s);
+      const shell=box(".hub-shell-scroll");
+      const root=box(".hub-main-content > .management-container");
+      const inside=box(selector);
+      const body=document.scrollingElement;
+      if(!shell||!root||!inside)return {missing:{shell:!!shell,root:!!root,inside:!!inside}};
+      const rootRect=root.getBoundingClientRect();
+      const innerRect=inside.getBoundingClientRect();
+      return {shellY:shell.scrollHeight-shell.clientHeight,
+        rootY:root.scrollHeight-root.clientHeight,
+        bodyY:(body?.scrollHeight??0)-window.innerHeight,
+        rootBottom:Math.round(rootRect.bottom),
+        innerBottom:Math.round(innerRect.bottom),
+        innerHeight:Math.round(innerRect.height),
+        innerOverflow:getComputedStyle(inside).overflowY,
+        horizontalShellOverflow:shell.scrollWidth-shell.clientWidth,
+        scale:Number(getComputedStyle(document.documentElement).getPropertyValue("--ui-scale"))};
+    },innerSelector);
+    assert.ok(!actual.missing,context+" missing work area: "+JSON.stringify(actual));
+    console.log("STAGE8_SAMPLE",JSON.stringify({context,...actual}));
+    assert.ok(actual.shellY<=3,context+" has outer shell vertical scrollbar: "+JSON.stringify(actual));
+    assert.ok(actual.rootY<=3,context+" has page-level vertical overflow: "+JSON.stringify(actual));
+    assert.ok(actual.bodyY<=3,context+" has document-level vertical scrollbar: "+JSON.stringify(actual));
+    assert.ok(actual.innerBottom<=actual.rootBottom+3,
+      context+" inner workspace extends outside page: "+JSON.stringify(actual));
+    assert.ok(actual.innerHeight>=24,
+      context+" inner workspace shrank to unusable height: "+JSON.stringify(actual));
+    return actual;
+  };
+  const stage8CheckModal=async(kind,open,close)=>{
+    await open();
+    const dialog=navPage.locator("dialog.app-modal-layer[open]").last();
+    await dialog.waitFor();
+    const metrics=await dialog.evaluate(el=>{
+      const frame=el.getBoundingClientRect();
+      const panel=el.querySelector(":scope > .modal");
+      const title=panel?.querySelector(":scope > header h2");
+      const closeButton=panel?.querySelector(":scope > header button");
+      const owner=panel?.querySelector(".client-editor-body, .product-detail-body")
+        ??panel?.querySelector(".modal-fields")??panel;
+      const scroll=owner.getBoundingClientRect();
+      const controls=[...panel.querySelectorAll("input:not([type=hidden]), select, textarea, button")]
+        .filter(x=>getComputedStyle(x).display!=="none"&&x.getBoundingClientRect().width>0);
+      return {width:Math.round(frame.width),top:Math.round(frame.top),bottom:Math.round(frame.bottom),
+        left:Math.round(frame.left),right:Math.round(frame.right),
+        titleSize:title?parseFloat(getComputedStyle(title).fontSize):0,
+        closeHeight:closeButton?Math.round(closeButton.getBoundingClientRect().height):0,
+        overflow:getComputedStyle(owner).overflowY,
+        scrollBottom:Math.round(scroll.bottom),
+        overhang:controls.reduce((max,control)=>{
+          const r=control.getBoundingClientRect();
+          return Math.max(max,frame.left-r.left,r.right-frame.right);
+        },0),
+        viewportHeight:window.innerHeight,viewportWidth:window.innerWidth};
+    });
+    const label=kind+" at "+(await navPage.evaluate(()=>getComputedStyle(document.documentElement).getPropertyValue("--ui-scale")))+
+      " / "+(await navPage.evaluate(()=>window.innerWidth+"x"+window.innerHeight));
+    console.log("STAGE8_MODAL",JSON.stringify({label,...metrics}));
+    assert.ok(metrics.top>=-2 && metrics.bottom<=metrics.viewportHeight+2,
+      label+" modal exceeds vertical viewport: "+JSON.stringify(metrics));
+    assert.ok(metrics.left>=-2&&metrics.right<=metrics.viewportWidth+2,
+      label+" modal exceeds horizontal viewport: "+JSON.stringify(metrics));
+    assert.ok(metrics.scrollBottom<=metrics.bottom+2,
+      label+" modal scroll content extends below frame: "+JSON.stringify(metrics));
+    assert.ok(metrics.overhang<=3,
+      label+" modal controls are horizontally clipped: "+JSON.stringify(metrics));
+    assert.ok(Math.abs(metrics.titleSize-18*metricsScale())<=.25,
+      label+" title did not follow UI scale: "+JSON.stringify(metrics));
+    function metricsScale(){return Number(label.split(" at ")[1].split(" / ")[0])}
+    await close(dialog);
+    return metrics;
+  };
+  for(const scale of stage8Scales){
+    await navMenu.getByRole("button",{name:"설정",exact:true}).click();
+    await navPage.getByRole("tab",{name:"기본설정"}).click();
+    await navPage.getByRole("combobox",{name:"전체 UI 크기"}).selectOption(String(scale));
+    await navPage.waitForFunction(expected=>
+      Math.abs(Number(getComputedStyle(document.documentElement).getPropertyValue("--ui-scale"))-expected)<.001,
+      scale/100);
+    for(const viewport of stage8ViewportSizes){
+      await navPage.setViewportSize(viewport);
+      for(const [menu,selector] of stage8Screens){
+        await navMenu.getByRole("button",{name:menu,exact:true}).click();
+        await navPage.locator(selector).first().waitFor({state:"visible"});
+        const context=menu+" "+viewport.width+"x"+viewport.height+" "+scale+"%";
+        const measure=await stage8Measure(context,selector);
+        stage8Results.push({context,...measure});
+      }
+      await navMenu.getByRole("button",{name:"운임 관리",exact:true}).click();
+      await navPage.getByRole("button",{name:"동급 배송 그룹 지정",exact:true}).click();
+      const subContext="배송 그룹 지정 "+viewport.width+"x"+viewport.height+" "+scale+"%";
+      stage8Results.push({context:subContext,...await stage8Measure(subContext,
+        ".shipping-assignment-list .shipping-table-scroll")});
+      await navMenu.getByRole("button",{name:"상품 관리",exact:true}).click();
+      await stage8CheckModal("상품 상세",
+        async()=>navPage.locator(".product-prices tbody tr").first()
+          .getByRole("button",{name:"상세 관리"}).click(),
+        async dialog=>{await dialog.getByRole("button",{name:"닫기 ×"}).click();
+          await dialog.waitFor({state:"hidden"});});
+      await navMenu.getByRole("button",{name:"거래처 관리",exact:true}).click();
+      await stage8CheckModal("거래처 상세",
+        async()=>navPage.locator(".client-table tbody tr").filter({hasText:"검증악기"}).first().click(),
+        async dialog=>{await dialog.getByRole("button",{name:"닫기 ×"}).click();
+          await dialog.waitFor({state:"hidden"});});
+    }
+  }
+  await navPage.setViewportSize({width:1520,height:1000});
+  await navMenu.getByRole("button",{name:"설정",exact:true}).click();
+  await navPage.getByRole("tab",{name:"기본설정"}).click();
+  await navPage.getByRole("combobox",{name:"전체 UI 크기"}).selectOption("100");
+  await navPage.waitForFunction(()=>Math.abs(
+    Number(getComputedStyle(document.documentElement).getPropertyValue("--ui-scale"))-1)<.001);
+  console.log("STAGE8_MATRIX",JSON.stringify({scales:stage8Scales,viewports:stage8ViewportSizes,
+    screens:stage8Screens.length+1,samples:stage8Results.length,
+    horizontalShellScrollAllowed:true,results:stage8Results}));
+  assert.equal(stage8Results.length,stage8Scales.length*stage8ViewportSizes.length*(stage8Screens.length+1));
+  console.log("PASS: Stage8 viewport/UI-scale matrix bounds all navigation pages and editor modals");
+
   assert.deepEqual(navErrors,[],"Navigation React errors: "+navErrors.join("\n"));
   await navPage.close();
   assert.deepEqual(pageErrors, [], "React runtime errors: " + pageErrors.join("\n"));
