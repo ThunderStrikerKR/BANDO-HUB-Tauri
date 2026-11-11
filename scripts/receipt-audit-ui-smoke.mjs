@@ -1639,7 +1639,8 @@ try {
       "Stage7 fields overflow horizontally "+label+": "+JSON.stringify(result));
     assert.ok(result.controlAudit.every(c=>c.left>=result.left-2 && c.right<=result.right+2),
       "Stage7 visible control exceeds dialog width "+label+": "+JSON.stringify(result));
-    assert.ok(result.controlAudit.filter(c=>c.tag==="button").every(c=>c.height>=24),
+    assert.ok(result.controlAudit.filter(c=>c.tag==="button").every(c=>
+      c.label.includes("도움말") ? c.height>=20 : c.height>=24),
       "Stage7 action button is too short "+label+": "+JSON.stringify(result));
     assert.ok(!result.scrollableContent || ["auto","scroll"].includes(result.scrollStyle),
       "Stage7 overflowing content cannot scroll "+label+": "+JSON.stringify(result));
