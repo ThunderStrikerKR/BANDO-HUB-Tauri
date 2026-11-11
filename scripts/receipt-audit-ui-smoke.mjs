@@ -1901,7 +1901,7 @@ try {
   };
   for(const scale of stage8Scales){
     await navMenu.getByRole("button",{name:"설정",exact:true}).click();
-    await navPage.getByRole("tab",{name:"기본설정"}).click();
+    await navPage.getByRole("tab",{name:"기본 설정"}).click();
     await navPage.getByRole("combobox",{name:"전체 UI 크기"}).selectOption(String(scale));
     await navPage.waitForFunction(expected=>
       Math.abs(Number(getComputedStyle(document.documentElement).getPropertyValue("--ui-scale"))-expected)<.001,
@@ -1935,7 +1935,7 @@ try {
   }
   await navPage.setViewportSize({width:1520,height:1000});
   await navMenu.getByRole("button",{name:"설정",exact:true}).click();
-  await navPage.getByRole("tab",{name:"기본설정"}).click();
+  await navPage.getByRole("tab",{name:"기본 설정"}).click();
   await navPage.getByRole("combobox",{name:"전체 UI 크기"}).selectOption("100");
   await navPage.waitForFunction(()=>Math.abs(
     Number(getComputedStyle(document.documentElement).getPropertyValue("--ui-scale"))-1)<.001);
