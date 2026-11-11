@@ -13,7 +13,9 @@ permissions:
   contents: read
   actions: read
 concurrency:
-  group: stage9-windows-native-${{ github.ref_name }}
+  # Webhook delivery can be out of order. An older revision must not cancel
+  # a newer Windows audit before its screenshot evidence is uploaded.
+  group: stage9-windows-native-${{ github.ref_name }}-${{ github.sha }}
   cancel-in-progress: true
 jobs:
   native-webview2-evidence:
