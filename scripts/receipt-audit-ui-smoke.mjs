@@ -1629,8 +1629,8 @@ try {
       result.bottom<=result.viewportHeight+1 &&
       result.left>=-1 && result.right<=result.viewportWidth+1,
       "Stage7 dialog escapes viewport "+label+": "+JSON.stringify(result));
-    assert.ok(result.titleFont>=17 && result.titleFont<=21,
-      "Stage7 title typography inconsistent "+label+": "+JSON.stringify(result));
+    assert.equal(result.titleFont,18,
+      "Stage7 modal title must use the shared 18px typography at 100% UI scale "+label+": "+JSON.stringify(result));
     assert.ok(result.closeHeight>=28 && result.closeHeight<=40,
       "Stage7 close button inconsistent "+label+": "+JSON.stringify(result));
     assert.ok(result.scrollBoxBottom<=result.bottom+2,
