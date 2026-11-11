@@ -240,14 +240,18 @@ export function ProductFreightPanel({
                     <td>{rule?.at ? new Date(rule.at).toLocaleDateString("ko-KR") : "-"}</td>
                     <td>
                       <button
-                        onClick={() =>
-                          (setInitialRule(editableShippingRule(rule ?? emptyProductRule())), setEditing({
+                        onClick={() => {
+                          // A missing rule has a generated version ID. Create it
+                          // once so an untouched editor is not falsely dirty.
+                          const initial = editableShippingRule(rule ?? emptyProductRule());
+                          setInitialRule(clone(initial));
+                          setEditing({
                             productId: p.id,
                             groupId: group?.id,
                             name: group ? group.name + " / 공통 기준" : p.name,
-                            rule: editableShippingRule(rule ?? emptyProductRule()),
-                          }))
-                        }
+                            rule: initial,
+                          });
+                        }}
                       >
                         {group ? "그룹 기준 편집" : "기본 운임 설정"}
                       </button>
