@@ -63,8 +63,16 @@
   letter-spacing: normal;
 }
 .app-modal-layer .modal-fields {
+  /* This must be a real flex item, not the legacy display:contents fieldset.
+     Product and client editors override the scroll owner for their fixed footers. */
+  display: block;
+  flex: 1 1 auto;
+  min-height: 0;
   min-width: 0;
   max-width: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
 }
 .app-modal-layer .modal-fields :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
   box-sizing: border-box;
