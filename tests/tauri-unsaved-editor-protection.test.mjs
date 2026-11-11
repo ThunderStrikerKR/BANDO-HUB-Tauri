@@ -30,7 +30,7 @@ test("unrelated workflow saves preserve another order's unsaved draft", async ()
 
 test("brand and alias changes guard item-to-item switching", () => {
   assert.match(source.brand, /const chooseBrand = async/);
-  assert.match(source.brand, /if \(dirty\) \{[\s\S]*?requestPageLeave/);
+  assert.match(source.brand, /if \(dirty\) \{[\s\S]*?requestEditorLeave/);
   assert.match(source.brand, /onClick=\{\(\) => void chooseBrand\(b\)\}/);
   assert.match(source.alias, /const chooseAlias = async/);
   assert.match(source.alias, /onClick=\{\(\) => void chooseAlias\(a\)\}/);
@@ -47,10 +47,10 @@ test("actual freight edits survive filtering and are guarded on navigation", () 
 });
 
 test("uncommitted color and freight group names never vanish or auto-create", () => {
-  assert.match(source.color, /hasChanges: \(\) => unsaved \|\| name\.length > 0/);
-  assert.match(source.color, /if \(name\.length > 0\)/);
+  assert.match(source.color, /hasChanges: \(\) => unsaved \|\| name\.trim\(\)\.length > 0/);
+  assert.match(source.color, /if \(name\.trim\(\)\.length > 0\)/);
   assert.match(source.color, /setName\(""\)/);
-  assert.match(source.shipping, /hasChanges: \(\) => changes\.length > 0 \|\| editingDirty \|\| newName\.length > 0/);
-  assert.match(source.shipping, /if \(newName\.length > 0\)/);
+  assert.match(source.shipping, /hasChanges: \(\) => changes\.length > 0 \|\| editingDirty \|\| newName\.trim\(\)\.length > 0/);
+  assert.match(source.shipping, /if \(newName\.trim\(\)\.length > 0\)/);
   assert.match(source.shipping, /setNewName\(""\)/);
 });
