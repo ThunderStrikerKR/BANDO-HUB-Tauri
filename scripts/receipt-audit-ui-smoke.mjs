@@ -2261,6 +2261,95 @@ try {
     windowsNativeVerified:false,changesToBusinessData:0,
   }));
 
+
+  // No-op editing contract: opening, focusing, retyping the original value,
+  // and closing an editor must never bring up a Save Changes decision.
+  // This exercises production React screens with an isolated mock IPC state.
+  const cleanEditorChecks=[];
+  const closeCleanDialog=async(label)=>{
+    const dialog=navPage.locator("dialog.app-modal-layer[open]").last();
+    await dialog.getByRole("button",{name:"닫기 ×"}).click();
+    await dialog.waitFor({state:"hidden",timeout:5000});
+    assert.equal(await navPage.locator("dialog.app-action-dialog[open]").count(),0,
+      label+": no-op editor unexpectedly prompted to save");
+    cleanEditorChecks.push(label);
+  };
+
+  await navMenu.getByRole("button",{name:"상품 관리",exact:true}).click();
+  await navPage.locator(".product-prices tbody tr").first()
+    .getByRole("button",{name:"상세 관리"}).click();
+  const productEdit=navPage.locator("dialog.app-modal-layer[open]").last();
+  const productDescription=productEdit.getByRole("textbox",{name:"상품설명"});
+  const originalDescription=await productDescription.inputValue();
+  await productDescription.fill(originalDescription+" 임시검사");
+  await productDescription.fill(originalDescription);
+  await closeCleanDialog("상품 상세 / 원상복구");
+
+  await navMenu.getByRole("button",{name:"거래처 관리",exact:true}).click();
+  await navPage.locator(".client-table tbody tr")
+    .filter({hasText:"검증악기"}).first().click();
+  const clientEdit=navPage.locator("dialog.app-modal-layer[open]").last();
+  const displayName=clientEdit.getByRole("textbox",{name:"송장 표시 상호"});
+  const originalDisplayName=await displayName.inputValue();
+  await displayName.fill(originalDisplayName+" 임시검사");
+  await displayName.fill(originalDisplayName);
+  await closeCleanDialog("거래처 상세 / 원상복구");
+
+  await navMenu.getByRole("button",{name:"운임 관리",exact:true}).click();
+  await navPage.getByRole("button",{name:"상품별 기본 운임",exact:true}).click();
+  await navPage.locator(".shipping-product-list tbody tr").last()
+    .getByRole("button",{name:/기본 운임 설정|그룹 기준 편집/}).first().click();
+  const freightEdit=navPage.locator("dialog.app-modal-layer[open]").last();
+  const freightMemo=freightEdit.getByRole("textbox",{name:"직원 참고 메모"});
+  const originalFreightMemo=await freightMemo.inputValue();
+  await freightMemo.fill(originalFreightMemo+" 임시검사");
+  await freightMemo.fill(originalFreightMemo);
+  await closeCleanDialog("상품별 운임 / 원상복구");
+
+  await navPage.getByRole("button",{name:"동급 그룹 운임표",exact:true}).click();
+  const groupRowForCleanTest=navPage.locator(".shipping-rates table tbody tr")
+    .filter({hasText:"검증용 배송 그룹"}).first();
+  await groupRowForCleanTest.getByRole("button",{name:"운임 수정",exact:true}).click();
+  await closeCleanDialog("동급 그룹 운임 / 무편집");
+
+  const shippingWhitespace=navPage.getByRole("textbox",{name:"새 배송 그룹명"});
+  await shippingWhitespace.fill("   ");
+  await navMenu.getByRole("button",{name:"상품 관리",exact:true}).click();
+  assert.equal(await navPage.locator("dialog.app-action-dialog[open]").count(),0,
+    "Whitespace-only unregistered freight group name incorrectly counted as edited");
+  cleanEditorChecks.push("미등록 배송 그룹명 / 공백");
+
+  await navPage.getByRole("navigation",{name:"상품 관리 메뉴"})
+    .getByRole("button",{name:"대표색상 관리",exact:true}).click();
+  await navPage.locator("#new-color-group").fill("   ");
+  await navMenu.getByRole("button",{name:"거래처 관리",exact:true}).click();
+  assert.equal(await navPage.locator("dialog.app-action-dialog[open]").count(),0,
+    "Whitespace-only color guidance group name incorrectly counted as edited");
+  cleanEditorChecks.push("대표색상 신규 그룹명 / 공백");
+
+  await navPage.getByRole("button",{name:"자동 메시지 편집",exact:true}).click();
+  const defaultTemplate=navPage.getByRole("textbox",{name:"선택한 자동 메시지 편집"});
+  const displayedTemplate=await defaultTemplate.inputValue();
+  await defaultTemplate.fill(displayedTemplate);
+  await navMenu.getByRole("button",{name:"설정",exact:true}).click();
+  assert.equal(await navPage.locator("dialog.app-action-dialog[open]").count(),0,
+    "Re-entering an identical displayed template produced a false edit");
+  cleanEditorChecks.push("자동 메시지 / 표시 기본값 재입력");
+
+  await navPage.getByRole("tab",{name:"기본 설정"}).click();
+  const operatorName=navPage.getByRole("textbox",{name:"작업자 이름"});
+  const initialOperatorName=await operatorName.inputValue();
+  await operatorName.fill(initialOperatorName+" 임시검사");
+  await operatorName.fill(initialOperatorName);
+  await navPage.getByRole("tab",{name:"파일 관리"}).click();
+  assert.equal(await navPage.locator(".settings-unsaved-modal[open]").count(),0,
+    "Restored settings input unexpectedly requested save");
+  cleanEditorChecks.push("설정 / 원상복구");
+
+  assert.equal(cleanEditorChecks.length,8);
+  console.log("CLEAN_EDITOR_NOOP_AUDIT",JSON.stringify({passed:cleanEditorChecks,
+    checks:cleanEditorChecks.length,savePrompts:0,mockBusinessWrites:0}));
+
   assert.deepEqual(navErrors,[],"Navigation React errors: "+navErrors.join("\n"));
   await navPage.close();
   assert.deepEqual(pageErrors, [], "React runtime errors: " + pageErrors.join("\n"));
