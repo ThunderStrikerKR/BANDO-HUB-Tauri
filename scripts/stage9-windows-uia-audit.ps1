@@ -33,12 +33,20 @@ public static class BandoAuditNative {
 '@
   $proc=Get-Process -Id $ProcessId -ErrorAction Stop
   if ($proc.MainWindowHandle -eq [IntPtr]::Zero) { throw "Native window has no handle" }
-  [BandoAuditNative]::ShowWindow($proc.MainWindowHandle, 9) | Out-Null
+  # Audit the usable desktop work area, not an oversized restored window
+  # that the taskbar can cover on a 1024x768 hosted test monitor.
+  [BandoAuditNative]::ShowWindow($proc.MainWindowHandle, 3) | Out-Null
   [BandoAuditNative]::SetForegroundWindow($proc.MainWindowHandle) | Out-Null
   Start-Sleep -Milliseconds 550
 
   $root=[System.Windows.Automation.AutomationElement]::FromHandle($proc.MainWindowHandle)
   if ($null -eq $root) { throw "Unable to attach UIAutomation to WebView2 window" }
+  $windowRect=$root.Current.BoundingRectangle
+  $workArea=[System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
+  $report.windowMode="MAXIMIZED"
+  $report.windowBounds=@{x=$windowRect.X;y=$windowRect.Y;w=$windowRect.Width;h=$windowRect.Height}
+  $report.workArea=@{x=$workArea.X;y=$workArea.Y;w=$workArea.Width;h=$workArea.Height}
+  Write-Host "STAGE9_WINDOW_GEOMETRY $($report.windowBounds | ConvertTo-Json -Compress) workArea=$($report.workArea | ConvertTo-Json -Compress)"
   $treeScope=[System.Windows.Automation.TreeScope]::Descendants
   $condition=[System.Windows.Automation.Condition]::TrueCondition
   function Elements {
