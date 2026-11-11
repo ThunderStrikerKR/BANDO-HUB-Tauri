@@ -20,6 +20,7 @@ import { recommendShipping } from "../shipping";
 import type { Item, Order, Product, State } from "../types";
 import { clone } from "../ui";
 import { pendingIssue } from "../validation";
+import { shouldRefreshUncommittedOrderPricing } from "./passive-pricing";
 import { matchingRecipient, rebindEvidence } from "../order-evidence";
 import { groupMessages, groupShipments, reconcileWorkflow } from "../workflow";
 type SaveMode = "save" | "notify" | "pay" | "queue" | "wait";
@@ -114,6 +115,9 @@ export function useOrderDesk({
     ? groupMessages(flowState, activeGroupId, links)
     : hubMessages(draft, state, undefined, links);
   const saved = state.orders.some((o) => o.id === draft.id),
+    // Saved orders retain their historical prices and freight even when
+    // a new product or shipping master arrives in the background.
+    passivePricingAllowed = shouldRefreshUncommittedOrderPricing(draft, state.orders),
     exported = draft.status === "EXPORTED" || activeShipment?.transferred === true;
   useEffect(() => {
     if (viewMode === "details" && highlight)
@@ -130,9 +134,11 @@ export function useOrderDesk({
     if (viewMode !== "details") onRawEditDirty?.(rawEditing && source !== draft.raw);
   }, [rawEditing, source, draft.raw, viewMode, onRawEditDirty]);
   useEffect(() => {
-    if (!liveClient) return;
+    if (!liveClient || !passivePricingAllowed) return;
     onChange((previous) => {
-      if (previous.pricesLocked) return previous;
+      // Check the latest draft too: a save may complete between scheduling
+      // the effect and running its state-updater callback.
+      if (!shouldRefreshUncommittedOrderPricing(previous, state.orders)) return previous;
       const next = repriceOrder(previous, liveClient, state);
       for (const r of next.recipients)
         if (
@@ -147,10 +153,14 @@ export function useOrderDesk({
       if (JSON.stringify(previous.recipients) === JSON.stringify(next.recipients)) return previous;
       return next;
     });
-  }, [state.products, liveClient?.id, liveClient?.tier, JSON.stringify(liveClient?.overrides)]);
+  }, [state.products, liveClient?.id, liveClient?.tier, JSON.stringify(liveClient?.overrides), passivePricingAllowed]);
   useEffect(() => {
+    if (!passivePricingAllowed) return;
     onChange((previous) => {
-      if (previous.pricesLocked || previous.shippingMode === "MANUAL") return previous;
+      if (!shouldRefreshUncommittedOrderPricing(previous, state.orders) ||
+          previous.shippingMode === "MANUAL" ||
+          !previous.recipients.some((recipient) => recipient.items.length > 0))
+        return previous;
       const result = recommendShipping(previous, state),
         fee = liveClient?.shippingFeeExcluded ? 0 : result.total;
       if (previous.shippingFee === fee && previous.shippingVersion === result.version)
@@ -162,7 +172,7 @@ export function useOrderDesk({
         shippingMode: "AUTO",
       };
     });
-  }, [state.shipping, state.products, draft.recipients, liveClient?.shippingFeeExcluded]);
+  }, [state.shipping, state.products, draft.recipients, liveClient?.shippingFeeExcluded, passivePricingAllowed]);
   useEffect(() => {
     if (
       viewMode === "details" ||
