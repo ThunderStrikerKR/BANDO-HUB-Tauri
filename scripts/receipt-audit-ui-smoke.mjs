@@ -1573,6 +1573,7 @@ try {
     window.__TAURI_INTERNALS__.invoke=(command,args)=>{
       if(command==="test_run_history")return Promise.resolve([]);
       if(command==="test_database_preview")return Promise.resolve({enabled:false});
+      if(command==="receipt_archive")return Promise.resolve([]);
       return original(command,args);
     };
   });
@@ -1691,7 +1692,18 @@ try {
       content:el.textContent?.trim().slice(0,90)??""
     }));
     assert.ok(preview.visible,"Developer workflow preview not shown: "+popup);
-    stage7Records.push({popup,status:"FLOW_REQUIRES_UPLOAD_OR_ORDER_FIXTURE",preview});
+    if(popup==="registration" || popup==="receipt"){
+      if(popup==="registration")
+        await work.getByRole("button",{name:"엑셀 대량 등록",exact:true}).click();
+      else
+        await work.getByRole("button",{name:"감사 기록 열기",exact:true}).click();
+      const dialog=nativeOpen();
+      await dialog.waitFor();
+      await measureStage7(popup+"-dialog",dialog);
+      await closeNative(dialog);
+    }else{
+      stage7Records.push({popup,status:"REQUIRES_WORKBOOK_FIXTURE",preview});
+    }
     await navPage.getByRole("button",{name:"시험 화면 닫기"}).click();
   }
   console.log("STAGE7_MODAL_AUDIT",JSON.stringify(stage7Records));
