@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { sameValue } from "./shared/draft";
-import { requestPageLeave, usePageLeaveGuard } from "./shared/page-leave";
+import { requestEditorLeave, usePageLeaveGuard } from "./shared/page-leave";
 import { uid } from "./domain";
 import { aliasProblems, internalModel, saveAlias } from "./matching";
 import { ProductSearchDialog } from "./ProductSearchDialog";
@@ -44,7 +44,12 @@ export function AliasManager({
   const chooseAlias = async (alias: State["aliases"][number]) => {
     if (editing === alias.id) return;
     if (dirty) {
-      const leave = await requestPageLeave((message) => onNotice(message, "error"));
+      const leave = await requestEditorLeave({
+        label: "상품 별칭",
+        hasChanges: () => dirty,
+        save: saveEntry,
+        discard,
+      }, (message) => onNotice(message, "error"));
       if (!leave.proceed) return;
     }
     setEditing(alias.id);
