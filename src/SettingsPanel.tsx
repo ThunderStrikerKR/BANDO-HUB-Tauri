@@ -15,8 +15,8 @@ const same = sameValue;
 function settingsChanges(saved: Record<string, unknown>, edited: Record<string, unknown>) {
   const changes: Record<string, unknown> = {};
   const expected: Record<string, unknown> = {};
-  const comparableSaved = visibleSettings(saved as State["settings"]) as Record<string, unknown>;
-  const comparableEdited = visibleSettings(edited as State["settings"]) as Record<string, unknown>;
+  const comparableSaved = visibleSettings(saved as unknown as State["settings"]) as unknown as Record<string, unknown>;
+  const comparableEdited = visibleSettings(edited as unknown as State["settings"]) as unknown as Record<string, unknown>;
   for (const key of new Set([...Object.keys(saved), ...Object.keys(edited)])) {
     if (same(comparableSaved[key], comparableEdited[key])) continue;
     changes[key] = edited[key] ?? null;
