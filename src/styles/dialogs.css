@@ -4,23 +4,23 @@
   top: 50%;
   transform: translate(-50%, -50%);
   margin: 0;
-  width: min(560px, calc(100vw - var(--kakao-reserved-width, 0px) - 40px));
+  width: min(var(--modal-decision-width), calc(100vw - var(--kakao-reserved-width, 0px) - 40px));
   box-sizing: border-box;
   max-height: calc(100dvh - 32px);
   overflow: auto;
-  padding: 16px 18px;
+  padding: var(--modal-panel-padding);
   background: #212121;
   color: #f5f5f5;
   border: 1px solid #666;
   border-radius: 9px;
   box-shadow: 0 18px 70px #0009;
-  font: 400 calc(13px * var(--ui-scale, 1))/1.5 var(--font-body);
+  font: 400 var(--modal-body-size)/1.5 var(--font-body);
 }
 .app-action-dialog::backdrop {
   background: #0009;
 }
 .app-action-dialog h2 {
-  font: 650 calc(18px * var(--ui-scale, 1))/1.35 var(--font-heading);
+  font: 650 var(--modal-title-size)/1.35 var(--font-heading);
   margin: 0 0 12px;
 }
 .app-action-dialog p {
@@ -44,9 +44,9 @@
   margin-top: 12px;
 }
 .app-action-dialog button {
-  font: 600 calc(13px * var(--ui-scale, 1))/1.4 var(--font-body);
+  font: 600 var(--modal-decision-action-size)/1.4 var(--font-body);
   min-width: 82px;
-  min-height: var(--control-compact);
+  min-height: var(--modal-close-height);
   padding: 6px 12px;
 }
 .app-action-dialog :focus-visible {
