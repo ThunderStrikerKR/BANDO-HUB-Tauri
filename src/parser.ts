@@ -287,7 +287,10 @@ const person = (s: string) =>
   // A destination institution at the end of an address is not an additional
   // recipient. Keep it inside the address. Explicit standalone institutions
   // are still recognized separately in order-evidence.ts.
-  !/(?:시|군|구|동|읍|면|리|로|길|층|호|아파트|빌라|센터|상가|학교|교회|성당|병원|학원|월드|주세요|감사해요|보내세요)$/.test(s);
+  // Single-syllable endings such as 호, 길, 리, 로 can occur in real
+  // personal names. Filter complete institutional/boilerplate endings, not
+  // surname/given-name syllables or an arbitrary name length alone.
+  !/(?:아파트|빌라|센터|상가|학교|교회|성당|병원|학원|월드|도서관|회관|지원청|주세요|감사해요|보내세요)$/.test(s);
 function parseLegacy(raw: string, selectedClient: Client | undefined, state: State): Recipient[] {
   const client = selectedClient ?? unassignedClient;
   const result: Recipient[] = [];
@@ -461,17 +464,11 @@ function parseLegacy(raw: string, selectedClient: Client | undefined, state: Sta
       )
         create();
       const r = current ?? create();
-      let value = remainder.slice(found.index).trim();
-      const embedded = value.match(
-        /(?:[가-힣]+(?:시|군|구))\s+([가-힣]{2,5})\s+(?=[가-힣0-9·.]+(?:동|읍|면|리|로|길))/,
-      );
-      if (embedded && person(embedded[1])) {
-        const at = remainder.indexOf(embedded[1], found.index);
-        assign(r, "name", embedded[1], offset + at, offset + at + embedded[1].length);
-        value =
-          value.slice(0, value.indexOf(embedded[1])) +
-          value.slice(value.indexOf(embedded[1]) + embedded[1].length).trimStart();
-      }
+      // A delivery address is authoritative once recognized. Do not pull
+      // name-shaped words from the middle or tail of an address: district,
+      // building and institution names belong to the address until an
+      // explicit name field or an independent recipient line says otherwise.
+      const value = remainder.slice(found.index).trim();
       let before = addressPrefix
         ? ""
         : remainder
@@ -479,13 +476,6 @@ function parseLegacy(raw: string, selectedClient: Client | undefined, state: Sta
             .trim()
             .replace(/[:：,]/g, " ")
             .trim();
-      const last = value.match(/\s+([가-힣]{2,5}(?:님)?)\s*$/);
-      if (last && person(last[1])) {
-        const name = last[1].replace(/님$/, "");
-        const at = remainder.lastIndexOf(last[1]);
-        assign(r, "name", name, offset + at, offset + at + name.length);
-        value = value.slice(0, last.index).trim();
-      }
       for (const n of before.split(/[,/\s]+/).filter(person)) {
         const at = remainder.indexOf(n);
         assign(r, "name", n.replace(/님$/, ""), offset + at, offset + at + n.length);
@@ -494,21 +484,6 @@ function parseLegacy(raw: string, selectedClient: Client | undefined, state: Sta
         at = literalAt >= 0 ? literalAt : found.index;
       const addressEnd = literalAt >= 0 ? at + value.length : remainder.trimEnd().length;
       assign(r, "address", value, offset + at, offset + addressEnd);
-      if (embedded && person(embedded[1])) {
-        const nameAt = remainder.indexOf(embedded[1], found.index);
-        const span = r.sources!.pop()!;
-        for (const [start, end] of [
-          [at, nameAt],
-          [nameAt + embedded[1].length, addressEnd],
-        ])
-          if (end > start)
-            r.sources!.push({
-              ...span,
-              start: offset + start,
-              end: offset + end,
-              text: raw.slice(offset + start, offset + end),
-            });
-      }
       const info = addressInfo(value);
       r.addressKind = info.kind;
       r.addressParts = addressParts(value);
