@@ -245,6 +245,24 @@ for (const sample of samples) {
     console.log("ORDER20_RESULT "+JSON.stringify(summary));
     assert.equal(recipients.length,sample.expectedRecipients,"Wrong number of deliveries");
     assert.equal(summary.quantitiesOK,true,"Missing or misassociated quantities");
+    // A place of delivery (e.g. a church) must not create a phantom
+    // recipient or steal a real recipient's contact, address, or product.
+    const institutionRecipients={5:["정가상"],16:["배가상"],17:["김가상","박가상"]};
+    if (Object.hasOwn(institutionRecipients,sample.id)) {
+      assert.deepEqual(recipients.map(r=>r.name),institutionRecipients[sample.id],
+        "Institution or title must not create a separate recipient");
+      assert.ok(recipients[0].address.includes("가상교회"),
+        "The institution belongs to the destination address");
+      assert.ok(recipients.every(r=>r.address && (r.phone||r.mobile)),
+        "A delivery must retain its address and contact");
+      assert.deepEqual(recipients.map(r=>r.items.length),
+        sample.id===17?[1,1]:[1],
+        "Each product must remain attached to the correct delivery");
+      if(sample.id===17) {
+        assert.equal(recipients[0].items[0].quantity,4);
+        assert.equal(recipients[1].items[0].quantity,1);
+      }
+    }
     // No quantity in case 6: unresolved is correct, not a fabricated 1.
     if (sample.id===6)
       assert.equal(recipients[0].items[0]?.quantityConfirmed,false,
