@@ -31,6 +31,11 @@
     background-color 100ms,
     border-color 100ms;
 }
+/* Modal action font is a role-specific token; helper icon buttons can still
+   use their own small variant in the feature that owns them. */
+.app-modal-layer button {
+  font-size: var(--modal-action-size);
+}
 .app-v03 .management-container :is(input:not([type="checkbox"]):not([type="radio"]), select),
 .app-modal-layer :is(input:not([type="checkbox"]):not([type="radio"]), select) {
   box-sizing: border-box;
