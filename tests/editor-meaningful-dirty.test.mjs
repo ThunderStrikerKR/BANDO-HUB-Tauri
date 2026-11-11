@@ -16,6 +16,12 @@ test("opening an unregistered freight rule never counts generated metadata as an
   assert.equal(sameFreightEditor(original, freshAgain), true);
   assert.equal(sameFreightEditor(original, { ...original, notes: original.notes + "!" }), false);
   assert.equal(sameFreightEditor(original, { ...original, maxBundle: 1 }), false);
+  assert.equal(sameFreightEditor(original, { ...original, maxConfirmed: true }), false,
+    "Confirming the maximum packaging quantity is a real change");
+  assert.equal(sameFreightEditor(original, { ...original, perItem: 3000 }), false,
+    "Per-item freight must never be ignored");
+  assert.equal(sameFreightEditor(original, { ...original, packable: true }), false,
+    "Future freight business metadata must not be silently omitted");
   assert.equal(sameFreightEditor(original, { ...original, fees: { "1": 0 } }), false,
     "A confirmed zero-won delivery charge is not an unregistered charge");
   assert.equal(sameFreightEditor(original, { ...original, fees: { "1": 3000 } }), false);
