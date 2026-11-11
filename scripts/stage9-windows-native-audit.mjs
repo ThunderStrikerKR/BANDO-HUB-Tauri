@@ -75,6 +75,7 @@ try{
         cdpEndpoint:report.cdpEndpoint,
       }));
     }catch(error){report.windowsSessionProbeError=String(error)}
+    let uiaCaptured = false;
     // Windows accessibility is independent of CDP and targets the exact same
     // real native window. Capture all top menus and available subtabs when it
     // is supported by the installed WebView2 runtime.
@@ -85,13 +86,34 @@ try{
         "-ProcessId",String(app.pid),"-OutDir",out,
       ],{timeout:240000,encoding:"utf8",maxBuffer:4*1024*1024});
       report.uiaOutputTail=output.slice(-8000);
+      const evidence=JSON.parse(await fs.readFile(join(out,"native-uia-audit.json"),"utf8"));
+      const menus=evidence.passes.filter(x=>x.kind==="menu").length;
+      const settings=evidence.passes.filter(x=>x.kind==="subtab"&&x.label.startsWith("설정-")).length;
+      if(evidence.status!=="NATIVE_UIA_CAPTURED"||menus!==8||settings!==5){
+        throw Error("Incomplete Windows UIA screen coverage: "+JSON.stringify({
+          status:evidence.status,menus,settings,total:evidence.passes.length,
+        }));
+      }
+      report.uia={status:evidence.status,menus,settings,screens:evidence.passes.length,
+        screen:evidence.passes[0]?.screen};
+      uiaCaptured=true;
       console.log("STAGE9_UIA_RUN_COMPLETE",output.slice(-4500));
     }catch(error){
       report.uiaError=String(error);
       console.error("STAGE9_UIA_RUN_FAILED",String(error).slice(0,2000));
     }
-    throw Error("WebView2 CDP unavailable; native Windows UIA evidence retained separately");
-  }
+    if(!uiaCaptured)
+      throw Error("WebView2 CDP unavailable and complete native Windows UIA capture failed");
+    // This is proof of real Windows screen navigation, NOT full visual or modal sign-off.
+    report.status="NATIVE_UIA_SCREEN_EVIDENCE_COLLECTED";
+    report.limitations=[
+      "WebView2 CDP unavailable: computed CSS and DOM checks unverified",
+      "Windows UIA screenshots cover 1024x768 only; multi-scale inspection pending",
+      "Native edit dialogs and real operating workflows still require inspection",
+    ];
+    await write();
+    console.log("STAGE9_NATIVE_UIA_SUMMARY",JSON.stringify(report.uia));
+  } else {
   browser=await chromium.connectOverCDP("http://127.0.0.1:"+port,{timeout:15000});
   const ctx=browser.contexts()[0];
   const page=ctx?.pages().find(x=>/tauri|localhost/i.test(x.url()))??ctx?.pages()[0];
@@ -184,6 +206,7 @@ try{
   await write();
   console.log("STAGE9_NATIVE_SUMMARY",JSON.stringify({
     pages:report.results.length,menus:8,nativeUrl:native.href,errors:report.errors.length}));
+  }
 }catch(error){
   report.status="FAILED";
   report.failure=error?.stack||String(error);
