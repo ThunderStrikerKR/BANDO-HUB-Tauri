@@ -12,7 +12,9 @@ permissions:
 # A draft PR receives both push and pull_request events for the same commit.
 # Keep only the newest branch revision to avoid duplicate Windows CI queues.
 concurrency:
-  group: bando-tauri-${{ github.head_ref || github.ref_name }}
+  # A push and its PR may fire within seconds; they must not cancel each
+  # other's browser run while the runner is stopping the previous process.
+  group: bando-tauri-${{ github.event_name }}-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 jobs:
   node-validation:
