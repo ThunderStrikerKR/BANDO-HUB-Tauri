@@ -258,6 +258,8 @@ const fixtures=[
   },
 {
   "id": "P03-C",
+  "expectedContacts": ["010-1234-5678", "010-2345-6789"],
+  "expectedQuantities": [1, 2],
   "label": "two destinations: personal names and institution endings must not split or merge",
   "raw": "BD 709 (블랙) 1개\n김민수\n010-1234-5678\n서울특별시 송파구 석촌호수로 162 가상교회\nBD 709 (블랙) 2개\n박수호\n010-2345-6789\n경기도 성남시 분당구 불정로 6 중앙도서관",
   "names": [
@@ -273,6 +275,8 @@ const fixtures=[
 },
 {
   "id": "E04-C",
+  "expectedContacts": ["010-1234-5678", "010-2345-6789"],
+  "expectedQuantities": [1, 2],
   "label": "independent institution recipient and person recipient remain two deliveries",
   "raw": "BD 709 (블랙) 1개\n한빛중앙교회\n서울특별시 송파구 석촌호수로 162\n010-1234-5678\nBD 709 (블랙) 2개\n박민지\n경기도 성남시 분당구 불정로 6\n010-2345-6789",
   "names": [
@@ -315,8 +319,19 @@ for(const fixture of fixtures){
     for(let i=0;i<recipients.length;i++){
       assert.ok(recipients[i].address.includes(fixture.addresses[i]),
         "Destination address must preserve an institution/building");
-      assert.ok(recipients[i].phone||recipients[i].mobile,
-        "Recipient must retain a contact number");
+      const expectedContact=(fixture.expectedContacts??["010-1234-5678"])[i];
+      const actualContacts=[recipients[i].phone,recipients[i].mobile].filter(Boolean);
+      assert.ok(actualContacts.includes(expectedContact),
+        "Recipient must retain the correct contact, not another delivery's contact");
+      if(fixture.expectedContacts) {
+        for(const other of fixture.expectedContacts.filter((_,index)=>index!==i)){
+          assert.ok(!actualContacts.includes(other),
+            "Contact from a different delivery was incorrectly attached");
+        }
+      }
+      assert.deepEqual(recipients[i].items.map(item=>item.quantity),
+        [(fixture.expectedQuantities??[1])[i]],
+        "Product quantities must stay with the intended recipient");
     }
   });
 }
