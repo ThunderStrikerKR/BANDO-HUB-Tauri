@@ -26,8 +26,8 @@ import { optimizeProductImage } from "./product-image-preprocess";
 import { RegistrationManager } from "./RegistrationManager";
 import type { NoticeSink } from "./shared/notices";
 import { useAsyncTask } from "./shared/useAsyncTask";
-import { sameValue } from "./shared/draft";
-import { requestPageLeave, usePageLeaveGuard } from "./shared/page-leave";
+import { sameProductEditor } from "./shared/meaningful-changes";
+import { requestEditorLeave, requestPageLeave, usePageLeaveGuard } from "./shared/page-leave";
 
 import type { Product, State, Variant } from "./types";
 import { Field, Modal, MoneyInput, clone } from "./ui";
@@ -60,6 +60,7 @@ export function ProductManager({
     [priceMode, setPriceMode] = useState(false),
     [detailPriceMode, setDetailPriceMode] = useState(false),
     [categoryPicker, setCategoryPicker] = useState(false);
+  const editDirty = !!edit && !!originalEdit && !sameProductEditor(edit, originalEdit);
   const [localImage, setLocalImage] = useState<{ id: string; data: string }>();
   useEffect(() => {
     setLocalImage(undefined);
@@ -169,15 +170,20 @@ export function ProductManager({
   };
   usePageLeaveGuard({
     label: "상품",
-    hasChanges: () => !!edit && !!originalEdit && !sameValue(edit, originalEdit),
+    hasChanges: () => editDirty,
     busy: () => savingView,
     save,
     discard: () => { setEdit(undefined); setOriginalEdit(undefined); setCategoryPicker(false); },
   });
   const closeDetail = async () => {
     if (!edit || savingView) return;
-    if (originalEdit && !sameValue(edit, originalEdit)) {
-      const leave = await requestPageLeave((message) => onNotice(message, "error"));
+    if (editDirty) {
+      const leave = await requestEditorLeave({
+        label: "상품",
+        hasChanges: () => editDirty,
+        save,
+        discard: () => { setEdit(undefined); setOriginalEdit(undefined); setCategoryPicker(false); },
+      }, (message) => onNotice(message, "error"));
       if (!leave.proceed) return;
     }
     setEdit(undefined);
