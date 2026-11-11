@@ -8,8 +8,8 @@ import { ClientWorkbookTools } from "./ClientWorkbookTools";
 import { colorLabel, registeredProducts } from "./product-models";
 import type { NoticeSink } from "./shared/notices";
 import { useAsyncTask } from "./shared/useAsyncTask";
-import { sameValue } from "./shared/draft";
-import { requestPageLeave, usePageLeaveGuard } from "./shared/page-leave";
+import { sameClientEditor } from "./shared/meaningful-changes";
+import { requestEditorLeave, requestPageLeave, usePageLeaveGuard } from "./shared/page-leave";
 
 import type { Client, State } from "./types";
 import { Field, Modal, MoneyInput, clone } from "./ui";
@@ -41,6 +41,7 @@ export function ClientManager({
     [edit, setEdit] = useState<Client>(),
     [exception, setException] = useState(""),
     [price, setPrice] = useState<number | null>(null);
+  const editDirty = !!edit && !!originalEdit && !sameClientEditor(edit, originalEdit);
   const beginEdit = (value: Client) => {
     const next = clone(value);
     setEdit(next);
@@ -50,8 +51,13 @@ export function ClientManager({
   };
   const closeEdit = async () => {
     if (!edit || savingView) return;
-    if (originalEdit && !sameValue(edit, originalEdit)) {
-      const leave = await requestPageLeave((message) => onNotice(message, "error"));
+    if (editDirty) {
+      const leave = await requestEditorLeave({
+        label: "거래처",
+        hasChanges: () => editDirty,
+        save,
+        discard: () => { setEdit(undefined); setOriginalEdit(undefined); },
+      }, (message) => onNotice(message, "error"));
       if (!leave.proceed) return;
     }
     setEdit(undefined);
@@ -100,7 +106,7 @@ export function ClientManager({
   };
   usePageLeaveGuard({
     label: "거래처",
-    hasChanges: () => !!edit && !!originalEdit && !sameValue(edit, originalEdit),
+    hasChanges: () => editDirty,
     busy: () => savingView,
     save,
     discard: () => { setEdit(undefined); setOriginalEdit(undefined); },
@@ -214,6 +220,7 @@ export function ClientManager({
         {edit && (
           <Modal
             draft={edit}
+            dirty={editDirty}
             busy={savingView}
             title={state.clients.some((c) => c.id === edit.id) ? "거래처 상세 관리" : "거래처 등록"}
             className="client-editor-modal"
