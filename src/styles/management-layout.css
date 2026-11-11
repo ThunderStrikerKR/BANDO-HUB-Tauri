@@ -552,4 +552,50 @@
   }
   .app-v03 .management-container .management-search-field { flex-basis: 100%; }
   .app-v03 .management-container .management-tabbar > button { flex-basis: 125px; }
+
+  /* Freight assignment has only one search and one filter. Preserve both at
+     full control height in a single row rather than consuming two rows. */
+  .app-v03 .management-container .shipping-assignment-list > .shipping-tools.management-search-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(150px, 200px);
+    align-items: center;
+    gap: 8px;
+  }
+  .app-v03 .management-container .shipping-assignment-list > .shipping-tools.management-search-toolbar .management-search-field {
+    width: 100%;
+    min-width: 0;
+    flex-basis: auto;
+  }
+  .app-v03 .management-container .shipping-assignment-list > .shipping-tools.management-search-toolbar > select {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+  }
+}
+
+/* Short desktop windows: reclaim empty chrome, not product-name width or
+   editable row height. Shared freight summary/tabs retain the same design
+   across every freight tab; only assignment has a persistent save footer. */
+@media (max-height: 760px) {
+  .app-v03 .management-container .shipping-manager > .shipping-stats {
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  .app-v03 .management-container .shipping-manager > .shipping-stats article {
+    padding: 5px 8px;
+  }
+  .app-v03 .management-container .shipping-manager > .shipping-tabs.management-tabbar {
+    margin-bottom: 6px;
+  }
+  .app-v03 .management-container .shipping-manager > .shipping-assignment-list > .shipping-tools.management-search-toolbar {
+    padding: 7px 10px;
+  }
+  .app-v03 .management-container .shipping-manager > .shipping-assignment-list > .shipping-bulk {
+    padding: 6px 10px;
+    gap: 8px;
+  }
+  .app-v03 .management-container .shipping-manager > .shipping-assignment-list > .shipping-savebar {
+    padding: 7px 10px;
+    gap: 10px;
+  }
 }
