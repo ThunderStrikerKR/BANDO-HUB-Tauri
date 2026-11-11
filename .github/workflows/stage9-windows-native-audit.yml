@@ -9,6 +9,7 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: stage9-windows-native-${{ github.ref_name }}
   cancel-in-progress: true
@@ -16,33 +17,37 @@ jobs:
   native-webview2-evidence:
     name: Real Tauri EXE WebView2 screen evidence
     runs-on: windows-latest
-    timeout-minutes: 65
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
+      # Stage 8 published this exact release binary at commit d442587c.
+      # Only stage9 audit scripts and workflows changed after that commit.
+      # This source artifact expires 2026-11-18. Do not silently use
+      # a stale or different binary if it becomes unavailable.
+      - name: Download stage8-verified portable Windows distribution
+        uses: actions/download-artifact@v4
         with:
-          workspaces: src-tauri -> target
-          cache-targets: true
-      - name: Install frontend dependencies
-        run: npm install --no-audit --no-fund --ignore-scripts
-      - name: Compile actual native Windows Tauri EXE
-        run: npm run build:windows
-      - name: Verify native EXE exists
+          name: BANDO-HUB-Tauri-v0.0.4-Windows-portable-OCR
+          path: stage9-exe
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 43064632955
+      - name: Extract verified portable ZIP and identify EXE
         shell: pwsh
         run: |
-          $exe = "src-tauri/target/release/bando_hub_tauri.exe"
-          if (!(Test-Path $exe)) { throw "Native EXE was not produced" }
-          Write-Host "Native EXE: $((Get-Item $exe).Length) bytes"
-      - name: Install CDP test client (no browser emulation)
+          Expand-Archive -LiteralPath "stage9-exe/BANDO-HUB-portable.zip" -DestinationPath "stage9-exe/unpacked" -Force
+          $exe="stage9-exe/unpacked/bando_hub.exe"
+          if (!(Test-Path $exe)) { throw "Verified stage8 portable EXE is missing" }
+          Write-Host "Audit binary: $((Get-Item $exe).Length) bytes"
+      - name: Install Playwright client without a browser emulator
         run: npm install --no-save --no-package-lock --no-audit --no-fund playwright@1.55.1
-      - name: Launch actual Windows EXE and capture WebView2 screens
+      - name: Launch actual Windows portable EXE and capture WebView2 screens
         env:
-          BANDO_STAGE9_EXE: ${{ github.workspace }}\\src-tauri\\target\\release\\bando_hub_tauri.exe
+          BANDO_STAGE9_EXE: ${{ github.workspace }}\\stage9-exe\\unpacked\\bando_hub.exe
           BANDO_STAGE9_OUT: stage9-native-evidence
+          BANDO_STAGE9_BINARY_COMMIT: d442587c0049373aa9b234c7edba42648dd21dc8
         run: node scripts/stage9-windows-native-audit.mjs
       - name: Preserve native screenshots and diagnostics even on failure
         if: always()
