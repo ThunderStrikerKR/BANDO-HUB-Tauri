@@ -5,7 +5,7 @@ import { tsImport } from "tsx/esm/api";
 
 /**
  * Exactly 11 previously audited length-dependent name recognition sites.
- * P01 parser.ts person() bare name; P02 embedded district/road name;
+ * P01 parser.ts person() bare name; P02 preserve administrative address tokens;
  * P03 address trailing token; E04 standalone institution; E05 parenthesis;
  * E06 labelled name; E07 two-part honorific; E08 product-row remainder;
  * E09 bare name + phone; E10 phone-adjacent name; D11 legacy name fallback.
@@ -50,13 +50,13 @@ const fixtures=[
   },
   {
     "id": "P02",
-    "label": "name embedded between district and road",
-    "raw": "BD 709 (블랙) 1개\n서울특별시 송파구 김수호 석촌호수로 162\n010-1234-5678",
+    "label": "address components must remain in the address, with recipient name on a separate line",
+    "raw": "BD 709 (블랙) 1개\n김민수\n010-1234-5678\n서울특별시 송파구 송파동 석촌호수로 162",
     "names": [
-      "김수호"
+      "김민수"
     ],
     "addresses": [
-      "석촌호수로 162"
+      "송파구 송파동 석촌호수로 162"
     ],
     "legacy": false,
     "source": "src/parser.ts"
