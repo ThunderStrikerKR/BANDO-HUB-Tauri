@@ -1710,8 +1710,8 @@ try {
     await closeNative(dialog);
     await navPage.getByRole("button",{name:"시험 화면 닫기"}).click();
   }
-  const stage7Workbook=async(name,headers,values)=>{
-    const workbook=new ExcelJS.Workbook(),sheet=workbook.addWorksheet("Sheet1");
+  const stage7Workbook=async(name,headers,values,sheetName="Sheet1")=>{
+    const workbook=new ExcelJS.Workbook(),sheet=workbook.addWorksheet(sheetName);
     sheet.addRow(headers);
     sheet.addRow(values);
     return {name,mimeType:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -1721,7 +1721,7 @@ try {
     ["최종 등록명","제조사 모델코드","브랜드","색상","구성 구분","규격",
       "판매 단위","상품군","카테고리 경로","도매가","반도매가","소매가","상품 링크","비고"],
     ["CI 미등록 제품","CI-TEST-1001","","검정","가방 미포함","","개",
-      "반도스탠드","","1000","1300","1600","","합성 UI 검사용"]);
+      "반도스탠드","","1000","1300","1600","","합성 UI 검사용"],"상품 등록");
   const replyHeaders=["수하인명","수하인우편번호","수하인주소","수하인전화번호",
     "수하인핸드폰번호","택배수량","택배운임","운임구분","품목명","",
     "메시지","송하인명","(송)우편","(송)주소1","(송)전화","(송)핸드폰","운송장번호"];
