@@ -89,12 +89,13 @@ try{
       const evidence=JSON.parse(await fs.readFile(join(out,"native-uia-audit.json"),"utf8"));
       const menus=evidence.passes.filter(x=>x.kind==="menu").length;
       const settings=evidence.passes.filter(x=>x.kind==="subtab"&&x.label.startsWith("설정-")).length;
-      if(evidence.status!=="NATIVE_UIA_CAPTURED"||menus!==8||settings!==5){
+      const popups=evidence.passes.filter(x=>x.kind==="popup").length;
+      if(evidence.status!=="NATIVE_UIA_CAPTURED"||menus!==8||settings!==5||popups!==4){
         throw Error("Incomplete Windows UIA screen coverage: "+JSON.stringify({
-          status:evidence.status,menus,settings,total:evidence.passes.length,
+          status:evidence.status,menus,settings,popups,total:evidence.passes.length,
         }));
       }
-      report.uia={status:evidence.status,menus,settings,screens:evidence.passes.length,
+      report.uia={status:evidence.status,menus,settings,popups,screens:evidence.passes.length,
         screen:evidence.passes[0]?.screen};
       uiaCaptured=true;
       console.log("STAGE9_UIA_RUN_COMPLETE",output.slice(-4500));
