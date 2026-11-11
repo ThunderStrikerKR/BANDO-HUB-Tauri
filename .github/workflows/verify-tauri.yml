@@ -133,6 +133,8 @@ jobs:
         run: npm install --no-save --no-package-lock --no-audit --no-fund playwright@1.55.1
       - name: Install headless Chromium
         run: npx playwright install --with-deps chromium
+      - name: Guard saved order against passive repricing in actual React UI
+        run: node scripts/reception-pricing-ui-smoke.mjs
       - name: Run real React UI audit smoke test
         run: node scripts/receipt-audit-ui-smoke.mjs
       - name: Verify product manager displays curated names instead of website titles
