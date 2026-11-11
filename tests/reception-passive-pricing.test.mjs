@@ -65,11 +65,23 @@ test("both passive React effects use the saved-order guard, explicit edit path s
   assert.match(priceEffect, /!liveClient \|\| !passivePricingAllowed/);
   assert.match(freightEffect, /if \(!passivePricingAllowed\)/);
   for (const block of [priceEffect, freightEffect]) {
-    assert.match(block, /shouldRefreshUncommittedOrderPricing\(previous, state\.orders\)/);
+    assert.match(block, /shouldRefreshUncommittedOrderPricing\(previous, persisted\)/);
   }
   assert.match(source, /const edit = \([\s\S]*?recommendShipping\(next, state\)/,
     "Explicit staff edit must still recalculate shipping");
   const orderDesk = readFileSync(new URL("../src/OrderDesk.tsx", import.meta.url), "utf8");
   assert.match(orderDesk, /onDealer=\{async \(c\) => \{[\s\S]*?repriceOrder\(/,
     "Explicit dealer change must continue repricing");
+});
+
+test("preview order is not treated as persisted when backing storage has no such order", () => {
+  const local = draft({ id:"local-preview" });
+  const previewState = [local, { id:"persisted-another-order" }];
+  const actualPersisted = [{ id:"persisted-another-order" }];
+  assert.equal(shouldRefreshUncommittedOrderPricing(local, previewState), false,
+    "The incorrect preview-based lookup would mark the draft as saved");
+  assert.equal(shouldRefreshUncommittedOrderPricing(local, actualPersisted), true);
+  const workspace=readFileSync(new URL("../src/HubWorkspace.tsx", import.meta.url),"utf8");
+  assert.equal((workspace.match(/persistedOrders=\{state\.orders\}/g)??[]).length,2,
+    "Both rendered order desks must use canonical persisted records");
 });
