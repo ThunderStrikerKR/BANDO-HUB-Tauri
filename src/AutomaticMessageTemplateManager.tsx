@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { HelpTooltip } from "./ui/HelpTooltip";
 import { usePendingChanges } from "./shared/pending-changes";
 import { usePageLeaveGuard } from "./shared/page-leave";
-import { sameValue } from "./shared/draft";
 import {
   AUTOMATIC_MESSAGE_TEMPLATES, AUTOMATIC_TEMPLATE_IDS,
   previewAutomaticTemplate, validateAutomaticMessageTemplates,
@@ -21,7 +20,11 @@ export function AutomaticMessageTemplateManager({
   const [selected,setSelected]=useState<AutomaticTemplateId>("colorDefault");
   const [status,setStatus]=useState("");
   const [busy,setBusy]=useState(false);
-  const dirty=!sameValue(baseline,draft);
+  // A template that displays the built-in text is unchanged even if an
+  // explicit duplicate override was temporarily entered.
+  const dirty=Object.entries(AUTOMATIC_MESSAGE_TEMPLATES).some(([id,definition])=>
+    (baseline[id as AutomaticTemplateId]??definition.body)!==
+    (draft[id as AutomaticTemplateId]??definition.body));
   usePendingChanges(dirty);
   useEffect(()=>{onDirtyChange?.(dirty);},[dirty,onDirtyChange]);
   useEffect(()=>{
