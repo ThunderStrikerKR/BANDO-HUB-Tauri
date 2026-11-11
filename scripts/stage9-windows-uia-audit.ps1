@@ -73,7 +73,7 @@ public static class BandoAuditNative {
   function ClickUI([string]$label){
     $nodes=Elements
     $target=$nodes | Where-Object {
-      $_.name -eq $label -and $_.control -match "Button" -and !$_.offscreen -and $_.w -gt 0
+      $_.name -eq $label -and $_.control -match "Button|TabItem" -and !$_.offscreen -and $_.w -gt 0
     } | Select-Object -First 1
     if ($null -eq $target) { throw "No UIAutomation button: $label" }
     $success=$false
@@ -84,6 +84,12 @@ public static class BandoAuditNative {
         $success=$true
       }
     } catch { }
+    if (-not $success) {
+      try {
+        $selection=$target.el.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern)
+        if ($null -ne $selection) { $selection.Select(); $success=$true }
+      } catch { }
+    }
     if (-not $success){
       $cx=[int]($target.x+$target.w/2)
       $cy=[int]($target.y+$target.h/2)
@@ -138,6 +144,12 @@ public static class BandoAuditNative {
       foreach($label in $children[$menu]){
         ClickUI $label
         Capture "subtab" "$menu-$label"
+        if ($menu -eq "거래처 관리" -and $label -eq "자동 메시지 편집") {
+          foreach ($nested in @("상황별 공통 안내","잠정 상품 선택 안내")) {
+            ClickUI $nested
+            Capture "nested" "$menu-$label-$nested"
+          }
+        }
       }
     }
   }
