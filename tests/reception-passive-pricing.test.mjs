@@ -62,8 +62,9 @@ test("both passive React effects use the saved-order guard, explicit edit path s
   const freightEffect = parts.find((part) => part.includes("recommendShipping(previous, state)"));
   assert.ok(priceEffect, "Reprice effect should remain present for new receptions");
   assert.ok(freightEffect, "Freight effect should remain present for new receptions");
+  assert.match(priceEffect, /!liveClient \|\| !passivePricingAllowed/);
+  assert.match(freightEffect, /if \(!passivePricingAllowed\)/);
   for (const block of [priceEffect, freightEffect]) {
-    assert.match(block, /if \(!passivePricingAllowed\)/);
     assert.match(block, /shouldRefreshUncommittedOrderPricing\(previous, state\.orders\)/);
   }
   assert.match(source, /const edit = \([\s\S]*?recommendShipping\(next, state\)/,
