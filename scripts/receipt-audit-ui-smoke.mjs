@@ -2124,6 +2124,28 @@ try {
       await navPage.getByRole("button",{name:"동급 배송 그룹 지정",exact:true}).click();
       await lastRowProbe("배송 그룹 지정"+suffix,
         ".shipping-assignment-list .shipping-table-scroll");
+      const assignmentSpace=await navPage.locator(".shipping-manager").evaluate(root=>{
+        const names={
+          heading:":scope > .page-heading",summary:":scope > .shipping-stats",
+          tabs:":scope > .shipping-tabs",search:".shipping-assignment-list > .shipping-tools",
+          bulk:".shipping-assignment-list > .shipping-bulk",
+          list:".shipping-assignment-list > .shipping-table-scroll",
+          savebar:".shipping-assignment-list > .shipping-savebar",
+        };
+        const measures=Object.fromEntries(Object.entries(names).map(([key,selector])=>{
+          const el=root.querySelector(selector);
+          if(!el)return [key,null];
+          const r=el.getBoundingClientRect(),css=getComputedStyle(el);
+          return [key,{height:Math.round(r.height),top:Math.round(r.top),
+            bottom:Math.round(r.bottom),marginTop:css.marginTop,
+            marginBottom:css.marginBottom,paddingTop:css.paddingTop,
+            paddingBottom:css.paddingBottom,display:css.display}];
+        }));
+        return {width:Math.round(root.getBoundingClientRect().width),
+          height:Math.round(root.getBoundingClientRect().height),measures};
+      });
+      console.log("STAGE8_ASSIGNMENT_SPACE",JSON.stringify({scale,
+        viewport:viewport.width+"x"+viewport.height,...assignmentSpace}));
       const finalSelect=navPage.locator(".shipping-assignment-list tbody tr").last().locator("select");
       await finalSelect.focus();
       assert.equal(await finalSelect.evaluate(el=>document.activeElement===el),true,
