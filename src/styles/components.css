@@ -3,8 +3,7 @@
 .app-modal-layer {
   color: var(--text-primary);
 }
-.app-v03 .management-container :is(h1, h2),
-.app-modal-layer .modal > header h2 {
+.app-v03 .management-container :is(h1, h2) {
   font-family: var(--font-heading);
   font-weight: 650;
   line-height: 1.35;
