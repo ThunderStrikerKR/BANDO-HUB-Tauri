@@ -441,6 +441,7 @@ export function HubWorkspace(props: Props) {
           {...props}
           key={receptionOrder.id + ":reception:" + discardRevision}
           state={base}
+          persistedOrders={state.orders}
           draft={receptionOrder}
           onChange={changeReception}
           viewMode="reception"
@@ -453,6 +454,7 @@ export function HubWorkspace(props: Props) {
           {...props}
           key={(detail?.id ?? draft.id) + ":" + (selected?.groupId ?? "empty") + ":" + discardRevision}
           state={base}
+          persistedOrders={state.orders}
           draft={detail ?? draft}
           viewMode="details"
           onManual={() => setManual(true)}
