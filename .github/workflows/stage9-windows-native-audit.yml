@@ -49,7 +49,7 @@ jobs:
       - name: Allow loopback CDP for the isolated test EXE
         shell: pwsh
         run: |
-          $path="HKCU:\\Software\\Policies\\Microsoft\\Edge\\WebView2\\AdditionalBrowserArguments"
+          $path="HKCU:\Software\Policies\Microsoft\Edge\WebView2\AdditionalBrowserArguments"
           New-Item -Path $path -Force | Out-Null
           New-ItemProperty -Path $path -Name "bando_hub.exe" -Value "--remote-debugging-port=19649 --remote-debugging-address=127.0.0.1" -PropertyType String -Force | Out-Null
       - name: Launch actual Windows portable EXE and capture WebView2 screens
@@ -62,7 +62,7 @@ jobs:
         if: always()
         shell: pwsh
         run: |
-          $path="HKCU:\\Software\\Policies\\Microsoft\\Edge\\WebView2\\AdditionalBrowserArguments"
+          $path="HKCU:\Software\Policies\Microsoft\Edge\WebView2\AdditionalBrowserArguments"
           Remove-ItemProperty -Path $path -Name "bando_hub.exe" -ErrorAction SilentlyContinue
       - name: Preserve native screenshots and diagnostics even on failure
         if: always()
