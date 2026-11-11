@@ -104,6 +104,12 @@
   align-items: center; gap: 10px; padding: 11px 23px; border-top: 1px solid #48525e; background: #292e36;
 }
 .app-modal-layer.category-picker-dialog { width: min(550px, calc(100vw - 36px)); max-height: 600px; }
+/* Keep the 600px picker box and its scrollable contents in one boundary.
+   The generic modal's 820px height must not escape the smaller picker. */
+.app-modal-layer.category-picker-dialog > .modal {
+  height: min(600px, calc(100dvh - 36px));
+  max-height: 100%;
+}
 .app-modal-layer.category-picker-dialog .modal-fields { overflow: auto; }
 .category-picker-content { display: flex; flex-direction: column; min-height: 0; }
 .category-picker-breadcrumbs { display: flex; flex-wrap: wrap; align-items: center; padding: 9px 0; border-bottom: 1px solid #444; }
