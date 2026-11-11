@@ -1931,6 +1931,46 @@ try {
         async()=>navPage.locator(".client-table tbody tr").filter({hasText:"검증악기"}).first().click(),
         async dialog=>{await dialog.getByRole("button",{name:"닫기 ×"}).click();
           await dialog.waitFor({state:"hidden"});});
+      // All secondary tabs are covered at both viewport extremes and both
+      // UI-scale extremes. This supplements 128 primary page combinations.
+      if((scale===90||scale===125)&&(viewport.width===1920||viewport.width===1024)){
+        const extraTabs=[
+          ["상품 관리","상품 관리 메뉴",
+            [["카테고리 관리",".management-scroll"],
+              ["대표색상 관리",".management-scroll"],
+              ["별칭 관리",".management-scroll"],
+              ["브랜드 관리",".management-scroll"]]],
+          ["운임 관리",null,
+            [["동급 그룹 운임표",".shipping-rates"],
+              ["조합 / 기준 이력",".shipping-rates"]]],
+          ["엑셀 관리",null,
+            [["공장 엑셀 대기",".excel-table-scroll"],
+              ["매장 발송 대기",".excel-table-scroll"],
+              ["엑셀 작성 이력",".excel-table-scroll"]]],
+          ["거래처 관리",null,
+            [["자동 메시지 편집",".management-scroll"]]],
+        ];
+        for(const [parent,tabMenu,tabs] of extraTabs){
+          await navMenu.getByRole("button",{name:parent,exact:true}).click();
+          for(const [tab,selector] of tabs){
+            const source=tabMenu
+              ? navPage.getByRole("navigation",{name:tabMenu})
+              : navPage;
+            await source.getByRole("button",{name:tab,exact:true}).click();
+            const context=parent+" / "+tab+" "+viewport.width+"x"+viewport.height+" "+scale+"%";
+            await navPage.locator(selector).first().waitFor({state:"visible"});
+            stage8Results.push({context,...await stage8Measure(context,selector)});
+          }
+        }
+        await navMenu.getByRole("button",{name:"설정",exact:true}).click();
+        await navPage.getByRole("tab",{name:"개발자 모드"}).click();
+        await navPage.locator("#dev-popup").selectOption("common");
+        await navPage.locator("#dev-popup-state").selectOption("LONG");
+        await stage8CheckModal("긴 내용 공통 모달",
+          async()=>navPage.getByRole("button",{name:"선택한 실제 화면 열기"}).click(),
+          async dialog=>{await dialog.getByRole("button",{name:"닫기 ×"}).click();
+            await dialog.waitFor({state:"hidden"});});
+      }
     }
   }
   await navPage.setViewportSize({width:1520,height:1000});
@@ -1940,9 +1980,9 @@ try {
   await navPage.waitForFunction(()=>Math.abs(
     Number(getComputedStyle(document.documentElement).getPropertyValue("--ui-scale"))-1)<.001);
   console.log("STAGE8_MATRIX",JSON.stringify({scales:stage8Scales,viewports:stage8ViewportSizes,
-    screens:stage8Screens.length+1,samples:stage8Results.length,
+    primaryScreens:stage8Screens.length+1,extraTabChecks:40,samples:stage8Results.length,
     horizontalShellScrollAllowed:true,results:stage8Results}));
-  assert.equal(stage8Results.length,stage8Scales.length*stage8ViewportSizes.length*(stage8Screens.length+1));
+  assert.equal(stage8Results.length,stage8Scales.length*stage8ViewportSizes.length*(stage8Screens.length+1)+40);
   console.log("PASS: Stage8 viewport/UI-scale matrix bounds all navigation pages and editor modals");
 
   assert.deepEqual(navErrors,[],"Navigation React errors: "+navErrors.join("\n"));
