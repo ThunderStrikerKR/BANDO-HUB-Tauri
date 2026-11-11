@@ -96,7 +96,8 @@ try{
         }));
       }
       report.uia={status:evidence.status,menus,settings,popups,screens:evidence.passes.length,
-        screen:evidence.passes[0]?.screen};
+        screen:evidence.passes[0]?.screen,windowMode:evidence.windowMode,
+        windowBounds:evidence.windowBounds,workArea:evidence.workArea};
       uiaCaptured=true;
       console.log("STAGE9_UIA_RUN_COMPLETE",output.slice(-4500));
     }catch(error){
