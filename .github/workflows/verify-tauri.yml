@@ -131,8 +131,11 @@ jobs:
         run: npm install --no-audit --no-fund --ignore-scripts
       - name: Install browser test driver
         run: npm install --no-save --no-package-lock --no-audit --no-fund playwright@1.55.1
+      # ubuntu-24.04 already has the runtime libraries required by Chromium.
+      # The with-deps flag runs apt and can fail on transient Ubuntu mirror DNS
+      # failures before any UI test is executed.
       - name: Install headless Chromium
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install chromium
       - name: Guard saved order against passive repricing in actual React UI
         run: node scripts/reception-pricing-ui-smoke.mjs
       - name: Run real React UI audit smoke test
