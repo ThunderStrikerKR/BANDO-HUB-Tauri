@@ -2146,6 +2146,28 @@ try {
       });
       console.log("STAGE8_ASSIGNMENT_SPACE",JSON.stringify({scale,
         viewport:viewport.width+"x"+viewport.height,...assignmentSpace}));
+      if(viewport.width===1024){
+        const controls=await navPage.locator(".shipping-assignment-list > .shipping-tools")
+          .evaluate(el=>{
+            const search=el.querySelector(".management-search-field")?.getBoundingClientRect();
+            const filter=el.querySelector(":scope > select")?.getBoundingClientRect();
+            const frame=el.getBoundingClientRect();
+            return {search:search&&{top:search.top,bottom:search.bottom,right:search.right},
+              filter:filter&&{top:filter.top,bottom:filter.bottom,right:filter.right},
+              toolbarRight:frame.right};
+          });
+        assert.ok(controls.search && controls.filter &&
+          Math.abs(controls.search.top-controls.filter.top)<=3 &&
+          controls.search.right<=controls.filter.right &&
+          controls.filter.right<=controls.toolbarRight+2,
+          "Freight search and filter must fit on one aligned row: "+JSON.stringify({scale,viewport,controls}));
+      }
+      if(scale===125 && viewport.width===1024 && viewport.height===700){
+        const last=followupLists.at(-1);
+        assert.ok(last.visibleRows>=4 && last.viewHeight>=165,
+          "Short-window freight assignment must expose at least four editable rows: "+
+          JSON.stringify({last,space:assignmentSpace}));
+      }
       const finalSelect=navPage.locator(".shipping-assignment-list tbody tr").last().locator("select");
       await finalSelect.focus();
       assert.equal(await finalSelect.evaluate(el=>document.activeElement===el),true,
