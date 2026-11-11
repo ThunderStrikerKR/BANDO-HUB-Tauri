@@ -7,11 +7,11 @@
   border: 0;
   background: transparent;
   color: #eee;
-  width: min(880px, calc(100vw - 36px));
-  max-width: calc(100vw - 36px);
-  max-height: calc(100dvh - 36px);
+  width: min(var(--modal-width), calc(100vw - var(--modal-viewport-gutter)));
+  max-width: calc(100vw - var(--modal-viewport-gutter));
+  max-height: calc(100dvh - var(--modal-viewport-gutter));
   overflow: visible;
-  font: 400 calc(13px * var(--ui-scale, 1))/1.5 var(--font-body);
+  font: 400 var(--modal-body-size)/1.5 var(--font-body);
   letter-spacing: normal;
 }
 .app-modal-layer:not([open]) {
@@ -25,12 +25,12 @@
   box-sizing: border-box;
   width: 100%;
   max-width: none;
-  max-height: calc(100dvh - 36px);
+  max-height: calc(100dvh - var(--modal-viewport-gutter));
   margin: 0;
   overflow: auto;
   background: #202020;
   color: #eee;
-  padding: 16px 18px;
+  padding: var(--modal-panel-padding);
   border: 1px solid #555;
   border-radius: 10px;
   box-shadow: 0 18px 70px #0009;
@@ -39,23 +39,23 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 12px;
-  min-height: var(--control-compact);
-  margin-bottom: 12px;
+  gap: var(--modal-header-gap);
+  min-height: var(--modal-close-height);
+  margin-bottom: var(--modal-header-gap);
 }
 .app-modal-layer .modal > header h2 {
   min-width: 0;
   margin: 0;
   font-family: var(--font-heading);
-  font-size: calc(18px * var(--ui-scale, 1));
+  font-size: var(--modal-title-size);
   font-weight: 650;
   letter-spacing: 0;
   line-height: 1.35;
 }
 .app-modal-layer .modal > header > button {
   flex: 0 0 auto;
-  min-height: var(--control-compact);
-  height: var(--control-compact);
+  min-height: var(--modal-close-height);
+  height: var(--modal-close-height);
   padding: 5px 10px;
 }
 .app-modal-layer button,
