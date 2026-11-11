@@ -1706,8 +1706,28 @@ try {
     }
     await navPage.getByRole("button",{name:"시험 화면 닫기"}).click();
   }
+  // A second set of real dialogs is reachable from category and freight
+  // management, rather than the developer workbench's default previews.
+  await navMenu.getByRole("button",{name:"상품 관리",exact:true}).click();
+  await navPage.getByRole("navigation",{name:"상품 관리 메뉴"})
+    .getByRole("button",{name:"카테고리 관리",exact:true}).click();
+  await navPage.getByRole("button",{name:"+ 하위 분류 추가",exact:true}).first().click();
+  let operationDialog=nativeOpen();
+  await operationDialog.waitFor();
+  await measureStage7("category-add",operationDialog);
+  await closeNative(operationDialog);
+  await navMenu.getByRole("button",{name:"운임 관리",exact:true}).click();
+  await navPage.getByRole("button",{name:"동급 그룹 운임표",exact:true}).click();
+  const groupRow=navPage.locator(".shipping-rates table tbody tr").filter({hasText:"검증용 배송 그룹"}).first();
+  for(const [button,label] of [["운임 수정","shipping-group-rate"],["삭제","shipping-group-delete"]]){
+    await groupRow.getByRole("button",{name:button,exact:true}).click();
+    const dialog=nativeOpen();
+    await dialog.waitFor();
+    await measureStage7(label,dialog);
+    await closeNative(dialog);
+  }
   console.log("STAGE7_MODAL_AUDIT",JSON.stringify(stage7Records));
-  assert.equal(stage7Records.length,20,
+  assert.equal(stage7Records.length,23,
     "Stage7 modal workbench inventory changed without audit coverage");
   console.log("PASS: developer workbench common modes and all 12 popup entries audited");
 
