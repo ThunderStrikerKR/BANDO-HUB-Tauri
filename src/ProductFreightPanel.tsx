@@ -8,8 +8,8 @@ import { confirmAction } from "./dialogs";
 import { registeredProducts, sortProducts } from "./product-models";
 import type { NoticeSink } from "./shared/notices";
 import { useAsyncTask } from "./shared/useAsyncTask";
-import { sameValue } from "./shared/draft";
-import { requestPageLeave, usePageLeaveGuard } from "./shared/page-leave";
+import { sameFreightEditor } from "./shared/meaningful-changes";
+import { requestEditorLeave, usePageLeaveGuard } from "./shared/page-leave";
 
 import {
   editableShippingRule,
@@ -97,7 +97,7 @@ export function ProductFreightPanel({
     if (ok) { setEditing(undefined);setInitialRule(undefined); }
     return ok;
   };
-  const editingDirty = !!editing && !!initialRule && !sameValue(editing.rule, initialRule);
+  const editingDirty = !!editing && !!initialRule && !sameFreightEditor(editing.rule, initialRule);
   usePageLeaveGuard({
     label: "상품별 운임",
     hasChanges: () => editingDirty,
@@ -108,7 +108,12 @@ export function ProductFreightPanel({
   const closeEditing = async () => {
     if (!editing || busy) return;
     if (editingDirty) {
-      const leave = await requestPageLeave((message) => onNotice(message, "error"));
+      const leave = await requestEditorLeave({
+        label: "상품별 운임",
+        hasChanges: () => editingDirty,
+        save: writeRule,
+        discard: () => { setEditing(undefined); setInitialRule(undefined); },
+      }, (message) => onNotice(message, "error"));
       if (!leave.proceed) return;
     }
     setEditing(undefined);
@@ -299,6 +304,7 @@ export function ProductFreightPanel({
       {editing && (
         <Modal
           draft={editing}
+          dirty={editingDirty}
           busy={busy}
           title={editing.name + " 운임 설정"}
           onClose={() => void closeEditing()}
