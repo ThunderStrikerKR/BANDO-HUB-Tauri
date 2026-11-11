@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { rebaseDraft, sameValue } from "./draft";
 import { usePendingChanges } from "./pending-changes";
-export function useDraft<T extends object>(incoming: T) {
+export function useDraft<T extends object>(
+  incoming: T,
+  equal: (left: T, right: T) => boolean = sameValue,
+) {
   const baseline = useRef(structuredClone(incoming)),
     latest = useRef(incoming),
     current = useRef(structuredClone(incoming));
@@ -27,7 +30,7 @@ export function useDraft<T extends object>(incoming: T) {
     setDraft(structuredClone(latest.current));
     setConflicts([]);
   };
-  const dirty = !sameValue(draft, incoming);
+  const dirty = !equal(draft, incoming);
   usePendingChanges(dirty);
   return {
     draft,
