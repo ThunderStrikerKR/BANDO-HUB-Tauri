@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { setTimeout as pause } from "node:timers/promises";
 import { chromium } from "playwright";
+import ExcelJS from "exceljs";
 import { auditCSS } from "./audit-css-ownership.mjs";
 
 const root = new URL("../", import.meta.url);
@@ -1680,8 +1681,26 @@ try {
     await closeNative(dialog);
     await navPage.getByRole("button",{name:"시험 화면 닫기"}).click();
   }
-  // These three entries host source-dependent workflows rather than opening a
-  // dialog immediately. Record the bounded preview surface, not a false pass.
+  const stage7Workbook=async(name,headers,values)=>{
+    const workbook=new ExcelJS.Workbook(),sheet=workbook.addWorksheet("Sheet1");
+    sheet.addRow(headers);
+    sheet.addRow(values);
+    return {name,mimeType:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      buffer:Buffer.from(await workbook.xlsx.writeBuffer())};
+  };
+  const registrationFile=await stage7Workbook("CI-product-registration.xlsx",
+    ["최종 등록명","제조사 모델코드","브랜드","색상","구성 구분","규격",
+      "판매 단위","상품군","카테고리 경로","도매가","반도매가","소매가","상품 링크","비고"],
+    ["CI 미등록 제품","CI-TEST-1001","","검정","가방 미포함","","개",
+      "반도스탠드","","1000","1300","1600","","합성 UI 검사용"]);
+  const replyHeaders=["수하인명","수하인우편번호","수하인주소","수하인전화번호",
+    "수하인핸드폰번호","택배수량","택배운임","운임구분","품목명","",
+    "메시지","송하인명","(송)우편","(송)주소1","(송)전화","(송)핸드폰","운송장번호"];
+  const replyCells=Array(17).fill("");
+  replyCells[0]="CI 검증수취인";replyCells[2]="경기도 검증시 시험길 12";
+  replyCells[3]="01012345678";replyCells[6]="3000";replyCells[16]="000012345678";
+  const replyFile=await stage7Workbook("CI-factory-reply.xlsx",replyHeaders,replyCells);
+  // Generated in memory: uploaded only to the detached browser mock, never saved.
   for(const popup of ["registration","reply","receipt"]){
     await popupSelect.selectOption(popup);
     await popupOpen.click();
@@ -1692,17 +1711,28 @@ try {
       content:el.textContent?.trim().slice(0,90)??""
     }));
     assert.ok(preview.visible,"Developer workflow preview not shown: "+popup);
-    if(popup==="registration" || popup==="receipt"){
-      if(popup==="registration")
-        await work.getByRole("button",{name:"엑셀 대량 등록",exact:true}).click();
-      else
-        await work.getByRole("button",{name:"감사 기록 열기",exact:true}).click();
+    if(popup==="registration"){
+      await work.getByRole("button",{name:"엑셀 대량 등록",exact:true}).click();
+      const dialog=nativeOpen();
+      await dialog.waitFor();
+      await dialog.locator('input[type="file"]').setInputFiles(registrationFile);
+      await dialog.locator(".registration-preview").first().waitFor();
+      await measureStage7(popup+"-workbook-review",dialog);
+      await closeNative(dialog);
+    }else if(popup==="reply"){
+      await work.locator('input[type="file"]').setInputFiles(replyFile);
+      const dialog=nativeOpen();
+      await dialog.waitFor();
+      assert.equal(await dialog.getByRole("button",{name:/DB 백업 후 회신/}).isDisabled(),true,
+        "Synthetic factory preview must never allow production commit");
+      await measureStage7(popup+"-workbook-review",dialog);
+      await closeNative(dialog);
+    }else{
+      await work.getByRole("button",{name:"감사 기록 열기",exact:true}).click();
       const dialog=nativeOpen();
       await dialog.waitFor();
       await measureStage7(popup+"-dialog",dialog);
       await closeNative(dialog);
-    }else{
-      stage7Records.push({popup,status:"REQUIRES_WORKBOOK_FIXTURE",preview});
     }
     await navPage.getByRole("button",{name:"시험 화면 닫기"}).click();
   }
