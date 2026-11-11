@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { requestPageLeave, usePageLeaveGuard } from "./shared/page-leave";
+import { requestEditorLeave, requestPageLeave, usePageLeaveGuard } from "./shared/page-leave";
 import { categoryPath, categoryProducts, changeCategory, deleteCategory, descendants } from "./category-tree";
 import { CATALOG_ROOTS, catalogFromCategory, isCatalogRoot, withCatalogRoots } from "./category-roots";
 import { Modal } from "./ui";
@@ -64,11 +64,13 @@ export function CategoryManager({
       setBusy(false);
     }
   };
-  const hasUnsaved = !!current && (
-    (editorOpen && !isCatalogRoot(current.id) && name.trim() !== current.name) ||
+  const renameDirty = !!current && editorOpen && !isCatalogRoot(current.id) &&
+    name.trim() !== current.name.trim();
+  const operationDirty = !!current && (
     (operation === "add" && !!newName.trim()) ||
     (operation === "move" && !!target && target !== (current.parentId ?? CATALOG_ROOTS[0].id))
   );
+  const hasUnsaved = renameDirty || operationDirty;
   const saveChanges = async (): Promise<boolean> => {
     if (!current || !hasUnsaved) return true;
     const base = { ...state, categories: withCatalogRoots(state.categories) };
@@ -89,7 +91,7 @@ export function CategoryManager({
           throw Error("분류 소속이 다른 상품이 있습니다. 상품 연결을 먼저 확인하세요.");
         return save(changeCategory(base, current.id, current.name, target), "분류 위치를 변경했습니다.");
       }
-      if (editorOpen && name.trim() !== current.name)
+      if (renameDirty)
         return save(changeCategory(base, current.id, name.trim(), current.parentId), "분류 이름을 변경했습니다.");
       return true;
     } catch (error) {
@@ -109,15 +111,28 @@ export function CategoryManager({
     discard,
   });
   const closeEditor = async () => {
-    if (hasUnsaved) {
-      const leave = await requestPageLeave((message) => onNotice(message, "error"));
+    if (renameDirty) {
+      const leave = await requestEditorLeave({
+        label: "카테고리 이름",
+        hasChanges: () => renameDirty,
+        save: async () => current ? save(
+          changeCategory({ ...state, categories: withCatalogRoots(state.categories) },
+            current.id, name.trim(), current.parentId),
+          "분류 이름을 변경했습니다.") : true,
+        discard: () => setName(current?.name ?? ""),
+      }, (message) => onNotice(message, "error"));
       if (!leave.proceed) return;
     }
     setEditorOpen(false);
   };
   const closeOperation = async () => {
-    if (hasUnsaved) {
-      const leave = await requestPageLeave((message) => onNotice(message, "error"));
+    if (operationDirty) {
+      const leave = await requestEditorLeave({
+        label: "카테고리 작업",
+        hasChanges: () => operationDirty,
+        save: saveChanges,
+        discard: () => { setNewName(""); setTarget(""); setTransferConfirmed(false); },
+      }, (message) => onNotice(message, "error"));
       if (!leave.proceed) return;
     }
     setOperation(null);
