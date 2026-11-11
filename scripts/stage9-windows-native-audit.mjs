@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
+import { spawn, execFileSync } from "node:child_process";
 import { promises as fs } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
@@ -27,6 +27,8 @@ app.stdout?.on("data",b=>stdout+=b.toString());
 app.stderr?.on("data",b=>stderr+=b.toString());
 const report={stage:9,type:"actual-Windows-Tauri-WebView2",
   exe:basename(exe),commit:process.env.GITHUB_SHA||"",
+  binaryCommit:process.env.BANDO_STAGE9_BINARY_COMMIT||"",
+  launchedPid:app.pid,sessionName:process.env.SESSIONNAME||"",user:process.env.USERNAME||"",
   os:process.env.ImageOS||"Windows",testRoot,
   syntheticFreshRunner:true,usesMockIpc:false,started:new Date().toISOString(),
   results:[],errors:[],status:"STARTED"};
@@ -46,7 +48,24 @@ try{
     }catch{/* initializing */}
     await pause(300);
   }
-  if(!found)throw Error("WebView2 native CDP unavailable on Windows runner; GUI inspection not verified");
+  if(!found){
+    // Distinguish Windows session / native-window failures from WebView2
+    // debugging port failures. No Windows GUI success is inferred here.
+    try {
+      const script =
+        "$p=Get-Process -Id "+app.pid+" -ErrorAction SilentlyContinue;"+
+        "$w=Get-Process -Name msedgewebview2 -ErrorAction SilentlyContinue;"+
+        "[PSCustomObject]@{app= @($p | Select-Object Id,Name,SessionId,MainWindowHandle,MainWindowTitle,Responding);"+
+        "webview2= @($w | Select-Object Id,Name,SessionId,MainWindowHandle,MainWindowTitle);"+
+        "sessionName=$env:SESSIONNAME;interactive=[Environment]::UserInteractive;"+
+        "user=[Environment]::UserName} | ConvertTo-Json -Depth 6 -Compress";
+      const result=execFileSync("powershell.exe",["-NoProfile","-Command",script],
+        {timeout:12000,encoding:"utf8"});
+      report.windowsSessionProbe=JSON.parse(result);
+      console.log("STAGE9_WINDOWS_SESSION_PROBE",JSON.stringify(report.windowsSessionProbe));
+    }catch(error){report.windowsSessionProbeError=String(error)}
+    throw Error("WebView2 native CDP unavailable on Windows runner; GUI inspection not verified");
+  }
   browser=await chromium.connectOverCDP("http://127.0.0.1:"+port,{timeout:15000});
   const ctx=browser.contexts()[0];
   const page=ctx?.pages().find(x=>/tauri|localhost/i.test(x.url()))??ctx?.pages()[0];
