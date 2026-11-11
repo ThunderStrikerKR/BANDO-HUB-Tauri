@@ -284,7 +284,10 @@ export function recommendModels(value: string, state: State) {
 const person = (s: string) =>
   /^[가-힣]{2,5}(?:님)?$/.test(s) &&
   !/^(?:주소|배송지|배송주소|받는곳|보내는곳|연락처|전화번호|사무실|행정실)$/.test(s) &&
-  !/(?:시|군|구|동|읍|면|리|로|길|층|호|아파트|빌라|센터|상가|주세요|감사해요|보내세요)$/.test(s);
+  // A destination institution at the end of an address is not an additional
+  // recipient. Keep it inside the address. Explicit standalone institutions
+  // are still recognized separately in order-evidence.ts.
+  !/(?:시|군|구|동|읍|면|리|로|길|층|호|아파트|빌라|센터|상가|학교|교회|성당|병원|학원|월드|주세요|감사해요|보내세요)$/.test(s);
 function parseLegacy(raw: string, selectedClient: Client | undefined, state: State): Recipient[] {
   const client = selectedClient ?? unassignedClient;
   const result: Recipient[] = [];
