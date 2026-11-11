@@ -13,10 +13,6 @@
   padding: 15px 22px;
   border-bottom: 1px solid #464646;
 }
-.app-modal-layer.client-editor-modal .modal > header h2 {
-  font-size: calc(18px * var(--ui-scale, 1));
-  line-height: 1.35;
-}
 .app-modal-layer.client-editor-modal .modal-fields {
   display: flex;
   flex-direction: column;
