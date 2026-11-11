@@ -1605,7 +1605,25 @@ try {
         scrollHeight:scrollOwner.scrollHeight,clientHeight:scrollOwner.clientHeight,
         scrollBoxBottom:Math.round(b.bottom),
         viewportWidth:window.innerWidth,viewportHeight:window.innerHeight,
-        focused:element.contains(document.activeElement)};
+        focused:element.contains(document.activeElement),
+        panelOverflow:panel?getComputedStyle(panel).overflowY:"",
+        controlAudit:[...panel.querySelectorAll("input:not([type=hidden]):not([type=file]), textarea, select, button")]
+          .filter(node=>getComputedStyle(node).display!=="none" && node.getBoundingClientRect().width>0)
+          .map(node=>{
+            const box=node.getBoundingClientRect();
+            return {tag:node.tagName.toLowerCase(),label:node.getAttribute("aria-label")||
+              node.textContent?.trim().slice(0,32)||"",
+              left:Math.round(box.left),right:Math.round(box.right),
+              top:Math.round(box.top),bottom:Math.round(box.bottom),
+              height:Math.round(box.height),font:parseFloat(getComputedStyle(node).fontSize)};
+          }),
+        fieldOverflow:fields?fields.scrollWidth-fields.clientWidth:0,
+        scrollableContent:scrollOwner.scrollHeight>scrollOwner.clientHeight+1,
+        footer:panel?.querySelector(".modal-footer,.client-editor-footer,.product-detail-footer")
+          ?(()=>{
+            const box=panel.querySelector(".modal-footer,.client-editor-footer,.product-detail-footer").getBoundingClientRect();
+            return {top:Math.round(box.top),bottom:Math.round(box.bottom)};
+          })():null};
     });
     assert.ok(result.width>200 && result.top>=-1 &&
       result.bottom<=result.viewportHeight+1 &&
@@ -1617,6 +1635,16 @@ try {
       "Stage7 close button inconsistent "+label+": "+JSON.stringify(result));
     assert.ok(result.scrollBoxBottom<=result.bottom+2,
       "Stage7 scroll owner escapes modal "+label+": "+JSON.stringify(result));
+    assert.ok(result.fieldOverflow<=3,
+      "Stage7 fields overflow horizontally "+label+": "+JSON.stringify(result));
+    assert.ok(result.controlAudit.every(c=>c.left>=result.left-2 && c.right<=result.right+2),
+      "Stage7 visible control exceeds dialog width "+label+": "+JSON.stringify(result));
+    assert.ok(result.controlAudit.filter(c=>c.tag==="button").every(c=>c.height>=24),
+      "Stage7 action button is too short "+label+": "+JSON.stringify(result));
+    assert.ok(!result.scrollableContent || ["auto","scroll"].includes(result.scrollStyle),
+      "Stage7 overflowing content cannot scroll "+label+": "+JSON.stringify(result));
+    if(result.footer)assert.ok(result.footer.bottom<=result.bottom+2,
+      "Stage7 action footer escapes modal "+label+": "+JSON.stringify(result));
     stage7Records.push({popup:label,...result});
     return result;
   };
