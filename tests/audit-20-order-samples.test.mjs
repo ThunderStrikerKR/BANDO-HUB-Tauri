@@ -68,7 +68,7 @@ const samples=[
     "kind": "TEXT",
     "expectedRecipients": 1,
     "expectedQuantities": [
-      1
+      null
     ],
     "raw": "안녕하세요? 주문드립니다.\nBANDO STAND 반도 보면대 지휘용 악보 스탠드\n받으시는 분\n남가상\n받으시는 분\n010-1234-5678\n배송지 주소\n50034 경상남도 함양군 함양읍 함양여중길 18-9 (가상학교)\n오늘 발송 가능한가요? 송장번호 부탁드립니다."
   },
@@ -245,5 +245,17 @@ for (const sample of samples) {
     console.log("ORDER20_RESULT "+JSON.stringify(summary));
     assert.equal(recipients.length,sample.expectedRecipients,"Wrong number of deliveries");
     assert.equal(summary.quantitiesOK,true,"Missing or misassociated quantities");
+    // No quantity in case 6: unresolved is correct, not a fabricated 1.
+    if (sample.id===6)
+      assert.equal(recipients[0].items[0]?.quantityConfirmed,false,
+        "Missing quantity must not be silently confirmed");
+    // "709 민판" denotes a non-perforated top. Never approve perforated 709.
+    if (sample.id===18) {
+      const chosen=recipients.flatMap(r=>r.items)[0];
+      assert.ok(!chosen.productId || /비타공|무타공/.test(chosen.name),
+        "709 민판 must stay unresolved or select a verified non-perforated SKU");
+      assert.equal(recipients[0]?.name,"이가상",
+        "The recipient name must not be confused with the Bando brand");
+    }
   });
 }
