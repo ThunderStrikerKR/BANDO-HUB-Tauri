@@ -1985,6 +1985,238 @@ try {
   assert.equal(stage8Results.length,stage8Scales.length*stage8ViewportSizes.length*(stage8Screens.length+1)+40);
   console.log("PASS: Stage8 viewport/UI-scale matrix bounds all navigation pages and editor modals");
 
+
+  // Stage 8 follow-up: the reception desk was absent from the original
+  // 4-scale x 4-viewport matrix. Keep the actual Kakao reservation and
+  // horizontally scrollable three-column workspace intact.
+  const followupReception = [];
+  const followupScale = async (value) => {
+    await navMenu.getByRole("button", {name:"설정",exact:true}).click();
+    await navPage.getByRole("tab", {name:"기본 설정"}).click();
+    await navPage.getByRole("combobox", {name:"전체 UI 크기"}).selectOption(String(value));
+    await navPage.waitForFunction(expected =>
+      Math.abs(Number(getComputedStyle(document.documentElement).getPropertyValue("--ui-scale"))-expected)<.001,
+      value/100);
+  };
+  for (const scale of stage8Scales) {
+    await followupScale(scale);
+    for (const viewport of stage8ViewportSizes) {
+      await navPage.setViewportSize(viewport);
+      await navMenu.getByRole("button", {name:"접수",exact:true}).click();
+      const live = navPage.locator(".hub-live-workspace");
+      await live.waitFor({state:"visible"});
+      const sample = await live.evaluate(el => {
+        const outer=document.querySelector(".hub-shell-scroll");
+        const inner=el.querySelector(".hub-panels");
+        const scroll=el.querySelector(".hub-workspace-scroll");
+        const stack=el.querySelector(".hub-reception-stack");
+        const slots=inner ? [...inner.querySelectorAll(":scope > .hub-panel-slot")] : [];
+        const body=document.scrollingElement;
+        const bound=e=>{const r=e.getBoundingClientRect();
+          return {left:Math.round(r.left),right:Math.round(r.right),
+            top:Math.round(r.top),bottom:Math.round(r.bottom),
+            width:Math.round(r.width),height:Math.round(r.height)};};
+        return {
+          shellY:outer ? outer.scrollHeight-outer.clientHeight : null,
+          bodyY:body ? body.scrollHeight-window.innerHeight : null,
+          scale:Number(getComputedStyle(document.documentElement).getPropertyValue("--ui-scale")),
+          viewport:{width:window.innerWidth,height:window.innerHeight},
+          live:bound(el),stack:stack?bound(stack):null,
+          slotCount:slots.length,slots:slots.map(bound),
+          internalHorizontalScroll:scroll ? scroll.scrollWidth-scroll.clientWidth : null,
+          outerHorizontalScroll:outer ? outer.scrollWidth-outer.clientWidth : null,
+          sourcePresent:!!el.querySelector(".source-pane, .source-document"),
+          messagePresent:!!el.querySelector(".hub-slot-1 .hub-portal-target"),
+          workflowPresent:!!el.querySelector(".hub-management .workflow-board"),
+        };
+      });
+      const context="접수 "+viewport.width+"x"+viewport.height+" "+scale+"%";
+      assert.ok(sample.slotCount===3 && sample.sourcePresent &&
+        sample.messagePresent && sample.workflowPresent,
+        context+" missing a reception panel: "+JSON.stringify(sample));
+      assert.ok(sample.slots.every(s=>s.width>=80 && s.height>=120) &&
+        sample.stack && sample.stack.height>=180,
+        context+" unusable reception column: "+JSON.stringify(sample));
+      assert.ok(sample.shellY<=3 && sample.bodyY<=3 &&
+        sample.live.bottom<=viewport.height+3,
+        context+" reception escapes viewport vertically: "+JSON.stringify(sample));
+      followupReception.push({context,...sample});
+      console.log("STAGE8_FOLLOWUP_RECEPTION",JSON.stringify({context,...sample}));
+    }
+  }
+  assert.equal(followupReception.length,16,"Every reception scale/viewport combination must run");
+
+  // Stage 8 usability: a bounded list is only useful when its LAST record and
+  // action remain reachable. Exercise actual controls without saving any data.
+  const followupLists=[];
+  const followupDialogs=[];
+  const followupRisks=[];
+  const lastRowProbe=async(label,selector)=>{
+    const element=navPage.locator(selector).first();
+    await element.waitFor({state:"visible"});
+    const sample=await element.evaluate(el=>{
+      const rows=[...el.querySelectorAll("tbody tr")];
+      const last=rows.at(-1);
+      if(!last)return {missingRows:true};
+      el.scrollTop=el.scrollHeight;
+      el.scrollLeft=el.scrollWidth;
+      const frame=el.getBoundingClientRect(),lastBox=last.getBoundingClientRect();
+      const rowHeight=rows.length?rows[Math.floor(rows.length/2)].getBoundingClientRect().height:0;
+      const visible=rows.filter(r=>{
+        const b=r.getBoundingClientRect();
+        return Math.min(b.bottom,frame.bottom)-Math.max(b.top,frame.top)>Math.min(14,b.height/2);
+      }).length;
+      const text=last.querySelector("td:nth-child(2)");
+      return {rowCount:rows.length,visibleRows:visible,viewHeight:Math.round(frame.height),
+        rowHeight:Math.round(rowHeight),lastTop:Math.round(lastBox.top),
+        lastBottom:Math.round(lastBox.bottom),viewTop:Math.round(frame.top),
+        viewBottom:Math.round(frame.bottom),
+        scrollTop:el.scrollTop,scrollEnd:el.scrollHeight-el.clientHeight,
+        horizontalScrollable:el.scrollWidth>el.clientWidth+2,
+        endReachable:lastBox.top<frame.bottom && lastBox.bottom>frame.top,
+        nameWidth:text?Math.round(text.getBoundingClientRect().width):null,
+        nameScrollWidth:text?text.scrollWidth:null};
+    });
+    assert.ok(!sample.missingRows && sample.rowCount>10,
+      label+" list lost real fixture rows: "+JSON.stringify(sample));
+    assert.ok(sample.endReachable && sample.scrollTop>=sample.scrollEnd-3,
+      label+" last record cannot be reached by list scroll: "+JSON.stringify(sample));
+    assert.ok(sample.visibleRows>=1,
+      label+" has no visible usable record: "+JSON.stringify(sample));
+    if(sample.visibleRows<3 || sample.viewHeight<140){
+      const flag={label,reason:"Fewer than 3 visible rows or list under 140px",...sample};
+      followupRisks.push(flag);
+      console.log("STAGE8_FOLLOWUP_DENSITY_RISK",JSON.stringify(flag));
+    }
+    followupLists.push({label,...sample});
+    console.log("STAGE8_FOLLOWUP_LIST",JSON.stringify({label,...sample}));
+  };
+  const closeFollowupModal=async(dialog)=>{
+    await dialog.getByRole("button",{name:"닫기 ×"}).click();
+    await dialog.waitFor({state:"hidden"});
+  };
+  const extremeScales=[90,125];
+  const extremeViewports=[
+    {width:1920,height:1080},{width:1024,height:700},
+  ];
+  for(const scale of extremeScales){
+    await followupScale(scale);
+    for(const viewport of extremeViewports){
+      await navPage.setViewportSize(viewport);
+      const suffix=" "+viewport.width+"x"+viewport.height+" "+scale+"%";
+
+      await navMenu.getByRole("button",{name:"상품 관리",exact:true}).click();
+      await lastRowProbe("상품 관리"+suffix,".product-list-workspace .price-table-scroll");
+      await navPage.locator(".product-prices tbody tr").last()
+        .getByRole("button",{name:"상세 관리"}).click();
+      let opened=navPage.locator("dialog.app-modal-layer[open]").last();
+      await opened.waitFor();
+      await closeFollowupModal(opened);
+
+      await navMenu.getByRole("button",{name:"운임 관리",exact:true}).click();
+      await lastRowProbe("상품별 운임"+suffix,".shipping-product-list .shipping-table-scroll");
+      await navPage.locator(".shipping-product-list tbody tr").last()
+        .getByRole("button",{name:/기본 운임 설정|그룹 기준 편집/}).first().click();
+      opened=navPage.locator("dialog.app-modal-layer[open]").last();
+      await opened.waitFor();
+      await closeFollowupModal(opened);
+
+      await navPage.getByRole("button",{name:"동급 배송 그룹 지정",exact:true}).click();
+      await lastRowProbe("배송 그룹 지정"+suffix,
+        ".shipping-assignment-list .shipping-table-scroll");
+      const finalSelect=navPage.locator(".shipping-assignment-list tbody tr").last().locator("select");
+      await finalSelect.focus();
+      assert.equal(await finalSelect.evaluate(el=>document.activeElement===el),true,
+        "Last shipping-group row select cannot receive focus "+suffix);
+
+      // These risky dialogs are real business components, opened without writes.
+      await navPage.getByRole("button",{name:"상품별 기본 운임",exact:true}).click();
+      const freight=await stage8CheckModal("상품별 운임 설정",
+        async()=>navPage.locator(".shipping-product-list tbody tr").first()
+          .getByRole("button",{name:/기본 운임 설정|그룹 기준 편집/}).first().click(),
+        closeFollowupModal);
+      followupDialogs.push({kind:"freight",scale,viewport,...freight});
+
+      await navMenu.getByRole("button",{name:"설정",exact:true}).click();
+      await navPage.getByRole("tab",{name:"개발자 모드"}).click();
+      for(const [id,name] of [["raw","원문 정정"],["category","카테고리 선택"]]){
+        await navPage.locator("#dev-popup").selectOption(id);
+        const measured=await stage8CheckModal(name,
+          async()=>navPage.getByRole("button",{name:"선택한 실제 화면 열기"}).click(),
+          closeFollowupModal);
+        followupDialogs.push({kind:id,scale,viewport,...measured});
+      }
+      // Manual classification is a dedicated dialog-role workspace, NOT a
+      // native Modal. Its outer bounds and table scroll owner must be measured.
+      await navPage.locator("#dev-popup").selectOption("manual");
+      await navPage.getByRole("button",{name:"선택한 실제 화면 열기"}).click();
+      const manual=navPage.getByRole("dialog",{name:"수동 분류"}).last();
+      await manual.waitFor();
+      const manualSample=await manual.evaluate(el=>{
+        const r=el.getBoundingClientRect();
+        const table=el.querySelector(".manual-grid-scroll");
+        const tableRect=table?.getBoundingClientRect();
+        const close=[...el.querySelectorAll("button")].find(b=>b.textContent?.includes("닫기"));
+        const closeRect=close?.getBoundingClientRect();
+        return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,
+          viewportWidth:window.innerWidth,viewportHeight:window.innerHeight,
+          tableHeight:tableRect?.height??0,tableOverflow:table?getComputedStyle(table).overflowY:"",
+          closeVisible:!!closeRect&&closeRect.bottom>0&&closeRect.top<window.innerHeight};
+      });
+      followupDialogs.push({kind:"manual",scale,viewport,...manualSample});
+      const manualVisible=manualSample.top>=-2 &&
+        manualSample.bottom<=manualSample.viewportHeight+2 &&
+        manualSample.closeVisible && manualSample.tableHeight>=24;
+      if(!manualVisible){
+        const risk={label:"수동 분류"+suffix,reason:"Manual workspace cannot fit viewport or close is unreachable",...manualSample};
+        followupRisks.push(risk);
+        console.log("STAGE8_FOLLOWUP_MANUAL_RISK",JSON.stringify(risk));
+      }
+      await manual.getByRole("button",{name:"닫기 ×"}).click();
+
+      // The three-choice unsaved edit prompt is a distinct native dialog.
+      await navMenu.getByRole("button",{name:"운임 관리",exact:true}).click();
+      await navPage.getByRole("button",{name:"동급 그룹 운임표",exact:true}).click();
+      const unsavedName=navPage.getByRole("textbox",{name:"새 배송 그룹명"});
+      await unsavedName.fill("CI 임시 저장 확인 화면 / 수정하지 않음");
+      await navMenu.getByRole("button",{name:"상품 관리",exact:true}).click();
+      const decision=navPage.locator("dialog.app-action-dialog[open]").last();
+      await decision.waitFor();
+      const decisionSample=await decision.evaluate(el=>{
+        const r=el.getBoundingClientRect();
+        const x=parseFloat(getComputedStyle(document.documentElement)
+          .getPropertyValue("--kakao-reserved-width"))||0;
+        const controls=[...el.querySelectorAll("button")].map(b=>{
+          const c=b.getBoundingClientRect();
+          return {left:c.left,right:c.right,top:c.top,bottom:c.bottom};
+        });
+        return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,
+          width:r.width,viewportWidth:window.innerWidth,viewportHeight:window.innerHeight,
+          kakaoReserved:x,centerError:Math.abs((r.left+r.right)/2-(x+(window.innerWidth-x)/2)),
+          controlsVisible:controls.every(c=>c.left>=r.left-2&&c.right<=r.right+2&&
+            c.top>=r.top-2&&c.bottom<=r.bottom+2)};
+      });
+      assert.ok(decisionSample.left>=-2 &&
+        decisionSample.right<=decisionSample.viewportWidth+2 &&
+        decisionSample.top>=-2 &&
+        decisionSample.bottom<=decisionSample.viewportHeight+2 &&
+        decisionSample.controlsVisible && decisionSample.centerError<=4,
+        "Unsaved edit decision is clipped or off-center "+suffix+": "+JSON.stringify(decisionSample));
+      followupDialogs.push({kind:"save-decision",scale,viewport,...decisionSample});
+      await decision.getByRole("button",{name:"취소",exact:true}).click();
+      await unsavedName.fill("");
+    }
+  }
+  await followupScale(100);
+  await navPage.setViewportSize({width:1520,height:1000});
+  assert.equal(followupLists.length,12,"Last-record access matrix is incomplete");
+  assert.equal(followupDialogs.length,20,"High-risk modal matrix is incomplete");
+  console.log("STAGE8_FOLLOWUP_SUMMARY",JSON.stringify({
+    reception:followupReception.length,lists:followupLists.length,
+    dialogs:followupDialogs.length,densityRisks:followupRisks,
+    windowsNativeVerified:false,changesToBusinessData:0,
+  }));
+
   assert.deepEqual(navErrors,[],"Navigation React errors: "+navErrors.join("\n"));
   await navPage.close();
   assert.deepEqual(pageErrors, [], "React runtime errors: " + pageErrors.join("\n"));
