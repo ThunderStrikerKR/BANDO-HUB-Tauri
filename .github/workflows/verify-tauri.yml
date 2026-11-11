@@ -29,6 +29,14 @@ jobs:
         run: npm install --no-audit --no-fund --ignore-scripts
       - name: TypeScript type check
         run: npm run check:types
+      # The full 20-case audit intentionally retains failing 18/19/20
+      # until those independent parser defects are repaired. Keep a separate
+      # green assertion for recipient boundaries 5/16/17 and institution-only
+      # addressees, rather than masking or deleting the unrelated failures.
+      - name: Recipient boundary regressions (orders 5, 16, 17)
+        run: |
+          node --test --test-name-pattern="ORDER_SAMPLE_05|ORDER_SAMPLE_16|ORDER_SAMPLE_17" tests/audit-20-order-samples.test.mjs
+          node --test tests/recipient-institution-boundaries.test.mjs
       - name: Node tests
         run: npm test
   rust-reception:
