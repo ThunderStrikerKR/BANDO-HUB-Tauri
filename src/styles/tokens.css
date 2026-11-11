@@ -25,4 +25,15 @@
   --field-label-color: #c4c4c4;
   --manage-product-name-size: calc(13px * var(--ui-scale, 1));
   --manage-product-description-size: calc(12px * var(--ui-scale, 1));
+  /* All new <Modal> and confirmAction / askSaveChanges dialogs inherit these. */
+  --modal-title-size: calc(18px * var(--ui-scale, 1));
+  --modal-body-size: calc(13px * var(--ui-scale, 1));
+  --modal-action-size: calc(14px * var(--ui-scale, 1));
+  --modal-decision-action-size: var(--modal-body-size);
+  --modal-close-height: var(--control-compact);
+  --modal-width: 880px;
+  --modal-decision-width: 560px;
+  --modal-viewport-gutter: 36px;
+  --modal-panel-padding: 16px 18px;
+  --modal-header-gap: 12px;
 }
