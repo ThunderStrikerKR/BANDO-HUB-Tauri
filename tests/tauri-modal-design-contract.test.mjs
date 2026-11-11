@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { join, relative } from "node:path";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { auditCSS } from "../scripts/audit-css-ownership.mjs";
 
 const root = new URL("../", import.meta.url);
+const repositoryRoot = fileURLToPath(root);
+const sourceRoot = fileURLToPath(new URL("../src", import.meta.url));
 const source = (path) => readFileSync(new URL("../" + path, import.meta.url), "utf8");
 const tokens = source("src/styles/tokens.css");
 const modals = source("src/styles/modals.css");
@@ -77,7 +80,7 @@ test("future native dialogs must use Modal or the confirmation/prompt helpers", 
       const path = join(directory, entry.name);
       if (entry.isDirectory()) { walk(path); continue; }
       if (!/\.(?:tsx?|jsx?)$/.test(entry.name)) continue;
-      const normalized = relative(new URL("../", import.meta.url).pathname, path)
+      const normalized = relative(repositoryRoot, path)
         .replaceAll("\\", "/");
       if (normalized === "src/ui/Modal.tsx" || normalized === "src/dialogs.ts") continue;
       const content = readFileSync(path, "utf8");
@@ -85,7 +88,7 @@ test("future native dialogs must use Modal or the confirmation/prompt helpers", 
         matches.push(normalized);
     }
   };
-  walk(new URL("../src", import.meta.url));
+  walk(sourceRoot);
   assert.deepEqual(matches, [],
     "Do not add raw native dialogs with independent CSS. Reuse Modal or dialogs.ts: " + matches.join(", "));
 });
