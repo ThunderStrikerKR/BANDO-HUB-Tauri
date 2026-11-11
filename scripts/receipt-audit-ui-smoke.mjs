@@ -1563,6 +1563,142 @@ try {
   assert.ok(cascadeInventory.length>=100,"Cross-file CSS collision inventory unexpectedly incomplete");
 
 
+
+  // Stage 7: use the actual developer modal workbench with detached mock data.
+  // Do not submit business saves. Test every listed popup mode, including long
+  // content, errors, busy state, and the unique manual-classification surface.
+  await navPage.evaluate(()=>{
+    window.bando.isTestWorkspace=true;
+    const original=window.__TAURI_INTERNALS__.invoke;
+    window.__TAURI_INTERNALS__.invoke=(command,args)=>{
+      if(command==="test_run_history")return Promise.resolve([]);
+      if(command==="test_database_preview")return Promise.resolve({enabled:false});
+      return original(command,args);
+    };
+  });
+  await navMenu.getByRole("button",{name:"설정",exact:true}).click();
+  await navPage.getByRole("tab",{name:"개발자 모드"}).click();
+  const popupSelect=navPage.locator("#dev-popup");
+  await popupSelect.waitFor();
+  const popupOpen=navPage.getByRole("button",{name:"선택한 실제 화면 열기"});
+  const stage7Records=[];
+  const measureStage7=async(label,dialog)=>{
+    const result=await dialog.evaluate(element=>{
+      const rect=element.getBoundingClientRect();
+      const panel=element.querySelector(":scope > .modal");
+      const heading=panel?.querySelector(":scope > header h2");
+      const close=panel?.querySelector(":scope > header button");
+      const fields=panel?.querySelector(".modal-fields");
+      const scrollOwner=panel?.querySelector(".client-editor-body, .product-detail-body")
+        ??fields??panel;
+      const b=scrollOwner.getBoundingClientRect();
+      return {label:element.getAttribute("aria-label"),
+        width:Math.round(rect.width),height:Math.round(rect.height),
+        top:Math.round(rect.top),bottom:Math.round(rect.bottom),
+        left:Math.round(rect.left),right:Math.round(rect.right),
+        titleFont:heading?parseFloat(getComputedStyle(heading).fontSize):0,
+        closeHeight:close?Math.round(close.getBoundingClientRect().height):0,
+        scrollOwner:scrollOwner.className?.toString()??"",
+        scrollStyle:getComputedStyle(scrollOwner).overflowY,
+        scrollHeight:scrollOwner.scrollHeight,clientHeight:scrollOwner.clientHeight,
+        scrollBoxBottom:Math.round(b.bottom),
+        viewportWidth:window.innerWidth,viewportHeight:window.innerHeight,
+        focused:element.contains(document.activeElement)};
+    });
+    assert.ok(result.width>200 && result.top>=-1 &&
+      result.bottom<=result.viewportHeight+1 &&
+      result.left>=-1 && result.right<=result.viewportWidth+1,
+      "Stage7 dialog escapes viewport "+label+": "+JSON.stringify(result));
+    assert.ok(result.titleFont>=17 && result.titleFont<=21,
+      "Stage7 title typography inconsistent "+label+": "+JSON.stringify(result));
+    assert.ok(result.closeHeight>=28 && result.closeHeight<=40,
+      "Stage7 close button inconsistent "+label+": "+JSON.stringify(result));
+    assert.ok(result.scrollBoxBottom<=result.bottom+2,
+      "Stage7 scroll owner escapes modal "+label+": "+JSON.stringify(result));
+    stage7Records.push({popup:label,...result});
+    return result;
+  };
+  const nativeOpen=()=>navPage.locator("dialog.app-modal-layer[open]").last();
+  const closeNative=async(dialog)=>{
+    await dialog.getByRole("button",{name:"닫기 ×"}).click();
+    await dialog.waitFor({state:"hidden"});
+  };
+  for(const mode of ["NORMAL","EMPTY","ERROR","BUSY","LONG","WARNING","SUCCESS","FAILURE","CANCEL"]){
+    await popupSelect.selectOption("common");
+    await navPage.locator("#dev-popup-state").selectOption(mode);
+    await popupOpen.click();
+    const dialog=nativeOpen();
+    await dialog.waitFor();
+    const entry=await measureStage7("common/"+mode,dialog);
+    if(mode==="LONG")
+      assert.ok(entry.scrollHeight>entry.clientHeight,
+        "Long text should scroll inside common modal: "+JSON.stringify(entry));
+    if(mode==="ERROR"||mode==="WARNING"||mode==="FAILURE")
+      assert.ok(await dialog.getByRole("alert").count()>0,
+        "Stage7 warning/error message is missing in "+mode);
+    if(mode==="BUSY"){
+      assert.equal(await dialog.getAttribute("aria-busy"),"true");
+      await navPage.waitForFunction(()=>
+        document.querySelector('dialog.developer-preview-dialog[open]')?.getAttribute("aria-busy")!=="true");
+    }
+    await closeNative(dialog);
+  }
+  for(const popup of ["raw","resolver","product-search","category","retail"]){
+    await popupSelect.selectOption(popup);
+    await popupOpen.click();
+    const dialog=nativeOpen();
+    await dialog.waitFor();
+    await measureStage7(popup,dialog);
+    await closeNative(dialog);
+  }
+  await popupSelect.selectOption("manual");
+  await popupOpen.click();
+  const manual=navPage.getByRole("dialog",{name:"수동 분류"});
+  await manual.waitFor();
+  const manualResult=await manual.evaluate(el=>{
+    const box=el.getBoundingClientRect();
+    const scroll=el.querySelector(".manual-grid-scroll");
+    return {width:Math.round(box.width),height:Math.round(box.height),
+      viewportWidth:window.innerWidth,viewportHeight:window.innerHeight,
+      scrollPresent:!!scroll,scrollOverflow:scroll?getComputedStyle(scroll).overflowY:""};
+  });
+  assert.ok(manualResult.scrollPresent,"Manual classification requires an independent grid scrollbar");
+  stage7Records.push({popup:"manual",...manualResult});
+  await manual.getByRole("button",{name:"닫기 ×"}).click();
+  await manual.waitFor({state:"hidden"});
+  for(const [popup,button] of [["client","＋ 거래처 등록"],["product","상품 추가"]]){
+    await popupSelect.selectOption(popup);
+    await popupOpen.click();
+    const workspace=navPage.locator(".developer-live-container");
+    await workspace.waitFor();
+    await workspace.getByRole("button",{name:button,exact:true}).click();
+    if(popup==="product")await workspace.getByRole("button",{name:"직접 등록",exact:true}).click();
+    const dialog=nativeOpen();
+    await dialog.waitFor();
+    await measureStage7(popup+"-editor",dialog);
+    await closeNative(dialog);
+    await navPage.getByRole("button",{name:"시험 화면 닫기"}).click();
+  }
+  // These three entries host source-dependent workflows rather than opening a
+  // dialog immediately. Record the bounded preview surface, not a false pass.
+  for(const popup of ["registration","reply","receipt"]){
+    await popupSelect.selectOption(popup);
+    await popupOpen.click();
+    const work=navPage.locator(".developer-live-container");
+    await work.waitFor();
+    const preview=await work.evaluate(el=>({
+      visible:el.getBoundingClientRect().width>0,
+      content:el.textContent?.trim().slice(0,90)??""
+    }));
+    assert.ok(preview.visible,"Developer workflow preview not shown: "+popup);
+    stage7Records.push({popup,status:"FLOW_REQUIRES_UPLOAD_OR_ORDER_FIXTURE",preview});
+    await navPage.getByRole("button",{name:"시험 화면 닫기"}).click();
+  }
+  console.log("STAGE7_MODAL_AUDIT",JSON.stringify(stage7Records));
+  assert.equal(stage7Records.length,20,
+    "Stage7 modal workbench inventory changed without audit coverage");
+  console.log("PASS: developer workbench common modes and all 12 popup entries audited");
+
   assert.deepEqual(navErrors,[],"Navigation React errors: "+navErrors.join("\n"));
   await navPage.close();
   assert.deepEqual(pageErrors, [], "React runtime errors: " + pageErrors.join("\n"));
