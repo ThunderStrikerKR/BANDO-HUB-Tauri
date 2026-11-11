@@ -75,7 +75,22 @@ public static class BandoAuditNative {
     $target=$nodes | Where-Object {
       $_.name -eq $label -and $_.control -match "Button|TabItem" -and !$_.offscreen -and $_.w -gt 0
     } | Select-Object -First 1
-    if ($null -eq $target) { throw "No UIAutomation button: $label" }
+    if ($null -eq $target) {
+      # A long product-name table intentionally scrolls horizontally. Focus
+      # the offscreen row action so native WebView2 can reveal it without
+      # shrinking the product-name column or synthesizing DOM interactions.
+      $hidden=$nodes | Where-Object {
+        $_.name -eq $label -and $_.control -match "Button|TabItem" -and $_.w -gt 0
+      } | Select-Object -First 1
+      if ($null -ne $hidden) {
+        try { $hidden.el.SetFocus(); Start-Sleep -Milliseconds 350 } catch { }
+        $nodes=Elements
+        $target=$nodes | Where-Object {
+          $_.name -eq $label -and $_.control -match "Button|TabItem" -and !$_.offscreen -and $_.w -gt 0
+        } | Select-Object -First 1
+      }
+    }
+    if ($null -eq $target) { throw "No visible native UIAutomation button: $label" }
     $success=$false
     try {
       $invoke=$target.el.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern)
@@ -153,9 +168,28 @@ public static class BandoAuditNative {
       }
     }
   }
+  # Test only opening/closing real edit dialogs. Never press Save or confirm
+  # an action: this runner has a fresh isolated DB, but must remain read-only.
+  $popups=@(
+    @{ menu="상품 관리"; tab="상품 목록"; buttons=@("상세 관리"); label="상품 상세 관리" },
+    @{ menu="상품 관리"; tab="상품 목록"; buttons=@("상품 추가","직접 등록"); label="상품 신규 등록" },
+    @{ menu="거래처 관리"; tab="거래처 목록"; buttons=@("＋ 거래처 등록"); label="거래처 신규 등록" },
+    @{ menu="운임 관리"; tab="상품별 기본 운임"; buttons=@("기본 운임 설정"); label="상품별 기본 운임 설정" }
+  )
+  foreach($popup in $popups){
+    ClickUI $popup.menu
+    ClickUI $popup.tab
+    foreach($trigger in $popup.buttons){ ClickUI $trigger }
+    Capture "popup" $popup.label
+    try { ClickUI "닫기 ×" }
+    catch {
+      [System.Windows.Forms.SendKeys]::SendWait("{ESC}")
+      Start-Sleep -Milliseconds 300
+    }
+  }
   $report.status="NATIVE_UIA_CAPTURED"
   Store
-  Write-Host "STAGE9_UIA_SUMMARY pages=$($report.passes.Count),menus=$($menus.Count)"
+  Write-Host "STAGE9_UIA_SUMMARY pages=$($report.passes.Count),menus=$($menus.Count),popups=$(@($report.passes | Where-Object {$_.kind -eq 'popup'}).Count)"
 } catch {
   $report.status="FAILED"
   $report.failures+= $_.Exception.Message
