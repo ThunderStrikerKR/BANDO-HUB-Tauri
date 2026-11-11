@@ -78,10 +78,10 @@ export function ColorGuidanceManager({state,onRefresh,query=""}: {
   };
   usePageLeaveGuard({
     label: "대표색상",
-    hasChanges: () => unsaved || name.length > 0,
+    hasChanges: () => unsaved || name.trim().length > 0,
     busy: () => busy,
     save: async () => {
-      if (name.length > 0) {
+      if (name.trim().length > 0) {
         setStatus("새 그룹 이름을 입력했습니다. 그룹 생성으로 등록하거나 저장 안 함을 선택하세요.");
         return false;
       }
