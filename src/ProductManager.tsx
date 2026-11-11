@@ -391,6 +391,7 @@ export function ProductManager({
         {edit && (
           <Modal
             draft={edit}
+            dirty={editDirty}
             busy={savingView}
             className="product-detail-dialog"
             title={state.products.some((item) => item.id === edit.id) ? "상품 상세 관리" : "상품 등록"}
