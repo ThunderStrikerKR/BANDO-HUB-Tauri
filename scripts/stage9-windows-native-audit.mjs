@@ -39,32 +39,43 @@ const write=async()=>{
 };
 const fileName=s=>String(s).replace(/[^\p{L}\p{N}-]+/gu,"-").slice(0,55);
 try{
-  let found=false;
+  let found=false,portResponded=false,lastTargets=[];
   for(let i=0;i<140;i++){
     if(app.exitCode!==null)throw Error("EXE exited with code "+app.exitCode+": "+stderr.slice(-1000));
     try{
       const r=await fetch("http://127.0.0.1:"+port+"/json/list",{signal:AbortSignal.timeout(850)});
-      if(r.ok && (await r.json()).some(x=>x.type==="page"&&/tauri|localhost/i.test(x.url||""))){found=true;break}
+      if(r.ok){
+        portResponded=true;
+        const targets=await r.json();
+        lastTargets=targets.map(x=>({type:x.type,url:x.url,title:x.title}));
+        if(targets.some(x=>x.type==="page"&&/tauri|localhost/i.test(x.url||""))){
+          found=true;break;
+        }
+      }
     }catch{/* initializing */}
     await pause(300);
   }
   if(!found){
-    // Distinguish Windows session / native-window failures from WebView2
-    // debugging port failures. No Windows GUI success is inferred here.
+    // Record actual Windows UI/process evidence without calling the CDP-less
+    // capture a successful browser UI audit.
+    report.cdpEndpoint={portResponded,targets:lastTargets};
     try {
-      const script =
-        "$p=Get-Process -Id "+app.pid+" -ErrorAction SilentlyContinue;"+
-        "$w=Get-Process -Name msedgewebview2 -ErrorAction SilentlyContinue;"+
-        "[PSCustomObject]@{app= @($p | Select-Object Id,Name,SessionId,MainWindowHandle,MainWindowTitle,Responding);"+
-        "webview2= @($w | Select-Object Id,Name,SessionId,MainWindowHandle,MainWindowTitle);"+
-        "sessionName=$env:SESSIONNAME;interactive=[Environment]::UserInteractive;"+
-        "user=[Environment]::UserName} | ConvertTo-Json -Depth 6 -Compress";
-      const result=execFileSync("powershell.exe",["-NoProfile","-Command",script],
-        {timeout:12000,encoding:"utf8"});
+      const result=execFileSync("powershell.exe",[
+        "-NoProfile","-ExecutionPolicy","Bypass",
+        "-File",resolve("scripts/stage9-windows-desktop-probe.ps1"),
+        "-ProcessId",String(app.pid),"-OutDir",out,
+      ],{timeout:30000,encoding:"utf8"});
       report.windowsSessionProbe=JSON.parse(result);
-      console.log("STAGE9_WINDOWS_SESSION_PROBE",JSON.stringify(report.windowsSessionProbe));
+      console.log("STAGE9_WINDOWS_SESSION_PROBE",JSON.stringify({
+        processId:report.windowsSessionProbe.processId,
+        mainWindowHandle:report.windowsSessionProbe.mainWindowHandle,
+        webviewProcessCount:report.windowsSessionProbe.webviewProcessCount,
+        screenshot:report.windowsSessionProbe.desktopScreenshot,
+        screenshotError:report.windowsSessionProbe.screenshotError,
+        cdpEndpoint:report.cdpEndpoint,
+      }));
     }catch(error){report.windowsSessionProbeError=String(error)}
-    throw Error("WebView2 native CDP unavailable on Windows runner; GUI inspection not verified");
+    throw Error("WebView2 native CDP unavailable; desktop probe retained but native UI not audited");
   }
   browser=await chromium.connectOverCDP("http://127.0.0.1:"+port,{timeout:15000});
   const ctx=browser.contexts()[0];
