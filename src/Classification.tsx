@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { sameValue } from "./shared/draft";
-import { requestPageLeave, usePageLeaveGuard } from "./shared/page-leave";
+import { requestEditorLeave, usePageLeaveGuard } from "./shared/page-leave";
 import { CategoriesPanel } from "./ManagementUI";
 import { classifiedProducts, registryKey, validateBrands, type Brand } from "./product-registry";
 import type { NoticeSink } from "./shared/notices";
@@ -119,7 +119,12 @@ export function RegistrySettings({
   const chooseBrand = async (brand: Brand) => {
     if (editing === brand.id) return;
     if (dirty) {
-      const leave = await requestPageLeave((message) => onNotice(message, "error"));
+      const leave = await requestEditorLeave({
+        label: "브랜드",
+        hasChanges: () => dirty,
+        save: saveBrand,
+        discard,
+      }, (message) => onNotice(message, "error"));
       if (!leave.proceed) return;
     }
     setEditing(brand.id);
