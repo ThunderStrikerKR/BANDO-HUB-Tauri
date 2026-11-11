@@ -96,7 +96,7 @@ export function analyzeEvidence(
     };
     const organization = match[0]
       .trim()
-      .match(/^[가-힣A-Za-z0-9 ()]{2,30}(?:학교|교회|월드|목사)$/);
+      .match(/^[가-힣A-Za-z0-9 ()]{2,30}(?:학교|교회|성당|병원|학원|월드|목사)$/);
     if (organization && !local.some((r) => r.items.length || r.address)) {
       const value = organization[0].replace(/\s+목사$/, "");
       add(
