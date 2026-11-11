@@ -187,6 +187,18 @@ export function analyzeEvidence(
       r.items.flatMap((i) => i.sources?.filter((s) => s.field === "product") ?? []),
     );
     if (localProducts.length && !local.some((r) => r.name || r.address)) {
+      // A product recognizer may use a short code span (e.g. '709') rather
+      // than the full product/option prefix. Extract a clearly trailing name
+      // after a confirmed quantity without requiring all option tokens to
+      // disappear from the source line.
+      const trailing = match[0].match(
+        /(?:\d+)\s*(?:개|대|세트|ea|pcs)\s+([가-힣]{2,5})(?:님)?\s*$/i,
+      );
+      if (trailing && !/(?:보면대|스탠드|마이크|교회|학교|성당|병원|학원|도서관|회관|센터|배송|출고|발송|요청|선불|착불|확인|주세요|감사)/.test(trailing[1])) {
+        const start = match[0].lastIndexOf(trailing[1]);
+        add("name", start, start + trailing[1].length, trailing[1],
+          "상품 수량 뒤의 독립 수취인명");
+      }
       const removed = [
         ...localProducts,
         ...extractQuantities(match[0]).map((q) => ({ start: q.start, end: q.end })),
