@@ -20,7 +20,7 @@ const client = {
 const item = {
   id:"ci-price-item", name:product.name, productId:product.id, variantId:variant.id,
   raw:"기존 상품 1개", color:variant.color, quantity:1, origin:"FACTORY",
-  unitPrice:17777, sources:[],
+  unitPrice:17777, sources:[], issues:[],
 };
 const recipient = {
   id:"ci-price-recipient", name:"과거단가보존", address:"서울특별시 검증로 13",
