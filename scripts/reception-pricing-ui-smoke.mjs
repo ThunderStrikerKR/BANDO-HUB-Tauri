@@ -78,7 +78,9 @@ try {
   const page=await browser.newPage({viewport:{width:1520,height:1000}});
   page.setDefaultTimeout(15000);
   const errors=[];
+  const consoleErrors=[];
   page.on("pageerror",error=>errors.push(error.message));
+  page.on("console",msg=>{if(msg.type()==="error")consoleErrors.push(msg.text())});
   await page.addInitScript(({savedState})=>{
     let backend=structuredClone(savedState);
     let reads=0;
@@ -127,7 +129,7 @@ try {
       .map(n=>n.textContent?.trim().slice(0,450)),
     body:document.body.innerText.slice(0,2500),
   }));
-  console.log("RECEPTION_PRICING_OPEN_DIAG",JSON.stringify({afterOpen,errors}));
+  console.log("RECEPTION_PRICING_OPEN_DIAG",JSON.stringify({afterOpen,errors,consoleErrors}));
   await page.locator(".hub-live-workspace").waitFor({state:"visible"});
   // Let mounted effects and nested workflow previews settle before navigation.
   await pause(350);
