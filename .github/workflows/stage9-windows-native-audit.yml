@@ -1,0 +1,54 @@
+name: Stage 9 real Windows EXE UI audit
+on:
+  push:
+    branches:
+      - feature/tauri-product-bulk-registration
+    paths:
+      - scripts/stage9-windows-native-audit.mjs
+      - .github/workflows/stage9-windows-native-audit.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: stage9-windows-native-${{ github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  native-webview2-evidence:
+    name: Real Tauri EXE WebView2 screen evidence
+    runs-on: windows-latest
+    timeout-minutes: 65
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          cache-targets: true
+      - name: Install frontend dependencies
+        run: npm install --no-audit --no-fund --ignore-scripts
+      - name: Compile actual native Windows Tauri EXE
+        run: npm run build:windows
+      - name: Verify native EXE exists
+        shell: pwsh
+        run: |
+          $exe = "src-tauri/target/release/bando_hub_tauri.exe"
+          if (!(Test-Path $exe)) { throw "Native EXE was not produced" }
+          Write-Host "Native EXE: $((Get-Item $exe).Length) bytes"
+      - name: Install CDP test client (no browser emulation)
+        run: npm install --no-save --no-package-lock --no-audit --no-fund playwright@1.55.1
+      - name: Launch actual Windows EXE and capture WebView2 screens
+        env:
+          BANDO_STAGE9_EXE: ${{ github.workspace }}\\src-tauri\\target\\release\\bando_hub_tauri.exe
+          BANDO_STAGE9_OUT: stage9-native-evidence
+        run: node scripts/stage9-windows-native-audit.mjs
+      - name: Preserve native screenshots and diagnostics even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: BANDO-HUB-stage9-native-Windows-screen-audit
+          path: stage9-native-evidence/
+          if-no-files-found: warn
+          retention-days: 14
