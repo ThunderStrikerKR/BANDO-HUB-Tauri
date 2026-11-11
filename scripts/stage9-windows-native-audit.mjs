@@ -75,7 +75,22 @@ try{
         cdpEndpoint:report.cdpEndpoint,
       }));
     }catch(error){report.windowsSessionProbeError=String(error)}
-    throw Error("WebView2 native CDP unavailable; desktop probe retained but native UI not audited");
+    // Windows accessibility is independent of CDP and targets the exact same
+    // real native window. Capture all top menus and available subtabs when it
+    // is supported by the installed WebView2 runtime.
+    try {
+      const output=execFileSync("powershell.exe",[
+        "-NoProfile","-ExecutionPolicy","Bypass",
+        "-File",resolve("scripts/stage9-windows-uia-audit.ps1"),
+        "-ProcessId",String(app.pid),"-OutDir",out,
+      ],{timeout:240000,encoding:"utf8",maxBuffer:4*1024*1024});
+      report.uiaOutputTail=output.slice(-8000);
+      console.log("STAGE9_UIA_RUN_COMPLETE",output.slice(-4500));
+    }catch(error){
+      report.uiaError=String(error);
+      console.error("STAGE9_UIA_RUN_FAILED",String(error).slice(0,2000));
+    }
+    throw Error("WebView2 CDP unavailable; native Windows UIA evidence retained separately");
   }
   browser=await chromium.connectOverCDP("http://127.0.0.1:"+port,{timeout:15000});
   const ctx=browser.contexts()[0];
