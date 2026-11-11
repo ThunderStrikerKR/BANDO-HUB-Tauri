@@ -7,8 +7,8 @@ import { ProductFreightPanel } from "./ProductFreightPanel";
 import { ShippingFeeRanges } from "./ShippingFeeRanges";
 import type { NoticeSink } from "./shared/notices";
 import { useAsyncTask } from "./shared/useAsyncTask";
-import { sameValue } from "./shared/draft";
-import { requestPageLeave, usePageLeaveGuard } from "./shared/page-leave";
+import { sameFreightEditor } from "./shared/meaningful-changes";
+import { requestEditorLeave, requestPageLeave, usePageLeaveGuard } from "./shared/page-leave";
 
 import {
   changeShippingBasis,
@@ -114,7 +114,7 @@ export function ShippingManager({
                   if (ok) { setPending({}); setSelected([]); }
                   return ok;
   };
-  const editingDirty = !!editing && !!initialEditing && !sameValue(editing.rule, initialEditing);
+  const editingDirty = !!editing && !!initialEditing && !sameFreightEditor(editing.rule, initialEditing);
   const saveEditedRule = async (): Promise<boolean> => {
     if (!editing) return true;
               const next = structuredClone(shipping),
@@ -145,10 +145,10 @@ export function ShippingManager({
   };
   usePageLeaveGuard({
     label: "운임 관리",
-    hasChanges: () => changes.length > 0 || editingDirty || newName.length > 0,
+    hasChanges: () => changes.length > 0 || editingDirty || newName.trim().length > 0,
     busy: () => busy,
     save: async () => {
-      if (newName.length > 0) {
+      if (newName.trim().length > 0) {
         onNotice("새 배송 그룹을 등록하려면 배송 그룹 추가를 눌러 주세요. 등록 전의 이름은 자동 저장하지 않습니다.", "error");
         return false;
       }
@@ -166,7 +166,12 @@ export function ShippingManager({
   const closeEditing = async () => {
     if (!editing || busy) return;
     if (editingDirty) {
-      const leave = await requestPageLeave((message) => onNotice(message, "error"));
+      const leave = await requestEditorLeave({
+        label: "동급 그룹 운임",
+        hasChanges: () => editingDirty,
+        save: saveEditedRule,
+        discard: () => { setEditing(undefined); setInitialEditing(undefined); },
+      }, (message) => onNotice(message, "error"));
       if (!leave.proceed) return;
     }
     setEditing(undefined);
@@ -516,12 +521,11 @@ export function ShippingManager({
                         }}
                       >이름 수정</Button>
                       <Button size="compact"
-                        onClick={() =>
-                          (setInitialEditing(editableShippingRule(g.current)), setEditing({
-                            id: g.id,
-                            rule: editableShippingRule(g.current),
-                          }))
-                        }
+                        onClick={() => {
+                          const initial = editableShippingRule(g.current);
+                          setInitialEditing(structuredClone(initial));
+                          setEditing({ id: g.id, rule: initial });
+                        }}
                       >
                         운임 수정
                       </Button>
@@ -699,6 +703,7 @@ export function ShippingManager({
       {editing && (
         <Modal
           title="배송 그룹 운임 수정"
+          dirty={editingDirty}
           onClose={() => {
             if (!busy) void closeEditing();
           }}
