@@ -60,7 +60,7 @@ try{
     // capture a successful browser UI audit.
     report.cdpEndpoint={portResponded,targets:lastTargets};
     try {
-      const result=execFileSync("powershell.exe",[
+      const result=execFileSync("pwsh.exe",[
         "-NoProfile","-ExecutionPolicy","Bypass",
         "-File",resolve("scripts/stage9-windows-desktop-probe.ps1"),
         "-ProcessId",String(app.pid),"-OutDir",out,
@@ -79,7 +79,7 @@ try{
     // real native window. Capture all top menus and available subtabs when it
     // is supported by the installed WebView2 runtime.
     try {
-      const output=execFileSync("powershell.exe",[
+      const output=execFileSync("pwsh.exe",[
         "-NoProfile","-ExecutionPolicy","Bypass",
         "-File",resolve("scripts/stage9-windows-uia-audit.ps1"),
         "-ProcessId",String(app.pid),"-OutDir",out,
