@@ -253,11 +253,6 @@
 .app-modal-layer .modal > header {
   flex-shrink: 0;
 }
-.app-modal-layer .modal-fields {
-  overflow: auto;
-  min-height: 0;
-  flex: 1;
-}
 .app-modal-layer:has(.retail-order-dialog) .modal-fields {
   overflow: hidden;
 }
