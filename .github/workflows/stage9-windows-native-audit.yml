@@ -43,12 +43,27 @@ jobs:
           Write-Host "Audit binary: $((Get-Item $exe).Length) bytes"
       - name: Install Playwright client without a browser emulator
         run: npm install --no-save --no-package-lock --no-audit --no-fund playwright@1.55.1
+      # WebView2 ignored the process-level debug env flag on the previous
+      # hosted runner. Test Microsoft Edge's documented per-EXE registry policy
+      # only on this disposable Windows CI VM; remove it even after a failure.
+      - name: Allow loopback CDP for the isolated test EXE
+        shell: pwsh
+        run: |
+          $path="HKCU:\\Software\\Policies\\Microsoft\\Edge\\WebView2\\AdditionalBrowserArguments"
+          New-Item -Path $path -Force | Out-Null
+          New-ItemProperty -Path $path -Name "bando_hub.exe" -Value "--remote-debugging-port=19649 --remote-debugging-address=127.0.0.1" -PropertyType String -Force | Out-Null
       - name: Launch actual Windows portable EXE and capture WebView2 screens
         env:
           BANDO_STAGE9_EXE: ${{ github.workspace }}\\stage9-exe\\unpacked\\bando_hub.exe
           BANDO_STAGE9_OUT: stage9-native-evidence
           BANDO_STAGE9_BINARY_COMMIT: d442587c0049373aa9b234c7edba42648dd21dc8
         run: node scripts/stage9-windows-native-audit.mjs
+      - name: Remove temporary WebView2 debugger policy
+        if: always()
+        shell: pwsh
+        run: |
+          $path="HKCU:\\Software\\Policies\\Microsoft\\Edge\\WebView2\\AdditionalBrowserArguments"
+          Remove-ItemProperty -Path $path -Name "bando_hub.exe" -ErrorAction SilentlyContinue
       - name: Preserve native screenshots and diagnostics even on failure
         if: always()
         uses: actions/upload-artifact@v4
