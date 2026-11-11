@@ -41,6 +41,10 @@ export type OrderDeskProps = {
   onSelectWorkflow: (s: WorkflowSelection) => void;
   onWorkflowSave: (s: State) => Promise<void>;
   state: State;
+  // HubWorkspace may supply a preview state containing unsaved orders.
+  // Use the authoritative persisted order set when deciding whether this
+  // record is a new reception that may track current master prices.
+  persistedOrders?: readonly Pick<Order, "id">[];
   draft: Order;
   onChange: (next: Order | ((previous: Order) => Order)) => void;
   onSave: (mode: SaveMode) => Promise<void>;
@@ -52,6 +56,7 @@ export type OrderDeskProps = {
 };
 export function useOrderDesk({
   state,
+  persistedOrders,
   draft,
   onChange,
   onSave,
@@ -114,10 +119,11 @@ export function useOrderDesk({
   const generated = activeGroupId
     ? groupMessages(flowState, activeGroupId, links)
     : hubMessages(draft, state, undefined, links);
-  const saved = state.orders.some((o) => o.id === draft.id),
-    // Saved orders retain their historical prices and freight even when
-    // a new product or shipping master arrives in the background.
-    passivePricingAllowed = shouldRefreshUncommittedOrderPricing(draft, state.orders),
+  const persisted = persistedOrders ?? state.orders;
+  const saved = persisted.some((o) => o.id === draft.id),
+    // Saved orders retain historical prices even when their preview state
+    // contains a revised product/shipping master.
+    passivePricingAllowed = shouldRefreshUncommittedOrderPricing(draft, persisted),
     exported = draft.status === "EXPORTED" || activeShipment?.transferred === true;
   useEffect(() => {
     if (viewMode === "details" && highlight)
@@ -138,7 +144,7 @@ export function useOrderDesk({
     onChange((previous) => {
       // Check the latest draft too: a save may complete between scheduling
       // the effect and running its state-updater callback.
-      if (!shouldRefreshUncommittedOrderPricing(previous, state.orders)) return previous;
+      if (!shouldRefreshUncommittedOrderPricing(previous, persisted)) return previous;
       const next = repriceOrder(previous, liveClient, state);
       for (const r of next.recipients)
         if (
@@ -157,7 +163,7 @@ export function useOrderDesk({
   useEffect(() => {
     if (!passivePricingAllowed) return;
     onChange((previous) => {
-      if (!shouldRefreshUncommittedOrderPricing(previous, state.orders) ||
+      if (!shouldRefreshUncommittedOrderPricing(previous, persisted) ||
           previous.shippingMode === "MANUAL" ||
           !previous.recipients.some((recipient) => recipient.items.length > 0))
         return previous;
