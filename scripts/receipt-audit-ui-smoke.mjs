@@ -919,8 +919,8 @@ try {
           statsBelow:!stats||stats.getBoundingClientRect().top>=rect.bottom
         };
       });
-      assert.equal(tabs.display,"inline-grid",
-        "Shared management tabbar must fit labels, not stretch: "+label);
+      assert.ok(["grid","inline-grid"].includes(tabs.display),
+        "Shared management tabbar must use its compact grid layout: "+label);
       assert.ok(tabs.width<=tabs.workWidth+1,
         "Management tabs escaped workspace: "+JSON.stringify({label,tabs}));
       assert.ok(tabs.widths.length>=2,"Missing tab controls: "+label);

@@ -1385,7 +1385,7 @@ mod dated_archive_tests {
     }
 
     #[test]
-    fn today's_factory_and_store_folders_are_separate_and_safe_to_create() {
+    fn todays_factory_and_store_folders_are_separate_and_safe_to_create() {
         let unique = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
         let folder = std::env::temp_dir()
