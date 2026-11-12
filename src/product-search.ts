@@ -11,13 +11,9 @@ export function searchProducts(state: State, query: string, clientId?: string, c
       (!category || p.categories?.includes(category) || p.category === category) &&
       terms.every((t) =>
         [
-          p.code,
           p.name,
           p.subtitle ?? "",
-          p.originalName ?? "",
-          p.manufacturerCode ?? "",
           ...brandTerms(state, p),
-          ...(p.modelCodes ?? []),
           ...state.aliases
             .filter((a) => a.productId === p.id && (a.clientId === null || a.clientId === clientId))
             .map((a) => a.text),
@@ -67,7 +63,7 @@ export function representativeProducts(state: State, text: string, clientId?: st
         evidenceCount(b) - evidenceCount(a) ||
         count(b) - count(a) ||
         Number(!!b.isDefaultSale) - Number(!!a.isDefaultSale) ||
-        a.code.localeCompare(b.code, "ko", { numeric: true }),
+        a.name.localeCompare(b.name, "ko", { numeric: true }),
     )
     .slice(0, 3);
 }

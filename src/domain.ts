@@ -182,7 +182,7 @@ export function itemFromProduct(
     id: uid(),
     productId: p.id,
     variantId: v?.id ?? null,
-    raw: p.code,
+    raw: p.name,
     name: p.variants.some((variant) => variant.source === "DEMO") &&
       !productName.startsWith("[가상] ")
       ? "[가상] " + productName : productName,

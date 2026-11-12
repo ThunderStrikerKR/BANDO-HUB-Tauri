@@ -660,7 +660,8 @@ declare global {
 }
 
 export type MatchKind =
-  | "CODE"
+  | "CODE" // historical recognition records
+  | "NAME"
   | "CLIENT_ALIAS"
   | "COMMON_ALIAS"
   | "COMMON_INHERIT"
