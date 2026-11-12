@@ -119,22 +119,12 @@ try {
   const historicalRow=page.locator(".order-history-list tbody tr")
     .filter({hasText:"과거단가보존"});
   await historicalRow.waitFor();
-  await historicalRow.getByRole("button",{name:"주문 열기"}).click();
-  await pause(350);
-  const afterOpen=await page.evaluate(()=>({
-    heading:[...document.querySelectorAll("h1,h2")].map(n=>n.textContent?.trim()).slice(0,16),
-    visibleWorkspace:[...document.querySelectorAll(".hub-live-workspace")]
-      .map(n=>({visible:!!n.getClientRects().length,outer:n.parentElement?.outerHTML.slice(0,350)})),
-    notices:[...document.querySelectorAll('[role="alert"], [role="dialog"]')]
-      .map(n=>n.textContent?.trim().slice(0,450)),
-    body:document.body.innerText.slice(0,2500),
-  }));
-  console.log("RECEPTION_PRICING_OPEN_DIAG",JSON.stringify({afterOpen,errors,consoleErrors}));
-  await page.locator(".hub-live-workspace").waitFor({state:"visible"});
-  // Let mounted effects and nested workflow previews settle before navigation.
-  await pause(350);
+  // Order history is read-only; do not restore a removed action for this test.
+  assert.equal(await historicalRow.getByRole("button",{name:"주문 열기"}).count(),0);
+  await historicalRow.getByRole("button",{name:"과거단가보존"}).click();
+  await historicalRow.getByText(/주문 당시:/).waitFor();
   assert.equal(await page.getByRole("dialog",{name:"변경사항 저장"}).count(),0,
-    "Opening a saved order must never request confirmation");
+    "Expanding stored order details must not request edit confirmation");
 
   // Simulate background refresh of product and freight masters without
   // touching the saved order. The app polls native state periodically.
@@ -155,7 +145,7 @@ try {
   assert.equal(stored.shippingVersion,"archived-rule-id");
   assert.equal(result.writes,0,"Passive refresh must never write an order");
   assert.deepEqual(errors,[],"React runtime errors: "+errors.join("\n"));
-  console.log("PASS: Saved historical order remains clean across opening and master refresh",
+  console.log("PASS: Stored order history remains read-only across expansion and master refresh",
     JSON.stringify({reads:result.reads,writes:result.writes,
       unitPrice:stored.recipients[0].items[0].unitPrice,
       freight:stored.shippingFee,freightVersion:stored.shippingVersion}));
