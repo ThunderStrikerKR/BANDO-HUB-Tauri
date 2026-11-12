@@ -34,6 +34,23 @@ pub struct Inner {
 }
 
 #[cfg(windows)]
+impl Inner {
+    fn sync_related(&mut self,session:&Session,app:&AppHandle)->Result<(),String>{
+        let mut tracked=std::mem::take(&mut self.tracked);
+        let mut active=self.active_chat.take();
+        let result=native::sync_related(session,&mut tracked,&mut active,app,self.region);
+        self.tracked=tracked;
+        self.active_chat=active;
+        result
+    }
+    fn restore_related(&mut self) {
+        let mut tracked=std::mem::take(&mut self.tracked);
+        let mut active=self.active_chat.take();
+        native::restore_related(&mut tracked,&mut active);
+    }
+}
+
+#[cfg(windows)]
 mod native {
     use super::*;
     use std::path::Path;
@@ -55,6 +72,11 @@ mod native {
         min:Point, max:Point, normal:Rect}
     #[repr(C)]
     struct MonitorInfo {size:u32, monitor:Rect, work:Rect, flags:u32}
+    #[repr(C)]
+    struct MinMaxInfo {
+        reserved:Point,max_size:Point,max_position:Point,
+        min_track:Point,max_track:Point,
+    }
     const SW_RESTORE:i32=9;
     const SWP_NOACTIVATE:u32=0x10;
     const SWP_NOMOVE:u32=0x2;
@@ -62,11 +84,19 @@ mod native {
     const SWP_NOZORDER:u32=0x4;
     const HWND_TOPMOST:Hwnd=-1;
     const HWND_NOTOPMOST:Hwnd=-2;
+    const WS_SYSMENU:isize=0x00080000;
+    const WM_GETMINMAXINFO:u32=0x24;
+    const SMTO_ABORTIFHUNG:u32=0x2;
+    const DWMWA_EXTENDED_FRAME_BOUNDS:u32=9;
     const PROCESS_QUERY_LIMITED_INFORMATION:u32=0x1000;
 
     #[link(name="user32")]
     unsafe extern "system" {
         fn EnumWindows(cb:Option<unsafe extern "system" fn(Hwnd,isize)->i32>, param:isize)->i32;
+        fn EnumChildWindows(hwnd:Hwnd,cb:Option<unsafe extern "system" fn(Hwnd,isize)->i32>,param:isize)->i32;
+        fn SendMessageTimeoutW(hwnd:Hwnd,msg:u32,wparam:usize,lparam:isize,
+            flags:u32,timeout:u32,result:*mut usize)->isize;
+        fn GetDpiForWindow(hwnd:Hwnd)->u32;
         fn IsWindow(hwnd:Hwnd)->i32;
         fn IsWindowVisible(hwnd:Hwnd)->i32;
         fn IsIconic(hwnd:Hwnd)->i32;
@@ -83,6 +113,10 @@ mod native {
         fn GetForegroundWindow()->Hwnd;
         fn MonitorFromWindow(hwnd:Hwnd,flags:u32)->Handle;
         fn GetMonitorInfoW(handle:Handle,info:*mut MonitorInfo)->i32;
+    }
+    #[link(name="dwmapi")]
+    unsafe extern "system" {
+        fn DwmGetWindowAttribute(hwnd:Hwnd,attribute:u32,value:*mut Rect,size:u32)->i32;
     }
     #[link(name="kernel32")]
     unsafe extern "system" {
@@ -134,6 +168,9 @@ mod native {
         if let Some(pid)=verified(hwnd) {
             let title=win_text(hwnd,false);
             if title.trim().is_empty() { return 1 }
+            // The original Electron implementation identified regular KakaoTalk
+            // windows by WS_SYSMENU, excluding notifications and floating tips.
+            if unsafe {GetWindowLongPtrW(hwnd,-16)} & WS_SYSMENU == 0 { return 1 }
             let class_name=win_text(hwnd,true);
             let kind=if title=="카카오톡"||title.eq_ignore_ascii_case("KakaoTalk")
                 {"MAIN"} else {"CHAT"};
@@ -185,6 +222,66 @@ mod native {
         if unsafe{SetWindowPos(hwnd,above,r.left,r.top,r.width(),r.height(),flags)}==0{
             Err(os("창 배치 실패"))
         }else{Ok(())}
+    }
+    fn visible_rect(hwnd:Hwnd)->Result<Rect,String>{
+        let outer=rect(hwnd)?;
+        let mut visual=Rect::default();
+        let ok=unsafe{DwmGetWindowAttribute(hwnd,DWMWA_EXTENDED_FRAME_BOUNDS,
+            &mut visual,std::mem::size_of::<Rect>() as u32)}==0;
+        Ok(if ok&&visual.width()>0&&visual.height()>0{visual}else{outer})
+    }
+    fn set_visible_rect(hwnd:Hwnd,desired:Rect)->Result<(),String>{
+        let outer=rect(hwnd)?;
+        let visible=visible_rect(hwnd)?;
+        if visible==desired{return Ok(())}
+        let margins=(visible.left-outer.left,visible.top-outer.top,
+            outer.right-visible.right,outer.bottom-visible.bottom);
+        set_rect(hwnd,Rect{
+            left:desired.left-margins.0,
+            top:desired.top-margins.1,
+            right:desired.right+margins.2,
+            bottom:desired.bottom+margins.3,
+        },0)
+    }
+    fn min_visible_height(hwnd:Hwnd)->Result<i32,String>{
+        let mut data=MinMaxInfo{
+            reserved:Point::default(),max_size:Point::default(),
+            max_position:Point::default(),min_track:Point::default(),
+            max_track:Point::default(),
+        };
+        let mut result=0usize;
+        let ok=unsafe{SendMessageTimeoutW(hwnd,WM_GETMINMAXINFO,0,
+            &mut data as *mut _ as isize,SMTO_ABORTIFHUNG,500,&mut result)};
+        if ok==0||data.min_track.y<=0 {
+            return Err("카카오톡 창의 최소 높이를 확인하지 못했습니다.".into())
+        }
+        let outer=rect(hwnd)?;
+        let visual=visible_rect(hwnd)?;
+        Ok((data.min_track.y-(outer.height()-visual.height())).max(1))
+    }
+    unsafe extern "system" fn banner_child(hwnd:Hwnd,param:isize)->i32{
+        let (reference,dpi,candidates)=unsafe{
+            &mut *(param as *mut (Rect,u32,Vec<i32>))
+        };
+        if unsafe{IsWindowVisible(hwnd)}==0{return 1}
+        if let Ok(child)=rect(hwnd){
+            let tolerance=((3.0*(*dpi as f64)/96.0).ceil() as i32).max(2);
+            let height=child.height();
+            if child.width() as f64>=reference.width() as f64*0.8
+                && height as f64>=24.0*(*dpi as f64)/96.0
+                && height as f64<=reference.height() as f64*0.35
+                && (child.bottom-reference.bottom).abs()<=tolerance {
+                candidates.push(child.top);
+            }
+        }
+        1
+    }
+    fn banner_top(hwnd:Hwnd,reference:Rect)->i32{
+        let dpi=unsafe{GetDpiForWindow(hwnd)}.max(96);
+        let mut query=(reference,dpi,Vec::<i32>::new());
+        unsafe{EnumChildWindows(hwnd,Some(banner_child),
+            &mut query as *mut _ as isize);}
+        query.2.into_iter().min().unwrap_or(reference.bottom)
     }
     fn monitor_work(hwnd:Hwnd)->Result<Rect,String>{
         let monitor=unsafe{MonitorFromWindow(hwnd,2)};
@@ -278,104 +375,69 @@ mod native {
     pub fn live(s:&Session)->bool{
         verified(s.hwnd)==Some(s.pid)&&belongs_to_current_app(s.main)
     }
+    // The original v0.8.10 "겹쳐 보기" and "나누어 보기" BOTH use the
+    // reserved KakaoTalk panel. STACK vertically divides KakaoTalk's
+    // messenger header and conversations; it must NEVER move BANDO HUB.
     pub fn overlap(s:&mut Session,app:&AppHandle,region:Region)->Result<(),String>{
         let target=overlay_region(app,region)?;
-        if s.mode==Mode::Stack && unsafe{SetWindowPlacement(s.main,&s.main_original)}==0 {
-            return Err(os("반도허브 창 위치 복원 실패"))
-        }
-        unsafe{ShowWindow(s.hwnd,SW_RESTORE);}
-        set_rect(s.hwnd,target,HWND_TOPMOST)?;
         s.width=target.width();
         s.mode=Mode::Overlap;
         Ok(())
     }
-    fn kakao_width(desired:i32,scale:f64)->i32 {
-        desired.clamp((392.0*scale).ceil() as i32,(620.0*scale).ceil() as i32)
-    }
-    fn split_rect(work:Rect,desired:i32,scale:f64)->Result<(Rect,Rect),String>{
-        if !scale.is_finite()||!(0.5..=8.0).contains(&scale){
-            return Err("모니터 DPI 배율을 확인할 수 없습니다.".into())
+    pub fn stack(s:&mut Session,app:&AppHandle,region:Region)->Result<(),String>{
+        let target=overlay_region(app,region)?;
+        if target.width()<250 || target.height()<360{
+            return Err("카카오톡 나누어 보기 영역이 부족합니다.".into())
         }
-        // Windows desktop work areas use physical pixels; Tauri minWidth/
-        // minHeight and the CSS layout use logical units.
-        let minimum_main=(1024.0*scale).ceil() as i32;
-        let minimum_height=(700.0*scale).ceil() as i32;
-        let gap=(8.0*scale).ceil() as i32;
-        let k=kakao_width(desired,scale);
-        if work.width()<k+gap+minimum_main||work.height()<minimum_height{
-            return Err("나누어 보기는 모니터 공간이 부족합니다. 겹쳐 보기를 이용하세요.".into())
-        }
-        Ok((
-            Rect{left:work.left,top:work.top,right:work.left+k,bottom:work.bottom},
-            Rect{left:work.left+k+gap,top:work.top,right:work.right,bottom:work.bottom}
-        ))
-    }
-    pub fn stack(s:&mut Session,app:&AppHandle)->Result<(),String>{
-        let window=app.get_webview_window("main").ok_or("반도허브 창을 찾지 못했습니다.")?;
-        let scale=window.scale_factor().map_err(|e|e.to_string())?;
-        let (kakao,main)=split_rect(monitor_work(s.main)?,s.width,scale)?;
-        // Restore to the user's layout immediately before entering split mode,
-        // not the (possibly stale) position at the time KakaoTalk was attached.
-        let before_split=placement(s.main)?;
-        let before_kakao=placement(s.hwnd)?;
-        let kakao_was_topmost=topmost(s.hwnd);
-        unsafe{ShowWindow(s.main,SW_RESTORE);}
-        if let Err(error)=set_rect(s.main,main,0) {
-            unsafe{SetWindowPlacement(s.main,&before_split);}
-            return Err(error)
-        }
-        set_z(s.hwnd,s.original_topmost);
-        unsafe{ShowWindow(s.hwnd,SW_RESTORE);}
-        if let Err(e)=set_rect(s.hwnd,kakao,0){
-            // A failed second move must not strand the app in split view or
-            // leave KakaoTalk at the wrong position / topmost state.
-            unsafe{
-                SetWindowPlacement(s.main,&before_split);
-                SetWindowPlacement(s.hwnd,&before_kakao);
-            }
-            set_z(s.hwnd,kakao_was_topmost);
-            return Err(e)
-        }
-        s.main_original=before_split;
+        s.width=target.width();
         s.mode=Mode::Stack;
-        s.width=kakao.width();
         Ok(())
     }
     pub fn sync(s:&mut Session,app:&AppHandle,region:Option<Region>)->Result<(),String>{
         if !live(s){return Err("카카오톡 연결이 끊어졌습니다.".into())}
-        // Do not reposition a window that the user explicitly minimized.
-        if unsafe{IsIconic(s.hwnd)}!=0 {
-            set_z(s.hwnd,s.original_topmost);
-            return Ok(())
+        if let Some(region)=region {
+            s.width=overlay_region(app,region)?.width();
         }
-        if s.mode==Mode::Overlap{
-            if unsafe{IsIconic(s.main)}!=0 || !focus_on_app_or_kakao(s.hwnd,s.pid) {
-                set_z(s.hwnd,s.original_topmost);
-            }else if let Some(area)=region{
-                let target=overlay_region(app,area)?;
-                set_rect(s.hwnd,target,HWND_TOPMOST)?;
-                // Dragged CSS width is the width used by the next split view.
-                s.width=target.width();
-            }
-        }else if unsafe{IsIconic(s.main)}==0{
-            let main=rect(s.main)?;
-            let scale=app.get_webview_window("main")
-                .ok_or("반도허브 창을 찾지 못했습니다.")?
-                .scale_factor().map_err(|e|e.to_string())?;
-            if !scale.is_finite()||!(0.5..=8.0).contains(&scale) {
-                return Err("모니터 DPI 배율을 확인할 수 없습니다.".into())
-            }
-            let gap=(8.0*scale).ceil() as i32;
-            let width=kakao_width(s.width,scale);
-            let target=Rect{left:main.left-width-gap,top:main.top,
-                right:main.left-gap,bottom:main.bottom};
-            let work=monitor_work(s.main)?;
-            if target.left>=work.left && target.right<=work.right
-                && target.top>=work.top && target.bottom<=work.bottom {
-                set_rect(s.hwnd,target,0)?;
-            }
-        }
+        // All window movement and z-order is performed together by
+        // sync_related, so MAIN/CHAT cannot fight one another every 300ms.
         Ok(())
+    }
+    pub fn measured_ratio(s:&Session)->Result<f64,String>{
+        let app=rect(s.main)?.width().max(1) as f64;
+        Ok(app/(app+s.width.max(1) as f64))
+    }
+    // Geometry of the v0.8.10 vertical KakaoTalk split:
+    // main messenger at its measured minimum, chat below its banner/ad area.
+    fn stack_targets(area:Rect,main:Hwnd,chats:&[Hwnd])
+        ->Result<(Rect,Rect),String>{
+        if chats.is_empty(){return Ok((area,area))}
+        let before=rect(main)?;
+        let minimum=min_visible_height(main)?;
+        if minimum>=area.height()-100 {
+            return Err("대화창과 기본창을 나누어 표시할 높이가 부족합니다.".into())
+        }
+        let top=Rect{left:area.left,top:area.top,
+            right:area.right,bottom:area.top+minimum};
+        let outcome=(||{
+            set_visible_rect(main,top)?;
+            let main_visible=visible_rect(main)?;
+            let chat_top=banner_top(main,main_visible).clamp(area.top+1,area.bottom);
+            let chat=Rect{left:area.left,top:chat_top,
+                right:area.right,bottom:area.bottom};
+            if chat.height()<100{
+                return Err("대화창 표시 높이가 부족합니다.".into())
+            }
+            for hwnd in chats {
+                if min_visible_height(*hwnd)?>chat.height(){
+                    return Err("대화창 최소 높이보다 나누어 보기 영역이 작습니다.".into())
+                }
+            }
+            Ok((top,chat))
+        })();
+        if outcome.is_err() {
+            let _=set_rect(main,before,0);
+        }
+        outcome
     }
     // Observe KakaoTalk foreground changes without hooking or injecting into
     // KakaoTalk. Only an actively opened chat (or the original main window)
