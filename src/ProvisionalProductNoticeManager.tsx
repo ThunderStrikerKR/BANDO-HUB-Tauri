@@ -39,7 +39,7 @@ export function ProvisionalProductNoticeManager({
   const products = useMemo(() => registeredProducts(state.products), [state.products]);
   const visible = products.filter(p =>
     query.trim()
-      ? (p.name+" "+p.code+" "+(p.subtitle ?? "")).toLocaleLowerCase()
+      ? (p.name+" "+(p.subtitle ?? "")).toLocaleLowerCase()
           .includes(query.trim().toLocaleLowerCase())
       : !!draft[p.id],
   ).sort((a,b) => Number(!!draft[b.id])-Number(!!draft[a.id]) ||
@@ -97,7 +97,7 @@ export function ProvisionalProductNoticeManager({
       <div className="family-field">
         <label htmlFor="provisional-notice-product-search">안내문을 등록할 상품 검색</label>
         <input id="provisional-notice-product-search" defaultValue={query}
-          placeholder="상품명이나 모델코드 검색" onInput={e=>onQueryChange(e.currentTarget.value)}/>
+          placeholder="상품명 검색" onInput={e=>onQueryChange(e.currentTarget.value)}/>
       </div>
       <div className="family-list-scroll">
         {visible.map(p=><button type="button" key={p.id}

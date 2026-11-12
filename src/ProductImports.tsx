@@ -101,12 +101,12 @@ export function ProductImports({
           <h4>{preview.product.name}</h4>
           <p>상품명: {preview.product.name}</p>
           <p>상품설명 (매장 참고): {preview.product.subtitle || "별도 설명 없음"}</p>
-          <p>모델코드: {preview.product.code || "확인 필요"}</p>
+          <p>등록 상품명: {preview.product.name}</p>
           <p>모델 판정 근거: {preview.modelSource === "MODEL_FIELD" ? "공식 모델명" :
             preview.modelSource === "CUSTOM_CODE" ? "자체 상품코드" :
             preview.modelSource === "TITLE" ? "공식 상품명에서 추출 (확인 권장)" : "미확정"}</p>
           <p>공식 원본 상품명: {preview.product.originalName || "없음"}</p>
-          <p>카페24 상품코드: {preview.product.siteCode || "확인되지 않음"}</p>
+          <p>공식 상품 연동: {preview.product.siteId || "미연결"}</p>
           <p>원본 상품번호: {preview.product.siteId}</p>
           <p>공식 소매가: {won(preview.product.variants[0]?.retail ?? null)}</p>
           <p>

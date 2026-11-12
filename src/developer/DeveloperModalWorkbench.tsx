@@ -152,7 +152,7 @@ export function DeveloperModalWorkbench({ state, raw, onNotice, onRecorded }: {
         : <p role="alert">후보 상품을 재현할 수 없습니다. 시험 기준 데이터를 확인하세요.</p>;
     if (popup === "product-search")
       return <ProductSearchDialog state={fixtures.working} onClose={close}
-        onChoose={(product) => { onNotice("선택한 상품: " + product.code, "success"); close(); }}/>;
+        onChoose={(product) => { onNotice("선택한 상품: " + product.name, "success"); close(); }}/>;
     if (popup === "category")
       return <ProductCategoryPicker categories={state.categories ?? []}
         onClose={close} onSelect={(id) => { onNotice("선택한 카테고리: " + id, "success"); close(); }}/>;
