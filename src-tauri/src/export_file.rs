@@ -50,6 +50,18 @@ pub(crate) fn resolve_export_path(state: &Value, id: &str) -> Result<PathBuf, St
     Ok(file.to_path_buf())
 }
 
+/// Only a verified, persisted Excel export ID can reveal its destination.
+pub(crate) fn resolve_export_directory(state: &Value, id: &str) -> Result<PathBuf, String> {
+    let file = resolve_export_path(state, id)?;
+    let parent = file.parent().ok_or("저장된 Excel 폴더를 찾지 못했습니다.")?;
+    let directory = fs::canonicalize(parent)
+        .map_err(|_| "Excel 폴더를 열 수 없습니다.".to_string())?;
+    if !directory.is_dir() {
+        return Err("출력 파일의 저장 폴더가 존재하지 않습니다.".into());
+    }
+    Ok(directory)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -77,6 +89,15 @@ mod tests {
         let mut unlisted=state.clone();
         unlisted["exports"][0]["savedPath"]=json!(file.parent().unwrap().join("different.xlsx").to_string_lossy());
         assert!(resolve_export_path(&unlisted,"export-1").is_err());
+        fs::remove_dir_all(file.parent().unwrap()).unwrap();
+    }
+    #[test]
+    fn verifies_exact_output_folder_by_saved_export_id() {
+        let (file,state) = fixture();
+        let folder=resolve_export_directory(&state,"export-1").unwrap();
+        assert_eq!(folder,fs::canonicalize(file.parent().unwrap()).unwrap());
+        assert!(resolve_export_directory(&state,"not-a-real-id").is_err());
+        assert!(resolve_export_directory(&state,"").is_err());
         fs::remove_dir_all(file.parent().unwrap()).unwrap();
     }
     #[test]
