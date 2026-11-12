@@ -137,6 +137,57 @@ test("order history matches Korean date and excludes unconfirmed reception draft
   assert.equal(rows[0].shipmentIds[0],"s-a");
 });
 
+
+test("order management status follows the four approved stages, with real export and reply evidence", () => {
+  const state=base();
+  const first=state.workflow.shipments.find(s=>s.id==="s-a");
+  const status=()=>orderHistory(state,"",DAY).find(r=>r.order.id==="order-a").status;
+  first.transferred=false;
+  assert.equal(status(),"처리 중");
+  first.transferred=true;
+  assert.equal(status(),"엑셀 추출 대기");
+
+  const entry={id:"excel:s-a:FACTORY",shipmentId:"s-a",origin:"FACTORY",status:"QUEUED",
+    snapshot:{recipient:state.orders[0].recipients[0]}};
+  state.workflow.queue=[entry];
+  assert.equal(status(),"엑셀 추출 대기");
+  entry.status="EXPORTED";
+  entry.exportId="export-1";
+  assert.equal(status(),"엑셀 추출 완료");
+
+  first.tracking={FACTORY:"123456789012"};
+  assert.equal(status(),"엑셀 추출 완료","tracking alone does not prove a factory reply");
+  state.factoryReplies=[{id:"reply-1",rows:[
+    {row:1,shipmentId:"s-a",tracking:"123456789012",applied:false}
+  ]}];
+  assert.equal(status(),"엑셀 추출 완료","unapplied reply must not complete order");
+  state.factoryReplies[0].rows[0].applied=true;
+  assert.equal(status(),"공장 회신 완료");
+
+  // Mixed completion must wait until ALL shipments have been exported and replied.
+  const second={...first,id:"s-a-b",tracking:{}};
+  state.workflow.shipments.push(second);
+  state.workflow.queue.push({id:"excel:s-a-b:FACTORY",shipmentId:"s-a-b",
+    origin:"FACTORY",status:"QUEUED"});
+  assert.equal(status(),"엑셀 추출 대기");
+  state.workflow.queue[1].status="EXPORTED";
+  assert.equal(status(),"엑셀 추출 완료");
+  second.tracking={FACTORY:"987654321098"};
+  state.factoryReplies[0].rows.push({row:2,shipmentId:"s-a-b",tracking:"987654321098",applied:true});
+  assert.equal(status(),"공장 회신 완료");
+});
+
+test("store-only exports never claim a factory response", () => {
+  const state=base();
+  state.workflow.queue=[{id:"excel:s-retail:STORE",shipmentId:"s-retail",
+    origin:"STORE",status:"STORE_SENT"}];
+  state.factoryReplies=[{id:"unused",rows:[{
+    shipmentId:"s-retail",applied:true,tracking:"12345678"
+  }]}];
+  const row=orderHistory(state,"",DAY).find(r=>r.order.id==="order-retail");
+  assert.equal(row.status,"엑셀 추출 완료");
+});
+
 test("bill totals include VAT and customer shipping exactly once, never as additional cash", () => {
   const report=get(base());
   assert.equal(report.orderRows.length,3);
