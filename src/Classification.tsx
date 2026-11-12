@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { categoryFilterLevels } from "./category-filter-levels";
 import { sameValue } from "./shared/draft";
 import { requestEditorLeave, usePageLeaveGuard } from "./shared/page-leave";
 import { CategoriesPanel } from "./ManagementUI";
@@ -9,53 +10,45 @@ import { Field } from "./ui";
 import { Button } from "./ui/Button";
 export function ClassificationFilters({
   state,
-  major,
-  minor,
+  category,
   brand,
   onChange,
 }: {
   state: State;
-  major: string;
-  minor: string;
+  category: string;
   brand: string;
-  onChange: (major: string, minor: string, brand: string) => void;
+  onChange: (category: string, brand: string) => void;
 }) {
-  const cats = state.categories ?? [],
-    available = new Set(classifiedProducts(state, major, minor).map((p) => p.brandId));
+  const levels = categoryFilterLevels(state.categories ?? [], category);
+  const available = new Set(classifiedProducts(state, category).map((p) => p.brandId));
   return (
     <>
-      <select
-        aria-label="상품 대분류"
-        value={major}
-        onChange={(e) => onChange(e.target.value, "", brand)}
-      >
-        <option value="">전체 대분류</option>
-        {cats
-          .filter((c) => !c.parentId && /[가-힣]/.test(c.name) && c.name !== "악세사리")
-          .map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-      </select>
-      <select
-        aria-label="상품 소분류"
-        value={minor}
-        onChange={(e) => onChange(major, e.target.value, brand)}
-      >
-        <option value="">전체 소분류</option>
-        {cats
-          .filter((c) => c.parentId === major)
-          .map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-      </select>
+      <div className="product-category-filter" role="group" aria-label="상품 카테고리 필터">
+        {levels.map((level) => (
+          <select
+            key={level.parentId ?? "category-root"}
+            aria-label={`카테고리 ${level.depth + 1}단계`}
+            value={level.selectedId}
+            onChange={(event) =>
+              onChange(event.target.value || level.parentId || "", brand)
+            }
+          >
+            <option value="">{level.depth === 0 ? "전체 카테고리" : "현재 분류 전체"}</option>
+            {level.children.map((child) => (
+              <option key={child.id} value={child.id}>{child.name}</option>
+            ))}
+          </select>
+        ))}
+        {category && (
+          <button type="button" onClick={() => onChange("", brand)}>
+            카테고리 초기화
+          </button>
+        )}
+      </div>
       <select
         aria-label="상품 브랜드"
         value={brand}
-        onChange={(e) => onChange(major, minor, e.target.value)}
+        onChange={(event) => onChange(category, event.target.value)}
       >
         <option value="">전체 브랜드</option>
         {state.brands

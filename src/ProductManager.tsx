@@ -9,7 +9,6 @@ import { AliasManager } from "./AliasManager";
 import { ClassificationFilters, RegistrySettings } from "./Classification";
 import { confirmAction } from "./dialogs";
 import { normalizeColor, uid, validateProduct } from "./domain";
-import { CatalogPanel } from "./ManagementUI";
 import { PriceCell } from "./PriceCell";
 import {
   colorLabel,
@@ -46,8 +45,7 @@ export function ProductManager({
   onNotice: NoticeSink;
 }) {
   const { busy: savingView, run: runSave } = useAsyncTask(onNotice);
-  const [major, setMajor] = useState(""),
-    [minor, setMinor] = useState(""),
+  const [category, setCategory] = useState(""),
     [brand, setBrand] = useState("");
   const [search, setSearch] = useState(""),
     [missing, setMissing] = useState(false),
@@ -82,8 +80,8 @@ export function ProductManager({
     (localImage?.id === edit.id ? localImage.data : edit.imageData)
   );
   const classifiedIds = useMemo(
-    () => new Set(classifiedProducts(state, major, minor, brand).map((p) => p.id)),
-    [state.products, state.categories, major, minor, brand],
+    () => new Set(classifiedProducts(state, category, "", brand).map((p) => p.id)),
+    [state.products, state.categories, category, brand],
   );
   const products = sortProducts(
     state.products.filter((p) => !p.deletedAt && !p.supersededBy),
@@ -233,7 +231,6 @@ export function ProductManager({
           "대표색상 관리",
           "별칭 관리",
           "브랜드 관리",
-          "상품 동기화",
         ].map((label) => (
           <button
             key={label}
@@ -299,13 +296,11 @@ export function ProductManager({
               <div className="manager-filters">
                 <ClassificationFilters
                   state={state}
-                  major={major}
-                  minor={minor}
+                  category={category}
                   brand={brand}
-                  onChange={(a, b, c) => {
-                    setMajor(a);
-                    setMinor(b);
-                    setBrand(c);
+                  onChange={(nextCategory, nextBrand) => {
+                    setCategory(nextCategory);
+                    setBrand(nextBrand);
                   }}
                 />
                 <label className="check">
@@ -365,7 +360,7 @@ export function ProductManager({
                     )}
                   </tbody>
                 </ManagementTable>
-                {!products.length && <EmptyState compact title={search || missing || major || minor || brand ? "조건에 맞는 상품이 없습니다." : "등록된 상품이 없습니다."} />}
+                {!products.length && <EmptyState compact title={search || missing || category || brand ? "조건에 맞는 상품이 없습니다." : "등록된 상품이 없습니다."} />}
               </div>
             </section>
           </>
@@ -381,11 +376,6 @@ export function ProductManager({
         )}
         {section === "브랜드 관리" && (
           <RegistrySettings state={state} onSave={onSave} onNotice={onNotice} categories={false} />
-        )}
-        {section === "상품 동기화" && (
-          <>
-            <CatalogPanel state={state} onSave={onSave} onRefresh={onRefresh} onError={onNotice} />
-          </>
         )}
         {edit && (
           <Modal

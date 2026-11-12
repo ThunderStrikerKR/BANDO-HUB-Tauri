@@ -1,4 +1,5 @@
 import { descendants } from "./category-tree.js";
+import { withCatalogRoots } from "./category-roots.js";
 import { colorLabel } from "./product-models.js";
 import type { Category, Product, State } from "./types.js";
 export interface Brand {
@@ -117,7 +118,7 @@ export function initialClassification(existing: Category[] = []) {
 }
 /** Query reverse stand accessory paths without duplicating products. Links are explicit. */
 export function categoryIds(state: State, major: string, minor = "") {
-  const cats = state.categories ?? [],
+  const cats = withCatalogRoots(state.categories),
     selected = minor
       ? cats.filter((c) => c.id === minor)
       : cats.filter((c) => c.id === major || c.parentId === major),

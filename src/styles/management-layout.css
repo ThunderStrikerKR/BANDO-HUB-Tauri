@@ -344,6 +344,25 @@
   vertical-align: middle;
 }
 
+/* Category filters follow the saved category tree at any depth.
+   Keep the product table wide: additional levels wrap only inside its filter row. */
+.app-v03 .management-container .manager-filters > .product-category-filter {
+  display: flex;
+  flex: 1 1 360px;
+  flex-wrap: wrap;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+.app-v03 .management-container .product-category-filter > select {
+  flex: 1 1 150px;
+  min-width: 135px;
+  max-width: 260px;
+}
+.app-v03 .management-container .product-category-filter > button {
+  flex: 0 0 auto;
+}
+
 /* Section-owned controls: title and tabs stay outside the content surface.
    A single card owns the search and the corresponding list, as in order history.
    Avoid creating a second rounded bordered search card inside a list card. */
