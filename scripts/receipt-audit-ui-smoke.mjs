@@ -237,10 +237,16 @@ try {
           if (command === "dock_region_native") return undefined;
           if (command === "dock_status_native") return response();
           if (command === "dock_cycle_native") {
-            if (mode === "ORIGINAL") return response({ selectionRequired: true });
-            mode = mode === "OVERLAP" ? "STACK" : "ORIGINAL";
+            return response({ selectionRequired: mode === "ORIGINAL" });
+          }
+          if (command === "dock_mode_native") {
+            if (mode === "ORIGINAL") throw Error("Kakao must connect before layout selection");
+            if (!["OVERLAP", "STACK"].includes(args.mode)) throw Error("Invalid Kakao view mode");
+            mode = args.mode;
             return response();
           }
+          if (command === "dock_stop_native") { mode = "ORIGINAL"; return response(); }
+          if (command === "dock_start_native") { mode = "OVERLAP"; return response(); }
           if (command === "dock_windows_native") return [
             { handle: "123", title: "카카오톡", processId: 11, kind: "MAIN" },
             { handle: "456", title: "테스트 대화", processId: 11, kind: "CHAT" },
@@ -360,15 +366,24 @@ try {
   await page.getByRole("tab", { name: "데이터 관리" }).click();
   await page.getByRole("button", { name: "감사 기록 열기" }).click();
   await page.getByText("3건 조회").waitFor();
-  // A separate mock-native scenario checks the full three-mode UI and picker.
+  // Two explicit layouts inside one Kakao pane; connection is not a view.
   await page.reload();
   await page.getByRole("button", { name: "카카오톡 함께 보기" }).click();
   await page.getByText("연결할 카카오톡 창 선택").waitFor();
   await page.getByRole("button", { name: /카카오톡 기본 창/ }).click();
-  await page.getByRole("button", { name: "카카오톡 / 겹쳐 보기" }).waitFor();
-  await page.getByRole("button", { name: "카카오톡 / 겹쳐 보기" }).click();
-  await page.locator(".hub-kakao-slot[hidden]").waitFor({ state: "attached" });
-  await page.getByRole("button", { name: "카카오톡 / 나누어 보기" }).click();
+  const modes = page.getByRole("group", { name: "카카오톡 보기 방식" });
+  const overlap = modes.getByRole("button", { name: "겹쳐 보기" });
+  const split = modes.getByRole("button", { name: "나누어 보기" });
+  await overlap.waitFor();
+  assert.equal(await overlap.getAttribute("aria-pressed"), "true");
+  await split.click();
+  assert.equal(await split.getAttribute("aria-pressed"), "true");
+  assert.equal(await overlap.getAttribute("aria-pressed"), "false");
+  assert.equal(await page.locator(".hub-kakao-slot").isVisible(), true,
+    "legacy 나누어 보기 must not hide the Kakao pane");
+  await overlap.click();
+  assert.equal(await overlap.getAttribute("aria-pressed"), "true");
+  await modes.getByRole("button", { name: "카카오톡 연결 해제" }).click();
   await page.getByRole("button", { name: "카카오톡 함께 보기" }).waitFor();
   // STORE file is a frozen Logen workbook, not proof of shipment.
   await nav.getByRole("button", { name: "엑셀 관리" }).click();

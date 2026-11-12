@@ -29,7 +29,7 @@ export function HubShell({
     lastDragged = useRef<number[] | undefined>(undefined);
   const r = live ?? validPanels(ratios),
     total = r.reduce((a, b) => a + b, 0),
-    stacked = false; // Both views occupy the existing left KakaoTalk region.
+    paneWidth = r[0]; // Both native layouts use this same Kakao panel.
   useLayoutEffect(() => {
     const el = region.current;
     if (!el) return;
@@ -88,7 +88,7 @@ export function HubShell({
       <div
         className="hub-shell"
         style={{
-          gridTemplateColumns: `minmax(${kakaoMinimum}px,${r[0]}fr) 6px minmax(${mainMinimum}px,${total - r[0]}fr)`,
+          gridTemplateColumns: `minmax(${kakaoMinimum}px,${paneWidth}fr) 6px minmax(${mainMinimum}px,${total - r[0]}fr)`,
         }}
       >
         <aside className="hub-panel-slot hub-slot-0 hub-kakao-slot">
