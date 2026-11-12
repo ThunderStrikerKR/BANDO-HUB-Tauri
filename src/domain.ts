@@ -69,8 +69,8 @@ const variantSchema = z.object({
 });
 export const productSchema = z.object({
   id: z.string().min(1),
-  code: z.string().min(1),
-  name: z.string().min(1),
+  code: z.string().optional(),
+  name: z.string().trim().min(1),
   category: z.string(),
   origin: z.enum(["STORE", "FACTORY"]),
   defaultColor: z.string().min(1),
@@ -86,14 +86,13 @@ export function validateProduct(p: Product, products: Product[]) {
     products.some(
       (x) =>
         x.id !== p.id &&
-        normalizeCode(x.code) === normalizeCode(p.code) &&
-        p.variants.some((v) => v.source === "DEMO") ===
-          x.variants.some((v) => v.source === "DEMO") &&
-        p.name.trim().toLowerCase() === x.name.trim().toLowerCase() &&
+        (x.catalog ?? "BANDOSTAND") === (p.catalog ?? "BANDOSTAND") &&
+        x.name.normalize("NFKC").trim().replace(/\s+/g," ").toLowerCase() ===
+          p.name.normalize("NFKC").trim().replace(/\s+/g," ").toLowerCase() &&
         (!p.siteId || !x.siteId || p.siteId === x.siteId),
     )
   )
-    throw Error("같은 상품코드가 이미 있습니다.");
+    throw Error("동일한 상품명과 판매 구성이 이미 등록되어 있습니다.");
   if (!p.variants.some((v) => normalizeColor(v.color) === normalizeColor(p.defaultColor)))
     throw Error("상품 색상이 가격 기록과 일치하지 않습니다.");
   for (const v of p.variants)

@@ -44,14 +44,11 @@ export function optionModel(value: string): string | undefined {
   const numeric = value.match(/^(\d{3}[A-Za-z0-9-]*)(?![A-Za-z0-9-])/);
   return numeric ? normalizeModel("BD " + numeric[1]) : undefined;
 }
-export function productKey(p: Product, code = p.code) {
-  return (
-    (p.catalog ?? (p.variants.some((v) => v.source === "DEMO") ? "DEMO" : "BANDOSTAND")) +
-    "|" +
-    compact(normalizeModel(code)) +
-    (p.saleUnit ? "|sale:" + p.variants[0].id : "")
-  );
+/** Stable tombstone identity; changing an editable name cannot change product identity. */
+export function productKey(p: Product, _legacyCode?: string) {
+  return "PRODUCT|" + p.id;
 }
+
 export const registeredProducts = (products: Product[]) =>
   products.filter((p) => p.active !== false && !p.deletedAt && !p.supersededBy);
 export function variantLabel(v: Variant) {

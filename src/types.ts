@@ -43,7 +43,8 @@ export interface Product {
   sourceProductId?: string;
   colorStatus?: "KNOWN" | "NOT_REQUIRED" | "MISSING";
   id: string;
-  code: string;
+  /** Legacy source field. New products have no business product code. */
+  code?: string;
   name: string;
   category: string;
   origin: Origin;
