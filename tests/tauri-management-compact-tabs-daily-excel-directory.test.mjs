@@ -16,7 +16,7 @@ test("all five management screens share nonstretching equal-width tabs",()=>{
   assert.ok(block.includes("grid-auto-columns: minmax(max-content, 1fr)"));
   assert.ok(block.includes("width: max-content"));
   assert.ok(block.includes("max-width: 100%"));
-  assert.ok(!block.includes("width: 100%"));
+  assert.doesNotMatch(block, /^\s*width:\s*100%\s*;/m);
   assert.ok(block.includes("overflow-x: auto"));
   assert.ok(!css.includes("flex-basis: 125px"));
   for(const [path,selector] of [
@@ -33,7 +33,7 @@ test("freight layout places title then tabs then counters and work content",()=>
   const title=markup.indexOf('title="운임 관리"');
   const tabs=markup.indexOf('className="shipping-tabs management-tabbar"');
   const stats=markup.indexOf('className="shipping-stats"');
-  const content=markup.indexOf('tab === "products"');
+  const content=markup.indexOf('      {tab === "products" && (');
   assert.ok(title>=0 && tabs>title && stats>tabs && content>stats);
 });
 
