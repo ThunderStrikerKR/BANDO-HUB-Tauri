@@ -194,12 +194,9 @@ function updateExistingProduct(state: State, current: Product, cells: string[]):
     throw Error("기존 상품의 출고구분은 Excel에서 변경하지 않습니다.");
   }
   if (cells[13] && cells[13] !== "정상") throw Error("보관 상태는 변경할 수 없습니다.");
+  // A passive Excel round-trip must not rewrite legacy metadata. Codes are
+  // ignored as identities and are never created for new products.
   p.name = optional(cells[2], p.name);
-  delete p.code;
-  delete p.manufacturerCode;
-  delete p.modelCodes;
-  delete p.originalCode;
-  delete p.modelKey;
   if (cells[3]) {
     if (cells[3] === EMPTY) delete p.subtitle;
     else p.subtitle = cells[3];
