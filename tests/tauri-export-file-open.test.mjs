@@ -13,7 +13,9 @@ test("export history opens by ID via Rust, not from a frontend-provided path",()
   assert.match(bridge,/openExportFile: \(id\) => invoke<void>\("open_export_file", \{ id \}\)/);
   assert.match(rust,/fn open_export_file\(db: State<'_, Database>, id: String\)/);
   assert.match(rust,/export_file::resolve_export_path\(&snapshot, &id\)/);
-  assert.match(rust,/open_export_file, factory_conflict::approve_factory_conflict/);
+  assert.match(rust,/open_export_file, open_export_directory, factory_conflict::approve_factory_conflict/);
+  assert.match(rust,/fn open_export_directory\(db: State<'_, Database>, id: String\)/);
+  assert.match(rust,/export_file::resolve_export_directory\(&snapshot, &id\)/);
   assert.match(module,/record\["savedPath"\]/);
   assert.match(module,/fs::canonicalize\(file\)/);
   assert.match(module,/magic != b"PK/);
