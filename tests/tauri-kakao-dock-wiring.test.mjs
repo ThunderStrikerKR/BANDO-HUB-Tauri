@@ -27,6 +27,7 @@ test("native Kakao process authentication, safe original placement and no inject
   ]) assert.ok(native.includes(fragment),fragment+" absent");
   assert.doesNotMatch(native,/SetParent|ReadProcessMemory|WriteProcessMemory|SetWindowsHookEx/);
   assert.match(native,/verified\(t\.hwnd\)==Some\(t\.pid\)/);
+  assert.match(native,/if IsIconic\(hwnd\)==0/);
 });
 
 test("there are precisely two viewing modes and connection is not a view",()=>{

@@ -159,8 +159,13 @@ mod native {
             let mut pid=0u32;
             GetWindowThreadProcessId(hwnd,&mut pid);
             if !exe_is_kakao(pid) {return None}
-            let r=rect(hwnd).ok()?;
-            if r.width()<140 || r.height()<150 {return None}
+            // A minimized KakaoTalk window can have a tiny off-screen
+            // placeholder rect. It is still the same valid HWND and must
+            // remain registered so restoring the window preserves its dock.
+            if IsIconic(hwnd)==0 {
+                let r=rect(hwnd).ok()?;
+                if r.width()<140 || r.height()<150 {return None}
+            }
             Some(pid)
         }
     }
