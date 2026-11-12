@@ -61,7 +61,7 @@ export function AppHeader({
           <div className="kakao-view-modes" role="group" aria-label="카카오톡 보기 방식">
             <button disabled={busy} aria-pressed={dock.mode === "OVERLAP"}
               className={dock.mode === "OVERLAP" ? "current" : undefined}
-              onClick={() => onDockMode("OVERLAP")}>겹쳐 보기</button>
+              onClick={() => onDockMode("OVERLAP")}>함께 보기</button>
             <button disabled={busy} aria-pressed={dock.mode === "STACK"}
               className={dock.mode === "STACK" ? "current" : undefined}
               onClick={() => onDockMode("STACK")}>나누어 보기</button>

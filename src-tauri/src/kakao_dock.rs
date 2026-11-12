@@ -992,7 +992,7 @@ pub fn dock_mode_native(
         let result=match mode.as_str(){
             "OVERLAP"=>native::overlap(&mut session,&app,region),
             "STACK"=>native::stack(&mut session,&app,region),
-            _=>Err("겹쳐 보기 또는 나누어 보기만 선택할 수 있습니다.".into()),
+            _=>Err("함께 보기 또는 나누어 보기만 선택할 수 있습니다.".into()),
         }.and_then(|()|inner.sync_related(&session,&app));
         if let Err(error)=result{
             session=before;

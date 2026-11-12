@@ -373,7 +373,7 @@ try {
   await modes.waitFor();
   assert.equal(await page.getByRole("dialog", { name: "연결할 카카오톡 창 선택" }).count(), 0,
     "v0.8.10 connects directly without requiring an unnecessary picker");
-  const overlap = modes.getByRole("button", { name: "겹쳐 보기" });
+  const overlap = modes.getByRole("button", { name: "함께 보기" });
   const split = modes.getByRole("button", { name: "나누어 보기" });
   await overlap.waitFor();
   assert.equal(await overlap.getAttribute("aria-pressed"), "true");

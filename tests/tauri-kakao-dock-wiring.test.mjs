@@ -41,7 +41,8 @@ test("there are precisely two viewing modes and connection is not a view",()=>{
   assert.match(header,/role="group" aria-label="카카오톡 보기 방식"/);
   assert.match(header,/aria-pressed=\{dock.mode === "OVERLAP"\}/);
   assert.match(header,/aria-pressed=\{dock.mode === "STACK"\}/);
-  assert.match(header,/겹쳐 보기/);
+  assert.match(header,/함께 보기/);
+  assert.doesNotMatch(header,/겹쳐 보기/);
   assert.match(header,/나누어 보기/);
   assert.match(header,/카카오톡 함께 보기/);
   assert.match(header,/onDockStop/);
