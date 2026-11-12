@@ -2,8 +2,10 @@ import { categoryPath } from "./category-tree";
 import { catalogFromCategory, withCatalogRoots } from "./category-roots";
 import { normalizeCode, normalizeColor, validateProduct, validProductUrl } from "./domain";
 import { normalizeModel, registeredProducts } from "./product-models";
-import { registryKey } from "./product-registry";
+
 import type { Catalog, ImportPreview, Product, State } from "./types";
+// Keep official-page name comparison self-contained for trusted HTML preview.
+const registryKey = (value: string) => value.normalize("NFKC").trim().toLocaleLowerCase().replace(/\s+/g," ");
 
 /**
  * Parse the current public detail page without executing embedded HTML scripts.
