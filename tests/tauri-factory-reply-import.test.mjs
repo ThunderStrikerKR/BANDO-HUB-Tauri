@@ -228,30 +228,34 @@ test("different XLSX files with already-applied identical waybill and postage ar
   assert.equal(result.workflow.shipments[0].actualFreight.FACTORY, 4000);
 });
 
-test("nonstandard Logen headers, filled J column, or extra R data reject entire workbook", async () => {
+test("factory reply headers are informational, including Q1 and extra header columns", async () => {
   const state = stateFixture();
   for (const [column, wrong] of [[3, "수하인전화"], [4, "수하인핸드폰"],
-    [9, "메시지"], [10, "송하인명"], [16, "송장번호"]]) {
-    const bad = [...headers];
-    bad[column] = wrong;
-    const invalidFile = await workbookFile([goodRow()], "bad.xlsx", bad);
-    await assert.rejects(
-      () => parseFactoryReplyWorkbook(state, invalidFile),
-      /양식 불일치/,
-    );
+    [9, "메시지"], [10, "송하인명"], [16, "송장번호"], [16, ""]]) {
+    const customHeaders = [...headers];
+    customHeaders[column] = wrong;
+    const file = await workbookFile([goodRow()], "different-header.xlsx", customHeaders);
+    const preview = await parseFactoryReplyWorkbook(state, file);
+    assert.equal(preview.applied, 1);
+    assert.equal(preview.rows[0].tracking, "001234567891");
   }
+  const unrelatedHeaders = headers.map((_, index) => "공장 양식 " + (index + 1));
+  unrelatedHeaders[16] = "";
+  unrelatedHeaders.push("공장 참고");
+  const file = await workbookFile([goodRow()], "factory-layout.xlsx", unrelatedHeaders);
+  const preview = await parseFactoryReplyWorkbook(state, file);
+  assert.equal(preview.applied, 1);
+  assert.equal(preview.rows[0].actual, 4000);
+});
+
+test("filled J data or extra R data still reject the workbook", async () => {
+  const state = stateFixture();
   const nonblankJ = goodRow();
   nonblankJ[9] = "임의 데이터";
   const invalidJ = await workbookFile([nonblankJ]);
   await assert.rejects(
     () => parseFactoryReplyWorkbook(state, invalidJ),
     /J열은 공백/,
-  );
-  const extraHeaders = [...headers, "추가 열"];
-  const invalidHeaders = await workbookFile([goodRow()], "extra.xlsx", extraHeaders);
-  await assert.rejects(
-    () => parseFactoryReplyWorkbook(state, invalidHeaders),
-    /추가 열 제목/,
   );
   const extraData = [...goodRow(), "추가 데이터"];
   const invalidData = await workbookFile([extraData]);

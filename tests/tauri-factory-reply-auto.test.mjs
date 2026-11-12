@@ -56,10 +56,10 @@ const columns=[
   "택배수량","택배운임","운임구분","품목명","","메시지","송하인명",
   "(송)우편","(송)주소1","(송)전화","(송)핸드폰","운송장번호",
 ];
-async function inbox(rows, name="reply.xlsx") {
+async function inbox(rows, name="reply.xlsx", header=columns) {
   const book=new ExcelJS.Workbook();
   const sheet=book.addWorksheet("로젠");
-  sheet.addRow(columns);
+  sheet.addRow(header);
   rows.forEach(row=>sheet.addRow(row));
   const bytes=Buffer.from(await book.xlsx.writeBuffer());
   const digest=Buffer.from(await webcrypto.subtle.digest("SHA-256",bytes)).toString("hex");
@@ -103,6 +103,17 @@ test("automatic monitor reuses real XLSX matching and saves once",async()=>{
   assert.equal(again.duplicate,true);
   assert.equal(api.commits,1);
 });
+test("automatic monitor accepts factory-modified header labels including Q1",async()=>{
+  const api=fakeApi(sample());
+  const header=columns.map((_,i)=>"공장열 "+(i+1));
+  header[16]="송장";
+  const file=await inbox([row()],"custom-headings.xlsx",header);
+  const result=await processWatchedFactoryReply(api,file);
+  assert.equal(result.invalid,false);
+  assert.equal(result.applied,1);
+  assert.equal(result.held,0);
+  assert.equal(api.value.workflow.shipments[0].tracking.FACTORY,"001122334455");
+});
 test("address mismatch is recorded as held without editing shipping data",async()=>{
   const api=fakeApi(sample());
   const mismatch=row();
@@ -124,7 +135,7 @@ test("invalid workbook is rejected without any SQLite write or audit record",asy
     filename:"invalid.xlsx",id:"factory-reply-"+digest,bytes:[...bytes],
   });
   assert.equal(result.invalid,true);
-  assert.match(result.reason,/양식 불일치/);
+  assert.match(result.reason,/처리할 배송 행/);
   assert.deepEqual(api.value,before);
   assert.equal(api.commits,0);
 });

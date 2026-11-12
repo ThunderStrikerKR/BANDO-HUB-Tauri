@@ -1,5 +1,4 @@
 import type ExcelJS from "exceljs";
-import { LOGEN_HEADERS } from "./factory-export.js";
 import { connectFactoryReply, type FactoryReply, type ReplyRow } from "./factory-replies";
 import type { State } from "./types";
 
@@ -7,8 +6,6 @@ import type { State } from "./types";
  * additional Q waybill column. Never infer a tracking number from A-O. */
 const MAX_BYTES = 10 * 1024 * 1024;
 const MAX_ROWS = 1000;
-// The fixed A:P real-world Logen shipping form plus the Q waybill field.
-const STANDARD_REPLY_HEADERS = [...LOGEN_HEADERS, "운송장번호"] as const;
 
 export interface FactoryReplyPreview {
   revision: number;
@@ -47,29 +44,6 @@ const stableHash = async (bytes: ArrayBuffer) => {
 const formatDate = () => new Date().toLocaleDateString("sv-SE");
 const validName = (name: string) => /\.xlsx$/i.test(name) && !/[\\/\0]/.test(name);
 
-// Do not infer columns, accept alternative header names, or repair a moved column.
-function requireStandardReplySheet(sheet: ExcelJS.Worksheet): void {
-  const header = sheet.getRow(1);
-  for (let index = 1; index <= STANDARD_REPLY_HEADERS.length; index++) {
-    const cell = header.getCell(index);
-    cellText(cell); // Reject merged/formula header cells as well as wrong labels.
-    const actual = cell.value == null ? "" : cell.text;
-    const expected = STANDARD_REPLY_HEADERS[index - 1];
-    if (actual !== expected) {
-      const column = String.fromCharCode(64 + index);
-      throw Error("로젠 회신 양식 불일치: " + column +
-        "열 제목은 " + (expected || "(공백)") + "이어야 합니다.");
-    }
-  }
-  for (let index = STANDARD_REPLY_HEADERS.length + 1; index <= header.cellCount; index++) {
-    const cell = header.getCell(index);
-    cellText(cell);
-    if (cell.value != null && cell.text !== "") {
-      throw Error("로젠 회신 양식 불일치: Q열 뒤에 추가 열 제목이 있습니다.");
-    }
-  }
-}
-
 export function previewFactoryReply(state: State, reply: FactoryReply): FactoryReplyPreview {
   if (state.factoryReplies?.some((r) => r.id === reply.id)) {
     throw Error("이미 등록된 동일 회신 파일입니다. 회신 이력에서 확인하세요.");
@@ -97,7 +71,7 @@ export async function parseFactoryReplyWorkbook(state: State, file: File):
   await book.xlsx.load(new Uint8Array(bytes) as unknown as Parameters<typeof book.xlsx.load>[0]);
   const sheet = book.worksheets[0];
   if (!sheet) throw Error("로젠 회신 Excel의 첫 번째 시트를 찾지 못했습니다.");
-  requireStandardReplySheet(sheet);
+  // Column positions are fixed; header labels are not part of shipment data.
   if (sheet.rowCount - 1 > MAX_ROWS) throw Error("공장 회신은 한 번에 최대 1,000행을 처리합니다.");
   const rows: ReplyRow[] = [];
   for (let i = 2; i <= sheet.rowCount; i++) {
@@ -137,6 +111,9 @@ export async function parseFactoryReplyWorkbook(state: State, file: File):
     });
   }
   if (!rows.length) throw Error("회신 파일에 처리할 배송 행이 없습니다.");
+  if (rows.every((row) => !row.tracking)) {
+    throw Error("로젠 회신 양식 불일치: Q열 운송장번호 데이터가 없습니다.");
+  }
   const trackingCounts = new Map<string, number>();
   for (const row of rows) if (row.tracking) {
     trackingCounts.set(row.tracking, (trackingCounts.get(row.tracking) ?? 0) + 1);
