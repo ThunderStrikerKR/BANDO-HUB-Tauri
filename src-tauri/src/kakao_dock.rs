@@ -85,6 +85,8 @@ mod native {
     const HWND_TOPMOST:Hwnd=-1;
     const HWND_NOTOPMOST:Hwnd=-2;
     const WS_SYSMENU:isize=0x00080000;
+    const WS_CAPTION:isize=0x00C00000;
+    const SWP_FRAMECHANGED:u32=0x20;
     const WM_GETMINMAXINFO:u32=0x24;
     const SMTO_ABORTIFHUNG:u32=0x2;
     const DWMWA_EXTENDED_FRAME_BOUNDS:u32=9;
@@ -110,6 +112,7 @@ mod native {
         fn SetWindowPos(hwnd:Hwnd,after:Hwnd,x:i32,y:i32,w:i32,h:i32,flags:u32)->i32;
         fn ShowWindow(hwnd:Hwnd,cmd:i32)->i32;
         fn GetWindowLongPtrW(hwnd:Hwnd,index:i32)->isize;
+        fn SetWindowLongPtrW(hwnd:Hwnd,index:i32,value:isize)->isize;
         fn GetForegroundWindow()->Hwnd;
         fn MonitorFromWindow(hwnd:Hwnd,flags:u32)->Handle;
         fn GetMonitorInfoW(handle:Handle,info:*mut MonitorInfo)->i32;
@@ -213,6 +216,25 @@ mod native {
         else{Ok(p)}
     }
     fn topmost(hwnd:Hwnd)->bool{unsafe{GetWindowLongPtrW(hwnd,-20)&0x8!=0}}
+    fn style(hwnd:Hwnd)->isize {unsafe{GetWindowLongPtrW(hwnd,-16)}}
+    fn restore_style(hwnd:Hwnd,original:isize) {
+        if style(hwnd)==original{return}
+        unsafe {
+            SetWindowLongPtrW(hwnd,-16,original);
+            SetWindowPos(hwnd,0,0,0,0,0,
+                SWP_NOMOVE|SWP_NOSIZE|SWP_NOZORDER|SWP_NOACTIVATE|SWP_FRAMECHANGED);
+        }
+    }
+    fn hide_caption(hwnd:Hwnd){
+        let current=style(hwnd);
+        let plain=current & !WS_CAPTION;
+        if plain==current{return}
+        unsafe {
+            SetWindowLongPtrW(hwnd,-16,plain);
+            SetWindowPos(hwnd,0,0,0,0,0,
+                SWP_NOMOVE|SWP_NOSIZE|SWP_NOZORDER|SWP_NOACTIVATE|SWP_FRAMECHANGED);
+        }
+    }
     fn set_z(hwnd:Hwnd,ontop:bool){
         if topmost(hwnd)==ontop{return}
         unsafe{SetWindowPos(hwnd,if ontop{HWND_TOPMOST}else{HWND_NOTOPMOST},
@@ -329,7 +351,7 @@ mod native {
     #[derive(Clone,Copy)]
     pub struct Tracked {
         hwnd:Hwnd, pid:u32, original:Placement, original_topmost:bool,
-        kind:&'static str,
+        original_style:isize,kind:&'static str,
     }
     fn tracked_live(t:&Tracked)->bool {
         verified(t.hwnd)==Some(t.pid)
@@ -337,6 +359,7 @@ mod native {
     fn restore_tracked(t:&Tracked) {
         // A stale HWND may already belong to another process.
         if tracked_live(t) {
+            restore_style(t.hwnd,t.original_style);
             set_z(t.hwnd,t.original_topmost);
             unsafe { SetWindowPlacement(t.hwnd,&t.original); }
         }
@@ -349,13 +372,14 @@ mod native {
         if let Some(t)=tracked.iter().find(|t| t.hwnd==session.hwnd&&t.pid==session.pid){
             session.kakao_original=t.original;
             session.original_topmost=t.original_topmost;
+            session.original_style=t.original_style;
         }
     }
     #[derive(Clone,Copy)]
     pub struct Session{
         pub(super) hwnd:Hwnd,pid:u32,main:Hwnd,
         kakao_original:Placement,main_original:Placement,
-        original_topmost:bool,pub mode:Mode,pub width:i32,
+        original_topmost:bool,original_style:isize,pub mode:Mode,pub width:i32,
     }
     pub fn attach(main:Hwnd,id:&str)->Result<Session,String>{
         let candidate=candidates().into_iter().find(|c|c.handle==id)
@@ -363,7 +387,8 @@ mod native {
         let hwnd=parse(id)?;
         Ok(Session{hwnd,pid:candidate.process_id,main,
             kakao_original:placement(hwnd)?,main_original:placement(main)?,
-            original_topmost:topmost(hwnd),mode:Mode::Overlap,width:420})
+            original_topmost:topmost(hwnd),original_style:style(hwnd),
+            mode:Mode::Overlap,width:420})
     }
     fn belongs_to_current_app(hwnd:Hwnd)->bool {
         if unsafe{IsWindow(hwnd)}==0 {return false}
@@ -476,7 +501,8 @@ mod native {
             tracked.push(Tracked {
                 hwnd,pid:candidate.process_id,
                 original:placement(hwnd)?,
-                original_topmost:topmost(hwnd),kind:candidate.kind,
+                original_topmost:topmost(hwnd),
+                original_style:style(hwnd),kind:candidate.kind,
             });
         }
         let mut all=Vec::new();
@@ -513,6 +539,11 @@ mod native {
             .map(|(hwnd,_)|*hwnd).collect::<Vec<_>>();
         let snapshots=all.iter().filter_map(|(hwnd,_)|
             rect(*hwnd).ok().map(|before|(*hwnd,before))).collect::<Vec<_>>();
+        // Match the original Electron dock: captionless KakaoTalk windows
+        // while docked, original styles restored on disconnect/exit.
+        for (hwnd,_) in &all {
+            if unsafe{IsIconic(*hwnd)}==0{hide_caption(*hwnd);}
+        }
         // No global HWND_TOPMOST flags: order KakaoTalk relatively to the hub.
         // A foreign active application must never be covered by the dock.
         let layout=(||->Result<(),String>{
@@ -578,6 +609,7 @@ mod native {
         // Never move an unrelated application that happens to inherit the
         // previously selected handle.
         if belongs_to_original_kakao(s){
+            restore_style(s.hwnd,s.original_style);
             set_z(s.hwnd,s.original_topmost);
             unsafe{SetWindowPlacement(s.hwnd,&s.kakao_original);}
         }

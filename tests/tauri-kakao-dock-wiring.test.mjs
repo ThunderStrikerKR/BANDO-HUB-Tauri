@@ -27,6 +27,13 @@ test("native Kakao process authentication, safe original placement and no inject
   ]) assert.ok(native.includes(fragment),fragment+" absent");
   assert.doesNotMatch(native,/SetParent|ReadProcessMemory|WriteProcessMemory|SetWindowsHookEx/);
   assert.match(native,/verified\(t\.hwnd\)==Some\(t\.pid\)/);
+  assert.match(native,/WS_CAPTION/);
+  assert.match(native,/SWP_FRAMECHANGED/);
+  assert.match(native,/fn hide_caption\(hwnd:Hwnd\)/);
+  assert.match(native,/fn restore_style\(hwnd:Hwnd,original:isize\)/);
+  assert.match(native,/original_style:isize/);
+  assert.match(native,/restore_style\(t\.hwnd,t\.original_style\)/);
+  assert.match(native,/restore_style\(s\.hwnd,s\.original_style\)/);
   assert.match(native,/if IsIconic\(hwnd\)==0/);
 });
 
