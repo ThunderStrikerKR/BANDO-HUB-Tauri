@@ -86,7 +86,7 @@
 }
 .shipping-search input {
   padding-left: 38px !important;
-  background: #191919 !important;
+  background: var(--surface-input);
 }
 .shipping-tools > select {
   max-width: 230px;

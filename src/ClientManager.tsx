@@ -143,13 +143,6 @@ export function ClientManager({
         <button type="button" aria-current={section==="clients"?"page":undefined} onClick={()=>void switchSection("clients")}>거래처 목록</button>
         <button type="button" aria-current={section==="messages"?"page":undefined} onClick={()=>void switchSection("messages")}>자동 메시지 편집</button>
       </nav>
-      {section === "clients" && (
-        <div className="management-search-toolbar">
-          <ManagementSearch label="거래처 관리 검색"
-            placeholder="상호 / 주소 / 전화번호 / 별칭 검색"
-            value={search} onChange={setSearch}/>
-        </div>
-      )}
       {section==="messages" ? (
         <div className="management-scroll">
           <nav className="product-subnav management-tabbar management-tabbar-secondary" aria-label="자동 메시지 편집 종류">
@@ -163,8 +156,12 @@ export function ClientManager({
             : <ProvisionalProductNoticeManager state={state} onRefresh={onRefresh} onNotice={onNotice} onDirtyChange={setMessageDirty} query={noticeSearch} onQueryChange={setNoticeSearch}/>}
         </div>
       ) : (<>
-      <div className="management-scroll">
-
+      <div className="management-scroll client-list-workspace">
+        <div className="management-search-toolbar">
+          <ManagementSearch label="거래처 관리 검색"
+            placeholder="상호 / 주소 / 전화번호 / 별칭 검색"
+            value={search} onChange={setSearch}/>
+        </div>
         {excelOpen && (
           <section className="card client-excel-panel">
             <ClientWorkbookTools onSave={onSave} onRefresh={onRefresh} onNotice={onNotice} />

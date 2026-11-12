@@ -25,6 +25,10 @@
   --field-label-color: #c4c4c4;
   --manage-product-name-size: calc(13px * var(--ui-scale, 1));
   --manage-product-description-size: calc(12px * var(--ui-scale, 1));
+  /* One visual role, one surface across all management screens. */
+  --manage-toolbar-surface: var(--surface-panel);
+  --manage-toolbar-border: #454545;
+  --manage-table-head-surface: #242424;
   /* All new <Modal> and confirmAction / askSaveChanges dialogs inherit these. */
   --modal-title-size: calc(18px * var(--ui-scale, 1));
   --modal-body-size: calc(13px * var(--ui-scale, 1));

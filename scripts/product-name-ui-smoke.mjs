@@ -135,8 +135,48 @@ try {
   assert.ok(!ledText.includes("BD LED-2s"));
   console.log("PASS UI: four BD LED model-first names, correct retail price and no invented colors");
 
-  await page.getByRole("navigation",{name:"업무 메뉴"})
-    .getByRole("button",{name:"거래처 관리"}).click();
+  // Computed styles are audited across every management screen in the browser.
+  const navigation=page.getByRole("navigation",{name:"업무 메뉴"});
+  const visualPages=[
+    ["상품 관리",".fixed-manager > .management-search-toolbar",".product-prices table.management-data-table thead th"],
+    ["주문 내역",".order-history-list > .management-search-toolbar",".order-history-list table.management-data-table thead th"],
+    ["엑셀 관리",".excel-workspace > .management-search-toolbar",".excel-table-scroll table.management-data-table thead th"],
+    ["일일 결산",".daily-settlement > .management-search-toolbar",".daily-settlement table.management-data-table thead th"],
+    ["운임 관리",".shipping-product-list > .shipping-tools.management-search-toolbar",".shipping-product-list table.management-data-table thead th"],
+    ["거래처 관리",".client-list-workspace > .management-search-toolbar",".client-list-workspace table.client-table thead th"],
+  ];
+  for(const [menu, toolbarSelector, headingSelector] of visualPages) {
+    await navigation.getByRole("button",{name:menu}).click();
+    await page.locator(toolbarSelector).first().waitFor();
+    await page.locator(headingSelector).first().waitFor();
+    const visual=await page.evaluate(({toolbarSelector,headingSelector})=>{
+      const toolbar=document.querySelector(toolbarSelector);
+      const heading=document.querySelector(headingSelector);
+      const control=toolbar.querySelector('input:not([type="checkbox"]), select');
+      const rect=toolbar.getBoundingClientRect();
+      const cardRect=document.querySelector(".client-list-workspace > section.card")?.getBoundingClientRect();
+      return {
+        toolbar:getComputedStyle(toolbar).backgroundColor,
+        heading:getComputedStyle(heading).backgroundColor,
+        control:control ? getComputedStyle(control).backgroundColor : null,
+        clientEdges:cardRect?{
+          left:Math.abs(rect.left-cardRect.left),
+          right:Math.abs(rect.right-cardRect.right),
+        }:null,
+      };
+    },{toolbarSelector,headingSelector});
+    assert.equal(visual.toolbar,"rgb(32, 32, 32)",menu+" toolbar");
+    assert.equal(visual.heading,"rgb(36, 36, 36)",menu+" table heading");
+    assert.equal(visual.control,"rgb(41, 41, 41)",menu+" input");
+    if(menu==="거래처 관리") {
+      assert.ok(visual.clientEdges.left<=1 && visual.clientEdges.right<=1,
+        "Client search and list edges differ: "+JSON.stringify(visual.clientEdges));
+    }
+  }
+  console.log("PASS UI: six management screens share search, header and input palette; client search and table align");
+
+  await page.getByRole("navigation",{name:"거래처 관리 메뉴"})
+    .getByRole("button",{name:"자동 메시지 편집"}).click();
   await page.getByRole("navigation",{name:"거래처 관리 메뉴"})
     .getByRole("button",{name:"자동 메시지 편집"}).click();
   const templateEditor=page.getByRole("textbox",{name:"선택한 자동 메시지 편집"});

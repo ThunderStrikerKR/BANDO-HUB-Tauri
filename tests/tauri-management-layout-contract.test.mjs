@@ -32,7 +32,25 @@ test("every searchable management screen uses the shared freight-style control",
   assert.match(component,/onChange\(event\.target\.value\)/);
   const css=read("src/styles/management-layout.css");
   assert.match(css,/\.management-search-field > input/);
-  assert.match(css,/background: #191919 !important/);
+  const components=read("src/styles/components.css");
+  const tokens=read("src/styles/tokens.css");
+  assert.match(components,/background: var\(--surface-input\)/);
+  assert.match(tokens,/--manage-toolbar-surface: var\(--surface-panel\)/);
+  assert.match(css,/background: var\(--manage-toolbar-surface\)/);
+  assert.match(css,/background: var\(--manage-table-head-surface\)/);
+  assert.doesNotMatch(css,/background: #191919 !important/);
+});
+
+test("client search and client table share a width and scroll owner",()=>{
+  const source=read("src/ClientManager.tsx");
+  const rail=source.indexOf('className="management-scroll client-list-workspace"');
+  const search=source.indexOf('<ManagementSearch label="거래처 관리 검색"');
+  const table=source.indexOf('<ManagementTable className="client-table">');
+  assert.ok(rail>0 && search>rail && table>search);
+  const css=read("src/styles/management-layout.css");
+  assert.match(css,/\.client-list-workspace > :is\(\.management-search-toolbar, \.card\)/);
+  assert.match(css,/\.client-list-workspace > \.management-search-toolbar/);
+  assert.match(css,/position: sticky/);
 });
 
 test("tabbed pages put tabs before their search tools",()=>{
