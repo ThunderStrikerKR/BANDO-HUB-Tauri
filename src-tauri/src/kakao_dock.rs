@@ -377,7 +377,7 @@ mod native {
     }
     #[derive(Clone,Copy)]
     pub struct Session{
-        pub(super) hwnd:Hwnd,pid:u32,main:Hwnd,
+        pub(super) hwnd:Hwnd,pub(super) pid:u32,main:Hwnd,
         kakao_original:Placement,main_original:Placement,
         original_topmost:bool,original_style:isize,pub mode:Mode,pub width:i32,
     }
@@ -614,13 +614,6 @@ mod native {
         Ok(())
     }
 
-    // Report the physical app-area share rather than the historical fixed 0.8.
-    // Geometry is authoritative: CSS splitter widths and monitor DPI may change.
-    pub fn measured_ratio(s:&Session)->Result<f64,String>{
-        let app=rect(s.main)?.width().max(1) as f64;
-        let kakao=rect(s.hwnd)?.width().max(1) as f64;
-        Ok(app/(app+kakao))
-    }
     pub fn restore(s:&Session){
         // HWND values can be recycled by Windows after KakaoTalk exits.
         // Never move an unrelated application that happens to inherit the
@@ -893,7 +886,7 @@ fn start(app:&AppHandle,inner:&mut Inner,handle:&str)->Result<Status,String>{
             if let Some(mut old)=previous {
                 let rollback=match old.mode {
                     native::Mode::Overlap=>native::overlap(&mut old,app,region),
-                    native::Mode::Stack=>native::stack(&mut old,app),
+                    native::Mode::Stack=>native::stack(&mut old,app,region),
                 };
                 if rollback.is_ok(){
                     inner.session=Some(old);
