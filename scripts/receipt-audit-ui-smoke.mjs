@@ -956,6 +956,30 @@ try {
       });
       assert.ok(search.tool && search.icon,"Shared search missing on "+label);
       assert.ok(search.width>=180,"Unexpectedly narrow search: "+JSON.stringify(search));
+      if(["엑셀 관리","상품 관리","거래처 관리"].includes(label)){
+        const owned=await input.evaluate(element=>{
+          const tableOwner=element.closest(".excel-list-panel, .product-prices, .client-list-panel");
+          const tabs=document.querySelector(".management-container .management-tabbar");
+          const ownerRect=tableOwner?.getBoundingClientRect();
+          const tabsRect=tabs?.getBoundingClientRect();
+          return {owner:tableOwner?.className ?? null,belowTabs:!!ownerRect&&!!tabsRect&&ownerRect.top>=tabsRect.bottom,
+            inside:!!tableOwner,searchInside:tableOwner?.contains(element)??false};
+        });
+        assert.ok(owned.inside&&owned.searchInside&&owned.belowTabs,
+          "Management list search must sit inside its table section, below tabs: "+JSON.stringify({label,owned}));
+        if(["상품 관리","거래처 관리"].includes(label)){
+          const actionAudit=await navPage.locator(".management-section-actions").first().evaluate(group=>{
+            const bounds=group.getBoundingClientRect();
+            const tabs=document.querySelector(".management-container .management-tabbar")?.getBoundingClientRect();
+            const pageTitle=document.querySelector(".management-container .page-heading")?.getBoundingClientRect();
+            return {buttons:group.querySelectorAll("button").length,belowTabs:!!tabs&&bounds.top>=tabs.bottom,
+              belowTitle:!!pageTitle&&bounds.top>=pageTitle.bottom};
+          });
+          assert.ok(actionAudit.belowTabs&&actionAudit.belowTitle&&actionAudit.buttons===(label==="상품 관리"?3:2),
+            "Tab-specific actions must appear below the page title and tabs: "+JSON.stringify({label,actionAudit}));
+        }
+        console.log("PASS: MANAGEMENT_SECTION_OWNERSHIP",label,JSON.stringify(owned));
+      }
       layoutSamples.push({label,search,heading:metrics});
     }else layoutSamples.push({label,heading:metrics});
   }

@@ -113,8 +113,36 @@ export function ClientManager({
   });
   return (
     <div className="fixed-manager">
-      <PageHeading title="거래처 관리" actions={section === "clients" ? (
-        <>
+      <PageHeading title="거래처 관리" />
+      <nav className="product-subnav management-tabbar" aria-label="거래처 관리 메뉴">
+        <button type="button" aria-current={section==="clients"?"page":undefined} onClick={()=>void switchSection("clients")}>거래처 목록</button>
+        <button type="button" aria-current={section==="messages"?"page":undefined} onClick={()=>void switchSection("messages")}>자동 메시지 편집</button>
+      </nav>
+      {section==="messages" ? (
+        <div className="management-scroll">
+          <nav className="product-subnav management-tabbar management-tabbar-secondary" aria-label="자동 메시지 편집 종류">
+            <button type="button" aria-current={messageSection==="general"?"page":undefined}
+              onClick={()=>void switchMessageSection("general")}>상황별 공통 안내</button>
+            <button type="button" aria-current={messageSection==="provisional"?"page":undefined}
+              onClick={()=>void switchMessageSection("provisional")}>잠정 상품 선택 안내</button>
+          </nav>
+          {messageSection==="general"
+            ? <AutomaticMessageTemplateManager state={state} onRefresh={onRefresh} onNotice={onNotice} onDirtyChange={setMessageDirty}/>
+            : <ProvisionalProductNoticeManager state={state} onRefresh={onRefresh} onNotice={onNotice} onDirtyChange={setMessageDirty} query={noticeSearch} onQueryChange={setNoticeSearch}/>}
+        </div>
+      ) : (<>
+      <div className={"management-scroll client-list-workspace" + (excelOpen ? " client-excel-expanded" : "")}>
+        {excelOpen && (
+          <section className="card client-excel-panel">
+            <ClientWorkbookTools onSave={onSave} onRefresh={onRefresh} onNotice={onNotice} />
+          </section>
+        )}
+        <section className="card client-list-panel">
+          <div className="management-search-toolbar">
+            <ManagementSearch label="거래처 관리 검색"
+              placeholder="상호 / 주소 / 전화번호 / 별칭 검색"
+              value={search} onChange={setSearch}/>
+            <div className="management-section-actions" aria-label="거래처 목록 작업">
           <button type="button" aria-expanded={excelOpen} onClick={() => setExcelOpen((open) => !open)}>Excel 관리</button>
           <button
             className="primary"
@@ -137,38 +165,10 @@ export function ClientManager({
           >
             ＋ 거래처 등록
           </button>
-        </>
-      ) : undefined} />
-      <nav className="product-subnav management-tabbar" aria-label="거래처 관리 메뉴">
-        <button type="button" aria-current={section==="clients"?"page":undefined} onClick={()=>void switchSection("clients")}>거래처 목록</button>
-        <button type="button" aria-current={section==="messages"?"page":undefined} onClick={()=>void switchSection("messages")}>자동 메시지 편집</button>
-      </nav>
-      {section==="messages" ? (
-        <div className="management-scroll">
-          <nav className="product-subnav management-tabbar management-tabbar-secondary" aria-label="자동 메시지 편집 종류">
-            <button type="button" aria-current={messageSection==="general"?"page":undefined}
-              onClick={()=>void switchMessageSection("general")}>상황별 공통 안내</button>
-            <button type="button" aria-current={messageSection==="provisional"?"page":undefined}
-              onClick={()=>void switchMessageSection("provisional")}>잠정 상품 선택 안내</button>
-          </nav>
-          {messageSection==="general"
-            ? <AutomaticMessageTemplateManager state={state} onRefresh={onRefresh} onNotice={onNotice} onDirtyChange={setMessageDirty}/>
-            : <ProvisionalProductNoticeManager state={state} onRefresh={onRefresh} onNotice={onNotice} onDirtyChange={setMessageDirty} query={noticeSearch} onQueryChange={setNoticeSearch}/>}
-        </div>
-      ) : (<>
-      <div className="management-scroll client-list-workspace">
-        <div className="management-search-toolbar">
-          <ManagementSearch label="거래처 관리 검색"
-            placeholder="상호 / 주소 / 전화번호 / 별칭 검색"
-            value={search} onChange={setSearch}/>
-        </div>
-        {excelOpen && (
-          <section className="card client-excel-panel">
-            <ClientWorkbookTools onSave={onSave} onRefresh={onRefresh} onNotice={onNotice} />
-          </section>
-        )}
-        <section className="card">
-          <ManagementTable className="client-table">
+            </div>
+          </div>
+          <div className="client-table-scroll">
+            <ManagementTable className="client-table">
             <colgroup><col style={{ width: "30%" }} /><col style={{ width: "38%" }} /><col style={{ width: "32%" }} /></colgroup>
             <thead>
               <tr>
@@ -211,8 +211,9 @@ export function ClientManager({
                 </tr>
               ))}
             </tbody>
-          </ManagementTable>
-          {!rows.length && <EmptyState compact title={search ? "검색 결과가 없습니다." : "등록된 거래처가 없습니다."} />}
+            </ManagementTable>
+            {!rows.length && <EmptyState compact title={search ? "검색 결과가 없습니다." : "등록된 거래처가 없습니다."} />}
+          </div>
         </section>
         {edit && (
           <Modal

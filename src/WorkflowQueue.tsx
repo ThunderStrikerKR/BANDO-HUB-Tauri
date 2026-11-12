@@ -140,15 +140,15 @@ export function WorkflowQueue({
           </button>
         ))}
       </div>
-      <div className="management-search-toolbar">
-        <ManagementSearch label="엑셀 목록 검색" value={query}
-          placeholder="거래처 / 수취인 / 상품 검색" onChange={setQuery}/>
-      </div>
-
       {scope === "HISTORY" && (
         <FactoryReplyImport onSave={onSave} onRefresh={onRefresh} onNotice={onNotice} />
       )}
-      <div className={"excel-table-scroll" + (excelListEmpty ? " excel-list-empty" : "")}>
+      <section className="excel-list-panel" aria-label="엑셀 목록">
+        <div className="management-search-toolbar">
+          <ManagementSearch label="엑셀 목록 검색" value={query}
+            placeholder="거래처 / 수취인 / 상품 검색" onChange={setQuery}/>
+        </div>
+        <div className={"excel-table-scroll" + (excelListEmpty ? " excel-list-empty" : "")}>
         {scope === "HISTORY" ? (
           <ManagementTable className="excel-history-table">
             <thead>
@@ -397,7 +397,8 @@ export function WorkflowQueue({
           <FactoryReplyHistory state={state} query={query} onOpen={onOpen}
             onRefresh={onRefresh} onNotice={onNotice} />
         )}
-      </div>
+        </div>
+      </section>
       <footer className="excel-fixed-footer">
         {scope !== "HISTORY" && <small className="muted">저장 위치는 Windows 저장 창에서 선택합니다. 파일 작성은 발송 완료가 아닙니다.</small>}
         {companyMissing && onSettings && <button onClick={onSettings}>반도스탠드 정보 설정</button>}

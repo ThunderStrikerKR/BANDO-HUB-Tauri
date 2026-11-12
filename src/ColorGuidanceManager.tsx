@@ -8,9 +8,11 @@ import { colorLabel, registeredProducts } from "./product-models";
 import type { State } from "./types";
 import { Field } from "./ui";
 import { Button } from "./ui/Button";
+import { ManagementSearch } from "./ui/ManagementSearch";
 
-export function ColorGuidanceManager({state,onRefresh,query=""}: {
+export function ColorGuidanceManager({state,onRefresh,query="",onQueryChange}: {
   state:State;onRefresh:(committed?:State)=>Promise<void>;query?:string;
+  onQueryChange:(query:string)=>void;
 }) {
   const [draft,setDraft]=useState<State>(()=>structuredClone(state));
   const [baseline,setBaseline]=useState<State>(()=>structuredClone(state));
@@ -103,6 +105,10 @@ export function ColorGuidanceManager({state,onRefresh,query=""}: {
             onChange={e=>setName(e.target.value)}/>
         </Field>
         <Button onClick={add} disabled={busy}>그룹 생성</Button>
+      </div>
+      <div className="management-search-toolbar">
+        <ManagementSearch label="상품 검색" placeholder="그룹 이름 또는 상품명 검색"
+          value={query} onChange={onQueryChange}/>
       </div>
       <div className="family-list-scroll">
         {rows.filter(g=>!query.trim()||(g.name+" "+g.productIds.map(id=>

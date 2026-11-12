@@ -43,7 +43,7 @@ test("every searchable management screen uses the shared freight-style control",
 
 test("client search and client table share a width and scroll owner",()=>{
   const source=read("src/ClientManager.tsx");
-  const rail=source.indexOf('className="management-scroll client-list-workspace"');
+  const rail=source.indexOf('"management-scroll client-list-workspace"');
   const search=source.indexOf('<ManagementSearch label="거래처 관리 검색"');
   const table=source.indexOf('<ManagementTable className="client-table">');
   assert.ok(rail>0 && search>rail && table>search);
@@ -51,8 +51,34 @@ test("client search and client table share a width and scroll owner",()=>{
   const workflow=read("src/styles/workflow.css");
   assert.match(workflow,/\.management-scroll\s*\{[^}]*padding:\s*16px 0;/);
   assert.doesNotMatch(workflow,/\.management-scroll\s*\{[^}]*padding:\s*16px 20px;/);
-  assert.match(css,/\.client-list-workspace > \.management-search-toolbar/);
-  assert.match(css,/position: sticky/);
+  assert.match(source,/className="card client-list-panel"/);
+  assert.match(source,/className="client-table-scroll"/);
+  assert.match(css,/\.client-list-panel > \.client-table-scroll/);
+  assert.match(css,/scrollbar-gutter: stable/);
+});
+
+test("Excel, product, and client searches belong to their content sections, not page-level chrome",()=>{
+  const excel=read("src/WorkflowQueue.tsx");
+  const product=read("src/ProductManager.tsx");
+  const client=read("src/ClientManager.tsx");
+  const category=read("src/CategoryManager.tsx");
+  const color=read("src/ColorGuidanceManager.tsx");
+  const css=read("src/styles/management-layout.css");
+  assert.ok(excel.indexOf('className="excel-list-panel"') > excel.indexOf('className="workflow-queue-tabs management-tabbar"'));
+  assert.ok(excel.indexOf('<ManagementSearch label="엑셀 목록 검색"') > excel.indexOf('className="excel-list-panel"'));
+  assert.ok(excel.indexOf('className={"excel-table-scroll"') > excel.indexOf('<ManagementSearch label="엑셀 목록 검색"'));
+  assert.match(product,/<PageHeading title="상품 관리" \/>/);
+  assert.match(client,/<PageHeading title="거래처 관리" \/>/);
+  assert.ok(product.indexOf('className="product-list-subheading"') > product.indexOf('aria-label="상품 관리 메뉴"'));
+  assert.ok(product.indexOf('aria-label="상품 목록 작업"') > product.indexOf('className="product-list-subheading"'));
+  assert.ok(product.indexOf('<ManagementSearch label="상품 검색" placeholder="모델명 또는 상품명 검색"') > product.indexOf('className="card product-prices"'));
+  assert.ok(client.indexOf('aria-label="거래처 목록 작업"') > client.indexOf('aria-label="거래처 관리 메뉴"'));
+  assert.ok(client.indexOf('<ManagementSearch label="거래처 관리 검색"') > client.indexOf('className="card client-list-panel"'));
+  assert.ok(client.indexOf('<ManagementTable className="client-table"') > client.indexOf('<ManagementSearch label="거래처 관리 검색"'));
+  assert.match(category,/className="catalog-panel-header"[\s\S]*<ManagementSearch label="상품 검색"/);
+  assert.match(color,/className="family-list-panel"[\s\S]*<ManagementSearch label="상품 검색"/);
+  assert.match(css,/\.excel-list-panel > \.excel-table-scroll/);
+  assert.match(css,/\.client-list-panel > \.client-table-scroll/);
 });
 
 test("tabbed pages put tabs before their search tools",()=>{

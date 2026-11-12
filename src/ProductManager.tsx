@@ -225,19 +225,7 @@ export function ProductManager({
   };
   return (
     <div className="fixed-manager">
-      <PageHeading title="상품 관리" actions={section === "상품 목록" ? (
-        <>
-          <button type="button" aria-expanded={excelOpen} onClick={() => setExcelOpen((open) => !open)}>Excel 관리</button>
-                <button
-                  aria-pressed={priceMode}
-                  className={priceMode ? "primary" : ""}
-                  onClick={() => setPriceMode(!priceMode)}
-                >
-                  {priceMode ? "가격 수정 모드 종료" : "가격 수정 모드 켜기"}
-                </button>
-                <button className="primary" onClick={() => setAdding(!adding)}>상품 추가</button>
-        </>
-      ) : undefined} />
+      <PageHeading title="상품 관리" />
       <nav className="product-subnav management-tabbar" aria-label="상품 관리 메뉴">
         {[
           "상품 목록",
@@ -256,17 +244,11 @@ export function ProductManager({
           </button>
         ))}
       </nav>
-      {["상품 목록", "카테고리 관리", "대표색상 관리"].includes(section) && (
-        <div className="management-search-toolbar">
-          <ManagementSearch label="상품 검색"
-            placeholder={section === "카테고리 관리" ? "카테고리 이름 또는 전체 경로 검색" : section === "대표색상 관리" ? "그룹 이름 또는 상품명 검색" : "모델명 또는 상품명 검색"}
-            value={search} onChange={setSearch}/>
-        </div>
-      )}
       <div className={"management-scroll" + (section === "상품 목록" && !adding && !excelOpen ? " product-list-workspace" : "")}>
         {section === "상품 목록" && (
           <>
-            <div className="product-heading-help product-list-subheading">
+            <div className="product-list-subheading">
+              <div className="product-heading-help">
                   <h2>상품 가격표 <span>{products.length}개 상품</span></h2>
                   <HelpTooltip
                     title="상품 가격 수정"
@@ -276,6 +258,18 @@ export function ProductManager({
                     result="저장한 가격이 상품 가격표에 반영됩니다."
                     caution="수정 모드를 켜기 전에는 가격을 바꿀 수 없습니다. 가격이 비어 있으면 등록되지 않은 상태입니다."
                   />
+              </div>
+              <div className="management-section-actions" aria-label="상품 목록 작업">
+                <button type="button" aria-expanded={excelOpen} onClick={() => setExcelOpen((open) => !open)}>Excel 관리</button>
+                      <button
+                        aria-pressed={priceMode}
+                        className={priceMode ? "primary" : ""}
+                        onClick={() => setPriceMode(!priceMode)}
+                      >
+                        {priceMode ? "가격 수정 모드 종료" : "가격 수정 모드 켜기"}
+                      </button>
+                      <button className="primary" onClick={() => setAdding(!adding)}>상품 추가</button>
+              </div>
             </div>
             {adding && (
               <section className="card">
@@ -298,6 +292,10 @@ export function ProductManager({
               <RegistrationManager state={state} onSave={onSave} onRefresh={onRefresh} onNotice={onNotice} />
             </section>}
             <section className="card product-prices">
+              <div className="management-search-toolbar">
+                <ManagementSearch label="상품 검색" placeholder="모델명 또는 상품명 검색"
+                  value={search} onChange={setSearch}/>
+              </div>
               <div className="manager-filters">
                 <ClassificationFilters
                   state={state}
@@ -373,9 +371,11 @@ export function ProductManager({
           </>
         )}
         {section === "카테고리 관리" && (
-          <CategoryManager state={state} onSave={onSave} onNotice={onNotice} query={search} />
+          <CategoryManager state={state} onSave={onSave} onNotice={onNotice}
+            query={search} onQueryChange={setSearch} />
         )}
-        {section === "대표색상 관리" && <ColorGuidanceManager state={state} onRefresh={onRefresh} query={search} />}
+        {section === "대표색상 관리" && <ColorGuidanceManager state={state} onRefresh={onRefresh}
+          query={search} onQueryChange={setSearch} />}
         {section === "별칭 관리" && (
           <AliasManager state={state} onSave={onSave} onNotice={onNotice} />
         )}

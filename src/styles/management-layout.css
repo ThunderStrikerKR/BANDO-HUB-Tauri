@@ -344,10 +344,109 @@
   vertical-align: middle;
 }
 
+/* Section-owned controls: title and tabs stay outside the content surface.
+   A single card owns the search and the corresponding list, as in order history.
+   Avoid creating a second rounded bordered search card inside a list card. */
+.app-v03 .management-container .excel-list-panel {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-panel);
+  background: var(--surface-panel);
+}
+.app-v03 .management-container :is(
+  .excel-list-panel,
+  .product-prices,
+  .client-list-panel
+) > .management-search-toolbar {
+  flex: 0 0 auto;
+  margin: 0;
+  border: 0;
+  border-bottom: 1px solid var(--manage-toolbar-border);
+  border-radius: 0;
+}
+.app-v03 .management-container .excel-list-panel > .excel-table-scroll {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  max-height: none;
+  border: 0;
+}
+.app-v03 .management-container .excel-list-panel > .excel-table-scroll.excel-list-empty {
+  flex: 1 1 auto;
+  max-height: none;
+}
+.app-v03 .management-container .product-list-subheading {
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+.app-v03 .management-container .management-section-actions {
+  display: flex;
+  flex: 0 0 auto;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+.app-v03 .management-container .management-section-actions > button {
+  flex: 0 0 auto;
+}
+.app-v03 .management-container .client-list-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.app-v03 .management-container .client-list-workspace > .client-list-panel {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  margin-bottom: 0;
+  padding: 0;
+  overflow: hidden;
+}
+.app-v03 .management-container .client-list-panel > .client-table-scroll {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-gutter: stable;
+}
+.app-v03 .management-container .client-list-workspace.client-excel-expanded {
+  display: block;
+  overflow-y: auto;
+}
+.app-v03 .management-container .client-excel-expanded > .client-list-panel {
+  min-height: 280px;
+}
+.app-v03 .management-container .catalog-panel-header > .management-search-toolbar,
+.app-v03 .management-container .family-list-panel > .management-search-toolbar {
+  flex: 0 0 auto;
+  margin: 10px 0 0;
+  border: 0;
+  border-top: 1px solid var(--manage-toolbar-border);
+  border-radius: 0;
+}
+.app-v03 .management-container .catalog-panel-header > .management-search-toolbar {
+  margin-bottom: -12px;
+  padding: 10px 0;
+}
+.app-v03 .management-container .family-list-panel > .management-search-toolbar {
+  margin: 0;
+  border-bottom: 1px solid var(--manage-toolbar-border);
+}
+
 /* Excel: stop forcing a second row for context and buttons while the
    5-column / 4-column tables have ample width. Details expand by intent. */
 .app-v03 .management-container .excel-workspace { gap: 10px; }
-.app-v03 .management-container .excel-workspace > :is(.page-heading,.management-tabbar,.management-search-toolbar) {
+.app-v03 .management-container .excel-workspace > :is(.page-heading,.management-tabbar) {
   margin-bottom: 0;
 }
 .app-v03 .management-container .excel-table-scroll {
@@ -419,7 +518,7 @@
    toolbar and again around the table; preserve clear header row separators. */
 .app-v03 .management-container .order-history-list,
 .app-v03 .management-container .product-prices,
-.app-v03 .management-container section.card:has(> table.client-table) {
+.app-v03 .management-container .client-list-panel {
   padding: 0;
   overflow: hidden;
 }
@@ -435,16 +534,7 @@
   border-bottom: 1px solid var(--manage-toolbar-border);
   background: var(--manage-toolbar-surface);
 }
-.app-v03 .management-container section.card:has(> table.client-table) {
-  overflow: auto;
-}
-/* Client search stays visible while its parent scrolls. Horizontal gutters
-   belong to the single outer management container, not to this child rail. */
-.app-v03 .management-container .client-list-workspace > .management-search-toolbar {
-  position: sticky;
-  top: 0;
-  z-index: 3;
-}
+/* Client list owns its scroll area; the search remains visible above the table. */
 .app-v03 .management-container .client-table td:nth-child(2) {
   white-space: normal;
 }

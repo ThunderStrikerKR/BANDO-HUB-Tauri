@@ -3,6 +3,7 @@ import { requestEditorLeave, requestPageLeave, usePageLeaveGuard } from "./share
 import { categoryPath, categoryProducts, changeCategory, deleteCategory, descendants } from "./category-tree";
 import { CATALOG_ROOTS, catalogFromCategory, isCatalogRoot, withCatalogRoots } from "./category-roots";
 import { Modal } from "./ui";
+import { ManagementSearch } from "./ui/ManagementSearch";
 import type { Category, State } from "./types";
 import type { NoticeSink } from "./shared/notices";
 
@@ -11,11 +12,13 @@ export function CategoryManager({
   onSave,
   onNotice,
   query = "",
+  onQueryChange,
 }: {
   state: State;
   onSave: (s: State) => Promise<void>;
   onNotice: NoticeSink;
   query?: string;
+  onQueryChange: (query: string) => void;
 }) {
   const cats = useMemo(() => withCatalogRoots(state.categories), [state.categories]);
   const [selected, setSelected] = useState<string>(CATALOG_ROOTS[0].id);
@@ -199,6 +202,10 @@ export function CategoryManager({
               <button type="button" onClick={() => { if (current) { setName(current.name); setEditorOpen(true); } }} disabled={!current || busy}>선택 분류 편집</button>
               <button className="primary" onClick={() => begin("add")} disabled={!current || busy}>+ 하위 분류 추가</button>
             </div>
+          </div>
+          <div className="management-search-toolbar">
+            <ManagementSearch label="상품 검색" placeholder="카테고리 이름 또는 전체 경로 검색"
+              value={query} onChange={onQueryChange}/>
           </div>
           {current && <p className="catalog-map-selection">선택: {parentName(current.id)}</p>}
         </header>
