@@ -1,4 +1,5 @@
 import type { Alias, Product, State } from "./types.js";
+import { productNameHead } from "./product-name-matching.js";
 export const modelKey = (text: string) =>
   text.normalize("NFKC").toUpperCase().replace(/\s/g, "").replace(/^BD/, "");
 export const internalModel = (text: string) =>
@@ -44,14 +45,14 @@ export function aliasProblems(a: Alias, all: Alias[], products: Product[]) {
       (p) =>
         !p.deletedAt &&
         !p.supersededBy &&
-        [p.code, ...(p.modelCodes ?? [])].some((c) => modelKey(c) === key) &&
+        modelKey(productNameHead(p)) === key &&
         target &&
         !sameProduct(p, target),
     )
   )
-    problems.push("정식 상품코드와 충돌하는 별칭입니다.");
+    problems.push("등록된 상품명과 충돌하는 별칭입니다.");
   const suffix = key.match(/^(\d{3}(?:-\d+)?)(BK|BR|B|C|W|G)$/);
-  if (suffix && !products.some((p) => !p.deletedAt && modelKey(p.code) === key)) {
+  if (suffix && !products.some((p) => !p.deletedAt && modelKey(productNameHead(p)) === key)) {
     const colors: Record<string, string> = {
         BK: "black",
         B: "black",
@@ -69,7 +70,7 @@ export function aliasProblems(a: Alias, all: Alias[], products: Product[]) {
         그레이: "gray",
         회색: "gray",
       },
-      base = products.find((p) => !p.deletedAt && modelKey(p.code) === suffix[1]),
+      base = products.find((p) => !p.deletedAt && modelKey(productNameHead(p)) === suffix[1]),
       variant = target?.variants.find((v) => v.id === a.variantId);
     if (
       base &&
@@ -77,7 +78,7 @@ export function aliasProblems(a: Alias, all: Alias[], products: Product[]) {
         !sameProduct(base, target) ||
         (variant && (labels[variant.color] ?? variant.color.toLowerCase()) !== colors[suffix[2]]))
     )
-      problems.push("상품코드의 색상 / 옵션 규칙과 충돌하는 별칭입니다.");
+      problems.push("상품명의 색상 / 구성 규칙과 충돌하는 별칭입니다.");
   }
   if (a.variantId && !target?.variants.some((v) => v.id === a.variantId))
     problems.push("별칭 색상 / 옵션 연결을 확인하세요.");

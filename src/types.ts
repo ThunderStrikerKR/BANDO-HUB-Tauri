@@ -660,6 +660,7 @@ declare global {
 }
 
 export type MatchKind =
+  | "NAME"
   | "CODE"
   | "CLIENT_ALIAS"
   | "COMMON_ALIAS"

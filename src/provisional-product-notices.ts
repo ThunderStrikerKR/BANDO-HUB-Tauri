@@ -1,4 +1,5 @@
 import type { Item, Product, Settings, State } from "./types.js";
+import { productNameSpan } from "./product-name-matching.js";
 
 export type ProvisionalProductNotices = Record<string, string>;
 
@@ -18,20 +19,7 @@ const escapeRegExp = (text: string) => text.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\
 
 /** "709" is explicit only for 709, not for 709-1 or 709G. Never infer from grouping. */
 export function originalStatesChosenCode(expression: string, product: Product): boolean {
-  const codes = [
-    product.code,
-    product.manufacturerCode,
-    ...(product.modelCodes ?? []),
-  ].filter((value): value is string => typeof value === "string" && !!value.trim());
-  return codes.some(code =>
-    [...new Set([code.trim(), code.trim().replace(/^BD[\s-]*/i, "")])]
-      .filter(Boolean)
-      .some(variant => {
-        const pattern = variant.split(/\s+/).map(escapeRegExp).join("\\s*");
-        return new RegExp("(^|[^A-Za-z0-9])" + pattern + "(?=$|[^A-Za-z0-9-])", "i")
-          .test(expression);
-      }),
-  );
+  return !!productNameSpan(product,expression);
 }
 
 /** Intentionally scoped to staff resolution evidence. A regular sale never triggers it. */

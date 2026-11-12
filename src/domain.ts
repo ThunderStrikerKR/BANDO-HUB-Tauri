@@ -3,6 +3,7 @@ import { z } from "zod";
 import { aliasProblems } from "./matching.js";
 import { parseSmart } from "./parser.js";
 import { colorLabel, registeredProducts } from "./product-models.js";
+import { nameCandidates, productNameSpan } from "./product-name-matching.js";
 import { renderAutomaticTemplate } from "./automatic-message-templates.js";
 import type { Alias, Client, Item, Order, Product, Recipient, Settings, State } from "./types.js";
 import { blocking, orderIssues } from "./validation.js";
@@ -170,7 +171,7 @@ export function itemFromProduct(
   const v = !selectable ? undefined : selectedVariantId ? explicit : eligible[0];
   // Preserve the curated business-facing product label for every order line.
   // Distinct products can share a model code (e.g. instrument/fixture variants).
-  const basicName = (p.name || p.code).replace(/^반도스탠드\s*/i, "").trim();
+  const basicName = p.name.replace(/^반도스탠드\s*/i, "").trim();
   const detail = p.variants.length > 1 ? (v?.option ?? "").trim() : "";
   const productName = [basicName, ...(detail ? [detail] : [])].join(" / ");
   const configurationIncomplete = !!v && ["가방", "바퀴"].some((kind) => {
@@ -182,7 +183,7 @@ export function itemFromProduct(
     id: uid(),
     productId: p.id,
     variantId: v?.id ?? null,
-    raw: p.code,
+    raw: p.name,
     name: p.variants.some((variant) => variant.source === "DEMO") &&
       !productName.startsWith("[가상] ")
       ? "[가상] " + productName : productName,
@@ -220,14 +221,6 @@ export function parseLegacy(raw: string, client: Client, state: State): Recipien
     recipients.push(current);
     return current;
   };
-  const patterns = (p: Product) =>
-    [p.code, ...(p.modelCodes ?? [])]
-      .flatMap((code) => {
-        const values = [code];
-        if (/^BD\s*[- ]?\s*\d{3}/i.test(code)) values.push(code.replace(/^BD\s*[- ]?\s*/i, ""));
-        return values;
-      })
-      .sort((a, b) => b.length - a.length);
   for (const original of raw.replace(/\r/g, "").split("\n")) {
     const line = original.trim();
     if (!line) continue;
@@ -269,9 +262,7 @@ export function parseLegacy(raw: string, client: Client, state: State): Recipien
       r.address += (r.address ? " " : "") + line;
       continue;
     }
-    let candidates = registeredProducts(state.products).filter((p) =>
-      patterns(p).some((code) => codePattern(code).test(line)),
-    );
+    let candidates = nameCandidates(registeredProducts(state.products),line);
     if (candidates.some((p) => !p.variants.some((v) => v.source === "DEMO")))
       candidates = candidates.filter((p) => !p.variants.some((v) => v.source === "DEMO"));
     const matches = state.aliases
@@ -328,8 +319,8 @@ export function parseLegacy(raw: string, client: Client, state: State): Recipien
       });
       continue;
     }
-    const matchedCode = patterns(p).find((code) => codePattern(code).test(line));
-    let tail = matchedCode ? line.replace(codePattern(matchedCode), "") : line;
+    const matchedName = productNameSpan(p,line);
+    let tail = matchedName ? line.replace(matchedName[0], "") : line;
     tail = tail
       .replace(/\d+\s*(?:개|대|세트|ea|pcs)/gi, "")
       .replace(
@@ -376,7 +367,7 @@ export function parseLegacy(raw: string, client: Client, state: State): Recipien
       it.color = v.color;
       it.unitPrice = resolvePrice(p, v.id, client);
       it.url = v.url;
-      it.name = optionCodes(v.option ?? "")[0] ?? p.code;
+      it.name = p.name;
       it.issues = [];
       it.defaulted = false;
     }
@@ -384,7 +375,7 @@ export function parseLegacy(raw: string, client: Client, state: State): Recipien
     if (quantities.length > 1)
       it.issues.push("한 줄에 여러 상품이 있습니다. 상품별로 분리해 주세요.");
     if (unique.length === 1 && aliasProduct && aliasProduct.id !== p.id)
-      it.issues.push("별칭이 정식 상품코드와 충돌합니다. 정식 코드 우선 적용.");
+      it.issues.push("별칭과 상품명이 충돌합니다. 직원 확인이 필요합니다.");
     let residual = tail
       .replace(/(?:색상|컬러|옵션)\s*[:：]?/g, "")
       .replace(

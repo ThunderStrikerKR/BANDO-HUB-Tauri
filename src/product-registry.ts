@@ -157,7 +157,7 @@ export function brandTerms(state: State, p: Product) {
 export function registryIdentity(values: Record<string, string>) {
   return [
     values["브랜드"],
-    values["제조사 모델코드"] || values["최종 등록명"],
+    values["최종 등록명"],
     colorLabel(values["색상"] ?? ""),
     values["규격"],
     values["판매 단위"],
