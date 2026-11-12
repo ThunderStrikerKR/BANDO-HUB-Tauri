@@ -29,7 +29,7 @@ export function HubShell({
     lastDragged = useRef<number[] | undefined>(undefined);
   const r = live ?? validPanels(ratios),
     total = r.reduce((a, b) => a + b, 0),
-    stacked = dock.active && dock.mode === "STACK";
+    stacked = false; // Both views occupy the existing left KakaoTalk region.
   useLayoutEffect(() => {
     const el = region.current;
     if (!el) return;
@@ -39,7 +39,7 @@ export function HubShell({
       frame = requestAnimationFrame(() => {
         const b = el.getBoundingClientRect();
         document.documentElement.style.setProperty(
-          "--kakao-reserved-width", stacked ? "0px" : b.right + 6 + "px",
+          "--kakao-reserved-width", b.right + 6 + "px",
         );
         void window.bando
           ?.dockRegion({ x: b.x, y: b.y, width: b.width, height: b.height })
@@ -82,19 +82,16 @@ export function HubShell({
       window.removeEventListener("focus", send);
       document.removeEventListener("visibilitychange", send);
     };
-  }, [stacked]);
+  }, []);
   return (
     <div className="hub-shell-scroll">
       <div
         className="hub-shell"
         style={{
-          minWidth: stacked ? "1024px" : undefined,
-          gridTemplateColumns: stacked
-            ? "minmax(1024px, 1fr)"
-            : `minmax(${kakaoMinimum}px,${r[0]}fr) 6px minmax(${mainMinimum}px,${total - r[0]}fr)`,
+          gridTemplateColumns: `minmax(${kakaoMinimum}px,${r[0]}fr) 6px minmax(${mainMinimum}px,${total - r[0]}fr)`,
         }}
       >
-        <aside className="hub-panel-slot hub-slot-0 hub-kakao-slot" hidden={stacked}>
+        <aside className="hub-panel-slot hub-slot-0 hub-kakao-slot">
           <div ref={region} className="kakao-native-region">
             {!dock.active && (
               <button className="kakao-connect" disabled={busy} onClick={onConnect}>
@@ -105,7 +102,6 @@ export function HubShell({
         </aside>
         <div
           className="hub-split"
-          hidden={stacked}
           role="separator"
           tabIndex={0}
           aria-label="패널 너비 조절 1"

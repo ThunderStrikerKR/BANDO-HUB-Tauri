@@ -290,17 +290,31 @@ export function useAppModel() {
     setTab("접수");
     return true;
   };
+  // Connecting, choosing one of two layouts, and disconnecting are
+  // independent actions. No third viewing mode or implicit stop on cycling.
   const docking = async () => {
-    if (dockBusy) return;
+    if (dockBusy || dock.active) return;
     setDockBusy(true);
     try {
-      const result = await window.bando!.dockCycle();
-      setDock(result);
-      if (result.selectionRequired) setDockCandidates(await window.bando!.dockWindows());
-      else setDockCandidates([]);
-    } finally {
-      setDockBusy(false);
-    }
+      const windows = await window.bando!.dockWindows();
+      if (!windows.length) throw Error("실행 중인 카카오톡 창이 없습니다.");
+      if (windows.length === 1) {
+        setDock(await window.bando!.dockStart(windows[0].handle, 0.8));
+        setDockCandidates([]);
+      } else setDockCandidates(windows);
+    } finally { setDockBusy(false); }
+  };
+  const setDockMode = async (mode: "OVERLAP" | "STACK") => {
+    if (dockBusy || !dock.active || dock.mode === mode) return;
+    setDockBusy(true);
+    try { setDock(await window.bando!.dockMode(mode)); }
+    finally { setDockBusy(false); }
+  };
+  const stopDock = async () => {
+    if (dockBusy || !dock.active) return;
+    setDockBusy(true);
+    try { setDock(await window.bando!.dockStop()); setDockCandidates([]); }
+    finally { setDockBusy(false); }
   };
   const selectDock = async (handle: string) => {
     if (dockBusy) return;
@@ -469,6 +483,8 @@ export function useAppModel() {
     saveOrder,
     open,
     docking,
+    setDockMode,
+    stopDock,
     run,
     onWorkflowSave,
     onSelectWorkflow,

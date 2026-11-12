@@ -696,3 +696,13 @@
     font-size: 9px;
   }
 }
+/* Explicitly two viewing modes; disconnect is a separate action. */
+.kakao-view-modes {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.kakao-view-modes button[aria-pressed="true"] {
+  background: var(--surface-hover);
+  border-color: var(--border-focus);
+}

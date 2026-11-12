@@ -618,6 +618,7 @@ export interface Api {
   requestClose: (hasUnsavedChanges: boolean) => Promise<void>;
   onLayoutReset?: (fn: () => void) => () => void;
   dockCycle: () => Promise<DockStatus>;
+  dockMode: (mode: "OVERLAP" | "STACK") => Promise<DockStatus>;
   windowControl: (action: "minimize" | "maximize" | "close") => Promise<void>;
   dockSelect: (handle: string) => Promise<DockStatus>;
   load: () => Promise<State>;

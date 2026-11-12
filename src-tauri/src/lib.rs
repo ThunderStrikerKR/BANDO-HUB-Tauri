@@ -1091,7 +1091,7 @@ pub fn run() {
             save_product_workbook, save_registration_workbook, save_client_workbook, save_product_sync_workbook, save_factory_workbook, save_store_workbook, save_settlement_workbook, save_order_history_workbook, archive_factory_reply, open_factory_reply_file, open_export_file, factory_conflict::approve_factory_conflict,
             fetch_official_product_html,
             kakao_dock::dock_windows_native, kakao_dock::dock_status_native,
-            kakao_dock::dock_cycle_native, kakao_dock::dock_start_native,
+            kakao_dock::dock_cycle_native, kakao_dock::dock_mode_native, kakao_dock::dock_start_native,
             kakao_dock::dock_select_native, kakao_dock::dock_stop_native,
             kakao_dock::dock_region_native,
             startup_recovery::startup_status,

@@ -84,6 +84,8 @@ export function App() {
           busy={model.dockBusy}
           onNavigate={model.navigate}
           onDock={() => void model.run(model.docking)}
+          onDockMode={(mode) => void model.run(() => model.setDockMode(mode))}
+          onDockStop={() => void model.run(model.stopDock)}
           onWindow={(action) => void model.run(() => model.windowAction(action))}
         />
         {model.dockCandidates.length > 0 && (

@@ -61,6 +61,7 @@ const api: Api = {
   },
   dockStatus: () => invoke("dock_status_native"),
   dockCycle: () => invoke("dock_cycle_native"),
+  dockMode: (mode) => invoke("dock_mode_native", { mode }),
   dockStart: (handle, ratio) => invoke("dock_start_native", { handle, ratio }),
   dockStop: () => invoke("dock_stop_native"),
   dockSelect: (handle) => invoke("dock_select_native", { handle }),

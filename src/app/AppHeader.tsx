@@ -6,6 +6,8 @@ export function AppHeader({
   busy,
   onNavigate,
   onDock,
+  onDockMode,
+  onDockStop,
   onWindow,
   onNotifications,
   notificationCount = 0,
@@ -15,6 +17,8 @@ export function AppHeader({
   busy: boolean;
   onNavigate: (page: PageId) => void;
   onDock: () => void;
+  onDockMode: (mode: "OVERLAP" | "STACK") => void;
+  onDockStop: () => void;
   onNotifications?: () => void;
   notificationCount?: number;
   onWindow: (action: "minimize" | "maximize" | "close") => void;
@@ -49,25 +53,23 @@ export function AppHeader({
             회신 알림{notificationCount ? ` (${notificationCount})` : ""}
           </button>
         )}
-        <button
-          disabled={busy}
-          onClick={onDock}
-          title={
-            dock.mode === "OVERLAP"
-              ? "다음: 카카오톡과 나누어 보기"
-              : dock.mode === "STACK"
-                ? "다음: 카카오톡 창 원래 위치 복구"
-                : "실행 중인 카카오톡 창을 연결"
-          }
-        >
-          {busy
-            ? "배치 중…"
-            : dock.mode === "OVERLAP"
-              ? "카카오톡 / 겹쳐 보기"
-              : dock.mode === "STACK"
-                ? "카카오톡 / 나누어 보기"
-                : "카카오톡 함께 보기"}
-        </button>
+        {!dock.active ? (
+          <button disabled={busy} onClick={onDock} title="카카오톡 기본창과 대화창 연결">
+            {busy ? "연결 중…" : "카카오톡 함께 보기"}
+          </button>
+        ) : (
+          <div className="kakao-view-modes" role="group" aria-label="카카오톡 보기 방식">
+            <button disabled={busy} aria-pressed={dock.mode === "OVERLAP"}
+              className={dock.mode === "OVERLAP" ? "current" : undefined}
+              onClick={() => onDockMode("OVERLAP")}>겹쳐 보기</button>
+            <button disabled={busy} aria-pressed={dock.mode === "STACK"}
+              className={dock.mode === "STACK" ? "current" : undefined}
+              onClick={() => onDockMode("STACK")}>나누어 보기</button>
+            <button disabled={busy} onClick={onDockStop}
+              title="카카오톡 연결 해제 및 모든 창 원래 위치 복원"
+              aria-label="카카오톡 연결 해제">연결 해제</button>
+          </div>
+        )}
       </div>
       <div className="window-controls">
         {(["minimize", "maximize", "close"] as const).map((action, index) => (
