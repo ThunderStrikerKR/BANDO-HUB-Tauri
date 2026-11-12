@@ -199,35 +199,10 @@ export function analyzeEvidence(
         add("name", start, start + trailing[1].length, trailing[1],
           "상품 수량 뒤의 독립 수취인명");
       }
-      const removed = [
-        ...localProducts,
-        ...extractQuantities(match[0]).map((q) => ({ start: q.start, end: q.end })),
-      ].sort((a, b) => b.start - a.start);
-      let remainder = match[0];
-      for (const span of removed)
-        remainder =
-          remainder.slice(0, span.start) +
-          " ".repeat(span.end - span.start) +
-          remainder.slice(span.end);
-      const name = remainder
-        .replace(
-          /(?:블랙|검정|크롬|화이트|흰색|실버|그레이|회색|브라운|black|chrome|white|silver|gray|grey|brown)/gi,
-          " ",
-        )
-        .trim();
-      if (
-        /^[가-힣]{2,5}(?:님)?$/.test(name) &&
-        !/보면대|스탠드|마이크|주세요|감사|안녕|배송/.test(name)
-      ) {
-        const start = match[0].indexOf(name);
-        add(
-          "name",
-          start,
-          start + name.length,
-          name.replace(/님$/, ""),
-          "상품 / 수량과 같은 행에서 분리한 이름",
-        );
-      }
+      // Unclaimed text on a product line may be a brand, order instruction
+      // or option. Never promote that residual to a new recipient. A truly
+      // independent trailing name is captured above, after a confirmed quantity.
+
     }
     const inlineContact = match[0].match(/^([가-힣]{2,5})(?:님)?\s+(0[\d\s().-]{3,})$/);
     if (inlineContact && !/보면대|스탠드|마이크|키보드/.test(inlineContact[1])) {
@@ -359,7 +334,7 @@ export function analyzeEvidence(
           p.start,
           p.end,
           item.raw,
-          "상품 코드 / 별칭 / 옵션 인식 결과; 귀속은 별도 판정",
+          "상품명 / 별칭 / 구성 인식 결과; 귀속은 별도 판정",
         );
         if (products.some((x) => x.candidate.id === candidate.id)) continue;
         products.push({
