@@ -54,6 +54,8 @@ test("360 independent products export to 360 rows in one sheet with unchanged ro
   assert.equal(sheet.getCell("C2").value, state.products[0].name);
   assert.equal(sheet.getCell("E2").value, state.products[0].variants[0].color);
   assert.equal(sheet.getCell("H2").value, state.products[0].variants[0].retail);
+  assert.equal(sheet.getCell("I1").value,"상품군");
+  assert.ok(!unified.UNIFIED_PRODUCT_HEADERS.includes("신규 모델코드"));
   const p = await review(state, x);
   assert.equal(p.rows.length, 360);
   assert.equal(p.rows.filter((r) => r.status !== "UNCHANGED").length, 0);
@@ -87,14 +89,14 @@ test("new colors become separate independently priced product rows", async () =>
     const values = new Array(unified.UNIFIED_PRODUCT_HEADERS.length).fill("");
     values[1] = key; values[2] = "BD 900 " + color; values[4] = color;
     values[5] = 50000; values[6] = 70000; values[7] = price;
-    values[8] = "BD 900"; values[9] = "반도스탠드"; values[10] = "공장";
-    values[15] = "사용";
+    values[8] = "반도스탠드"; values[9] = "공장";
+    values[14] = "사용";
     sheet.addRow(values);
   }
   const p = await review(state, x);
   assert.equal(p.rows.filter((r) => r.status === "ERROR").length, 0, JSON.stringify(p.rows.filter((r) => r.status === "ERROR")));
   assert.equal(p.rows.filter((r) => r.status === "ADD").length, 2);
-  const added = unified.applyUnifiedProductWorkbook(state, p).next.products.filter((q) => q.code === "BD 900");
+  const added = unified.applyUnifiedProductWorkbook(state, p).next.products.filter((q) => /^BD 900/.test(q.name));
   assert.equal(added.length, 2);
   assert.ok(added.every((q) => q.variants.length === 1));
   assert.deepEqual(added.map((q) => q.variants[0].retail), [90000, 99000]);
@@ -102,11 +104,11 @@ test("new colors become separate independently priced product rows", async () =>
 test("protected internal IDs, duplicate product rows and formulas reject approval", async () => {
   const state = structuredClone(stateSeed), x = await workbook(state);
   const sheet = x.getWorksheet("상품 목록");
-  sheet.getCell("R2").value = "altered-price-id";
+  sheet.getCell("Q2").value = "altered-price-id";
   let p = await review(state, x);
   assert.ok(p.rows.some((r) => r.status === "ERROR"));
   assert.throws(() => unified.applyUnifiedProductWorkbook(state, p), /오류나 중복 의심/);
-  sheet.getCell("R2").value = state.products[0].variants[0].id;
+  sheet.getCell("Q2").value = state.products[0].variants[0].id;
   sheet.addRow(sheet.getRow(2).values.slice(1));
   p = await review(state, x);
   assert.ok(p.rows.some((r) => r.status === "ERROR"));
