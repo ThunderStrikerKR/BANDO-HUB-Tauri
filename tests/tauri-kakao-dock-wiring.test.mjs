@@ -64,6 +64,9 @@ test("both modes use the original left KakaoTalk pane and never move BANDO HUB",
   assert.match(native,/WM_GETMINMAXINFO/);
   assert.match(native,/DwmGetWindowAttribute/);
   assert.match(native,/banner_top\(main,main_visible\)/);
+  assert.match(native,/let old_visible=visible_rect\(main\)\?/);
+  assert.match(native,/bottom:area.top\+old_visible.height\(\)/);
+  assert.match(native,/min_visible_height\(main\)\?/);
   assert.match(native,/if chats\.is_empty\(\) \{/);
   assert.match(native,/previous\.height\(\)<area\.height\(\)/);
   const body=native.split("pub fn stack(s:&mut Session")[1]?.split("pub fn sync(")[0];

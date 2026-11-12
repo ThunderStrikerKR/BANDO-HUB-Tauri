@@ -452,13 +452,20 @@ mod native {
                 right:area.right,bottom:area.top+height},area))
         }
         let before=rect(main)?;
-        let minimum=min_visible_height(main)?;
-        if minimum>=area.height()-100 {
-            return Err("대화창과 기본창을 나누어 표시할 높이가 부족합니다.".into())
-        }
-        let top=Rect{left:area.left,top:area.top,
-            right:area.right,bottom:area.top+minimum};
         let outcome=(||{
+            // v0.8.10 measures minimum sizes AFTER moving windows to their
+            // destination monitor so each receives that monitor's DPI.
+            let old_visible=visible_rect(main)?;
+            set_visible_rect(main,Rect{
+                left:area.left,top:area.top,right:area.right,
+                bottom:area.top+old_visible.height(),
+            })?;
+            let minimum=min_visible_height(main)?;
+            if minimum>=area.height()-100{
+                return Err("대화창과 기본창을 나누어 표시할 높이가 부족합니다.".into())
+            }
+            let top=Rect{left:area.left,top:area.top,
+                right:area.right,bottom:area.top+minimum};
             set_visible_rect(main,top)?;
             let main_visible=visible_rect(main)?;
             let chat_top=banner_top(main,main_visible).clamp(area.top+1,area.bottom);
@@ -468,6 +475,11 @@ mod native {
                 return Err("대화창 표시 높이가 부족합니다.".into())
             }
             for hwnd in chats {
+                let old_visible=visible_rect(*hwnd)?;
+                set_visible_rect(*hwnd,Rect{
+                    left:area.left,top:chat_top,right:area.right,
+                    bottom:chat_top+old_visible.height(),
+                })?;
                 if min_visible_height(*hwnd)? > chat.height(){
                     return Err("대화창 최소 높이보다 나누어 보기 영역이 작습니다.".into())
                 }
