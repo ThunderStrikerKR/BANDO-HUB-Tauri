@@ -139,7 +139,7 @@ export function useAppModel() {
           .bando!.dockStatus()
           .then(setDock)
           .catch((e) => setNotice(String(e), "error")),
-      900,
+      300,
     );
     return () => clearInterval(timer);
   }, [dock.active]);

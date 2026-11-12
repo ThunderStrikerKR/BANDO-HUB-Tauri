@@ -91,3 +91,33 @@ test("failed layout switch rolls native windows back and reports sync failures",
   assert.match(source,/response\.notice=Some\(format!\("카카오톡 창 위치 동기화 실패/);
   assert.match(source,/inner\.session=Some\(s\);\s*result\?;/);
 });
+
+
+test("newly activated chats join the dock without being all raised on enumeration",()=>{
+  const native=read("src-tauri/src/kakao_dock.rs");
+  assert.match(native,/pub fn sync_related\(/);
+  assert.match(native,/candidate\.kind=="CHAT"&&foreground==hwnd/);
+  assert.match(native,/candidate\.kind=="MAIN"&&primary_is_chat/);
+  assert.match(native,/tracked\.len\(\)>=32/);
+  assert.match(native,/GetForegroundWindow/);
+  assert.match(native,/SWP_NOMOVE\|SWP_NOSIZE\|SWP_NOACTIVATE/);
+  assert.match(native,/if let Some\(chat\)=\*active_chat/);
+  assert.doesNotMatch(native,/SetWindowsHookEx|ReadProcessMemory/);
+  assert.match(read("src/app/useAppModel.ts"),/300,/);
+});
+
+test("each tracked KakaoTalk HWND is restored and stale handles are rejected",()=>{
+  const native=read("src-tauri/src/kakao_dock.rs");
+  assert.match(native,/pub struct Tracked/);
+  assert.match(native,/verified\(t\.hwnd\)==Some\(t\.pid\)/);
+  assert.match(native,/pub fn restore_related/);
+  assert.match(native,/inner\.tracked/);
+  assert.match(native,/native::preserve_original\(&mut session,&inner\.tracked\)/);
+  assert.match(native,/native::restore_related\(&mut inner\.tracked,&mut inner\.active_chat\)/);
+});
+
+test("owned KakaoTalk conversation windows can be discovered",()=>{
+  const native=read("src-tauri/src/kakao_dock.rs");
+  assert.doesNotMatch(native,/GetWindow\(hwnd,4\)!=0/);
+  assert.match(native,/if title\.trim\(\)\.is_empty\(\)/);
+});

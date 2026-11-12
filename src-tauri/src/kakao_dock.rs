@@ -25,7 +25,13 @@ pub struct Region { x:f64, y:f64, width:f64, height:f64 }
 #[derive(Default)]
 pub struct Dock(pub Mutex<Inner>);
 #[derive(Default)]
-pub struct Inner { session: Option<Session>, region: Option<Region> }
+pub struct Inner {
+    session: Option<Session>, region: Option<Region>,
+    #[cfg(windows)]
+    tracked: Vec<native::Tracked>,
+    #[cfg(windows)]
+    active_chat: Option<isize>,
+}
 
 #[cfg(windows)]
 mod native {
@@ -110,8 +116,12 @@ mod native {
     }
     fn verified(hwnd:Hwnd)->Option<u32> {
         unsafe {
-            if hwnd==0 || IsWindow(hwnd)==0 || IsWindowVisible(hwnd)==0
-                || GetWindow(hwnd,4)!=0 {return None}
+            if hwnd==0 || IsWindow(hwnd)==0 || IsWindowVisible(hwnd)==0 {
+                return None
+            }
+            // KakaoTalk chats can be owned top-level windows. EnumWindows
+            // still returns them; GW_OWNER != 0 is not a reason to ignore
+            // a verified KakaoTalk chat window.
             let mut pid=0u32;
             GetWindowThreadProcessId(hwnd,&mut pid);
             if !exe_is_kakao(pid) {return None}
@@ -123,6 +133,7 @@ mod native {
     unsafe extern "system" fn enumerate(hwnd:Hwnd,param:isize)->i32 {
         if let Some(pid)=verified(hwnd) {
             let title=win_text(hwnd,false);
+            if title.trim().is_empty() { return 1 }
             let class_name=win_text(hwnd,true);
             let kind=if title=="카카오톡"||title.eq_ignore_ascii_case("KakaoTalk")
                 {"MAIN"} else {"CHAT"};
@@ -199,20 +210,45 @@ mod native {
         let height=(r.height*scale).round() as i32;
         Ok(Rect{left,top,right:left+width,bottom:top+height})
     }
-    fn focus_on_app_or_kakao(selected:Hwnd)->bool{
+    fn focus_on_app_or_kakao(selected:Hwnd,pid:u32)->bool{
         let hwnd=unsafe{GetForegroundWindow()};
         if hwnd==0{return false}
         if hwnd==selected{return true}
         let mut focused_pid=0u32;
         unsafe{GetWindowThreadProcessId(hwnd,&mut focused_pid);}
         // Do not keep a docked Kakao window above another KakaoTalk chat.
-        focused_pid==unsafe{GetCurrentProcessId()}
+        focused_pid==unsafe{GetCurrentProcessId()} || verified(hwnd)==Some(pid)
     }
     #[derive(Clone,Copy,PartialEq,Eq)]
     pub enum Mode {Overlap,Stack}
     impl Mode{pub fn name(self)->&'static str{
         match self{Self::Overlap=>"OVERLAP",Self::Stack=>"STACK"}
     }}
+    #[derive(Clone,Copy)]
+    pub struct Tracked {
+        hwnd:Hwnd, pid:u32, original:Placement, original_topmost:bool,
+        kind:&'static str,
+    }
+    fn tracked_live(t:&Tracked)->bool {
+        verified(t.hwnd)==Some(t.pid)
+    }
+    fn restore_tracked(t:&Tracked) {
+        // A stale HWND may already belong to another process.
+        if tracked_live(t) {
+            set_z(t.hwnd,t.original_topmost);
+            unsafe { SetWindowPlacement(t.hwnd,&t.original); }
+        }
+    }
+    pub fn restore_related(tracked:&mut Vec<Tracked>,active_chat:&mut Option<isize>){
+        for t in tracked.drain(..){ restore_tracked(&t); }
+        *active_chat=None;
+    }
+    pub fn preserve_original(session:&mut Session,tracked:&[Tracked]) {
+        if let Some(t)=tracked.iter().find(|t| t.hwnd==session.hwnd&&t.pid==session.pid){
+            session.kakao_original=t.original;
+            session.original_topmost=t.original_topmost;
+        }
+    }
     #[derive(Clone,Copy)]
     pub struct Session{
         pub(super) hwnd:Hwnd,pid:u32,main:Hwnd,
@@ -313,7 +349,7 @@ mod native {
             return Ok(())
         }
         if s.mode==Mode::Overlap{
-            if unsafe{IsIconic(s.main)}!=0 || !focus_on_app_or_kakao(s.hwnd) {
+            if unsafe{IsIconic(s.main)}!=0 || !focus_on_app_or_kakao(s.hwnd,s.pid) {
                 set_z(s.hwnd,s.original_topmost);
             }else if let Some(area)=region{
                 let target=overlay_region(app,area)?;
@@ -341,6 +377,89 @@ mod native {
         }
         Ok(())
     }
+    // Observe KakaoTalk foreground changes without hooking or injecting into
+    // KakaoTalk. Only an actively opened chat (or the original main window)
+    // is enrolled. Unrelated KakaoTalk settings/photo windows are not moved
+    // merely because they exist in the enumeration.
+    pub fn sync_related(
+        s:&Session, tracked:&mut Vec<Tracked>, active_chat:&mut Option<isize>,
+        app:&AppHandle, region:Option<Region>,
+    )->Result<(),String>{
+        tracked.retain(tracked_live);
+        if active_chat.is_some_and(|hwnd| hwnd!=s.hwnd &&
+            !tracked.iter().any(|t|t.hwnd==hwnd&&t.kind=="CHAT")){
+            *active_chat=None;
+        }
+        let foreground=unsafe { GetForegroundWindow() };
+        let windows=candidates();
+        let primary_is_chat=windows.iter().any(|candidate|
+            candidate.handle==format!("{:016X}",s.hwnd as usize)&&candidate.kind=="CHAT");
+        for candidate in &windows {
+            if candidate.process_id!=s.pid { continue }
+            let hwnd=parse(&candidate.handle)?;
+            if hwnd==s.hwnd || tracked.iter().any(|t|t.hwnd==hwnd) {continue}
+            // The default KakaoTalk window remains behind conversations. New
+            // chats enter the dock only when the user activates that chat.
+            let should_enroll=(candidate.kind=="MAIN"&&primary_is_chat)
+                ||(candidate.kind=="CHAT"&&foreground==hwnd);
+            if !should_enroll || tracked.len()>=32 {continue}
+            tracked.push(Tracked{
+                hwnd,pid:candidate.process_id,original:placement(hwnd)?,
+                original_topmost:topmost(hwnd),kind:candidate.kind,
+            });
+        }
+        if unsafe{IsIconic(s.main)}!=0 {
+            for window in tracked.iter(){set_z(window.hwnd,window.original_topmost);}
+            return Ok(())
+        }
+        let foreground_chat=windows.iter().find(|candidate|
+            candidate.kind=="CHAT"&&candidate.process_id==s.pid&&
+            parse(&candidate.handle).ok()==Some(foreground)
+        ).map(|_|foreground);
+        if let Some(chat)=foreground_chat {
+            if chat==s.hwnd || tracked.iter().any(|t|t.hwnd==chat) {
+                *active_chat=Some(chat);
+            }
+        }
+        let user_is_working=focus_on_app_or_kakao(s.hwnd,s.pid);
+        if s.mode==Mode::Overlap&&!user_is_working{
+            // Keep the position, but do not cover a third-party foreground app.
+            for t in tracked.iter(){set_z(t.hwnd,t.original_topmost);}
+            return Ok(())
+        }
+        let target=if s.mode==Mode::Overlap {
+            let area=region.ok_or("카카오톡 배치 영역을 확인하지 못했습니다.")?;
+            overlay_region(app,area)?
+        } else {rect(s.hwnd)?};
+        // Do not activate background windows; keep their original focus and
+        // avoid moving an explicitly minimized conversation.
+        for t in tracked.iter(){
+            if unsafe{IsIconic(t.hwnd)}!=0 {
+                set_z(t.hwnd,t.original_topmost);
+                continue;
+            }
+            set_rect(t.hwnd,target,0)?;
+            if s.mode==Mode::Overlap {set_z(t.hwnd,true);}
+            else {set_z(t.hwnd,false);}
+        }
+        // Exactly the last *activated* chat is above the KakaoTalk main window.
+        // Other open conversations stay in the same rectangle behind it.
+        // This must run after moving the default window, or its topmost update
+        // would obscure the active conversation.
+        if let Some(chat)=*active_chat {
+            if chat==s.hwnd || tracked.iter().any(|t|t.hwnd==chat&&tracked_live(t)){
+                if unsafe{IsIconic(chat)}==0 {
+                    let order=if s.mode==Mode::Overlap {HWND_TOPMOST} else {0};
+                    unsafe {
+                        SetWindowPos(chat,order,0,0,0,0,
+                            SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE);
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
     // Report the physical app-area share rather than the historical fixed 0.8.
     // Geometry is authoritative: CSS splitter widths and monitor DPI may change.
     pub fn measured_ratio(s:&Session)->Result<f64,String>{
@@ -588,7 +707,13 @@ fn start(app:&AppHandle,inner:&mut Inner,handle:&str)->Result<Status,String>{
             }
         }
         let mut session=native::attach(native::main_window(app)?,handle)?;
+        native::preserve_original(&mut session,&inner.tracked);
         let previous=inner.session.take();
+        let previous_tracked=std::mem::take(&mut inner.tracked);
+        let previous_active=inner.active_chat.take();
+        for t in &previous_tracked { native::restore_related(
+            &mut vec![*t], &mut None,
+        ); }
         if let Some(old)=previous { native::restore(&old); }
         if let Err(e)=native::overlap(&mut session,app,region){
             native::restore(&session);
@@ -599,8 +724,15 @@ fn start(app:&AppHandle,inner:&mut Inner,handle:&str)->Result<Status,String>{
                     native::Mode::Overlap=>native::overlap(&mut old,app,region),
                     native::Mode::Stack=>native::stack(&mut old,app),
                 };
-                if rollback.is_ok(){inner.session=Some(old);}
-                else{native::restore(&old);}
+                if rollback.is_ok(){
+                    inner.session=Some(old);
+                    inner.tracked=previous_tracked;
+                    inner.active_chat=previous_active;
+                    if let Some(current)=inner.session {
+                        let _=native::sync_related(&current,&mut inner.tracked,
+                            &mut inner.active_chat,app,inner.region);
+                    }
+                }else{native::restore(&old);}
             }
             return Err(e)
         }
@@ -621,12 +753,15 @@ pub fn dock_status_native(app:AppHandle,dock:State<'_,Dock>)->Result<Status,Stri
     #[cfg(windows)]
     if let Some(session)=inner.session.take(){
         if !native::live(&session){
+            native::restore_related(&mut inner.tracked,&mut inner.active_chat);
             native::restore(&session);
             let mut s=inactive();s.notice=Some("카카오톡 창 연결이 해제되었습니다.".into());
             return Ok(s)
         }
         let mut session=session;
-        let error=native::sync(&mut session,&app,inner.region).err();
+        let error=native::sync(&mut session,&app,inner.region)
+            .and_then(|()|native::sync_related(&session,&mut inner.tracked,
+                &mut inner.active_chat,&app,inner.region)).err();
         inner.session=Some(session);
         if let Some(reason)=error {
             let mut response=status(&inner);
@@ -643,11 +778,17 @@ pub fn dock_cycle_native(app:AppHandle,dock:State<'_,Dock>)->Result<Status,Strin
     #[cfg(windows)]
     {
         if let Some(mut session)=inner.session.take(){
-            if !native::live(&session){native::restore(&session);return Ok(inactive())}
+            if !native::live(&session){
+                native::restore_related(&mut inner.tracked,&mut inner.active_chat);
+                native::restore(&session);return Ok(inactive())
+            }
             if session.mode==native::Mode::Overlap{
                 if let Err(e)=native::stack(&mut session,&app){inner.session=Some(session);return Err(e)}
+                let _=native::sync_related(&session,&mut inner.tracked,
+                    &mut inner.active_chat,&app,inner.region);
                 inner.session=Some(session);return Ok(status(&inner))
             }
+            native::restore_related(&mut inner.tracked,&mut inner.active_chat);
             native::restore(&session);return Ok(inactive())
         }
         let windows=native::candidates();
@@ -676,7 +817,10 @@ pub fn dock_select_native(app:AppHandle,dock:State<'_,Dock>,handle:String)->Resu
 #[tauri::command]
 pub fn dock_stop_native(dock:State<'_,Dock>)->Result<Status,String>{
     let mut inner=lock(&dock)?;
-    #[cfg(windows)]if let Some(s)=inner.session.take(){native::restore(&s);}
+    #[cfg(windows)]{
+        native::restore_related(&mut inner.tracked,&mut inner.active_chat);
+        if let Some(s)=inner.session.take(){native::restore(&s);}
+    }
     #[cfg(not(windows))]{inner.session=None;}
     Ok(inactive())
 }
@@ -691,7 +835,9 @@ pub fn dock_region_native(app:AppHandle,dock:State<'_,Dock>,region:Region)->Resu
     }
     #[cfg(windows)]if let Some(mut s)=inner.session{
         if native::live(&s) {
-            let result=native::sync(&mut s,&app,inner.region);
+            let result=native::sync(&mut s,&app,inner.region)
+                .and_then(|()|native::sync_related(&s,&mut inner.tracked,
+                    &mut inner.active_chat,&app,inner.region));
             inner.session=Some(s);
             result?;
         }
@@ -701,7 +847,10 @@ pub fn dock_region_native(app:AppHandle,dock:State<'_,Dock>,region:Region)->Resu
 }
 pub fn restore_on_exit(dock:&Dock){
     if let Ok(mut inner)=lock(dock){
-        #[cfg(windows)]if let Some(s)=inner.session.take(){native::restore(&s);}
+        #[cfg(windows)]{
+            native::restore_related(&mut inner.tracked,&mut inner.active_chat);
+            if let Some(s)=inner.session.take(){native::restore(&s);}
+        }
         #[cfg(not(windows))]{inner.session=None;}
     }
 }
