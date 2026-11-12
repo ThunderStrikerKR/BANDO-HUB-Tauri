@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - feature/tauri-product-bulk-registration
+      - feature/product-name-first-no-codes
   pull_request:
     branches:
       - main
