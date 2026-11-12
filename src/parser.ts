@@ -9,7 +9,8 @@ import {
 import { broadCategory, categoryKind } from "./matching.js";
 import { colorLabel, registeredProducts } from "./product-models.js";
 import { brandTerms } from "./product-registry.js";
-import { productFamily, representativeProducts } from "./product-search.js";
+import { productFamily } from "./product-search.js";
+import { nameCandidates, productNameHead, productNameSpan } from "./product-name-matching.js";
 import { analyzeEvidence, matchingRecipient, rebindEvidence } from "./order-evidence.js";
 import type { Client, Item, Recipient, State } from "./types.js";
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -109,11 +110,7 @@ function logicalLines(raw: string, state: State) {
       continue;
     }
     const known = registeredProducts(state.products)
-      .flatMap((p) =>
-        [p.code, ...(/^BD\s*\d/i.test(p.code) ? [p.code.replace(/^BD\s*/i, "")] : [])].map((c) =>
-          codeRegex(c).exec(line),
-        ),
-      )
+      .map((p) => productNameSpan(p,line))
       .filter((x): x is RegExpExecArray => !!x);
     const unknown = [...line.matchAll(/(?:BD\s*)?\d{3}[A-Za-z0-9-]*/gi)];
     const candidates = [...known, ...unknown]
@@ -225,12 +222,8 @@ export function modelColorHint(line: string) {
 }
 function registeredColorHint(line: string, products: State["products"]) {
   for (const p of products)
-    for (const code of [
-      p.code,
-      ...(p.manufacturerCode ? [p.manufacturerCode] : []),
-      ...(p.modelCodes ?? []),
-    ]) {
-      const bare = normalizeCode(code).replace(/^BD/, "");
+    for (const head of [productNameHead(p)]) {
+      const bare = normalizeCode(head).replace(/^BD/, "");
       if (!bare) continue;
       const pattern = new RegExp(
           "(?<![A-Za-z0-9-])(?:BD\\s*)?" +
@@ -249,38 +242,10 @@ function registeredColorHint(line: string, products: State["products"]) {
   return undefined;
 }
 export function recommendModels(value: string, state: State) {
-  const term = normalizeCode(value).replace(/^BD/, "");
-  if (!term) return [];
-  const distance = (a: string, b: string) => {
-    let row = Array.from({ length: b.length + 1 }, (_, i) => i);
-    for (let i = 0; i < a.length; i++) {
-      const next = [i + 1];
-      for (let j = 0; j < b.length; j++)
-        next.push(Math.min(next[j] + 1, row[j + 1] + 1, row[j] + Number(a[i] !== b[j])));
-      row = next;
-    }
-    return row[b.length];
-  };
-  const all = registeredProducts(state.products),
-    pool = all.some((p) => !p.variants.some((v) => v.source === "DEMO"))
-      ? all.filter((p) => !p.variants.some((v) => v.source === "DEMO"))
-      : all;
-  return pool
-    .map((p) => ({
-      p,
-      score: Math.min(
-        ...[
-          p.code,
-          ...(p.manufacturerCode ? [p.manufacturerCode] : []),
-          ...(p.modelCodes ?? []),
-        ].map((c) => distance(term, normalizeCode(c).replace(/^BD/, ""))),
-      ),
-    }))
-    .filter((x) => x.score <= 2)
-    .sort((a, b) => a.score - b.score || a.p.name.localeCompare(b.p.name))
-    .slice(0, 3)
-    .map((x) => x.p);
+  // Do not suggest unrelated SKUs based on a close website/model code.
+  return nameCandidates(registeredProducts(state.products),value).slice(0,20);
 }
+
 const person = (s: string) =>
   /^[가-힣]{2,5}(?:님)?$/.test(s) &&
   !/^(?:주소|배송지|배송주소|받는곳|보내는곳|연락처|전화번호|사무실|행정실)$/.test(s) &&
@@ -422,11 +387,7 @@ function parseLegacy(raw: string, selectedClient: Client | undefined, state: Sta
           known =
             !labelled &&
             (registeredProducts(state.products).some((p) =>
-              [
-                p.code,
-                ...(p.manufacturerCode ? [p.manufacturerCode] : []),
-                ...(p.modelCodes ?? []),
-              ].some((code) => normalizeCode(code).replace(/^BD/, "") === key),
+              normalizeCode(productNameHead(p)).replace(/^BD/, "") === key),
             ) ||
               state.aliases.some(
                 (a) =>
@@ -506,11 +467,7 @@ function parseLegacy(raw: string, selectedClient: Client | undefined, state: Sta
           ].some((term) => codeRegex(term).test(line)),
       )
       .sort((a, b) => Number(!!b.clientId) - Number(!!a.clientId) || b.text.length - a.text.length);
-    let choices = ps.filter((p) =>
-      [p.code, ...(p.manufacturerCode ? [p.manufacturerCode] : []), ...(p.modelCodes ?? [])]
-        .flatMap((c) => (/^BD\s*\d/i.test(c) ? [c, c.replace(/^BD\s*/i, "")] : [c]))
-        .some((c) => codeRegex(c).test(line)),
-    );
+    let choices = nameCandidates(ps,line);
     const brandMatches = ps.filter((p) =>
       brandTerms(state, p).some((b) => line.toLowerCase().includes(b.toLowerCase())),
     );
@@ -538,8 +495,7 @@ function parseLegacy(raw: string, selectedClient: Client | undefined, state: Sta
       if (tail) {
         const prefix = line.slice(0, tail.index),
           matched = choices
-            .flatMap((p) => [p.code, ...(p.modelCodes ?? [])])
-            .map((code) => codeRegex(code).exec(prefix))
+            .map((p) => productNameSpan(p,prefix))
             .find(Boolean);
         if (
           matched &&
@@ -650,16 +606,12 @@ function parseLegacy(raw: string, selectedClient: Client | undefined, state: Sta
     const protectedCode =
       hint &&
       choices.some((p) =>
-        [p.code, ...(p.manufacturerCode ? [p.manufacturerCode] : []), ...(p.modelCodes ?? [])].some(
-          (code) => bare(code) === bare(hint.term),
-        ),
+        bare(productNameHead(p)) === bare(hint.term),
       );
     if (hint && !protectedCode) {
       explicit = hint.color;
       choices = ps.filter((p) =>
-        [p.code, ...(p.manufacturerCode ? [p.manufacturerCode] : []), ...(p.modelCodes ?? [])].some(
-          (code) => bare(code) === bare(hint.base),
-        ),
+        bare(productNameHead(p)) === bare(hint.base),
       );
       if (choices.some((p) => !p.variants.some((v) => v.source === "DEMO")))
         choices = choices.filter((p) => !p.variants.some((v) => v.source === "DEMO"));
@@ -678,8 +630,8 @@ function parseLegacy(raw: string, selectedClient: Client | undefined, state: Sta
         const named = qualifiers(candidate.name);
         return configurationProof.every((token) => named.includes(token));
       });
-      // Zero or multiple matches are unresolved; never pick a different item.
-      if (proven.length) choices = proven;
+      // Reject contradictory configurations; never retain a wrong SKU.
+      choices = proven;
     }
     const codeChoices = choices.slice();
     const alias = aliases[0];
@@ -723,12 +675,9 @@ function parseLegacy(raw: string, selectedClient: Client | undefined, state: Sta
     }
     if (generic && !conflict) {
       p = undefined;
-      choices = representativeProducts(state, line, client.id);
-    } else if (!p && !choices.length)
-      choices = recommendModels(
-        unknownModel?.[0] ?? line.replace(/\s*\d+\s*(개|대).*$/, ""),
-        state,
-      );
+      choices = [];
+    }
+    // Unrecognized product names remain unresolved, not fuzzy code guesses.
     const ambiguousOptions = !explicit && !alias && choices.length > 1;
     if (ambiguousOptions) p = undefined;
     if (brandedCategory) p = undefined;
@@ -776,12 +725,12 @@ function parseLegacy(raw: string, selectedClient: Client | undefined, state: Sta
             ? "CATEGORY"
             : p
               ? exact.length
-                ? "CODE"
+                ? "NAME"
                 : alias?.clientId
                   ? "CLIENT_ALIAS"
                   : "COMMON_ALIAS"
               : "UNKNOWN",
-      term: alias?.text ?? unknownModel?.[0] ?? line,
+      term: alias?.text ?? line,
       productIds: choices.map((p) => p.id),
       aliasId: !exact.length ? alias?.id : undefined,
     };
@@ -797,7 +746,7 @@ function parseLegacy(raw: string, selectedClient: Client | undefined, state: Sta
       item.variantId = null;
       item.unitPrice = null;
       item.issues = ["상품 종류와 모델이 상충합니다."];
-      item.recognitionReason = "모델 코드와 상품 종류의 일치 여부를 직원이 확인해야 합니다.";
+      item.recognitionReason = "상품명과 상품 종류의 일치 여부를 직원이 확인해야 합니다.";
     }
     if (p && !p.requiresOption && p.variants.length === 1 &&
         alias?.productId === p.id && alias.variantId) {
@@ -826,9 +775,7 @@ function parseLegacy(raw: string, selectedClient: Client | undefined, state: Sta
     }));
     const productTerm =
       (p ?? choices[0])
-        ? [...[(p ?? choices[0]).code, (p ?? choices[0]).code.replace(/^BD\s*/i, "")]]
-            .map((code) => codeRegex(code).exec(line))
-            .find(Boolean)
+        ? productNameSpan(p ?? choices[0],line)
         : unknownModel;
     const productAt = productTerm?.index ?? 0;
     item.sources = [
