@@ -13,7 +13,10 @@ const editorStyles = read("src/styles/order-item-editor.css");
 test("native KakaoTalk width is measured once in the BANDO HUB shell", () => {
   assert.ok(shell.includes("--kakao-reserved-width"));
   assert.ok(shell.includes("b.right + 6"));
-  assert.ok(shell.includes('stacked ? "0px"'));
+  // Both Kakao viewing layouts use the same left-hand reserved area.
+  assert.ok(!shell.includes('stacked ? "0px"'));
+  assert.ok(shell.includes('className="hub-panel-slot hub-slot-0 hub-kakao-slot"'));
+  assert.ok(!shell.includes("hidden={stacked}"));
 });
 
 test("shared modal placement and backdrop exclude the always-on-top KakaoTalk strip", () => {
