@@ -1,5 +1,5 @@
 import type ExcelJS from "exceljs";
-import { normalizeCode, normalizeColor, validateProduct } from "./domain";
+import { normalizeColor, validateProduct } from "./domain";
 import { registeredProducts } from "./product-models";
 import type { Catalog, Product, State, Variant, Price } from "./types";
 
@@ -17,8 +17,9 @@ const FORMAT = "BANDO-HUB-PRODUCTS-V2";
 const MAX_BYTES = 20 * 1024 * 1024;
 const MAX_ROWS = 20000;
 const EMPTY = "[비우기]";
-const modelKey = (value: string) => normalizeCode(value).replace(/[\s-]/g, "");
-const identity = (p: Product) => (p.catalog ?? "BANDOSTAND") + "|" + modelKey(p.code);
+const identity = (p: Product) =>
+  (p.catalog ?? "BANDOSTAND") + "|" + p.name.normalize("NFKC").trim().toLowerCase() +
+  "|" + normalizeColor(p.defaultColor);
 const isArchived = (p: Product) => !!(p.deletedAt || p.supersededBy);
 const displayGroup = (group: Catalog | undefined) => group === "BANDOMALL" ? "반도몰" : "반도스탠드";
 const groupValue = (text: string): Catalog => {
@@ -131,10 +132,10 @@ export async function exportProductSyncWorkbook(state: State): Promise<number[]>
     ["항목", "작성 규칙"],
     ["작업 방법", "현재 상품과 옵션 전체를 내보냅니다. 수정 후 업로드하면 변경된 행만 저장합니다."],
     ["기존 상품", "__상품ID와 기존 __옵션ID는 변경하지 마세요. 카페24 P코드는 모델코드가 아닙니다."],
-    ["신규 상품", "__상품ID는 공란으로 두고 신규등록키를 임의로 만드세요. 신규 모델코드, 상품명, 상품군을 입력하세요."],
+    ["신규 상품", "__상품ID는 공란으로 두고 신규등록키, 상품명과 상품군을 입력하세요. 모델 표기는 상품명에 포함합니다."],
     ["신규 옵션", "판매 옵션 및 가격 시트에 동일한 신규등록키를 입력하세요. __옵션ID는 공란으로 둡니다."],
     ["기존 상품 옵션 추가", "기존 __상품ID를 넣고 __옵션ID를 비워 새 옵션 행을 추가합니다."],
-    ["기존 상품 모델코드", "안전한 주문 및 별칭 연결을 위해 이 Excel에서는 기존 내부 모델코드를 변경하지 않습니다."],
+    ["기존 코드 호환", "기존 2시트 양식의 모델코드 열은 사용하지 않으며 신규 양식에서 제거됩니다."],
     ["기본색 및 상태", "기본색은 등록된 옵션 중 한 개와 정확히 일치해야 합니다. 상태는 사용 또는 중지입니다."],
     ["홈페이지 미연결", "상품 등록과 수정에 홈페이지 상품번호나 카페24 옵션 ID는 필요하지 않습니다."],
     ["공란", "기존 필드는 값을 유지합니다. 선택 텍스트나 가격을 지울 때 [비우기]를 사용하세요."],
@@ -187,13 +188,18 @@ function updateExistingProduct(state: State, current: Product, cells: string[]):
     return p;
   }
   if (cells[1]) throw Error("기존 상품에는 신규등록키를 입력하지 마세요.");
-  if (cells[4] && cells[4] !== EMPTY) throw Error("신규 모델코드는 기존 상품에 사용할 수 없습니다.");
+  if (cells[4] && cells[4] !== EMPTY) throw Error("상품코드 열은 사용하지 않습니다. 코드를 제거한 새 양식을 사용하세요.");
   if (cells[5] && cells[5] !== displayGroup(p.catalog)) throw Error("기존 상품군 변경은 지원하지 않습니다.");
   if (cells[6] && cells[6] !== (p.origin === "STORE" ? "매장" : "공장")) {
     throw Error("기존 상품의 출고구분은 Excel에서 변경하지 않습니다.");
   }
   if (cells[13] && cells[13] !== "정상") throw Error("보관 상태는 변경할 수 없습니다.");
   p.name = optional(cells[2], p.name);
+  delete p.code;
+  delete p.manufacturerCode;
+  delete p.modelCodes;
+  delete p.originalCode;
+  delete p.modelKey;
   if (cells[3]) {
     if (cells[3] === EMPTY) delete p.subtitle;
     else p.subtitle = cells[3];
@@ -215,17 +221,16 @@ function updateExistingProduct(state: State, current: Product, cells: string[]):
 }
 function createProduct(state: State, cells: string[]): Product {
   const at = new Date().toISOString();
-  const code = cells[4];
-  if (!code || code === EMPTY || /^P[A-Z0-9]{6,}$/i.test(code)) {
-    throw Error("신규 모델코드를 입력하세요. 카페24 P코드는 업무용 모델코드가 아닙니다.");
-  }
+  if (cells[4] && cells[4] !== EMPTY)
+    throw Error("상품코드 입력은 지원하지 않습니다. 모델 표기는 상품명에 포함하세요.");
   const group = groupValue(cells[5]);
+  const id = crypto.randomUUID();
   const p: Product = {
-    id: crypto.randomUUID(), name: cells[2], code, manufacturerCode: code,
+    id, name: cells[2],
     catalog: group, origin: group === "BANDOMALL" ? "STORE" : "FACTORY",
     category: "", defaultColor: cells[11], active: yesNo(cells[12], true),
     variants: [], createdAt: at, updatedAt: at, saleUnit: true,
-    modelCodes: [code], colorStatus: "KNOWN", verificationStatus: "REGISTERED",
+    colorStatus: "KNOWN", verificationStatus: "REGISTERED",
   };
   if (!p.name.trim()) throw Error("신규 상품명을 입력하세요.");
   if (!p.defaultColor) throw Error("신규 상품의 기본 색상을 입력하세요.");
@@ -237,7 +242,7 @@ function createProduct(state: State, cells: string[]): Product {
   p.sellingUnit = optional(cells[10]);
   categoryEdit(state, p, cells[7]);
   brandEdit(state, p, cells[8]);
-  p.familyKey = identity(p);
+  p.familyKey = p.id;
   return p;
 }
 function newVariant(cells: string[]): Variant {
@@ -382,7 +387,7 @@ export function previewProductSyncRows(state: State, source: WorkbookSource): Pr
       if (!original) {
         const duplicates = next.filter((p) =>
           p.id !== product.id && !isArchived(p) && identity(p) === identity(product) && p.name.trim() === product.name.trim());
-        if (duplicates.length) throw Error("같은 모델코드와 상품명을 가진 기존 상품이 있습니다.");
+        if (duplicates.length) throw Error("같은 상품명과 판매 구성을 가진 기존 상품이 있습니다.");
         validateProduct(product, registeredProducts(state.products));
       }
       product.saleUnit = true;
@@ -393,7 +398,7 @@ export function previewProductSyncRows(state: State, source: WorkbookSource): Pr
         sheet: "상품 목록", row: source.products.find((x) => x.cells[0] === product.id ||
           (x.cells[1] && keys.get(x.cells[1]) === product.id))?.row ?? 0,
         id: product.id, name: product.name,
-        status: /동일 모델코드|같은 상품코드|중복 상품/.test(message) ? "HOLD" : "ERROR",
+        status: /같은 상품명|중복 상품|판매 구성/.test(message) ? "HOLD" : "ERROR",
         changes: [], errors: [message],
       });
     }
