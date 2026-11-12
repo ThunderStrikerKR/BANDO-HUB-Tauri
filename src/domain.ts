@@ -3,6 +3,7 @@ import { z } from "zod";
 import { aliasProblems } from "./matching.js";
 import { parseSmart } from "./parser.js";
 import { colorLabel, registeredProducts } from "./product-models.js";
+import { productNameEvidence, registeredNameCandidates } from "./product-name-match.js";
 import { renderAutomaticTemplate } from "./automatic-message-templates.js";
 import type { Alias, Client, Item, Order, Product, Recipient, Settings, State } from "./types.js";
 import { blocking, orderIssues } from "./validation.js";
@@ -220,14 +221,7 @@ export function parseLegacy(raw: string, client: Client, state: State): Recipien
     recipients.push(current);
     return current;
   };
-  const patterns = (p: Product) =>
-    [p.code, ...(p.modelCodes ?? [])]
-      .flatMap((code) => {
-        const values = [code];
-        if (/^BD\s*[- ]?\s*\d{3}/i.test(code)) values.push(code.replace(/^BD\s*[- ]?\s*/i, ""));
-        return values;
-      })
-      .sort((a, b) => b.length - a.length);
+
   for (const original of raw.replace(/\r/g, "").split("\n")) {
     const line = original.trim();
     if (!line) continue;
@@ -269,9 +263,7 @@ export function parseLegacy(raw: string, client: Client, state: State): Recipien
       r.address += (r.address ? " " : "") + line;
       continue;
     }
-    let candidates = registeredProducts(state.products).filter((p) =>
-      patterns(p).some((code) => codePattern(code).test(line)),
-    );
+    let candidates = registeredNameCandidates(registeredProducts(state.products), line);
     if (candidates.some((p) => !p.variants.some((v) => v.source === "DEMO")))
       candidates = candidates.filter((p) => !p.variants.some((v) => v.source === "DEMO"));
     const matches = state.aliases
@@ -293,7 +285,7 @@ export function parseLegacy(raw: string, client: Client, state: State): Recipien
     if (!candidates.length && !aliasProduct && !quantities.length) continue;
     const r = current ?? create();
     const quantity = quantities.length === 1 ? Number(quantities[0][1]) : null;
-    // Two different pages with the same code are ambiguous; do not choose a color or model arbitrarily.
+    // Duplicate registered business names are ambiguous regardless of old codes.
     const unique = [...new Map(candidates.map((p) => [p.id, p])).values()];
     let p = unique.length === 1 ? unique[0] : aliasProduct;
     const explicitColor = Object.keys(colorMap).find((word) =>
@@ -328,8 +320,8 @@ export function parseLegacy(raw: string, client: Client, state: State): Recipien
       });
       continue;
     }
-    const matchedCode = patterns(p).find((code) => codePattern(code).test(line));
-    let tail = matchedCode ? line.replace(codePattern(matchedCode), "") : line;
+    const matchedName = productNameEvidence(line,p);
+    let tail = matchedName ? line.replace(matchedName[0], "") : line;
     tail = tail
       .replace(/\d+\s*(?:개|대|세트|ea|pcs)/gi, "")
       .replace(
@@ -376,7 +368,7 @@ export function parseLegacy(raw: string, client: Client, state: State): Recipien
       it.color = v.color;
       it.unitPrice = resolvePrice(p, v.id, client);
       it.url = v.url;
-      it.name = optionCodes(v.option ?? "")[0] ?? p.code;
+      it.name = p.name;
       it.issues = [];
       it.defaulted = false;
     }
@@ -384,7 +376,7 @@ export function parseLegacy(raw: string, client: Client, state: State): Recipien
     if (quantities.length > 1)
       it.issues.push("한 줄에 여러 상품이 있습니다. 상품별로 분리해 주세요.");
     if (unique.length === 1 && aliasProduct && aliasProduct.id !== p.id)
-      it.issues.push("별칭이 정식 상품코드와 충돌합니다. 정식 코드 우선 적용.");
+      it.issues.push("별칭과 등록 상품명이 충돌합니다. 상품을 다시 확인하세요.");
     let residual = tail
       .replace(/(?:색상|컬러|옵션)\s*[:：]?/g, "")
       .replace(

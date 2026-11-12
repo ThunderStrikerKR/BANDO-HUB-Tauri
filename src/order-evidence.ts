@@ -1,4 +1,5 @@
 import type { Client, Item, Recipient, State } from "./types.js";
+import { productModelNames } from "./product-name-match.js";
 
 export interface OrderEvidence {
   id: string;
@@ -254,9 +255,9 @@ export function analyzeEvidence(
     const knownNumericModel =
       contactValue &&
       state.products.some((p) =>
-        [p.code, ...(p.modelCodes ?? [])].some(
-          (code) =>
-            code.replace(/^BD\s*/i, "").replace(/\s/g, "") === contactValue.replace(/\s/g, ""),
+        productModelNames(p).some(
+          (name) =>
+            name.replace(/^BD\s*/i, "").replace(/\s/g, "") === contactValue.replace(/\s/g, ""),
         ),
       );
     if (
