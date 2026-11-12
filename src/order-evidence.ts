@@ -218,7 +218,9 @@ export function analyzeEvidence(
         .trim();
       if (
         /^[가-힣]{2,5}(?:님)?$/.test(name) &&
-        !/보면대|스탠드|마이크|주세요|감사|안녕|배송/.test(name)
+        !/보면대|스탠드|마이크|주세요|감사|안녕|배송/.test(name) &&
+        // A brand name left after product/quantity removal is not a recipient.
+        !/^(?:반도|반도스탠드|모델명|상품명|품목|제품명)(?:님)?$/.test(name)
       ) {
         const start = match[0].indexOf(name);
         add(

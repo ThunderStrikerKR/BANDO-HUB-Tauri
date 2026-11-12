@@ -10,7 +10,7 @@ const read = (path) => JSON.parse(readFileSync(new URL("../" + path, import.meta
 const seed = read("src-tauri/resources/state-seed.json");
 const { itemFromProduct, resolvePrice, validateProduct, unassignedClient } =
   await tsImport("../src/domain.ts", import.meta.url);
-const { parseSmart } = await tsImport("../src/parser.ts", import.meta.url);
+const { parseSmart, parseEvidence } = await tsImport("../src/parser.ts", import.meta.url);
 const { applyOfficialProductPreview } =
   await tsImport("../src/official-product-import.ts", import.meta.url);
 const { resolveHistoricalProductReference } =
@@ -236,4 +236,17 @@ test("T28: common hyphen/space variants and text-only model names resolve", () =
     assert.ok(item.productId, raw);
     assert.ok(seed.products.find(p=>p.id===item.productId)?.name.startsWith(expected), raw);
   }
+});
+
+test("T29: Bando brand prefix inside a product line must not create a recipient", () => {
+  const raw = [
+    "박가상", "010-2345-6789",
+    "전라남도 순천시 팔마1길 25 (연향동, 가상아파트) 101동 1003호",
+    "반도 뮤직트레이 그레이 1개",
+    "메모 문 앞에 놓아주세요",
+  ].join("\n");
+  const rows = parseEvidence(raw, client, seed).recipients;
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].name, "박가상");
+  assert.ok(!rows.some(row=>row.name==="반도"));
 });
