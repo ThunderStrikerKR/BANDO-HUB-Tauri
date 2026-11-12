@@ -203,3 +203,37 @@ test("T25: an unverified 709 민판 never silently selects the perforated 709", 
   const found = seed.products.find(p=>p.id===item.productId);
   assert.ok(!found || !/타공 상판/.test(found.name) || /비타공|무타공/.test(found.name));
 });
+
+
+test("T26: 민판 709 resolves to the separately registered 709-1 unperforated stand", () => {
+  const candidate = bySite("48", "709-1 / 블랙");
+  assert.ok(candidate);
+  for (const raw of ["BD 709 민판 1개", "반도 709 민판 한개",
+    "BD 709 무타공 1개", "BD 709 비타공 상판 1개"]) {
+    const item = itemFor(raw);
+    assert.equal(item.productId, candidate.id, raw);
+    assert.equal(item.quantity, 1, raw);
+  }
+});
+test("T27: -1 is NOT a perforation flag on non-score GT, SS and Desk stands", () => {
+  const score = seed.products.filter(p=>p.category.startsWith("보면대"));
+  const controls = seed.products.filter(p=>/^(?:BD )?(?:GT-1|SS-1|Desk TS-1)\b/i.test(p.name));
+  assert.ok(controls.length > 0);
+  assert.ok(score.some(p=>p.name.startsWith("BD 709-1")));
+  for (const p of controls) {
+    assert.ok(!p.category.startsWith("보면대"));
+  }
+});
+test("T28: common hyphen/space variants and text-only model names resolve", () => {
+  const samples = [
+    ["BD-950 *2개", "BD 950"],
+    ["반도스탠드 BD Boss101 수량 : 2개", "Boss101"],
+    ["모델명 : BD-LP-WA A타입 수량 : 1ea", "BD LP-WA / A타입"],
+    ["BD CONDUCTOR (1ea)", "BD Conductor"],
+  ];
+  for (const [raw, expected] of samples) {
+    const item = itemFor(raw);
+    assert.ok(item.productId, raw);
+    assert.ok(seed.products.find(p=>p.id===item.productId)?.name.startsWith(expected), raw);
+  }
+});

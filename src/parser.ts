@@ -10,7 +10,7 @@ import { broadCategory, categoryKind } from "./matching.js";
 import { colorLabel, registeredProducts } from "./product-models.js";
 import { brandTerms } from "./product-registry.js";
 import { productFamily } from "./product-search.js";
-import { productModelNames, productNameEvidence, registeredNameCandidates } from "./product-name-match.js";
+import { productModelNames, productNameEvidence, registeredNameCandidates, scoreStandTop } from "./product-name-match.js";
 import { analyzeEvidence, matchingRecipient, rebindEvidence } from "./order-evidence.js";
 import type { Client, Item, Recipient, State } from "./types.js";
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -662,6 +662,10 @@ function parseLegacy(raw: string, selectedClient: Client | undefined, state: Sta
     if (configurationProof.length) {
       const proven = choices.filter((candidate) => {
         const named = qualifiers(candidate.name);
+        // The exact "-1" score-stand suffix supplies the unperforated-top
+        // evidence even when older catalog titles omit the description.
+        if (scoreStandTop(candidate) === "UNPERFORATED")
+          named.push("비타공상판");
         return configurationProof.every((token) => named.includes(token));
       });
       // Zero or multiple matches are unresolved; never pick a different item.
