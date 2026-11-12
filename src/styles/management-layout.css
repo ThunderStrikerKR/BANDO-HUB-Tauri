@@ -376,9 +376,13 @@
   max-height: none;
   border: 0;
 }
+.app-v03 .management-container .excel-list-panel:has(> .excel-table-scroll.excel-list-empty) {
+  flex: 0 0 auto;
+}
 .app-v03 .management-container .excel-list-panel > .excel-table-scroll.excel-list-empty {
-  flex: 1 1 auto;
-  max-height: none;
+  flex: 0 0 auto;
+  min-height: 0;
+  max-height: min(320px, 45dvh);
 }
 .app-v03 .management-container .product-list-subheading {
   justify-content: space-between;

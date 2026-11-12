@@ -15,7 +15,15 @@ test("headings, tabs, and searchable tools follow the shared business hierarchy"
   assert.match(excel,/<ManagementSearch label="엑셀 목록 검색"/);
   assert.match(source("src/ShippingManager.tsx"),/title="운임 관리"/);
 });
-test("search is not shown in product tabs where it has no effect",()=>{
+test("product search belongs only to searchable subtab content",()=>{
   const s=source("src/ProductManager.tsx");
-  assert.match(s,/\["상품 목록", "카테고리 관리", "대표색상 관리"\]\.includes\(section\)/);
+  const productTab=s.indexOf('{section === "상품 목록" && (');
+  const search=s.indexOf('<ManagementSearch label="상품 검색"');
+  const categoryTab=s.indexOf('{section === "카테고리 관리" && (');
+  const colorTab=s.indexOf('{section === "대표색상 관리" &&');
+  assert.ok(productTab>0&&search>productTab&&categoryTab>search&&colorTab>categoryTab);
+  assert.match(s,/<CategoryManager[\s\S]*?query=\{search\} onQueryChange=\{setSearch\}/);
+  assert.match(s,/<ColorGuidanceManager[\s\S]*?query=\{search\} onQueryChange=\{setSearch\}/);
+  assert.match(source("src/CategoryManager.tsx"),/<ManagementSearch label="상품 검색"/);
+  assert.match(source("src/ColorGuidanceManager.tsx"),/<ManagementSearch label="상품 검색"/);
 });
