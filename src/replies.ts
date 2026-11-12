@@ -1,6 +1,7 @@
 import { normalizeCode, normalizeColor, orderClient, resolvePrice, totals, uid } from "./domain.js";
 import { addressInfo, addressParts, parseSmart, quantities } from "./parser.js";
 import { colorLabel, registeredProducts } from "./product-models.js";
+import { nameCandidates } from "./product-name-matching.js";
 import { recommendShipping } from "./shipping.js";
 import type { BillingSnapshot, Item, Order, ReplyChange, ReplyPreview, State } from "./types.js";
 export function billingSnapshot(o: Order, state: State, reason: string): BillingSnapshot {
@@ -95,21 +96,7 @@ export function proposeReply(
     };
   const quantity = qty[0]?.value;
   if (quantity !== undefined && quantity < 1) warnings.push("수량은 1 이상이어야 합니다.");
-  let candidates = registeredProducts(state.products).filter((p) => {
-    const code = normalizeCode(p.code);
-    const normalized = itemRaw.toUpperCase().replace(/\bBD\s*/g, "BD");
-    const index = normalized.indexOf(code);
-    const bare = code.replace(/^BD/, "");
-    const exact = (token: string) => {
-      const i = normalized.indexOf(token);
-      return (
-        i >= 0 &&
-        !/[A-Z0-9-]/.test(normalized[i - 1] ?? "") &&
-        !/[A-Z0-9-]/.test(normalized[i + token.length] ?? "")
-      );
-    };
-    return (index >= 0 && exact(code)) || (/^\d{3}/.test(bare) && exact(bare));
-  });
+  let candidates = nameCandidates(registeredProducts(state.products),itemRaw);
   if (
     /핑크|pink|노랑|노란|yellow|옐로우|초록|녹색|green|베이지|beige|보라|purple|퍼플|주황|orange/i.test(
       itemRaw,
@@ -117,16 +104,8 @@ export function proposeReply(
   )
     warnings.push("회신에 자동 해석을 지원하지 않는 색상이 있습니다. 등록 옵션을 직접 확인하세요.");
   const modelTokens = itemRaw.match(/(?:BD\s*)?\d{3}[A-Za-z0-9-]*/gi) ?? [];
-  if (
-    modelTokens.some(
-      (token) =>
-        !registeredProducts(state.products).some(
-          (p) =>
-            normalizeCode(p.code).replace(/^BD/, "") === normalizeCode(token).replace(/^BD/, ""),
-        ),
-    )
-  )
-    warnings.push("등록되지 않은 모델 표현이 있습니다. 정확한 모델을 확인하세요.");
+  if (modelTokens.length && !candidates.length)
+    warnings.push("등록된 상품명과 일치하지 않는 모델 표현입니다. 상품명을 확인하세요.");
   const colorWords = [
     "블랙",
     "검정",

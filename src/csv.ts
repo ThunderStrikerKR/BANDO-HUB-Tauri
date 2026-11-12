@@ -1,7 +1,7 @@
-import { normalizeCode, normalizeColor, uid, validateProduct, validProductUrl } from "./domain.js";
+import { normalizeColor, uid, validateProduct, validProductUrl } from "./domain.js";
 import type { ImportPreview, Product } from "./types.js";
 export const CSV_TEMPLATE =
-  "code,name,category,origin,defaultColor,color,wholesale,semi,retail,url,source,collectedAt\n";
+  "name,category,origin,defaultColor,color,wholesale,semi,retail,url,source,collectedAt\n";
 export function csvRows(text: string) {
   const rows: string[][] = [];
   let row: string[] = [],
@@ -33,61 +33,50 @@ export function csvRows(text: string) {
   return rows.filter((r) => r.some((c) => c.trim()));
 }
 export function previewCsv(text: string, existing: Product[]): ImportPreview[] {
-  const [headers, ...rows] = csvRows(text);
-  if (!headers || !["code", "name", "color", "retail", "source"].every((h) => headers.includes(h)))
-    throw Error("CSV 필수 열: code,name,color,retail,source");
-  const grouped = new Map<string, Product>();
-  for (const row of rows) {
-    const rec = Object.fromEntries(headers.map((h, i) => [h, row[i]?.trim() ?? ""]));
-    if (!["MANUAL", "OFFICIAL"].includes(rec.source))
+  const [headers,...rows]=csvRows(text);
+  if (!headers || !["name","color","retail","source"].every(h=>headers.includes(h)))
+    throw Error("CSV 필수 열: name,color,retail,source");
+  const previews: ImportPreview[] = [], seen=new Set<string>();
+  for(const row of rows) {
+    const rec=Object.fromEntries(headers.map((h,i)=>[h,row[i]?.trim()??""]));
+    if(!rec.name) throw Error("상품명이 필요합니다.");
+    if(!["MANUAL","OFFICIAL"].includes(rec.source))
       throw Error("source는 MANUAL 또는 OFFICIAL이어야 합니다.");
-    if (rec.source === "OFFICIAL" && (!validProductUrl(rec.url) || !rec.collectedAt))
+    if(rec.source==="OFFICIAL" && (!validProductUrl(rec.url)||!rec.collectedAt))
       throw Error("공식 가격은 원본 상세페이지 URL과 수집 날짜가 필요합니다.");
-    const amount = (value: string) => {
-      if (!value) return null;
-      if (!/^\d+$/.test(value)) throw Error("금액은 쉼표 없는 0 이상의 원 단위 정수로 입력하세요.");
-      const n = Number(value);
-      if (!Number.isSafeInteger(n)) throw Error("가격 범위 초과");
+    const price=(raw:string)=>{
+      if(!raw)return null;
+      if(!/^\d+$/.test(raw))throw Error("가격은 쉼표 없는 정수로 입력하세요.");
+      const n=Number(raw);
+      if(!Number.isSafeInteger(n)||n<0)throw Error("가격 범위 초과");
       return n;
     };
-    const key = normalizeCode(rec.code);
-    let p = grouped.get(key);
-    if (!p) {
-      p = {
-        id: uid(),
-        code: rec.code,
-        name: rec.name,
-        category: rec.category ?? "",
-        origin: rec.origin === "STORE" ? "STORE" : "FACTORY",
-        defaultColor: normalizeColor(rec.defaultColor || rec.color),
-        active: true,
-        variants: [],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      grouped.set(key, p);
-    }
-    p.variants.push({
-      id: uid(),
-      color: normalizeColor(rec.color),
-      wholesale: amount(rec.wholesale),
-      semi: amount(rec.semi),
-      retail: amount(rec.retail),
-      url: rec.url ?? "",
-      source: rec.source as "MANUAL" | "OFFICIAL",
-      collectedAt: rec.collectedAt || undefined,
-    });
-  }
-  return [...grouped.values()].map((p) => {
-    validateProduct(p, []);
-    const old = existing.find((x) => normalizeCode(x.code) === normalizeCode(p.code));
-    return {
-      product: p,
-      existingId: old?.id ?? null,
-      sourceUrl: p.variants[0].url,
-      warnings: old
-        ? ["기존 상품과 중복: 회사 입력값은 보존하고 소매가 변경을 개별 승인합니다."]
-        : [],
+    const color=normalizeColor(rec.color||"단일");
+    const origin: "STORE"|"FACTORY"=rec.origin==="STORE"?"STORE":"FACTORY";
+    const key=[rec.name.normalize("NFKC").toLowerCase().replace(/\s+/g," "),
+      rec.category,origin,color].join("|");
+    if(seen.has(key))throw Error("CSV에 같은 상품명과 판매 구성이 중복되었습니다.");
+    seen.add(key);
+    const p:Product={
+      id:uid(),name:rec.name,category:rec.category||"",origin,
+      defaultColor:normalizeColor(rec.defaultColor||color),
+      active:true,saleUnit:true,createdAt:new Date().toISOString(),
+      updatedAt:new Date().toISOString(),
+      variants:[{id:uid(),color,wholesale:price(rec.wholesale),
+        semi:price(rec.semi),retail:price(rec.retail),
+        url:rec.url||"",source:rec.source as "MANUAL"|"OFFICIAL",
+        collectedAt:rec.collectedAt||undefined}],
     };
-  });
+    const matches=existing.filter(x=>!x.deletedAt && x.active!==false &&
+      x.name.normalize("NFKC").toLowerCase().replace(/\s+/g," ")===
+        p.name.normalize("NFKC").toLowerCase().replace(/\s+/g," ") &&
+      x.category===p.category && x.origin===origin &&
+      x.variants.some(v=>normalizeColor(v.color)===color));
+    if(matches.length>1)throw Error("동일한 이름의 상품이 여러 개 있습니다. 수동 확인하세요.");
+    validateProduct(p,matches.length?[]:existing);
+    previews.push({product:p,existingId:matches[0]?.id??null,
+      sourceUrl:p.variants[0].url,
+      warnings:matches.length?["같은 상품명의 기존 상품이 있습니다. 가격과 구성을 확인하세요."]:[]});
+  }
+  return previews;
 }
