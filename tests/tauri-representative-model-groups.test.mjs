@@ -117,3 +117,44 @@ test("model-group UI, employee resolver, Rust persistence and messages use produ
   assert.match(source("src/automatic-message.ts"), /appliedRepresentativeModelNotice/);
   assert.match(source("src/ProductManager.tsx"), /"모델군 관리"/);
 });
+
+test("employee applying a representative model records exact product identity and a declarative notice", async () => {
+  const { parseSmart } = await tsImport("../src/parser.ts", import.meta.url);
+  const { resolveProduct } = await tsImport("../src/issue-actions.ts", import.meta.url);
+  const { suggestGroupRepresentative, appliedRepresentativeModelNotice } =
+    await tsImport("../src/model-groups.ts", import.meta.url);
+  const state = structuredClone(seed);
+  const black = state.products.find(p => p.siteId === "245");
+  const silver = state.products.find(p => p.siteId === "254");
+  const client = {
+    id: "group-test-client", name: "가상 거래처", contact: "", identifiers: "",
+    active: true, tier: "wholesale", shippingFeeExcluded: false,
+    payment: "PREPAID", overrides: {},
+  };
+  state.clients.push(client);
+  state.settings.colorGuidanceGroups = {
+    staff: { name: "Desk JS-2", productIds: [black.id, silver.id],
+      representativeProductId: black.id },
+  };
+  const recipients = parseSmart("BD Desk JS-2 3개", client, state);
+  const item = recipients.flatMap(r => r.items).find(i => i.raw.includes("JS-2"));
+  assert.ok(item);
+  assert.equal(item.productId, null);
+  const candidates = (item.productCandidates ?? [])
+    .map(candidate => state.products.find(p => p.id === candidate.productId))
+    .filter(Boolean);
+  assert.equal(suggestGroupRepresentative(state, candidates)?.productId, black.id);
+  const order = { id: "representative-order", clientId: client.id,
+    recipients: [{ id: "recipient", items: [item] }] };
+  const applied = resolveProduct(state, order, "recipient", item.id, black.id,
+    "once", false, black.variants[0].id, "staff");
+  const selected = applied.order.recipients[0].items[0];
+  assert.equal(selected.productId, black.id);
+  assert.equal(selected.variantId, black.variants[0].id);
+  assert.equal(selected.appliedRepresentativeModel.productId, black.id);
+  assert.equal(selected.appliedDefaultColor, undefined);
+  assert.equal(appliedRepresentativeModelNotice(selected), black.name + " 모델로 보내드릴게요.");
+  assert.equal(selected.modelProposal, undefined);
+  assert.throws(() => resolveProduct(state, order, "recipient", item.id, silver.id,
+    "once", false, silver.variants[0].id, "staff"), /대표모델/);
+});
