@@ -88,3 +88,23 @@ test("existing data duplicates stay unresolved without modifying IDs",()=>{
   assert.equal(match("마이크물림쇠 세트 / 35cm / 블랙 1개").length,2);
   assert.equal(match("마우스트레이 1개").length,2);
 });
+
+test("whole-document reception resolves catalog model and option evidence",async()=>{
+  const {parseSmart}=await tsImport("../src/parser.ts",import.meta.url);
+  const {unassignedClient}=await tsImport("../src/domain.ts",import.meta.url);
+  const client={...unassignedClient,id:"audit-recipient",name:"가상 테스트 거래처",tier:"retail",overrides:{}};
+  for(const [raw,wanted] of [
+    ["709 타공 그레이 1개","BD 709G / 그레이"],
+    ["709 민판 그레이 1개","BD 709-1G / 그레이"],
+    ["BD GT-10 통기타 전용 평평한 벽용 1개","BD GT-10 / 기타 벽걸이 / 통기타 전용 / 평평한 벽용"],
+    ["BD Z-4 상판 1 42×34cm 상판 2 37×29cm 1개","BD Z-4 / 상판 1 42×34cm / 상판 2 37×29cm"],
+    ["스피커홀더 B형 1개","스피커홀더 / B형"],
+    ["케이블홀더 2번 18mm 1개","케이블홀더 / 2번 18mm"],
+  ]){
+    const items=parseSmart(raw,client,state).flatMap(recipient=>recipient.items);
+    assert.equal(items.length,1,raw+": "+JSON.stringify(items.map(x=>x.name)));
+    const product=products.find(p=>p.id===items[0].productId);
+    assert.equal(product?.name,wanted,raw+": "+JSON.stringify(items[0]));
+    assert.equal(items[0].quantity,1,raw);
+  }
+});
