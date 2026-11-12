@@ -887,6 +887,33 @@ try {
     assert.equal(metrics.text,label,"Wrong title on "+label);
     assert.ok(Math.abs(Number.parseFloat(metrics.size)-20)<2,"Inconsistent title font: "+JSON.stringify(metrics));
     await samplePageStyle(label);
+    if(["엑셀 관리","상품 관리","거래처 관리","운임 관리","설정"].includes(label)){
+      const tabs = await navPage.locator(".management-tabbar").first().evaluate(bar=>{
+        const rect=bar.getBoundingClientRect();
+        const buttons=[...bar.querySelectorAll(":scope > button")];
+        const widths=buttons.map(b=>b.getBoundingClientRect().width);
+        const title=bar.closest(".shipping-manager")?.querySelector(".page-heading");
+        const stats=bar.closest(".shipping-manager")?.querySelector(".shipping-stats");
+        const css=getComputedStyle(bar);
+        return {
+          display:css.display,columns:css.gridAutoColumns,width:rect.width,
+          workWidth:bar.parentElement.getBoundingClientRect().width,
+          widths,scrollWidth:bar.scrollWidth,clientWidth:bar.clientWidth,
+          titleAbove:!title||title.getBoundingClientRect().bottom<=rect.top,
+          statsBelow:!stats||stats.getBoundingClientRect().top>=rect.bottom
+        };
+      });
+      assert.equal(tabs.display,"inline-grid",
+        "Shared management tabbar must fit labels, not stretch: "+label);
+      assert.ok(tabs.width<=tabs.workWidth+1,
+        "Management tabs escaped workspace: "+JSON.stringify({label,tabs}));
+      assert.ok(tabs.widths.length>=2,"Missing tab controls: "+label);
+      assert.ok(Math.max(...tabs.widths)-Math.min(...tabs.widths)<1.5,
+        "Tab buttons must be equally sized: "+JSON.stringify({label,tabs}));
+      assert.ok(tabs.titleAbove&&tabs.statsBelow,
+        "Freight layout must be title, tabs, then summary: "+JSON.stringify({label,tabs}));
+      console.log("PASS: COMPACT_EQUAL_TABS",label,JSON.stringify(tabs));
+    }
     if(label==="설정"){
       const settingSections=await navPage.locator(".settings > div:not([hidden]) .settings-help-heading")
         .evaluateAll((headings)=>headings.map(h=>{
