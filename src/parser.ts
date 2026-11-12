@@ -10,7 +10,7 @@ import { broadCategory, categoryKind } from "./matching.js";
 import { colorLabel, registeredProducts } from "./product-models.js";
 import { brandTerms } from "./product-registry.js";
 import { productFamily } from "./product-search.js";
-import { productModelNames, productNameEvidence, registeredNameCandidates, scoreStandTop } from "./product-name-match.js";
+import { productModelNames, productNameEvidence, registeredNameCandidates, scoreStandTop, verifiedScoreStandBases } from "./product-name-match.js";
 import { analyzeEvidence, matchingRecipient, rebindEvidence } from "./order-evidence.js";
 import type { Client, Item, Recipient, State } from "./types.js";
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -668,24 +668,24 @@ function parseLegacy(raw: string, selectedClient: Client | undefined, state: Sta
         .match(/(?:가방|바퀴)(?:미포함|포함|미장착|장착)|[ab]타입|민판|무타공상판|무타공|비타공상판|타공상판|\d+(?:\.\d+)?cm/g) ?? [])
         .map(token => /^(?:민판|무타공)/.test(token) ? "비타공상판" : token))];
     const configurationProof = qualifiers(line);
+    const verifiedScoreBases = verifiedScoreStandBases(ps);
+    const qualifies = (candidate: State["products"][number]) => {
+      const named = qualifiers(candidate.name);
+      const top = scoreStandTop(candidate, verifiedScoreBases);
+      if (top === "UNPERFORATED") named.push("비타공상판");
+      if (top === "PERFORATED") named.push("타공상판");
+      return configurationProof.every(token => named.includes(token));
+    };
     if (configurationProof.length) {
-      const proven = choices.filter((candidate) => {
-        const named = qualifiers(candidate.name);
-        // The exact "-1" score-stand suffix supplies the unperforated-top
-        // evidence even when older catalog titles omit the description.
-        if (scoreStandTop(candidate) === "UNPERFORATED")
-          named.push("비타공상판");
-        return configurationProof.every((token) => named.includes(token));
-      });
-      // Zero or multiple matches are unresolved; never pick a different item.
-      // A contradictory configuration must NEVER fall back to the bare model.
-      choices = proven;
+      // Each option must belong to this candidate, not merely to a sibling.
+      choices = choices.filter(qualifies);
     }
     const codeChoices = choices.slice();
     const alias = aliases[0];
     if (!choices.length && alias) {
       const p = ps.find((p) => p.id === alias.productId);
-      if (p) choices = [p];
+      // A saved alias must never bypass a contradictory top/option proof.
+      if (p && qualifies(p)) choices = [p];
     }
     const filtered = explicit
       ? choices.filter((p) =>
