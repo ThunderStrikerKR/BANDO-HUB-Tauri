@@ -1,11 +1,11 @@
 /* Product administration screens. Scope all new rules to their own components. */
 .app-modal-layer.product-detail-dialog {
-  width: min(880px, calc(100vw - 36px));
+  width: min(880px, max(0px, calc(100vw - var(--kakao-reserved-width, 0px) - 36px)));
   height: min(820px, calc(100dvh - 36px));
-  max-width: calc(100vw - 36px);
+  max-width: max(0px, calc(100vw - var(--kakao-reserved-width, 0px) - 36px));
   max-height: calc(100dvh - 36px);
   position: fixed;
-  inset: 0;
+  inset: 0 0 0 var(--kakao-reserved-width, 0px);
   margin: auto;
 }
 .app-modal-layer.product-detail-dialog::backdrop,
@@ -13,8 +13,8 @@
   background: linear-gradient(
     to right,
     transparent 0,
-    transparent var(--kakao-reserved-width, 398px),
-    rgb(0 0 0 / 55%) var(--kakao-reserved-width, 398px),
+    transparent var(--kakao-reserved-width, 0px),
+    rgb(0 0 0 / 55%) var(--kakao-reserved-width, 0px),
     rgb(0 0 0 / 55%) 100%
   );
 }

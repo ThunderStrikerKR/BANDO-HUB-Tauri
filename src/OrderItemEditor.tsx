@@ -1,21 +1,14 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Modal } from "./ui";
 import { itemFromProduct, resolvePrice } from "./domain";
 import { productModelNames } from "./product-name-match";
 import { searchProducts } from "./product-search";
-import { sameValue } from "./shared/draft";
-import { usePendingChanges } from "./shared/pending-changes";
 import type { Client, Item, Product, State } from "./types";
 
 function money(value: number | null): string {
   return value === null ? "가격 확인 필요" : value.toLocaleString("ko-KR") + "원";
 }
 
-/**
- * Product correction overlays only the BANDO HUB work panels.
- * Native showModal() would make the KakaoTalk panel inert, so this editor
- * deliberately uses an in-workspace non-modal surface instead.
- */
 export function OrderItemEditor({
   state,
   item,
@@ -46,16 +39,11 @@ export function OrderItemEditor({
     );
     return (recognized?.[0] ?? item.name.split(" / ")[0]).trim();
   });
-  const [host, setHost] = useState<HTMLElement | null>(null);
-  const [left, setLeft] = useState(0);
   const [imageCache, setImageCache] = useState<Record<string, string | null>>({});
   const [invalidImage, setInvalidImage] = useState<string | null>(null);
-  const closeButton = useRef<HTMLButtonElement>(null);
-  const originalFocus = useRef<HTMLElement | null>(null);
 
   const product = state.products.find((product) => product.id === draft.productId);
   const changed = draft.productId !== item.productId || draft.variantId !== item.variantId;
-  usePendingChanges(!sameValue(draft, item));
 
   const results = useMemo(
     () => searchProducts(state, query, client.id)
@@ -65,45 +53,6 @@ export function OrderItemEditor({
       .slice(0, 100),
     [state, query, client.id],
   );
-
-  useLayoutEffect(() => {
-    const workspace = document.querySelector<HTMLElement>(".hub-live-workspace");
-    const target = workspace ?? document.body;
-    const kakao = workspace?.querySelector<HTMLElement>(".hub-slot-0");
-    const scroll = workspace?.querySelector<HTMLElement>(".hub-workspace-scroll");
-
-    const measure = () => {
-      if (!workspace || !kakao || kakao.hidden || !kakao.getClientRects().length) {
-        setLeft(0);
-        return;
-      }
-      const width = Math.max(0,
-        Math.ceil(kakao.getBoundingClientRect().right -
-          workspace.getBoundingClientRect().left + 6));
-      setLeft(Math.min(width, workspace.clientWidth));
-    };
-
-    originalFocus.current =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    setHost(target);
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(target);
-    if (kakao) observer.observe(kakao);
-    scroll?.addEventListener("scroll", measure, { passive: true });
-    window.addEventListener("resize", measure);
-    return () => {
-      observer.disconnect();
-      scroll?.removeEventListener("scroll", measure);
-      window.removeEventListener("resize", measure);
-      if (originalFocus.current?.isConnected)
-        originalFocus.current.focus({ preventScroll: true });
-    };
-  }, []);
-
-  useLayoutEffect(() => {
-    if (host) closeButton.current?.focus({ preventScroll: true });
-  }, [host]);
 
   useEffect(() => {
     const current = product;
@@ -165,28 +114,13 @@ export function OrderItemEditor({
     onClose();
   };
 
-  if (!host) return null;
-  return createPortal(
-    <div
-      className={"order-item-edit-layer" + (host === document.body ? " order-item-edit-body-host" : "")}
-      style={{ left: host === document.body ? 0 : left }}
+  return (
+    <Modal
+      title="상품 상세 수정"
+      draft={draft}
+      onClose={onClose}
+      className="order-item-editor-modal"
     >
-      <section
-        className="order-item-edit-dialog"
-        role="dialog"
-        aria-modal="false"
-        aria-label="상품 상세 수정"
-        onKeyDown={(event) => {
-          if (event.key === "Escape") {
-            event.stopPropagation();
-            onClose();
-          }
-        }}
-      >
-        <header className="order-item-edit-header">
-          <h2>상품 상세 수정</h2>
-          <button ref={closeButton} type="button" onClick={onClose}>닫기 ×</button>
-        </header>
         <div className="order-item-edit-content">
           <div className="order-item-edit-product">
             <div className="order-item-edit-photo">
@@ -290,8 +224,6 @@ export function OrderItemEditor({
             적용
           </button>
         </footer>
-      </section>
-    </div>,
-    host,
+    </Modal>
   );
 }

@@ -12,22 +12,20 @@ const { resolvePrice, itemFromProduct } = await tsImport("../src/domain.ts", imp
 const priceClient = { id:"sample-customer",tier:"retail",overrides:{} };
 const p709 = state.products.find(p=>p.name==="BD 709 / 블랙 / 타공 상판");
 
-test("order item correction is local: KakaoTalk stays outside the overlay", () => {
-  assert.match(editor, /querySelector<HTMLElement>\("\.hub-live-workspace"\)/);
-  assert.match(editor, /querySelector<HTMLElement>\("\.hub-slot-0"\)/);
-  assert.match(editor, /getBoundingClientRect\(\)\.right/);
-  assert.match(editor, /aria-modal="false"/);
-  assert.doesNotMatch(editor, /<Modal[\s>]/);
-  assert.doesNotMatch(editor, /\.showModal\(/);
-  assert.match(styles, /\.order-item-edit-layer/);
-  assert.match(styles, /inset-block: 0/);
+test("order item correction reuses the shared Kakao-aware modal", () => {
+  assert.match(editor, /<Modal/);
+  assert.match(editor, /className="order-item-editor-modal"/);
+  assert.match(editor, /draft=\{draft\}/);
+  assert.doesNotMatch(editor, /createPortal|ResizeObserver|hub-slot-0|showModal/);
+  assert.match(styles, /\.app-modal-layer\.order-item-editor-modal/);
+  assert.doesNotMatch(styles, /order-item-edit-layer|order-item-edit-dialog/);
 });
 
 test("the approved fixed size, layout tokens and collapsed inline search are retained", () => {
-  assert.match(styles, /width: min\(756px, 100%\)/);
-  assert.match(styles, /height: min\(566px, 100%\)/);
-  assert.match(styles, /font: 650 var\(--modal-title-size\)/);
-  assert.match(styles, /font: 600 var\(--modal-action-size\)/);
+  assert.match(styles, /width: min\(756px,/);
+  assert.match(styles, /height: min\(566px,/);
+  assert.match(read("src/styles/modals.css"), /font-size: var\(--modal-title-size\)/);
+  assert.match(read("src/styles/components.css"), /font-size: var\(--modal-action-size\)/);
   assert.match(styles, /\.order-item-edit-search\[hidden\][\s\S]*display: none/);
   assert.match(editor, /aria-expanded=\{searchOpen\}/);
   assert.match(editor, /setSearchOpen\(\(expanded\) => !expanded\)/);

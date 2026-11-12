@@ -1,14 +1,19 @@
 /* App-wide native top-layer dialogs: uniform dim, native inert/focus trap. */
 .app-modal-layer {
   position: fixed;
-  inset: 0;
+  /* Center inside the visible BANDO HUB region, not behind the always-on-top
+     external KakaoTalk window. HubShell owns this single width token. */
+  inset: 0 0 0 var(--kakao-reserved-width, 0px);
   margin: auto;
   padding: 0;
   border: 0;
   background: transparent;
   color: #eee;
-  width: min(var(--modal-width), calc(100vw - var(--modal-viewport-gutter)));
-  max-width: calc(100vw - var(--modal-viewport-gutter));
+  width: min(
+    var(--modal-width),
+    max(0px, calc(100vw - var(--kakao-reserved-width, 0px) - var(--modal-viewport-gutter)))
+  );
+  max-width: max(0px, calc(100vw - var(--kakao-reserved-width, 0px) - var(--modal-viewport-gutter)));
   max-height: calc(100dvh - var(--modal-viewport-gutter));
   overflow: visible;
   font: 400 var(--modal-body-size)/1.5 var(--font-body);
@@ -17,9 +22,14 @@
 .app-modal-layer:not([open]) {
   display: none !important;
 }
-.app-modal-layer::backdrop,
-.app-action-dialog::backdrop {
-  background: rgb(0 0 0 / 65%);
+.app-modal-layer::backdrop {
+  background: linear-gradient(
+    to right,
+    transparent 0,
+    transparent var(--kakao-reserved-width, 0px),
+    rgb(0 0 0 / 65%) var(--kakao-reserved-width, 0px),
+    rgb(0 0 0 / 65%) 100%
+  );
 }
 .app-modal-layer > .modal {
   box-sizing: border-box;

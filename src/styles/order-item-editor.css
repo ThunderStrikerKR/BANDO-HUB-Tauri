@@ -1,77 +1,33 @@
-/* Order-item correction owns this surface; common Modal is not reused because
-   its native showModal() makes the KakaoTalk connection area inert. */
-.hub-live-workspace:has(> .order-item-edit-layer) {
-  position: relative;
+/* Product correction uses the shared native Modal and its global
+   KakaoTalk-aware centering, focus, Escape and save-change handling. */
+.app-modal-layer.order-item-editor-modal {
+  width: min(756px, max(0px, calc(100vw - var(--kakao-reserved-width, 0px) - var(--modal-viewport-gutter))));
+  height: min(566px, calc(100dvh - var(--modal-viewport-gutter)));
 }
-.order-item-edit-layer {
-  position: absolute;
-  inset-block: 0;
-  right: 0;
-  z-index: 200;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 16px;
-  background: rgb(0 0 0 / 65%);
-  color: var(--text-primary);
-  font: 400 var(--modal-body-size)/1.5 var(--font-body);
-}
-.order-item-edit-layer.order-item-edit-body-host {
-  position: fixed;
-}
-.order-item-edit-dialog {
-  display: flex;
-  flex-direction: column;
-  width: min(756px, 100%);
-  height: min(566px, 100%);
-  min-width: 0;
+.app-modal-layer.order-item-editor-modal > .modal {
+  height: 100%;
+  max-height: 100%;
   min-height: 0;
+  padding: 0;
   overflow: hidden;
-  border: 1px solid var(--border-default);
-  border-radius: 10px;
-  background: var(--surface-panel);
-  box-shadow: 0 18px 70px #0009;
 }
-.order-item-edit-dialog button {
-  box-sizing: border-box;
-  min-height: var(--control-height);
-  padding: 8px 12px;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-control);
-  background: var(--surface-input);
-  color: var(--text-primary);
-  font: 600 var(--modal-action-size)/1.35 var(--font-body);
-  white-space: nowrap;
-  cursor: pointer;
-}
-.order-item-edit-dialog button:hover:not(:disabled) {
-  background: var(--surface-hover);
-}
-.order-item-edit-dialog button:disabled {
-  cursor: default;
-  opacity: .48;
-}
-.order-item-edit-dialog :is(button, input):focus-visible {
-  outline: 2px solid var(--border-focus);
-  outline-offset: 2px;
-}
-.order-item-edit-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--modal-header-gap);
-  min-height: 56px;
+.app-modal-layer.order-item-editor-modal .modal > header {
   flex: 0 0 auto;
+  min-height: 56px;
   padding: 12px 18px;
+  margin: 0;
   border-bottom: 1px solid #444;
 }
-.order-item-edit-header h2 {
+.app-modal-layer.order-item-editor-modal .modal-fields {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  width: 100%;
+  padding: 0;
   margin: 0;
-  font: 650 var(--modal-title-size)/1.35 var(--font-heading);
-}
-.order-item-edit-header button {
-  min-height: var(--modal-close-height);
-  padding: 5px 10px;
+  border: 0;
+  overflow: hidden;
 }
 .order-item-edit-content {
   display: flex;
@@ -172,7 +128,7 @@
   overscroll-behavior: contain;
   border-top: 1px solid #444;
 }
-.order-item-edit-dialog .order-item-edit-candidate {
+.app-modal-layer.order-item-editor-modal .order-item-edit-candidate {
   display: grid;
   grid-template-columns: 16px minmax(0, 1fr) minmax(78px, auto);
   gap: 10px;
@@ -187,7 +143,7 @@
   text-align: left;
   white-space: normal;
 }
-.order-item-edit-dialog .order-item-edit-candidate.selected {
+.app-modal-layer.order-item-editor-modal .order-item-edit-candidate.selected {
   background: var(--surface-hover);
 }
 .order-item-edit-radio {
@@ -256,7 +212,6 @@
   color: var(--tone-error);
 }
 @media (max-width: 840px) {
-  .order-item-edit-layer { padding: 10px; }
   .order-item-edit-product {
     grid-template-columns: 130px minmax(0, 1fr);
   }
