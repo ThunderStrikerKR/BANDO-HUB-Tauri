@@ -234,6 +234,11 @@ try {
           }
           if (command === "choose_excel_directory") return "C:\\BANDO_CI_SELECTED";
           if (command === "open_excel_directory") return undefined;
+          if (command === "open_daily_excel_directory") {
+            window.__openedDailyExcelFolders ??= [];
+            window.__openedDailyExcelFolders.push(args.kind);
+            return undefined;
+          }
           if (command === "dock_region_native") return undefined;
           if (command === "dock_status_native") return response();
           if (command === "dock_cycle_native") {
@@ -388,7 +393,18 @@ try {
   await page.getByRole("button", { name: "카카오톡 함께 보기" }).waitFor();
   // STORE file is a frozen Logen workbook, not proof of shipment.
   await nav.getByRole("button", { name: "엑셀 관리" }).click();
+  const factoryFolder = page.getByRole("button", { name: "오늘 공장 Excel 폴더 열기" });
+  assert.equal(await factoryFolder.isDisabled(), false);
+  await factoryFolder.click();
+  await page.waitForFunction(() => window.__openedDailyExcelFolders?.length === 1);
   await page.getByRole("button", { name: "매장 발송 대기" }).click();
+  const storeFolder = page.getByRole("button", { name: "오늘 매장 Excel 폴더 열기" });
+  assert.equal(await storeFolder.isDisabled(), false);
+  await storeFolder.click();
+  await page.waitForFunction(() => window.__openedDailyExcelFolders?.length === 2);
+  assert.deepEqual(await page.evaluate(() => window.__openedDailyExcelFolders),
+    ["FACTORY","STORE"], "Each Excel tab must open its own dated folder");
+  console.log("PASS: daily factory and store Excel folder buttons work without selected orders");
   const queuedRow = page.getByRole("row").filter({ hasText: "매장시험수취인" });
   await queuedRow.getByRole("checkbox", { name: "엑셀 선택 매장시험수취인" }).check();
   await page.getByRole("button", { name: "선택 1건 매장 Excel 작성" }).click();
