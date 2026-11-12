@@ -427,9 +427,52 @@
 .app-v03 .management-container .settings-layout-single {
   width: 100%;
 }
+/* Order history has expandable recipient details inside the third column.
+   Its headers must not drift when expansion changes intrinsic text width or
+   starts a vertical scrollbar. This applies only to order history, not to
+   other management tables whose columns remain content-sized. */
+.app-v03 .management-container .order-history-list {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.app-v03 .management-container .order-history-list > .management-search-toolbar {
+  flex: 0 0 auto;
+}
+.app-v03 .management-container .order-history-list > .table-scroll {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
+}
+.app-v03 .management-container .order-history-list .management-data-table {
+  table-layout: fixed;
+  min-width: 1000px;
+}
+.app-v03 .management-container .order-history-list .management-data-table th:nth-child(1) { width: 12%; }
+.app-v03 .management-container .order-history-list .management-data-table th:nth-child(2) { width: 10%; }
+.app-v03 .management-container .order-history-list .management-data-table th:nth-child(3) { width: 42%; }
+.app-v03 .management-container .order-history-list .management-data-table th:nth-child(4) { width: 13%; }
+.app-v03 .management-container .order-history-list .management-data-table th:nth-child(5) { width: 12%; }
+.app-v03 .management-container .order-history-list .management-data-table th:nth-child(6) { width: 11%; }
+.app-v03 .management-container .order-history-list .management-data-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
 .app-v03 .management-container .order-history-list .management-data-table td:nth-child(3) {
+  min-width: 0;
   white-space: normal;
-  min-width: 300px;
+  overflow-wrap: anywhere;
+}
+.app-v03 .management-container .order-history-list .management-data-table td:nth-child(3) > div,
+.app-v03 .management-container .order-history-list .management-data-table td:nth-child(3) p {
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .app-v03 .management-container .daily-settlement > .card { padding: 14px; }
 .app-v03 .management-container .management-scroll { min-width: 0; }
