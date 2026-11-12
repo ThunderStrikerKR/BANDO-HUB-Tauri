@@ -7,7 +7,9 @@ test('product price workbook preserves hidden product and variant identity', () 
   const code = read('src/product-price-xlsx.ts');
   assert.match(code, /__상품ID/);
   assert.match(code, /__가격기록ID/);
-  assert.match(code, /normalizeCode\(data\[8\]\)/);
+  assert.match(code, /data\[8\] === \(v\.option/);
+  assert.match(code, /LEGACY_PRICE_HEADERS/);
+  assert.doesNotMatch(code, /normalizeCode\(data\[8\]\)/);
   assert.match(code, /productMappings\?\.\[values\[6\] \+ "\|" \+ values\[7\]\]/);
   assert.match(code, /sheet\.columns\.forEach/);
 });
