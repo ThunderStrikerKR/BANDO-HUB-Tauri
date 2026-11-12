@@ -5,13 +5,14 @@
 //! reject the TEST child process, so each mode has its own named Windows
 //! mutex and activation event. No production SQLite handle is opened by a
 //! rejected second launch.
-use std::io;
+use std::{env, fs::{self, File, OpenOptions}, io, os::windows::fs::OpenOptionsExt, path::PathBuf};
 use tauri::{AppHandle, Manager};
 
 type Handle = isize;
 const ERROR_ALREADY_EXISTS: u32 = 183;
 const WAIT_OBJECT_0: u32 = 0;
 const INFINITE: u32 = u32::MAX;
+const ERROR_SHARING_VIOLATION: i32 = 32;
 
 #[link(name = "kernel32")]
 unsafe extern "system" {
@@ -39,11 +40,14 @@ fn mode_namespace(test_workspace: bool) -> &'static str {
     }
 }
 
-/// Holding the mutex and event handles keeps this particular workspace mode
-/// reserved for the full duration of the Tauri process.
+/// Holding both Windows handles and the exclusive file lock keeps this
+/// workspace mode reserved for the entire Tauri process lifetime.
 pub(super) struct InstanceGuard {
     mutex: Handle,
     activate_event: Handle,
+    // An independent user-scoped Windows file lock protects against duplicate
+    // launches even if a future build changes the mutex namespace.
+    _file_lock: File,
 }
 
 impl Drop for InstanceGuard {
@@ -58,6 +62,19 @@ impl Drop for InstanceGuard {
 pub(super) enum Acquisition {
     First(InstanceGuard),
     Existing,
+}
+
+fn acquire_file_lock(namespace: &str) -> Result<File, io::Error> {
+    let root = env::var_os("LOCALAPPDATA")
+        .map(PathBuf::from)
+        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "LOCALAPPDATA is unavailable"))?
+        .join("BANDO-HUB").join("instance-locks");
+    fs::create_dir_all(&root)?;
+    // 0 = no file sharing. Windows releases this exclusive handle
+    // automatically when the process exits; the file itself may remain.
+    OpenOptions::new().read(true).write(true).create(true)
+        .share_mode(0)
+        .open(root.join(format!("{namespace}.lock")))
 }
 
 fn acquire_namespace(namespace: &str) -> Result<Acquisition, String> {
@@ -95,9 +112,30 @@ fn acquire_namespace(namespace: &str) -> Result<Acquisition, String> {
             None => Ok(Acquisition::Existing),
         };
     }
+    let file_lock = match acquire_file_lock(namespace) {
+        Ok(file) => file,
+        Err(error) if error.raw_os_error() == Some(ERROR_SHARING_VIOLATION) => {
+            // Another instance may hold a lock from a differently configured
+            // native mutex. Reject this launch without ever opening SQLite.
+            let _ = unsafe { SetEvent(event) };
+            unsafe {
+                CloseHandle(mutex);
+                CloseHandle(event);
+            }
+            return Ok(Acquisition::Existing);
+        }
+        Err(error) => {
+            unsafe {
+                CloseHandle(mutex);
+                CloseHandle(event);
+            }
+            return Err(format!("중복 실행 파일 잠금 생성 실패: {error}"));
+        }
+    };
     Ok(Acquisition::First(InstanceGuard {
         mutex,
         activate_event: event,
+        _file_lock: file_lock,
     }))
 }
 
@@ -110,11 +148,18 @@ pub(super) fn acquire(test_workspace: bool) -> Result<Acquisition, String> {
 /// Listen in the first instance for duplicate launch notifications. Never
 /// changes the active page or form state: only restores and focuses the window.
 pub(super) fn listen(guard: InstanceGuard, app: AppHandle) -> Result<(), String> {
+    let event = guard.activate_event;
+    // IMPORTANT: Guard ownership belongs to the application, not the
+    // activation-listener thread. An event wait failure must never allow a
+    // second process to start while the first Tauri window is still alive.
+    if !app.manage(guard) {
+        return Err("중복 실행 잠금 상태 등록 실패".into());
+    }
     std::thread::Builder::new()
         .name("bando-single-instance-activation".into())
         .spawn(move || {
             loop {
-                if unsafe { WaitForSingleObject(guard.activate_event, INFINITE) } != WAIT_OBJECT_0 {
+                if unsafe { WaitForSingleObject(event, INFINITE) } != WAIT_OBJECT_0 {
                     eprintln!("반도허브 기존 창 활성화 이벤트 수신 실패");
                     break;
                 }
