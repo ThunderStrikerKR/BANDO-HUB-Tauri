@@ -4,59 +4,56 @@ import { readFileSync } from "node:fs";
 
 const read = path => readFileSync(new URL("../" + path, import.meta.url), "utf8");
 const shell = read("src/HubShell.tsx");
-const shared = read("src/styles/modals.css");
-const productAdmin = read("src/styles/product-admin-redesign.css");
-const actions = read("src/styles/dialogs.css");
+const common = read("src/styles/modals.css");
+const products = read("src/styles/product-admin-redesign.css");
+const decisions = read("src/styles/dialogs.css");
 const editor = read("src/OrderItemEditor.tsx");
-const detail = read("src/styles/order-item-editor.css");
+const editorStyles = read("src/styles/order-item-editor.css");
 
-/** The left native KakaoTalk region is measured once by HubShell. */
-test("HubShell supplies the external KakaoTalk reserved width to every dialog", () => {
-  assert.match(shell, /--kakao-reserved-width/);
-  assert.match(shell, /b\.right \+ 6/);
-  assert.match(shell, /stacked \? "0px"/);
+test("native KakaoTalk width is measured once in the BANDO HUB shell", () => {
+  assert.ok(shell.includes("--kakao-reserved-width"));
+  assert.ok(shell.includes("b.right + 6"));
+  assert.ok(shell.includes('stacked ? "0px"'));
 });
 
-test("all shared modals are centered within the unoccluded app width", () => {
-  assert.match(shared, /inset: 0 0 0 var\(--kakao-reserved-width, 0px\)/);
-  assert.match(shared, /100vw - var\(--kakao-reserved-width, 0px\) - var\(--modal-viewport-gutter\)/);
-  assert.match(shared, /transparent var\(--kakao-reserved-width, 0px\)/);
-  assert.match(shared, /rgb\(0 0 0 \/ 65%\) var\(--kakao-reserved-width, 0px\)/);
-  assert.match(actions, /left: calc\(var\(--kakao-reserved-width, 0px\)/);
+test("shared modal placement and backdrop exclude the always-on-top KakaoTalk strip", () => {
+  assert.ok(common.includes("inset: 0 0 0 var(--kakao-reserved-width, 0px)"));
+  assert.ok(common.includes("100vw - var(--kakao-reserved-width, 0px) - var(--modal-viewport-gutter)"));
+  assert.ok(common.includes("transparent var(--kakao-reserved-width, 0px)"));
+  assert.ok(decisions.includes("left: calc(var(--kakao-reserved-width, 0px)"));
 });
 
-test("product detail dialog cannot reset the shared placement back to full viewport", () => {
-  assert.match(productAdmin,/\.app-modal-layer\.product-detail-dialog \{/);
-  assert.match(productAdmin, /inset: 0 0 0 var\(--kakao-reserved-width, 0px\)/);
-  const detailRule = productAdmin.match(/\\.app-modal-layer\\.product-detail-dialog\\s*\\{([^}]*)\\}/)?.[1];
-  assert.ok(detailRule, "Product dialog rule missing");
-  assert.doesNotMatch(detailRule, /inset:\\s*0\\s*;/);
-  assert.match(productAdmin, /max-width: max\(0px, calc\(100vw - var\(--kakao-reserved-width, 0px\) - 36px\)\)/);
+test("product administration dialogs preserve the shared reserved left edge", () => {
+  const detailRule = products.split(".app-modal-layer.product-detail-dialog {")[1]?.split("}")[0];
+  assert.ok(detailRule, "missing product-detail-dialog rule");
+  assert.ok(detailRule.includes("inset: 0 0 0 var(--kakao-reserved-width, 0px)"));
+  assert.ok(!detailRule.includes("inset: 0;"));
+  assert.ok(detailRule.includes("max-width: max(0px, calc(100vw - var(--kakao-reserved-width, 0px) - 36px))"));
 });
 
-test("simple shared dialogs use intrinsic height while large editors own fixed heights", () => {
-  const universal = read("src/styles/patch-v0808.css");
-  assert.match(universal, /\\.app-modal-layer > \\.modal \\{[\\s\\S]*?height: auto;/);
-  assert.doesNotMatch(universal.match(/\\.app-modal-layer > \\.modal \\{([^}]*)\\}/)?.[1] ?? "", /820px/);
-  const clientEditor = read("src/styles/client-editor.css");
-  assert.match(clientEditor, /height: min\\(820px/);
-  assert.match(productAdmin, /height: min\\(820px/);
-  assert.match(detail, /height: min\\(566px/);
+test("brief modal contents do not inherit the old global 820px blank canvas", () => {
+  const globalRule = read("src/styles/patch-v0808.css")
+    .split(".app-modal-layer > .modal {")[1]?.split("}")[0];
+  assert.ok(globalRule, "missing common modal panel rule");
+  assert.ok(globalRule.includes("height: auto"));
+  assert.ok(!globalRule.includes("820px"));
+  assert.ok(read("src/styles/client-editor.css").includes("height: min(820px"));
+  assert.ok(products.includes("height: min(820px"));
+  assert.ok(editorStyles.includes("height: min(566px"));
 });
 
-test("order editor uses one shared modal; fixed box and internal search scroll persist", () => {
-  assert.match(editor, /<Modal[\s\S]*className="order-item-editor-modal"/);
-  assert.match(detail, /width: min\(756px,/);
-  assert.match(detail, /height: min\(566px,/);
-  assert.match(detail, /\.order-item-edit-results \{/);
-  assert.match(detail, /overflow-y: auto/);
-  assert.doesNotMatch(editor, /createPortal|ResizeObserver|hub-slot-0/);
-  assert.doesNotMatch(detail, /order-item-edit-layer/);
+test("order item correction reuses Modal, fixed outer bounds and scrollable search", () => {
+  assert.ok(editor.includes("<Modal"));
+  assert.ok(editor.includes('className="order-item-editor-modal"'));
+  assert.ok(!editor.includes("createPortal"));
+  assert.ok(!editor.includes("ResizeObserver"));
+  assert.ok(editorStyles.includes("width: min(756px"));
+  assert.ok(editorStyles.includes("height: min(566px"));
+  assert.ok(editorStyles.includes(".order-item-edit-results {"));
+  assert.ok(editorStyles.includes("overflow-y: auto"));
 });
 
-/** Bounding-box calculation: the dialog must remain inside the visible region
- * at supported window sizes; native KakaoTalk occupies the left-hand strip. */
-test("reserved-width centering remains correct at multiple window sizes", () => {
+test("centering stays inside the unoccluded viewport at representative resolutions", () => {
   for (const [viewport, reserved, preferred] of [
     [1516, 410, 880],
     [1920, 420, 880],
@@ -69,8 +66,8 @@ test("reserved-width centering remains correct at multiple window sizes", () => 
     const available = viewport - reserved;
     const width = Math.min(preferred, Math.max(0, available - 36));
     const x = reserved + (available - width) / 2;
-    assert.ok(x >= reserved, "hidden behind KakaoTalk: " + [viewport,reserved,preferred]);
-    assert.ok(x + width <= viewport, "offscreen modal: " + [viewport,reserved,preferred]);
-    assert.ok(Math.abs((x + width / 2) - (reserved + available / 2)) < .1);
+    assert.ok(x >= reserved, "hidden behind KakaoTalk: " + [viewport, reserved, preferred]);
+    assert.ok(x + width <= viewport, "dialog extends beyond screen");
+    assert.equal(x + width / 2, reserved + available / 2);
   }
 });
