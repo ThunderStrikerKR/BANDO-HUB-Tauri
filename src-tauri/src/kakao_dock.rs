@@ -415,7 +415,17 @@ mod native {
     // main messenger at its measured minimum, chat below its banner/ad area.
     fn stack_targets(area:Rect,main:Hwnd,chats:&[Hwnd])
         ->Result<(Rect,Rect),String>{
-        if chats.is_empty(){return Ok((area,area))}
+        if chats.is_empty() {
+            // v0.8.10 keeps the surviving main window in its previous
+            // split slot when the last conversation is closed. Do not
+            // suddenly stretch it over the empty conversation area.
+            let previous=visible_rect(main)?;
+            let height=if previous.height()>=100 && previous.height()<area.height(){
+                previous.height()
+            }else{area.height()};
+            return Ok((Rect{left:area.left,top:area.top,
+                right:area.right,bottom:area.top+height},area))
+        }
         let before=rect(main)?;
         let minimum=min_visible_height(main)?;
         if minimum>=area.height()-100 {
