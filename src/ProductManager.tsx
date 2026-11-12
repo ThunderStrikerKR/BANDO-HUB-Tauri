@@ -228,7 +228,7 @@ export function ProductManager({
         {[
           "상품 목록",
           "카테고리 관리",
-          "대표색상 관리",
+          "모델군 관리",
           "별칭 관리",
           "브랜드 관리",
         ].map((label) => (
@@ -369,7 +369,7 @@ export function ProductManager({
           <CategoryManager state={state} onSave={onSave} onNotice={onNotice}
             query={search} onQueryChange={setSearch} />
         )}
-        {section === "대표색상 관리" && <ColorGuidanceManager state={state} onRefresh={onRefresh}
+        {section === "모델군 관리" && <ColorGuidanceManager state={state} onRefresh={onRefresh}
           query={search} onQueryChange={setSearch} />}
         {section === "별칭 관리" && (
           <AliasManager state={state} onSave={onSave} onNotice={onNotice} />

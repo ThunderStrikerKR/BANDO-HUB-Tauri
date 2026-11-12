@@ -20,7 +20,7 @@ test("product search belongs only to searchable subtab content",()=>{
   const productTab=s.indexOf('{section === "상품 목록" && (');
   const search=s.indexOf('<ManagementSearch label="상품 검색"');
   const categoryTab=s.indexOf('{section === "카테고리 관리" && (');
-  const colorTab=s.indexOf('{section === "대표색상 관리" &&');
+  const colorTab=s.indexOf('{section === "모델군 관리" &&');
   assert.ok(productTab>0&&search>productTab&&categoryTab>search&&colorTab>categoryTab);
   assert.match(s,/<CategoryManager[\s\S]*?query=\{search\} onQueryChange=\{setSearch\}/);
   assert.match(s,/<ColorGuidanceManager[\s\S]*?query=\{search\} onQueryChange=\{setSearch\}/);

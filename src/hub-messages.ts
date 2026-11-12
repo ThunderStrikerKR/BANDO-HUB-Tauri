@@ -4,6 +4,7 @@ import { groupedCustomerQuestions } from "./customer-questions.js";
 import { customerModel } from "./matching.js";
 import { colorLabel } from "./product-models.js";
 import { appliedDefaultColorNotice } from "./color-guidance.js";
+import { appliedRepresentativeModelNotice } from "./model-groups.js";
 import { provisionalProductNotice } from "./provisional-product-notices.js";
 import type { Order, Price, State, ValidationIssue } from "./types.js";
 import { orderIssues } from "./validation.js";
@@ -145,7 +146,10 @@ export function hubMessages(
   // The complete financial breakdown comes first. Employee-authored guidance
   // appears after the bank account, directly before independently chosen links.
   const provisionalNotices = recipients.flatMap(r =>
-    r.items.map(i => provisionalProductNotice(i,state)).filter(Boolean));
+    r.items.flatMap(i => [
+      appliedRepresentativeModelNotice(i,state.settings),
+      provisionalProductNotice(i,state),
+    ].filter(Boolean)));
   const paymentLinks = links.payment
     ? [...new Set(recipients.flatMap(r =>
         r.items.filter(i => i.url && validProductUrl(i.url))
@@ -157,7 +161,10 @@ export function hubMessages(
     (i) => !(amounts.every((a) => a.shipping !== null) && i === "운임 확인 필요"),
   );
   if (amounts.some((a) => a.shipping === null)) paymentIssues.push("배송 건별 운임 확인 필요");
-  const colorNotices = recipients.flatMap(r => r.items.map(i=>appliedDefaultColorNotice(i,state.settings))).filter(Boolean);
+  const colorNotices = recipients.flatMap(r => r.items.flatMap(i=>[
+    appliedDefaultColorNotice(i,state.settings),
+    appliedRepresentativeModelNotice(i,state.settings),
+  ])).filter(Boolean);
   const optionLinks = links.options
     ? recipients
         .flatMap((r) => [

@@ -2,7 +2,7 @@ import type { Settings } from "./types.js";
 
 type TemplateDef = {
   label: string;
-  category: "확인 안내" | "색상 및 수량" | "입금 안내";
+  category: "확인 안내" | "색상 및 수량" | "모델 및 옵션" | "입금 안내";
   description: string;
   body: string;
   variables: readonly string[];
@@ -50,6 +50,10 @@ export const AUTOMATIC_MESSAGE_TEMPLATES = {
   colorDefault: {
     label:"대표색상 통보",category:"색상 및 수량",description:"색상이 빠진 발주서에 직원이 지정한 대표색상으로 안내",
     body:"{색상}으로 보내드릴게요.",variables:["색상","상품명"],required:["색상"],sample:{"색상":"블랙","상품명":"BD 709"},
+  },
+  modelRepresentative: {
+    label:"대표모델 선택 통보",category:"모델 및 옵션",description:"모호한 발주서에 직원이 모델군의 대표 상품을 직접 선택한 경우에만 안내",
+    body:"{상품명} 모델로 보내드릴게요.",variables:["상품명"],required:["상품명"],sample:{"상품명":"BD 709 / 블랙 / 타공 상판"},
   },
   quantityOne: {
     label:"수량 1개 잠정 안내",category:"색상 및 수량",description:"수량이 없고 1개로 안내한 경우",

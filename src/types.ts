@@ -133,8 +133,10 @@ export interface Item {
   temporary?: boolean;
   recognitionReason?: string;
   modelProposal?: { original: string; required: boolean };
-  /** Set only when an employee selects the saved representative color in the issue resolver. */
+  /** Legacy historical color notice. Never overwritten by a model-group selection. */
   appliedDefaultColor?: { groupId: string; color: string };
+  /** Explicit employee selection of one product from an existing model group. */
+  appliedRepresentativeModel?: { groupId: string; productId: string; productName: string };
   manuallyConfirmed?: boolean;
   quantityConfirmed?: boolean;
   productCandidates?: Candidate[];
@@ -398,8 +400,9 @@ export interface Settings {
   senderPostcode?: string;
   excelDirectory?: string;
   factoryReplyDirectory?: string;
-  // Legacy model-family settings are ignored; never infer color from model codes.
-  colorGuidanceGroups?: Record<string, { name: string; productIds: string[]; representativeColor: string }>;
+  // Database key retained for compatibility. New groups select a stable product ID;
+  // representativeColor exists only on previously saved color-only groups.
+  colorGuidanceGroups?: Record<string, { name: string; productIds: string[]; representativeProductId?: string; representativeColor?: string }>;
   /** Company-wide user-edited message snippets used for future copyable output. */
   automaticMessageTemplates?: Record<string, string>;
   /** Staff-authored guidance for tentative manual product selections, keyed by stable product ID. */

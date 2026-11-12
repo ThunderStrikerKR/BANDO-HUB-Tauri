@@ -16,8 +16,8 @@ test("No model code based auto-family groups or prefilled color groups",async()=
   const ui=read("src/ColorGuidanceManager.tsx");
   assert.match(ui,/그룹 생성/);
   assert.match(ui,/기존 상품 검색 및 추가/);
-  assert.match(ui,/실제 상품 색상|상품의 색상 선택|등록된 상품의 색상 선택/);
-  assert.match(ui,/validateColorGuidance/);
+  assert.match(ui,/대표모델/);
+  assert.match(ui,/validateModelGroups/);
   assert.match(ui,/await window.bando.backup\(\)/);
   assert.match(ui,/window.bando.patchSettings/);
   assert.doesNotMatch(read("src/parser.ts"),/baseModelCandidates|modelRepresentatives|modelGroup\(/);
@@ -101,7 +101,7 @@ test("Copy messages notify only after employee action, without dealer choice req
  assert.doesNotMatch(helper,/진행해도 될까요/);
  assert.match(a,/appliedDefaultColorNotice/);
  assert.match(h,/appliedDefaultColorNotice/);
- assert.match(read("src/IssueResolver.tsx"),/기본색상.*선택/);
+ assert.match(read("src/IssueResolver.tsx"),/대표모델.*선택/);
  assert.match(read("src/issue-actions.ts"),/validateColorGroupProducts/);
  const native=read("src-tauri/src/lib.rs");
  assert.match(native,/"colorGuidanceGroups"/);

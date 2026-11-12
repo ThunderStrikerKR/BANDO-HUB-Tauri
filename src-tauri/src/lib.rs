@@ -344,14 +344,48 @@ fn validate_color_guidance(state: &Value) -> Result<(), String> {
     let mut assigned = std::collections::HashSet::new();
     for (id, group) in groups {
         let name = group["name"].as_str().unwrap_or("").trim();
-        let color = group["representativeColor"].as_str().unwrap_or("").trim();
-        if id.trim().is_empty() || name.is_empty() || color.is_empty()
-            || color == "단일" || color == "색상 미표기" {
-            return Err("그룹 이름과 대표색상을 입력하세요.".into());
+        if id.trim().is_empty() || name.is_empty() {
+            return Err("모델군 이름을 입력하세요.".into());
         }
-        if !names.insert(name.to_lowercase()) { return Err("그룹 이름이 중복됩니다.".into()); }
+        if !names.insert(name.to_lowercase()) { return Err("모델군 이름이 중복됩니다.".into()); }
         let members = group["productIds"].as_array().ok_or("소속 상품 형식 오류")?;
-        if members.len() < 2 { return Err("색상이 다른 독립 상품 2개 이상을 등록하세요.".into()); }
+        if members.len() < 2 { return Err("모델군에는 상품을 2개 이상 등록하세요.".into()); }
+
+        // The settings key is kept for SQLite compatibility. New groups are
+        // defined by independent product IDs, not shared color, price or size.
+        if let Some(representative) = group.get("representativeProductId") {
+            let selected = representative.as_str().unwrap_or("").trim();
+            if selected.is_empty() {
+                return Err("모델군에 등록된 실제 상품을 대표모델로 선택하세요.".into());
+            }
+            let mut local = std::collections::HashSet::new();
+            for member in members {
+                let pid = member.as_str().ok_or("상품 ID 오류")?;
+                if !local.insert(pid.to_owned()) || !assigned.insert(pid.to_owned()) {
+                    return Err("같은 상품을 중복하거나 여러 모델군에 등록할 수 없습니다.".into());
+                }
+                products.iter().find(|p|
+                    p["id"].as_str() == Some(pid)
+                    && p["active"] != false
+                    && p["deletedAt"].as_str().is_none()
+                    && p["supersededBy"].as_str().is_none()
+                    && p["catalog"].as_str() != Some("DEMO")
+                    && p["variants"].as_array().is_some_and(|variants|
+                        variants.len() == 1 && variants[0]["source"].as_str() != Some("DEMO")))
+                    .ok_or("활성 독립 판매 상품만 모델군에 등록할 수 있습니다.")?;
+            }
+            if !local.contains(selected) {
+                return Err("대표모델은 모델군에 속한 등록 상품 중 하나여야 합니다.".into());
+            }
+            continue;
+        }
+
+        // Legacy color-only entries remain readable until an employee
+        // explicitly migrates them by choosing a representative product.
+        let color = group["representativeColor"].as_str().unwrap_or("").trim();
+        if color.is_empty() || color == "단일" || color == "색상 미표기" {
+            return Err("기존 대표색상 그룹에 유효한 색상이 없습니다.".into());
+        }
         let mut colors = std::collections::HashSet::new();
         let mut price_reference: Option<(Value,Value,Value)> = None;
         let mut price_known=false;
@@ -410,13 +444,13 @@ fn validate_provisional_product_notices(state: &Value) -> Result<(), String> {
 fn validate_message_templates(state: &Value) -> Result<(), String> {
     let Some(config) = state["settings"].get("automaticMessageTemplates") else { return Ok(()); };
     let entries = config.as_object().ok_or("자동 메시지 설정은 객체여야 합니다.")?;
-    if entries.len() > 19 { return Err("자동 메시지 유형 개수가 올바르지 않습니다.".into()); }
+    if entries.len() > 20 { return Err("자동 메시지 유형 개수가 올바르지 않습니다.".into()); }
     for (key, value) in entries {
         let (vars, required): (&[&str], &[&str]) = match key.as_str() {
             "recipientName" | "requestClosing" | "paymentGreeting"
               | "optionsIntro" | "optionsClosing" => (&[], &[]),
             "addressMissing" | "addressDetail" | "contactMissing" => (&["수취인"], &["수취인"]),
-            "quantityMissing" | "modelMissing" | "modelConfirm" => (&["상품명"], &["상품명"]),
+            "quantityMissing" | "modelMissing" | "modelConfirm" | "modelRepresentative" => (&["상품명"], &["상품명"]),
             "requestRecipient" => (&["번호", "수취인", "확인항목"], &["수취인", "확인항목"]),
             "colorDefault" => (&["색상", "상품명"], &["색상"]),
             "quantityOne" => (&["수취인", "상품명"], &["수취인", "상품명"]),
@@ -1426,5 +1460,42 @@ mod dated_archive_tests {
             assert!(path.starts_with(&root));
         }
         fs::remove_dir_all(&folder).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod representative_model_group_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn same_color_and_different_price_products_can_share_a_model_group() {
+        let state = json!({
+            "settings": {"colorGuidanceGroups": {
+                "staff": {
+                    "name": "709 타공 / 비타공",
+                    "productIds": ["p709", "p709-1", "pglow"],
+                    "representativeProductId": "p709"
+                }
+            }},
+            "products": [
+                {"id":"p709","active":true,
+                 "variants":[{"color":"Black","retail":59000,"wholesale":null,"semi":null}]},
+                {"id":"p709-1","active":true,
+                 "variants":[{"color":"Black","retail":59000,"wholesale":null,"semi":null}]},
+                {"id":"pglow","active":true,
+                 "variants":[{"color":"색상 미표기","retail":7000,"wholesale":null,"semi":null}]}
+            ]
+        });
+        assert!(validate_color_guidance(&state).is_ok());
+        let mut wrong = state.clone();
+        wrong["settings"]["colorGuidanceGroups"]["staff"]["representativeProductId"] =
+            json!("unknown");
+        assert!(validate_color_guidance(&wrong).unwrap_err().contains("대표모델"));
+        wrong["settings"]["colorGuidanceGroups"]["staff"]["representativeProductId"] =
+            json!("p709");
+        wrong["settings"]["colorGuidanceGroups"]["staff"]["productIds"] =
+            json!(["p709", "p709"]);
+        assert!(validate_color_guidance(&wrong).is_err());
     }
 }

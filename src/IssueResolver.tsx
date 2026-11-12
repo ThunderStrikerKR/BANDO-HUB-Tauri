@@ -2,8 +2,7 @@ import { selectionHistory } from "./product-history";
 import { useState } from "react";
 import { ProductSearchDialog } from "./ProductSearchDialog";
 import { resolveProduct } from "./issue-actions";
-import { normalizeColor } from "./domain";
-import { suggestGroupColor } from "./color-guidance";
+import { suggestGroupRepresentative } from "./model-groups";
 import { internalModel } from "./matching";
 import { colorLabel } from "./product-models";
 import { representativeProducts } from "./product-search";
@@ -36,7 +35,7 @@ export function IssueResolver({
     [variant, setVariant] = useState(""),
     [confirmed, setConfirmed] = useState(false),
     [busy, setBusy] = useState(false),
-    [useDefaultColor, setUseDefaultColor] = useState(false);
+    [useRepresentativeModel, setUseRepresentativeModel] = useState(false);
   const candidates = [
     ...new Map(
       [
@@ -60,19 +59,13 @@ export function IssueResolver({
   const exactCandidates = (item.productCandidates ?? [])
     .map(candidate => state.products.find(product => product.id === candidate.productId))
     .filter((product): product is Product => !!product);
-  const defaultGuidance = !item.color || ["색상 미표기", "단일"].includes(item.color)
-    ? suggestGroupColor(state, exactCandidates)
+  const representativeGuidance = suggestGroupRepresentative(state, exactCandidates);
+  const representativeCandidate = representativeGuidance
+    ? candidates.find(product => product.id === representativeGuidance.productId)
     : undefined;
-  const groupProducts = defaultGuidance
-    ? state.settings.colorGuidanceGroups?.[defaultGuidance.groupId]?.productIds ?? []
-    : [];
-  const defaultCandidates = candidates.filter(product =>
-    groupProducts.includes(product.id) &&
-    product.variants.length === 1 &&
-    normalizeColor(product.variants[0].color) === normalizeColor(defaultGuidance?.color ?? "")
-  );
-  const chosenIsDefault = !!chosen && defaultCandidates.some(p => p.id === chosen.id) &&
-    chosen.variants.some(v => v.id === variant && normalizeColor(v.color) === normalizeColor(defaultGuidance?.color ?? ""));
+  const chosenIsRepresentative = !!chosen && !!representativeCandidate &&
+    chosen.id === representativeCandidate.id &&
+    chosen.variants.some(v => v.id === variant);
   const uncertain = ["CATEGORY", "UNKNOWN"].includes(item.match?.kind ?? "UNKNOWN");
   return (
     <>
@@ -102,23 +95,17 @@ export function IssueResolver({
           {step === 2 && (
             <li>
               <b>실제 등록 후보 검토</b>
-              {defaultGuidance && (
+              {representativeGuidance && representativeCandidate && (
                 <div className="family-help">
-                  <p>직원이 사전 등록한 대표색상: <strong>{colorLabel(defaultGuidance.color)}</strong></p>
-                  <p>대표색상은 자동 적용되지 않습니다. 직원이 이 화면에서 선택해야 합니다.</p>
-                  {defaultCandidates.length === 1 && (
-                    <button type="button" onClick={() => {
-                      setChosen(defaultCandidates[0]);
-                      setVariant(defaultCandidates[0].variants[0].id);
-                      setUseDefaultColor(true);
-                    }}>
-                      기본색상 {colorLabel(defaultGuidance.color)} 선택
-                    </button>
-                  )}
-                  {defaultCandidates.length > 1 && (
-                    <p>대표색상에 해당하는 상품이 여러 개입니다. 실제 상품을 직접 선택하세요.</p>
-                  )}
-                  {!defaultCandidates.length && <p>대표색상에 해당하는 등록 상품이 없습니다.</p>}
+                  <p>직원이 등록한 모델군의 대표모델: <strong>{representativeGuidance.productName}</strong></p>
+                  <p>대표모델은 자동 확정되지 않습니다. 실제 발주서와 비교한 후 직원이 선택하세요.</p>
+                  <button type="button" onClick={() => {
+                    setChosen(representativeCandidate);
+                    setVariant(representativeCandidate.variants[0].id);
+                    setUseRepresentativeModel(true);
+                  }}>
+                    대표모델 {representativeGuidance.productName} 선택
+                  </button>
                 </div>
               )}
               <div className="resolver-candidates">
@@ -129,7 +116,7 @@ export function IssueResolver({
                     onClick={() => {
                       setChosen(p);
                       setVariant(p.variants.length === 1 ? p.variants[0].id : "");
-                      setUseDefaultColor(false);
+                      setUseRepresentativeModel(false);
                     }}
                   >
                     <b>{internalModel(p.name)}</b>
@@ -190,14 +177,14 @@ export function IssueResolver({
               <p className="muted">
                 선택한 상품과 상품 링크가 복사용 계좌 안내 메시지에 자동으로 포함됩니다.
               </p>
-              {chosenIsDefault && (
+              {chosenIsRepresentative && (
                 <label className="check">
-                  <input type="checkbox" checked={useDefaultColor}
-                    onChange={e => setUseDefaultColor(e.target.checked)} />
-                  이번 주문은 등록된 기본색상 {colorLabel(defaultGuidance!.color)}으로 처리하고 거래처에 통보
+                  <input type="checkbox" checked={useRepresentativeModel}
+                    onChange={e => setUseRepresentativeModel(e.target.checked)} />
+                  이번 주문은 직원이 선택한 대표모델 {representativeGuidance!.productName}로 처리하고 거래처에 통보
                 </label>
               )}
-              {uncertain && !(useDefaultColor && chosenIsDefault) && (
+              {uncertain && !(useRepresentativeModel && chosenIsRepresentative) && (
                 <label className="check">
                   <input
                     type="checkbox"
@@ -207,7 +194,7 @@ export function IssueResolver({
                   원문 또는 실제 고객 회신으로 이 모델임을 확인했습니다
                 </label>
               )}
-              {uncertain && !(useDefaultColor && chosenIsDefault) && !confirmed && (
+              {uncertain && !(useRepresentativeModel && chosenIsRepresentative) && !confirmed && (
                 <p>
                   모델 적용 후 실제 상품 링크를 포함한 고객 확인 요청을 추가합니다. 고객 확인 전에는
                   단계 진행을 막습니다.
@@ -240,17 +227,17 @@ export function IssueResolver({
                 if (!chosen) return;
                 setBusy(true);
                 try {
-                  const applyDefault = useDefaultColor && chosenIsDefault;
+                  const applyRepresentative = useRepresentativeModel && chosenIsRepresentative;
                   const result = resolveProduct(
                     state,
                     order,
                     recipient.id,
                     item.id,
                     chosen.id,
-                    applyDefault ? "once" : scope,
-                    !applyDefault && uncertain && !confirmed,
+                    applyRepresentative ? "once" : scope,
+                    !applyRepresentative && uncertain && !confirmed,
                     variant,
-                    applyDefault ? defaultGuidance?.groupId : undefined,
+                    applyRepresentative ? representativeGuidance?.groupId : undefined,
                   );
                   await onApply(result.state, result.order);
                   onClose();
@@ -281,7 +268,7 @@ export function IssueResolver({
           onChoose={(p) => {
             setChosen(p);
             setVariant(p.variants.length === 1 ? p.variants[0].id : "");
-            setUseDefaultColor(false);
+            setUseRepresentativeModel(false);
             setSearch(false);
           }}
           onClose={() => setSearch(false)}

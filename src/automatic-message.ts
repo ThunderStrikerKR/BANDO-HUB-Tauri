@@ -1,5 +1,6 @@
 import { validProductUrl } from "./domain.js";
 import { appliedDefaultColorNotice } from "./color-guidance.js";
+import { appliedRepresentativeModelNotice } from "./model-groups.js";
 import { renderAutomaticTemplate } from "./automatic-message-templates.js";
 import { hubMessages } from "./hub-messages.js";
 import { groupAccount, groupOrder, groupStep, workflowIssues } from "./workflow.js";
@@ -58,7 +59,10 @@ export function automaticMessage(state: State, gid: string, includeLinks = false
           return [(row.items.find((item) => item.id === i.itemId)?.name || "상품") + " 모델 / 옵션"];
         return [];
       });
-    const colorNotices = row.items.map(i=>appliedDefaultColorNotice(i,state.settings)).filter(Boolean);
+    const colorNotices = row.items.flatMap(i=>[
+      appliedDefaultColorNotice(i,state.settings),
+      appliedRepresentativeModelNotice(i,state.settings),
+    ]).filter(Boolean);
     if (labels.length || custom.length || colorNotices.length) {
       if (labels.length || custom.length) requiresCustomerResponse = true;
       const links = row.items

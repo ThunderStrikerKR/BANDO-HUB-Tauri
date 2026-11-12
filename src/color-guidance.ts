@@ -47,7 +47,7 @@ export function validateColorGuidance(state: State) {
     names.add(key);
     if (!group.productIds?.length || group.productIds.length !== new Set(group.productIds).size)
       throw Error("그룹에 중복 없이 실제 상품을 등록하세요.");
-    validateColorGroupProducts(state,group.productIds,group.representativeColor);
+    validateColorGroupProducts(state,group.productIds,group.representativeColor ?? "");
     for (const productId of group.productIds) {
       if (!active.has(productId)) throw Error("활성 판매 상품만 추가할 수 있습니다.");
       if (members.has(productId)) throw Error("같은 상품을 여러 그룹에 등록할 수 없습니다.");
@@ -66,7 +66,7 @@ export function suggestGroupColor(state: State, candidates: Product[]): ColorGui
     g.productIds?.length && ids.every(id=>g.productIds.includes(id)));
   if (matches.length !== 1) return undefined;
   const [groupId,group] = matches[0];
-  if (!validGroup(state,group.productIds,group.representativeColor)) return undefined;
+  if (!validGroup(state,group.productIds,group.representativeColor ?? "")) return undefined;
   const color = colorLabel(group.representativeColor ?? "").trim();
   return color && !["단일","색상 미표기"].includes(color) ? {groupId,color} : undefined;
 }

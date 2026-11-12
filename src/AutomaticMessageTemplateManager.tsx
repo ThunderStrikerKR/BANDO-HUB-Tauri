@@ -89,7 +89,7 @@ export function AutomaticMessageTemplateManager({
         <h2>상황별 자동 메시지 <HelpTooltip title="상황별 자동 메시지" purpose="거래처에 복사해서 보낼 안내 문구를 상황에 맞게 미리 수정합니다." when="자주 사용하는 확인 요청이나 입금 안내 문구를 바꾸고 싶을 때 사용합니다." steps={["왼쪽 목록에서 수정할 안내 문구를 선택합니다.", "오른쪽 입력창에서 문구를 수정합니다.", "아래 미리보기로 실제 안내 문장을 확인합니다.", "변경사항 저장을 눌러 저장합니다."]} result="새로 생성하는 복사용 안내 문구에 저장한 내용이 적용됩니다." caution="금액 계산이나 주문 자체는 바뀌지 않습니다." /></h2>
       </header>
       <div className="family-list-scroll">
-        {(["확인 안내","색상 및 수량","입금 안내"] as const).map(category=>
+        {(["확인 안내","색상 및 수량","모델 및 옵션","입금 안내"] as const).map(category=>
           <div key={category}>
             <h3>{category}</h3>
             {AUTOMATIC_TEMPLATE_IDS.filter(id=>AUTOMATIC_MESSAGE_TEMPLATES[id].category===category)

@@ -986,7 +986,7 @@ try {
   // Child-tab samples use the same real browser and keep the draft state untouched.
   // Their computed metrics reveal overrides hidden by top-level-only snapshots.
   await navMenu.getByRole("button",{name:"상품 관리"}).click();
-  for(const label of ["상품 목록","카테고리 관리","대표색상 관리","별칭 관리","브랜드 관리"]){
+  for(const label of ["상품 목록","카테고리 관리","모델군 관리","별칭 관리","브랜드 관리"]){
     await navPage.getByRole("navigation",{name:"상품 관리 메뉴"}).getByRole("button",{name:label,exact:true}).click();
     await samplePageStyle("상품 관리 / "+label);
     if(label==="별칭 관리" || label==="브랜드 관리"){
@@ -1559,7 +1559,7 @@ try {
   assert.equal((await mockState()).state.aliases.find(a => a.id==="ci-alias-a").text,"CI회귀별칭A저장검사");
   console.log("PASS: alias target switch Save / Discard / Cancel");
 
-  await productSubnav.getByRole("button", {name:"대표색상 관리"}).click();
+  await productSubnav.getByRole("button", {name:"모델군 관리"}).click();
   const colorName = navPage.locator("#new-color-group");
   const colorForm = await navPage.locator(".family-create-form").evaluate((form) => {
     const field = form.querySelector(".field");
@@ -1580,14 +1580,14 @@ try {
   assert.equal(colorForm.marginBottom, "0px", JSON.stringify(colorForm));
   assert.ok(colorForm.buttonHeight >= 32 && colorForm.buttonHeight <= 44, JSON.stringify(colorForm));
   assert.ok(colorForm.buttonLeft >= colorForm.inputRight, JSON.stringify(colorForm));
-  await colorName.fill("CI 미등록 대표색상");
+  await colorName.fill("CI 미등록 모델군");
   await navMenu.getByRole("button", {name:"거래처 관리"}).click();
   await checkPrompt("unregistered color group name");
   await leave.getByRole("button", {name:"취소",exact:true}).click();
-  assert.equal(await colorName.inputValue(),"CI 미등록 대표색상");
+  assert.equal(await colorName.inputValue(),"CI 미등록 모델군");
   await navMenu.getByRole("button", {name:"거래처 관리"}).click();
   await leave.getByRole("button", {name:"저장",exact:true}).click();
-  assert.equal(await colorName.inputValue(),"CI 미등록 대표색상");
+  assert.equal(await colorName.inputValue(),"CI 미등록 모델군");
   await navMenu.getByRole("button", {name:"거래처 관리"}).click();
   await leave.getByRole("button", {name:"저장 안 함"}).click();
   assert.equal((await mockState()).state.settings.colorGuidanceGroups?.length ?? 0,0);
@@ -2044,7 +2044,7 @@ try {
         const extraTabs=[
           ["상품 관리","상품 관리 메뉴",
             [["카테고리 관리",".management-scroll"],
-              ["대표색상 관리",".management-scroll"],
+              ["모델군 관리",".management-scroll"],
               ["별칭 관리",".management-scroll"],
               ["브랜드 관리",".management-scroll"]]],
           ["운임 관리",null,
@@ -2427,7 +2427,7 @@ try {
   cleanEditorChecks.push("미등록 배송 그룹명 / 공백");
 
   await navPage.getByRole("navigation",{name:"상품 관리 메뉴"})
-    .getByRole("button",{name:"대표색상 관리",exact:true}).click();
+    .getByRole("button",{name:"모델군 관리",exact:true}).click();
   await navPage.locator("#new-color-group").fill("   ");
   await navMenu.getByRole("button",{name:"거래처 관리",exact:true}).click();
   assert.equal(await navPage.locator("dialog.app-action-dialog[open]").count(),0,
