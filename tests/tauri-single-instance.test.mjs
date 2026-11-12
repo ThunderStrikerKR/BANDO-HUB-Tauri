@@ -26,7 +26,10 @@ test("production and developer TEST have separate Windows instance identities", 
   assert.match(native, /CreateMutexW/);
   assert.match(native, /CreateEventW/);
   assert.match(native, /SetEvent\(event\)/);
-  assert.match(native, /WaitForSingleObject\(guard\.activate_event, INFINITE\)/);
+  assert.match(native, /WaitForSingleObject\(event, INFINITE\)/);
+  assert.match(native, /app\.manage\(guard\)/);
+  assert.match(native, /\.share_mode\(0\)/);
+  assert.match(native, /ERROR_SHARING_VIOLATION/);
   assert.match(native, /window\.show\(\)/);
   assert.match(native, /window\.unminimize\(\)/);
   assert.match(native, /window\.set_focus\(\)/);

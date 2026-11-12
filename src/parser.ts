@@ -274,7 +274,7 @@ export function recommendModels(value: string, state: State) {
 }
 const person = (s: string) =>
   /^[가-힣]{2,5}(?:님)?$/.test(s) &&
-  !/^(?:주소|배송지|배송주소|받는곳|보내는곳|연락처|전화번호|사무실|행정실)$/.test(s) &&
+  !/^(?:주소|배송지|배송주소|받는곳|보내는곳|연락처|전화번호|사무실|행정실|반도|반도스탠드|민판|무타공|비타공|한개|두개|세개)$/.test(s) &&
   // A destination institution at the end of an address is not an additional
   // recipient. Keep it inside the address. Explicit standalone institutions
   // are still recognized separately in order-evidence.ts.
@@ -465,7 +465,16 @@ function parseLegacy(raw: string, selectedClient: Client | undefined, state: Sta
             .trim()
             .replace(/[:：,]/g, " ")
             .trim();
-      for (const n of before.split(/[,/\s]+/).filter(person)) {
+      // In a combined one-line order, never treat "반도", "민판" or
+      // quantity words as names. After an item quantity, only the final
+      // explicit person token before the address can be the recipient.
+      const afterQuantity = before.match(
+        /(?:\d+|한|두|세|네)\s*(?:개|대|ea|pcs)\s+([가-힣]{2,5})(?:님)?\s*$/i,
+      );
+      const possibleNames = afterQuantity
+        ? [afterQuantity[1]]
+        : before.split(/[,/\s]+/).filter(person);
+      for (const n of possibleNames.filter(person)) {
         const at = remainder.indexOf(n);
         assign(r, "name", n.replace(/님$/, ""), offset + at, offset + at + n.length);
       }

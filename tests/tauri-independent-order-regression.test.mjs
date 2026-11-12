@@ -215,14 +215,18 @@ test("T26: 민판 709 resolves to the separately registered 709-1 unperforated s
     assert.equal(item.quantity, 1, raw);
   }
 });
-test("T27: -1 is NOT a perforation flag on non-score GT, SS and Desk stands", () => {
+test("T27: -1 is NOT a perforation flag on non-score GT, SS and Desk stands", async () => {
+  const {scoreStandTop} = await tsImport("../src/product-name-match.ts", import.meta.url);
   const score = seed.products.filter(p=>p.category.startsWith("보면대"));
   const controls = seed.products.filter(p=>/^(?:BD )?(?:GT-1|SS-1|Desk TS-1)\b/i.test(p.name));
   assert.ok(controls.length > 0);
   assert.ok(score.some(p=>p.name.startsWith("BD 709-1")));
   for (const p of controls) {
     assert.ok(!p.category.startsWith("보면대"));
+    assert.equal(scoreStandTop(p), null);
   }
+  assert.equal(scoreStandTop(score.find(p=>p.name.startsWith("BD 709-1 /"))),"UNPERFORATED");
+  assert.equal(scoreStandTop(score.find(p=>p.name.startsWith("BD 709 /"))),"PERFORATED");
 });
 test("T28: common hyphen/space variants and text-only model names resolve", () => {
   const samples = [

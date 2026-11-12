@@ -122,5 +122,9 @@ export function registeredNameCandidates(products: Product[], source: string): P
   }
 
   const priority = Math.max(...constrained.map(x=>x.found.priority));
-  return constrained.filter(x=>x.found.priority===priority).map(x=>x.product);
+  const result = constrained.filter(x=>x.found.priority===priority);
+  // A descriptive title shared by several distinct models is a category,
+  // not a product identity. "보면대카트" alone must not link Cart-10/Cart-20.
+  if (priority === 1 && result.length > 1) return [];
+  return result.map(x=>x.product);
 }
