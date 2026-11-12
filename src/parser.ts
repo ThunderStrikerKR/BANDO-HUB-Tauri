@@ -387,8 +387,7 @@ function parseLegacy(raw: string, selectedClient: Client | undefined, state: Sta
           known =
             !labelled &&
             (registeredProducts(state.products).some((p) =>
-              normalizeCode(productNameHead(p)).replace(/^BD/, "") === key),
-            ) ||
+              normalizeCode(productNameHead(p)).replace(/^BD/, "") === key) ||
               state.aliases.some(
                 (a) =>
                   (a.clientId === null || a.clientId === client.id) &&
