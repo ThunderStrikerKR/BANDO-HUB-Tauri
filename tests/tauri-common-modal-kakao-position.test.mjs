@@ -42,6 +42,14 @@ test("brief modal contents do not inherit the old global 820px blank canvas", ()
   assert.ok(editorStyles.includes("height: min(566px"));
 });
 
+test("product fields respond to remaining modal width, not global viewport width", () => {
+  assert.ok(products.includes("container-type: inline-size"));
+  assert.ok(products.includes("@container (max-width: 760px)"));
+  assert.ok(products.includes(".app-modal-layer.product-detail-dialog .product-detail-top"));
+  assert.ok(products.includes("flex-wrap: wrap"));
+  assert.ok(products.includes("min-width: 0"));
+});
+
 test("order item correction reuses Modal, fixed outer bounds and scrollable search", () => {
   assert.ok(editor.includes("<Modal"));
   assert.ok(editor.includes('className="order-item-editor-modal"'));

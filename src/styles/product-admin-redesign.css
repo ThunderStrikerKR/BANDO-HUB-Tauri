@@ -33,6 +33,9 @@
 .app-modal-layer.product-detail-dialog .modal-fields {
   display: flex; flex-direction: column; min-height: 0; flex: 1;
   overflow: hidden; margin: 0; padding: 0; border: none;
+  /* React to the modal's REAL available width after native KakaoTalk reservation,
+     not the whole monitor/viewport width. */
+  container-type: inline-size;
 }
 .product-detail-body {
   flex: 1; min-height: 0; padding: 22px 24px; overflow-y: auto; overflow-x: auto;
@@ -250,4 +253,34 @@
 @media (max-width: 720px) {
   .product-detail-top { min-width: 680px; }
   .product-detail-wide-fields,.product-detail-advanced { min-width: 680px; }
+}
+
+/* The native KakaoTalk window reduces the usable modal width even when the
+   screen is 1024px or wider. Viewport-only @media cannot detect that shrink.
+   The product edit body is already independently vertically scrollable. */
+@container (max-width: 760px) {
+  .app-modal-layer.product-detail-dialog .product-detail-body {
+    padding: 14px 16px;
+  }
+  .app-modal-layer.product-detail-dialog .product-detail-top {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    min-width: 0;
+  }
+  .app-modal-layer.product-detail-dialog .product-detail-image-column {
+    width: min(260px, 100%);
+  }
+  .app-modal-layer.product-detail-dialog .product-detail-image {
+    width: min(260px, 100%);
+    height: auto;
+  }
+  .app-modal-layer.product-detail-dialog .product-detail-right-fields {
+    flex: 1 1 270px;
+    min-width: 0;
+  }
+  .app-modal-layer.product-detail-dialog .product-detail-wide-fields,
+  .app-modal-layer.product-detail-dialog .product-detail-advanced {
+    min-width: 0;
+  }
 }
