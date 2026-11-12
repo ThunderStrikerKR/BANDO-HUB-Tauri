@@ -86,6 +86,10 @@ test("failed layout switches are reversible and do not disconnect current KakaoT
   assert.match(related,/for \(hwnd,before\) in snapshots/);
   assert.match(native,/inner\.restore_related\(\)/);
   assert.match(native,/native::restore\(&s\)/);
+  const restore=native.split("pub fn restore(s:&Session)")[1]?.split("#[cfg(test)]")[0];
+  assert.ok(restore);
+  assert.doesNotMatch(restore,/SetWindowPlacement\(s\.main/);
+  assert.match(restore,/SetWindowPlacement\(s\.hwnd/);
 });
 
 test("connecting to an invalid HWND does not drop the existing session",()=>{

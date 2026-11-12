@@ -481,7 +481,7 @@ mod native {
             .find(|(_,kind)|*kind=="CHAT") {
             *active_chat=Some(*hwnd);
         }
-        if active_chat.is_some_and(|hwnd|
+        if (*active_chat).is_some_and(|hwnd|
             !all.iter().any(|(h,kind)|*h==hwnd&&*kind=="CHAT")){
             *active_chat=all.iter().rev()
                 .find(|(_,kind)|*kind=="CHAT").map(|(hwnd,_)|*hwnd);
@@ -566,9 +566,8 @@ mod native {
             set_z(s.hwnd,s.original_topmost);
             unsafe{SetWindowPlacement(s.hwnd,&s.kakao_original);}
         }
-        if s.mode==Mode::Stack && belongs_to_current_app(s.main){
-            unsafe{SetWindowPlacement(s.main,&s.main_original);}
-        }
+        // Both Kakao viewing layouts stay inside the reserved Kakao pane.
+        // Never rewind the BANDO HUB window position when disconnecting.
     }
     #[cfg(test)]
     mod tests{
