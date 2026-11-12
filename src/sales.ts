@@ -18,7 +18,7 @@ export function splitSales(input: State): State {
       continue;
     }
     const family =
-      p.modelKey ?? (p.catalog ?? "BANDOSTAND") + "|" + p.code.replace(/\s/g, "").toUpperCase();
+      p.modelKey ?? (p.catalog ?? "BANDOSTAND") + "|PRODUCT:" + p.id;
     for (const [index, variant] of p.variants.entries()) {
       const id = index === 0 ? p.id : p.id + "~sale~" + encodeURIComponent(variant.id);
       if (products.some((x) => x.id === id)) throw Error("상품 ID 충돌: " + id);

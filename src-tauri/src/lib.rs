@@ -78,7 +78,7 @@ fn write_snapshot(conn: &mut Connection, mut state: Value, expected_revision: u6
         let mut insert = tx.prepare("INSERT INTO product_index(id,code,name,payload) VALUES (?1,?2,?3,?4)").map_err(err)?;
         for product in state["products"].as_array().ok_or("상품 데이터 오류")? {
             let id = product["id"].as_str().ok_or("상품 ID 누락")?;
-            let code = product["code"].as_str().ok_or("상품 코드 누락")?;
+            let code = product["code"].as_str().unwrap_or("");
             let name = product["name"].as_str().ok_or("상품명 누락")?;
             insert.execute(params![id, code, name, serde_json::to_string(product).map_err(err)?]).map_err(err)?;
         }
@@ -261,7 +261,7 @@ fn initialize_database(path: &Path) -> Result<Connection, String> {
             for product in seed["products"].as_array().ok_or("상품 초기 데이터 누락")? {
                 insert.execute(params![
                     product["id"].as_str().ok_or("상품 ID 누락")?,
-                    product["code"].as_str().ok_or("상품 코드 누락")?,
+                    product["code"].as_str().unwrap_or(""),
                     product["name"].as_str().ok_or("상품명 누락")?,
                     serde_json::to_string(product).map_err(err)?
                 ]).map_err(err)?;

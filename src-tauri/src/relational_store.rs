@@ -165,7 +165,7 @@ pub(super) fn store(tx: &Transaction<'_>, state: &Value) -> Result<(), String> {
         for (i, p) in source_list(state, "products")?.iter().enumerate() {
             let id = required_id(p,"상품")?;
             require_unique(&mut product_ids,id,"상품")?;
-            let code = p["code"].as_str().ok_or("상품 모델코드 누락")?;
+            let code = p["code"].as_str().unwrap_or("");
             let name = p["name"].as_str().ok_or("상품명 누락")?;
             statement.execute(params![id,i as i64,code,name,payload(p,Some("variants"))?]).map_err(err)?;
         }
@@ -403,7 +403,7 @@ pub(super) fn migrate(conn:&mut Connection)->Result<(),String>{
         ).map_err(err)?;
         for p in source_list(&state,"products")?{
             insert.execute(params![required_id(p,"상품")?,
-                p["code"].as_str().ok_or("상품 코드 누락")?,
+                p["code"].as_str().unwrap_or(""),
                 p["name"].as_str().ok_or("상품명 누락")?,payload(p,None)?]
             ).map_err(err)?;
         }

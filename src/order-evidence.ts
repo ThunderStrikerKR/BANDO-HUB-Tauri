@@ -254,7 +254,7 @@ export function analyzeEvidence(
     const knownNumericModel =
       contactValue &&
       state.products.some((p) =>
-        [p.code, ...(p.modelCodes ?? [])].some(
+        [p.name.split("/")[0].trim()].some(
           (code) =>
             code.replace(/^BD\s*/i, "").replace(/\s/g, "") === contactValue.replace(/\s/g, ""),
         ),
