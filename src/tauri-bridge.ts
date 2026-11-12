@@ -76,6 +76,7 @@ const api: Api = {
   chooseExcelDirectory: async () => (await invoke<string | null>("choose_excel_directory")) ?? undefined,
   openExcelDirectory: () => invoke<void>("open_excel_directory"),
   openExportFile: (id) => invoke<void>("open_export_file", { id }),
+  openExportDirectory: (id) => invoke<void>("open_export_directory", { id }),
   previewImport: async (url) => {
     const html = await invoke<string>("fetch_official_product_html", { target: url });
     const state = await invoke<State>("state_load");

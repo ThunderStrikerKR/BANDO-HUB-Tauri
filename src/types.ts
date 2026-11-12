@@ -627,6 +627,7 @@ export interface Api {
   chooseExcelDirectory: () => Promise<string | undefined>;
   openExcelDirectory: () => Promise<void>;
   openExportFile: (id: string) => Promise<void>;
+  openExportDirectory: (id: string) => Promise<void>;
   previewImport: (url: string) => Promise<ImportPreview>;
   officialList: () => Promise<OfficialLink[]>;
   copy: (text: string) => Promise<void>;
