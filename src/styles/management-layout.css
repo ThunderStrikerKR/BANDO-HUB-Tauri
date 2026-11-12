@@ -161,16 +161,27 @@
   height: var(--manage-control-height);
 }
 
-/* A tab bar always follows title/summary and precedes search/content.
-   Keep tabs on a single line when space allows, and wrap only when required. */
+/* Shared tabs across Excel, products, clients, freight, settings and
+   nested tabs. Equal-width buttons size to the longest label; the bar must
+   not stretch across the whole page. Narrow workspaces scroll horizontally
+   instead of squeezing text or pushing tabs to multiple rows. */
 .app-v03 .management-container .management-tabbar {
   box-sizing: border-box;
-  display: flex;
+  display: inline-grid;
+  grid-auto-flow: column;
+  grid-template-columns: none;
+  grid-auto-columns: minmax(max-content, 1fr);
   align-items: stretch;
-  flex-wrap: wrap;
+  justify-content: start;
   gap: 4px;
-  width: 100%;
+  width: max-content;
+  max-width: 100%;
   min-width: 0;
+  align-self: flex-start;
+  flex: 0 0 auto;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
   margin: 0 0 12px;
   padding: 3px;
   background: var(--manage-toolbar-surface);
@@ -179,8 +190,9 @@
 }
 .app-v03 .management-container .management-tabbar > button {
   box-sizing: border-box;
-  flex: 1 1 110px;
+  flex: none;
   min-width: max-content;
+  width: 100%;
   height: var(--manage-tab-height);
   min-height: var(--manage-tab-height);
   padding: 6px 12px;
@@ -199,7 +211,8 @@
 }
 .app-v03 .management-container .settings-tab-list.management-tabbar .settings-tab {
   box-sizing: border-box;
-  flex: 1 1 112px;
+  flex: none;
+  width: 100%;
   height: var(--manage-tab-height);
   min-height: var(--manage-tab-height);
   padding: 6px 12px;
@@ -220,6 +233,12 @@
   border-radius: 0;
 }
 .app-v03 .management-container .shipping-tabs.management-tabbar {
+  display: inline-grid;
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(max-content, 1fr);
+  width: max-content;
+  max-width: 100%;
   border-bottom: 1px solid #454545;
   margin-bottom: 12px;
 }
@@ -383,6 +402,18 @@
   align-items: center;
 }
 .app-v03 .management-container .excel-fixed-footer small { min-width: 0; }
+.app-v03 .management-container .excel-fixed-footer .excel-footer-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  flex: 0 0 auto;
+  gap: 8px;
+}
+.app-v03 .management-container .excel-fixed-footer .excel-footer-actions > button {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
 
 /* Table workspaces should not add a full card's padding on every side of a
    toolbar and again around the table; preserve clear header row separators. */
@@ -603,7 +634,6 @@
     flex-wrap: wrap;
   }
   .app-v03 .management-container .management-search-field { flex-basis: 100%; }
-  .app-v03 .management-container .management-tabbar > button { flex-basis: 125px; }
 
   /* Freight assignment has only one search and one filter. Preserve both at
      full control height in a single row rather than consuming two rows. */

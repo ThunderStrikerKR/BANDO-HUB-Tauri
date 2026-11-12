@@ -402,6 +402,7 @@ export function WorkflowQueue({
         {scope !== "HISTORY" && <small className="muted">저장 위치는 Windows 저장 창에서 선택합니다. 파일 작성은 발송 완료가 아닙니다.</small>}
         {companyMissing && onSettings && <button onClick={onSettings}>반도스탠드 정보 설정</button>}
         {scope !== "HISTORY" && (
+          <div className="excel-footer-actions">
           <button
             className="primary"
             disabled={busy || !chosen.length}
@@ -469,6 +470,18 @@ export function WorkflowQueue({
           >
             {scope === "STORE" ? "선택 " + chosen.length + "건 매장 Excel 작성" : "선택 " + chosen.length + "건 공장 Excel 작성"}
           </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void run(async () => {
+              await window.bando!.openDailyExcelDirectory(scope === "FACTORY" ? "FACTORY" : "STORE");
+            })}
+            aria-label={scope === "FACTORY" ? "오늘 공장 Excel 폴더 열기" : "오늘 매장 Excel 폴더 열기"}
+            title="오늘 날짜의 Excel 저장 폴더 열기"
+          >
+            폴더 열기
+          </button>
+          </div>
         )}
       </footer>
     </section>

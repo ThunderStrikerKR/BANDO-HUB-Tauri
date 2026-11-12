@@ -193,36 +193,6 @@ export function ShippingManager({
           <span className="shipping-version">운임 기준 {shipping.epoch}</span>
         </div>}
       />
-      <div className="shipping-stats">
-        <article>
-          <span>등록 상품</span>
-          <b>
-            {products.length}
-            <small>개</small>
-          </b>
-        </article>
-        <article>
-          <span>그룹 지정 완료</span>
-          <b>
-            {products.length - unassigned}
-            <small>개</small>
-          </b>
-        </article>
-        <article className="pending-stat">
-          <span>그룹 미지정</span>
-          <b>
-            {unassigned}
-            <small>개</small>
-          </b>
-        </article>
-        <article>
-          <span>배송 그룹</span>
-          <b>
-            {shipping.groups.filter((g) => !g.deletedAt).length}
-            <small>개</small>
-          </b>
-        </article>
-      </div>
       <div className="shipping-tabs management-tabbar" role="group" aria-label="배송 관리">
         <button
           aria-pressed={tab === "products"}
@@ -252,6 +222,36 @@ export function ShippingManager({
         >
           조합 / 기준 이력
         </button>
+      </div>
+      <div className="shipping-stats">
+        <article>
+          <span>등록 상품</span>
+          <b>
+            {products.length}
+            <small>개</small>
+          </b>
+        </article>
+        <article>
+          <span>그룹 지정 완료</span>
+          <b>
+            {products.length - unassigned}
+            <small>개</small>
+          </b>
+        </article>
+        <article className="pending-stat">
+          <span>그룹 미지정</span>
+          <b>
+            {unassigned}
+            <small>개</small>
+          </b>
+        </article>
+        <article>
+          <span>배송 그룹</span>
+          <b>
+            {shipping.groups.filter((g) => !g.deletedAt).length}
+            <small>개</small>
+          </b>
+        </article>
       </div>
       {tab === "products" && (
         <ProductFreightPanel state={{ ...state, shipping }} onSave={onSave} onNotice={onNotice} />

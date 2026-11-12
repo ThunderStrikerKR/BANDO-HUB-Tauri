@@ -626,6 +626,7 @@ export interface Api {
   patchSettings?: (changes: Record<string, unknown>, expected: Record<string, unknown>) => Promise<State>;
   chooseExcelDirectory: () => Promise<string | undefined>;
   openExcelDirectory: () => Promise<void>;
+  openDailyExcelDirectory: (kind: "FACTORY" | "STORE") => Promise<void>;
   openExportFile: (id: string) => Promise<void>;
   openExportDirectory: (id: string) => Promise<void>;
   previewImport: (url: string) => Promise<ImportPreview>;

@@ -666,6 +666,21 @@ fn open_excel_directory(db: State<'_, Database>) -> Result<(), String> {
 }
 
 
+// Date folders are only addressed by a fixed output category. Never accept
+// a filesystem path from the frontend for opening an Explorer window.
+#[tauri::command]
+fn open_daily_excel_directory(db: State<'_, Database>, kind: String) -> Result<(), String> {
+    let workbook_kind = match kind.as_str() {
+        "FACTORY" => WorkbookKind::Factory,
+        "STORE" => WorkbookKind::Store,
+        _ => return Err("공장 또는 매장 Excel 폴더만 열 수 있습니다.".into()),
+    };
+    let state = get_snapshot(&*lock_db(&db)?)?;
+    let root = workspace_excel_directory(&db, &state["settings"])?;
+    let today = archive_daily_directory(&root, workbook_kind, Local::now())?;
+    open::that(today).map_err(err)
+}
+
 #[derive(Debug, Clone, Copy)]
 enum WorkbookKind {
     Factory,
@@ -1092,7 +1107,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             state_load, state_save, settings_patch, price_set, clipboard_write, clipboard_read,
             ocr::capture_ocr,
-            product_open, catalog_report, catalog_approve, receipt_archive, backup_create, backup_list, backup_restore, choose_excel_directory, open_excel_directory,
+            product_open, catalog_report, catalog_approve, receipt_archive, backup_create, backup_list, backup_restore, choose_excel_directory, open_excel_directory, open_daily_excel_directory,
             factory_reply_watch::choose_factory_reply_directory,
             factory_reply_watch::factory_reply_watch_scan,
             factory_reply_watch::factory_reply_watch_commit,
@@ -1366,6 +1381,27 @@ mod dated_archive_tests {
         assert!(first.to_string_lossy().contains("07일"));
         assert_eq!(fs::read(&first).unwrap(), bytes);
         assert_eq!(fs::read(&second).unwrap(), bytes);
+        fs::remove_dir_all(&folder).unwrap();
+    }
+
+    #[test]
+    fn today's_factory_and_store_folders_are_separate_and_safe_to_create() {
+        let unique = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
+        let folder = std::env::temp_dir()
+            .join(format!("bando-today-folder-{}-{unique}", std::process::id()));
+        fs::create_dir_all(&folder).unwrap();
+        let root = canonical_excel_directory(&folder).unwrap();
+        let date = Local.with_ymd_and_hms(2026, 11, 13, 12, 0, 0).single().unwrap();
+        let factory = archive_daily_directory(&root, WorkbookKind::Factory, date.clone()).unwrap();
+        let store = archive_daily_directory(&root, WorkbookKind::Store, date).unwrap();
+        assert_ne!(factory, store);
+        assert!(factory.is_dir());
+        assert!(store.is_dir());
+        assert!(factory.starts_with(&root));
+        assert!(store.starts_with(&root));
+        assert!(factory.ends_with(Path::new("공장 발송/2026년/11월/13일")));
+        assert!(store.ends_with(Path::new("매장 발송/2026년/11월/13일")));
         fs::remove_dir_all(&folder).unwrap();
     }
 

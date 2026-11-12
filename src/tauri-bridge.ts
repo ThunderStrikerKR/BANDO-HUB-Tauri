@@ -75,6 +75,7 @@ const api: Api = {
   // The old Electron secondary-write IPC is intentionally not duplicated.
   chooseExcelDirectory: async () => (await invoke<string | null>("choose_excel_directory")) ?? undefined,
   openExcelDirectory: () => invoke<void>("open_excel_directory"),
+  openDailyExcelDirectory: (kind) => invoke<void>("open_daily_excel_directory", { kind }),
   openExportFile: (id) => invoke<void>("open_export_file", { id }),
   openExportDirectory: (id) => invoke<void>("open_export_directory", { id }),
   previewImport: async (url) => {
