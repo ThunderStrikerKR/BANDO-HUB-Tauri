@@ -247,7 +247,10 @@
 .app-modal-layer > .modal {
   display: flex;
   flex-direction: column;
-  height: min(820px, calc(100dvh - 36px));
+  /* Ordinary dialogs size to their content; long editors retain their own
+     explicit fixed heights and scroll owners. */
+  height: auto;
+  max-height: calc(100dvh - var(--modal-viewport-gutter));
   overflow: hidden;
 }
 .app-modal-layer .modal > header {

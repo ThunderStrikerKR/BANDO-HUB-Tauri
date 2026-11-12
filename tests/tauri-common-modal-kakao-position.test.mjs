@@ -28,8 +28,20 @@ test("all shared modals are centered within the unoccluded app width", () => {
 test("product detail dialog cannot reset the shared placement back to full viewport", () => {
   assert.match(productAdmin,/\.app-modal-layer\.product-detail-dialog \{/);
   assert.match(productAdmin, /inset: 0 0 0 var\(--kakao-reserved-width, 0px\)/);
-  assert.doesNotMatch(productAdmin, /inset: 0;/);
+  const detailRule = productAdmin.match(/\\.app-modal-layer\\.product-detail-dialog\\s*\\{([^}]*)\\}/)?.[1];
+  assert.ok(detailRule, "Product dialog rule missing");
+  assert.doesNotMatch(detailRule, /inset:\\s*0\\s*;/);
   assert.match(productAdmin, /max-width: max\(0px, calc\(100vw - var\(--kakao-reserved-width, 0px\) - 36px\)\)/);
+});
+
+test("simple shared dialogs use intrinsic height while large editors own fixed heights", () => {
+  const universal = read("src/styles/patch-v0808.css");
+  assert.match(universal, /\\.app-modal-layer > \\.modal \\{[\\s\\S]*?height: auto;/);
+  assert.doesNotMatch(universal.match(/\\.app-modal-layer > \\.modal \\{([^}]*)\\}/)?.[1] ?? "", /820px/);
+  const clientEditor = read("src/styles/client-editor.css");
+  assert.match(clientEditor, /height: min\\(820px/);
+  assert.match(productAdmin, /height: min\\(820px/);
+  assert.match(detail, /height: min\\(566px/);
 });
 
 test("order editor uses one shared modal; fixed box and internal search scroll persist", () => {
