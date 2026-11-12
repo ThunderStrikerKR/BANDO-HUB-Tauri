@@ -93,7 +93,7 @@ export function ProductManager({
       p.catalog !== "DEMO" &&
       !p.variants.some((v) => v.source === "DEMO") &&
       classifiedIds.has(p.id) &&
-      (p.name + " " + p.code + " " + (p.subtitle ?? "") + " " + (p.originalName ?? ""))
+      (p.name + " " + (p.subtitle ?? "") + " " + (p.originalName ?? ""))
         .toLowerCase()
         .replace(/\s/g, "")
         .includes(search.toLowerCase().replace(/\s/g, "")) &&

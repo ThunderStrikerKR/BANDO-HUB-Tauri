@@ -51,7 +51,7 @@ export function ColorGuidanceManager({state,onRefresh,query=""}: {
   const memberships=new Map(rows.flatMap(g=>g.productIds.map(id=>[id,g.name] as const)));
   const choices=registeredProducts(draft.products).filter(p=>
     search.trim()&&!active?.productIds.includes(p.id)&&
-    (p.name+" "+p.code+" "+(p.subtitle??"")).toLocaleLowerCase()
+    (p.name+" "+(p.subtitle??"")).toLocaleLowerCase()
       .includes(search.trim().toLocaleLowerCase())
   ).slice(0,30);
   const save=async(): Promise<boolean>=>{
@@ -167,7 +167,7 @@ export function ColorGuidanceManager({state,onRefresh,query=""}: {
           <div className="family-members-section">
             <div className="family-section-heading"><h3>기존 상품 검색 및 추가</h3></div>
             <input aria-label="대표색상 그룹 상품 검색" value={search}
-              placeholder="상품명이나 모델코드로 찾아서 추가"
+              placeholder="상품명으로 찾아서 추가"
               onChange={e=>setSearch(e.target.value)}/>
             <div className="family-search-results">
               {choices.map(p=><div className="family-member" key={p.id}>

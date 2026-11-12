@@ -61,12 +61,12 @@ function sampleProduct(state: State) {
     product.variants.length > 0 && product.variants.every((v) => v.source !== "DEMO"));
   return ready.find((product) =>
     product.variants.length === 1 && /black|블랙|검정/i.test(product.defaultColor) &&
-    product.variants[0].wholesale !== null && /(?:BD\s*)?\d{3}/i.test(product.code)) ??
-    ready.find((product) => /(?:BD\s*)?\d{3}/i.test(product.code)) ?? ready[0];
+    product.variants[0].wholesale !== null && /(?:BD\s*)?\d{3}/i.test(product.name)) ??
+    ready.find((product) => /(?:BD\s*)?\d{3}/i.test(product.name)) ?? ready[0];
 }
 export function exampleRaw(id: CaseId, state: State): string {
   const product = sampleProduct(state);
-  const model = product?.code || "709";
+  const model = product?.name || "709";
   const color = product?.defaultColor === "단일" ? "" : product?.defaultColor || "블랙";
   const item = [model, color, "3개"].filter(Boolean).join(" ");
   const who = "김민수";
