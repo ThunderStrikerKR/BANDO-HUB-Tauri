@@ -1,4 +1,4 @@
-import { dispatchState, trackingMessage } from "../factory-replies";
+import { trackingMessage } from "../factory-replies";
 import { DateNavigator } from "./DateNavigator";
 import { useMemo, useState } from "react";
 import { won } from "../domain";
@@ -123,10 +123,7 @@ export function OrderHistory({
                         .join(" / ")}
                     </small>
                   </td>
-                  <td>
-                    {row.status}
-                    <small>{dispatchState(state, row.order.id)}</small>
-                  </td>
+                  <td>{row.status}</td>
                   <td className="money-value">
                     {won(row.total)}
                     {row.order.orderType === "RETAIL" && (
