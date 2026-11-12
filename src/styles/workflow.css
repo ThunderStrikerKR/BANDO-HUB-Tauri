@@ -253,7 +253,8 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 16px 20px;
+  /* The management page already owns its outer 20px gutter. */
+  padding: 16px 0;
 }
 .management-scroll .manager-bar {
   margin-top: 0;

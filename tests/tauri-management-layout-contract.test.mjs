@@ -48,7 +48,9 @@ test("client search and client table share a width and scroll owner",()=>{
   const table=source.indexOf('<ManagementTable className="client-table">');
   assert.ok(rail>0 && search>rail && table>search);
   const css=read("src/styles/management-layout.css");
-  assert.match(css,/\.client-list-workspace > :is\(\.management-search-toolbar, \.card\)/);
+  const workflow=read("src/styles/workflow.css");
+  assert.match(workflow,/\.management-scroll\s*\{[^}]*padding:\s*16px 0;/);
+  assert.doesNotMatch(workflow,/\.management-scroll\s*\{[^}]*padding:\s*16px 20px;/);
   assert.match(css,/\.client-list-workspace > \.management-search-toolbar/);
   assert.match(css,/position: sticky/);
 });

@@ -407,17 +407,8 @@
 .app-v03 .management-container section.card:has(> table.client-table) {
   overflow: auto;
 }
-/* Client search and table share the same scroll rail and scrollbar gutter. */
-.app-v03 .management-container .client-list-workspace {
-  box-sizing: border-box;
-  width: 100%;
-  min-width: 0;
-}
-.app-v03 .management-container .client-list-workspace > :is(.management-search-toolbar, .card) {
-  box-sizing: border-box;
-  width: 100%;
-  min-width: 0;
-}
+/* Client search stays visible while its parent scrolls. Horizontal gutters
+   belong to the single outer management container, not to this child rail. */
 .app-v03 .management-container .client-list-workspace > .management-search-toolbar {
   position: sticky;
   top: 0;
