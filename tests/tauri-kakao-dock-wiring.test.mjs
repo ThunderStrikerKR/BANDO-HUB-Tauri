@@ -108,7 +108,9 @@ test("connecting to an invalid HWND does not drop the existing session",()=>{
   const check=start.indexOf("let requested=native::candidates()");
   const taking=start.indexOf("let previous=inner.session.take()");
   assert.ok(check>=0&&taking>check);
-  assert.match(start,/if format!\("\{:016X\}",current\.hwnd as usize\)==handle/);
+  assert.match(start,/if format!\\("\\{:016X\\}",current\\.hwnd as usize\\)==root_handle/);
+  assert.match(start,/inner\\.active_chat=if requested\\.kind=="CHAT"/);
+  assert.match(start,/inner\\.sync_related\\(&current,app\\)\\?/);
   assert.match(start,/if rollback\.is_ok\(\)/);
 });
 

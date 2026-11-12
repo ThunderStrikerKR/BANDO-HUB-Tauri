@@ -837,18 +837,26 @@ fn start(app:&AppHandle,inner:&mut Inner,handle:&str)->Result<Status,String>{
         // A stale/invalid target must never disconnect the current session.
         // Selecting the current window again is idempotent: never capture
         // its already-docked bounds as the new original placement.
-        if let Some(current)=inner.session {
-            if format!("{:016X}",current.hwnd as usize)==handle {
-                if native::live(&current) { return Ok(status(inner)); }
-                inner.session=None;
-                return Err("기존 카카오톡 창이 종료됐습니다. 창 목록을 다시 확인하세요.".into());
-            }
-        }
         let requested=native::candidates().into_iter().find(|c|c.handle==handle)
             .ok_or("선택한 카카오톡 창이 종료되었거나 허용되지 않았습니다.")?;
         let selected_main=native::candidates().into_iter()
             .find(|c|c.process_id==requested.process_id&&c.kind=="MAIN");
         let root_handle=selected_main.map(|c|c.handle).unwrap_or_else(||handle.to_string());
+        if let Some(current)=inner.session {
+            // Another CHAT in the same KakaoTalk process is only a selection.
+            // Never capture already-docked, captionless bounds as originals.
+            if format!("{:016X}",current.hwnd as usize)==root_handle {
+                if !native::live(&current) {
+                    inner.session=None;
+                    return Err("기존 카카오톡 창이 종료됐습니다. 창 목록을 다시 확인하세요.".into())
+                }
+                inner.active_chat=if requested.kind=="CHAT" {
+                    usize::from_str_radix(handle,16).ok().map(|v|v as isize)
+                }else{None};
+                inner.sync_related(&current,app)?;
+                return Ok(status(inner))
+            }
+        }
         let mut session=native::attach(native::main_window(app)?,&root_handle)?;
         native::preserve_original(&mut session,&inner.tracked);
         let requested_chat=if requested.kind=="CHAT" {
