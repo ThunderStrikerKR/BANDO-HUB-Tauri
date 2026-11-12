@@ -78,7 +78,9 @@ function html({title="반도스탠드 BD 700 가방포함",model="",custom="P000
 
 test("Cafe24 P-codes stay technical IDs; BD 700 model is recovered from the title",()=>{
   const preview=parseOfficialProductPage(url,html(),state());
-  assert.equal(preview.product.code,"BD 700");
+  assert.equal(preview.product.code,preview.product.id);
+  assert.notEqual(preview.product.code,"P00000QL");
+  assert.notEqual(preview.product.code,"BD 700");
   assert.equal(preview.product.siteCode,"P00000QL");
   assert.equal(preview.product.name,"BD 700 / 가방 포함");
   assert.equal(preview.product.subtitle,"");
@@ -142,11 +144,13 @@ test("Dynamic unfilled select and multi-model titles are not silently approved",
   }),state());
   assert.equal(c.canApply,false);
 });
-test("No model in the source means review, not a fake P-code model",()=>{
+test("A complete source product name may register without a separate model code",()=>{
   const result=parseOfficialProductPage(url,html({
     title:"반도스탠드 보면대 바퀴 4개 1set",model:"P00000NU",custom:"P00000NU",
   }),state());
-  assert.equal(result.canApply,false);
-  assert.equal(result.product.code,"");
+  assert.equal(result.canApply,true);
+  assert.equal(result.product.code,result.product.id);
+  assert.notEqual(result.product.code,"P00000NU");
+  assert.equal(result.product.siteCode,"P00000NU");
   assert.equal(result.product.name,"보면대 바퀴 4개 1set");
 });
