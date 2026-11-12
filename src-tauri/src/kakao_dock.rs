@@ -503,6 +503,7 @@ mod native {
         app:&AppHandle,region:Option<Region>,
     )->Result<(),String>{
         tracked.retain(tracked_live);
+        let initial_enrollment=tracked.is_empty();
         let list=candidates();
         let mut newcomers=Vec::new();
         for candidate in list.iter().filter(|c|c.process_id==s.pid) {
@@ -532,7 +533,11 @@ mod native {
             *active_chat=Some(*hwnd);
         } else if let Some((hwnd,_))=newcomers.iter().rev()
             .find(|(_,kind)|*kind=="CHAT") {
-            *active_chat=Some(*hwnd);
+            // Preserve the user's initial selection when several chats
+            // are discovered at first connection. Later openings replace it.
+            if !initial_enrollment || active_chat.is_none() {
+                *active_chat=Some(*hwnd);
+            }
         }
         if (*active_chat).is_some_and(|hwnd|
             !all.iter().any(|(h,kind)|*h==hwnd&&*kind=="CHAT")){

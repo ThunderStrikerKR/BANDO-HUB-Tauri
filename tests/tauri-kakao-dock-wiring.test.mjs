@@ -83,6 +83,8 @@ test("all regular KakaoTalk MAIN and CHAT windows are tracked and arranged in re
   assert.match(native,/for candidate in list\.iter\(\)\.filter\(\|c\|c\.process_id==s\.pid\)/);
   assert.match(native,/if tracked\.len\(\)>=32/);
   assert.match(native,/newcomers\.iter\(\)\.rev\(\)/);
+  assert.ok(native.includes("let initial_enrollment=tracked.is_empty()"));
+  assert.ok(native.includes("if !initial_enrollment || active_chat.is_none()"));
   assert.match(native,/SetWindowPos\(base,chat,0,0,0,0,/);
   assert.match(native,/SetWindowPos\(s\.main,base,0,0,0,0,/);
   assert.doesNotMatch(native,/set_rect\(t\.hwnd,target,HWND_TOPMOST\)/);
