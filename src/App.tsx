@@ -197,7 +197,6 @@ export function App() {
                     onQuery={model.setQuery}
                     date={model.historyDate}
                     onDate={model.setHistoryDate}
-                    onOpen={model.open}
                     onNotice={model.setNotice}
                   />
                 )}{" "}

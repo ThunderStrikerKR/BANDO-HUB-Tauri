@@ -276,7 +276,11 @@ test("report screens keep live read-only views while Excel export buttons are de
   assert.match(daily, /report\.warnings\.map/);
   assert.match(history, /orderHistory\(state, query, date\)/);
   assert.match(history, /value=\{query\} onChange=\{onQuery\}/);
-  assert.match(history, /onOpen\(row\.order\)/);
+  assert.doesNotMatch(history, /주문 열기|onOpen\(row\.order\)/);
+  assert.match(history, /trackingMessage\(state, row\.order\.id\)/);
+  assert.match(history, /setExpanded\(/);
+  assert.match(history, /배송 건 \/ 상품 항목을 펼쳐 주문 내용을 확인합니다/);
+  assert.doesNotMatch(app, /onOpen=\{model\.open\}/);
   // Excel export is intentionally deferred: no actionable download control or handler.
   assert.doesNotMatch(daily, /현재 결산 Excel 다운로드|saveSettlementWorkbook|exportDailySettlementWorkbook/);
   assert.doesNotMatch(history, /조회 결과 Excel 다운로드|saveOrderHistoryWorkbook|exportOrderHistoryWorkbook/);
