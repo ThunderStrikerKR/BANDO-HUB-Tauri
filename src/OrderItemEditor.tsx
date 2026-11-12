@@ -55,7 +55,7 @@ export function OrderItemEditor({
       <Modal draft={draft} title="상품 상세 수정" onClose={onClose}>
         <div className="item-editor-heading">
           <h3>
-            {internalModel(p?.code ?? draft.name)}
+            {internalModel(p?.name ?? draft.name)}
             <small>{p?.subtitle || p?.category}</small>
           </h3>
           {validProductUrl(draft.url) && (

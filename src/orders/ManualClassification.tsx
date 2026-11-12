@@ -783,7 +783,7 @@ export function ManualClassification({
             setSearch(undefined);
             if (active) focus(active);
           }}
-          onChoose={(product) => selectProduct(search, product.code, product)}
+          onChoose={(product) => selectProduct(search, product.name, product)}
         />
       )}
       {confirm && (

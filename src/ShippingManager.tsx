@@ -61,7 +61,7 @@ export function ShippingManager({
   );
   const rows = products.filter(
     (p) =>
-      (p.name + " " + p.code + " " + p.subtitle + " " + p.category)
+      (p.name + " " + p.subtitle + " " + p.category)
         .toLowerCase()
         .includes(query.toLowerCase()) &&
       (filter === "all" ||

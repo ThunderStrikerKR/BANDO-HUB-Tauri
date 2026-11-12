@@ -132,7 +132,7 @@ export function IssueResolver({
                       setUseDefaultColor(false);
                     }}
                   >
-                    <b>{internalModel(p.code)}</b>
+                    <b>{internalModel(p.name)}</b>
                     <span title={p.subtitle || p.name}>{p.subtitle || p.category}</span>
                     <small>{colorLabel(p.variants[0]?.color ?? "")}</small>
                     {selectionHistory(
@@ -144,7 +144,7 @@ export function IssueResolver({
                       .map((h) => (
                         <small key={h.variantId}>
                           과거 '{item.sources?.find((s) => s.field === "product")?.text || item.raw}
-                          '가 {internalModel(p.code)}로 확인되었던 거래 {h.count}건
+                          '가 {internalModel(p.name)}로 확인되었던 거래 {h.count}건
                         </small>
                       ))}
                     {item.match?.kind === "CONFLICT" && n === 0 ? " / 정확한 SKU 우선 후보" : ""}

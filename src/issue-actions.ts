@@ -48,7 +48,7 @@ export function resolveProduct(
   Object.assign(i, chosen, old, {
     manuallyConfirmed: true,
     temporary: false,
-    match: { kind: "CODE", term: p.code, productIds: [p.id] },
+    match: { kind: "NAME", term: p.name, productIds: [p.id] },
   });
   i.selectionEvidence = {
     expression:

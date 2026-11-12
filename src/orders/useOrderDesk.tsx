@@ -507,7 +507,7 @@ export function useOrderDesk({
         Object.assign(item, itemFromProduct(p, pricingClient, undefined, item.quantity), old, {
           manuallyConfirmed: true,
         });
-        item.match = { kind: "CODE", term: p.code, productIds: [p.id] };
+        item.match = { kind: "NAME", term: p.name, productIds: [p.id] };
         item.temporary = false;
         delete item.pendingAlias;
         if (proposal) {
