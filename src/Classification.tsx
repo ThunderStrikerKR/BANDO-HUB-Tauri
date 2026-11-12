@@ -190,7 +190,7 @@ export function ProductClassification({
 }) {
   return (
     <details>
-      <summary>브랜드 / 제조사 모델 / 여러 분류 연결</summary>
+      <summary>브랜드 / 여러 분류 연결</summary>
       <Field label="브랜드">
         <select
           value={product.brandId ?? ""}
@@ -203,12 +203,6 @@ export function ProductClassification({
             </option>
           ))}
         </select>
-      </Field>
-      <Field label="제조사 모델코드">
-        <input
-          value={product.manufacturerCode ?? ""}
-          onChange={(e) => onChange({ ...product, manufacturerCode: e.target.value })}
-        />
       </Field>
       <div className="category-paths">
         {state.categories

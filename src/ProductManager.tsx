@@ -13,7 +13,6 @@ import { CatalogPanel } from "./ManagementUI";
 import { PriceCell } from "./PriceCell";
 import {
   colorLabel,
-  normalizeModel,
   productKey,
   registeredProducts,
   sortProducts,
@@ -93,7 +92,7 @@ export function ProductManager({
       p.catalog !== "DEMO" &&
       !p.variants.some((v) => v.source === "DEMO") &&
       classifiedIds.has(p.id) &&
-      (p.name + " " + p.code + " " + (p.subtitle ?? "") + " " + (p.originalName ?? ""))
+      (p.name + " " + (p.subtitle ?? ""))
         .toLowerCase()
         .replace(/\s/g, "")
         .includes(search.toLowerCase().replace(/\s/g, "")) &&
@@ -137,15 +136,15 @@ export function ProductManager({
     if (!edit) return true;
     const result = await runSave(async () => {
       const p = clone(edit);
-      p.code = normalizeModel(p.manufacturerCode?.trim() || p.code || p.name);
-      p.name = normalizeModel(p.name || p.code);
+      p.name = p.name.trim();
+      // Existing databases still have a legacy code column; new rows store
+      // an opaque immutable ID there until the versioned SQLite migration.
+      p.code ||= p.id;
       if (p.variants.length !== 1) throw Error("상품은 한 가지 판매 구성으로만 등록할 수 있습니다. 기존 복수 구성은 각각 별도 상품으로 전환하세요.");
       p.saleUnit = true;
-      p.familyKey ??= p.registrationIdentity
-        ? p.id
-        : (p.catalog ?? "BANDOSTAND") + "|" + p.code.replace(/\s/g, "").toUpperCase();
+      p.familyKey ??= p.id;
       p.modelKey = productKey(p);
-      p.modelCodes = [p.code];
+      // No new model-code list: the model is part of the product name.
       p.variants = p.variants.map((v) => ({
         ...v,
         color: normalizeColor(v.color),
@@ -537,7 +536,7 @@ export function ProductManager({
                     </Field>
                   </div>
                 )}
-                <p className="muted">원래 모델: {edit.originalCode || "없음"} / 홈페이지 상품 ID: {edit.siteRefs?.join(", ") || edit.siteId || "없음"}</p>
+                <p className="muted">홈페이지 연결 ID: {edit.siteRefs?.join(", ") || edit.siteId || "없음"}</p>
                 {edit.priceHistory?.slice().reverse().map((history, index) => (
                   <p className="muted" key={index}>{history.at} / {history.field} / {String(history.before)} → {String(history.after)}</p>
                 ))}
