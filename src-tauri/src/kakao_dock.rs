@@ -626,7 +626,7 @@ mod native {
             std::ffi::OsStr::new(s).encode_wide().chain(std::iter::once(0)).collect()
         }
         fn spawn_fixture_window(title:&str)->Hwnd {
-            let cls=wide("BandoSyntheticKakaoWin32CI");
+            let cls=wide(&format!("BandoSyntheticKakaoWin32CI{title}"));
             let text=wide(title);
             let instance=unsafe{GetModuleHandleW(std::ptr::null())};
             let def=WndClassW {style:0,wnd_proc:Some(simple_window_proc),
@@ -647,7 +647,9 @@ mod native {
             let ready=std::path::PathBuf::from(
                 std::env::var("BANDO_DOCK_SYNTHETIC_READY_FILE").expect("fixture marker env"));
             let hwnd=spawn_fixture_window("카카오톡");
-            std::fs::write(&ready,format!("{:016X}",hwnd as usize)).expect("fixture marker write");
+            let chat=spawn_fixture_window("합성 대화");
+            std::fs::write(&ready,format!("{:016X};{:016X}",
+                hwnd as usize,chat as usize)).expect("fixture marker write");
             let started=std::time::Instant::now();
             while ready.exists() && started.elapsed()<std::time::Duration::from_secs(45) {
                 unsafe {
@@ -659,7 +661,7 @@ mod native {
                 }
                 std::thread::sleep(std::time::Duration::from_millis(15));
             }
-            unsafe{DestroyWindow(hwnd);}
+            unsafe{DestroyWindow(chat);DestroyWindow(hwnd);}
         }
         #[test]
         fn synthetic_win32_kakao_window_is_moved_and_restored() {
@@ -704,11 +706,14 @@ mod native {
                 std::thread::sleep(Duration::from_millis(40));
             }
             assert!(ready.exists(),"The synthetic KakaoTalk.exe did not create a visible window");
-            let handle=std::fs::read_to_string(&ready).unwrap();
-            let fixture_hwnd=parse(&handle).unwrap();
+            let handles=std::fs::read_to_string(&ready).unwrap();
+            let (handle,chat_handle)=handles.split_once(';').expect("two Kakao windows");
+            let fixture_hwnd=parse(handle).unwrap();
+            let chat_hwnd=parse(chat_handle).unwrap();
             assert!(verified(fixture_hwnd).is_some(),"real exe-name/Win32 verification");
             let matches=candidates();
             assert!(matches.iter().any(|item|item.handle==handle&&item.kind=="MAIN"));
+            assert!(matches.iter().any(|item|item.handle==chat_handle&&item.kind=="CHAT"));
             let main=spawn_fixture_window("BANDO HUB CI test window");
             assert!(attach(main,&format!("{:016X}",main as usize)).is_err(),
                 "non-KakaoTalk.exe must not attach");
@@ -718,8 +723,8 @@ mod native {
             let original_ratio=measured_ratio(&session).unwrap();
             let wider=Rect{right:old.right+80,..old};
             set_rect(fixture_hwnd,wider,0).unwrap();
-            assert!(measured_ratio(&session).unwrap() < original_ratio,
-                "reported KakaoTalk ratio must follow actual window geometry");
+            assert_eq!(measured_ratio(&session).unwrap(),original_ratio,
+                "UI-owned Kakao pane width, not manually resized window, determines ratio");
             let shifted=Rect{left:old.left+40,top:old.top+20,
                 right:old.right+40,bottom:old.bottom+20};
             set_rect(fixture_hwnd,shifted,0).unwrap();
@@ -732,34 +737,30 @@ mod native {
             restore(&session);
             assert_eq!(rect(fixture_hwnd).unwrap(),old,
                 "SetWindowPlacement must restore the original window bounds");
+            let chat_original=rect(chat_hwnd).unwrap();
+            let pane=Rect{left:20,top:30,right:460,bottom:1000};
+            let (main_slot,chat_slot)=stack_targets(pane,fixture_hwnd,&[chat_hwnd])
+                .expect("legacy vertical split has enough height");
+            assert_eq!(main_slot.left,pane.left);
+            assert_eq!(chat_slot.right,pane.right);
+            assert!(main_slot.height()<pane.height(),
+                "main Kakao window must be reduced to its minimum, not BANDO HUB");
+            assert!(chat_slot.top>=pane.top);
+            assert!(chat_slot.height()>0);
+            set_visible_rect(chat_hwnd,chat_slot).unwrap();
+            assert_eq!(visible_rect(chat_hwnd).unwrap(),chat_slot);
+            let _=set_rect(chat_hwnd,chat_original,0);
+            restore(&session);
             unsafe{DestroyWindow(main);}
             let _=&mut process;
         }
 
 
-        #[test] fn split_layout_respects_dpi_and_negative_monitor_origins(){
-            // 150% scale: at least 588 physical Kakao pixels and 1536
-            // physical app pixels; preserve a monitor left of primary.
-            let work=Rect{left:-2560,top:-120,right:0,bottom:1320};
-            let (kakao,main)=split_rect(work,420,1.5).unwrap();
-            assert_eq!(kakao.left,-2560);
-            assert_eq!(kakao.width(),588);
-            assert_eq!(main.left-kakao.right,12);
-            assert_eq!(kakao_width(420,1.5),588);
-            assert_eq!(kakao_width(900,1.0),620);
-            assert!(main.width()>=1536);
-            assert_eq!(main.right,0);
-            assert!(split_rect(Rect{left:0,top:0,right:1920,bottom:1080},
-                420,1.5).is_err());
-            assert!(split_rect(work,420,f64::NAN).is_err());
-        }
-
-        #[test] fn split_layout_reserves_main_minimum(){
-            let area=Rect{left:0,top:0,right:1920,bottom:1040};
-            let (left,right)=split_rect(area,420,1.0).unwrap();
-            assert_eq!(left.width(),420);
-            assert!(right.width()>=1024);
-            assert!(split_rect(Rect{left:0,top:0,right:1280,bottom:1000},420,1.0).is_err());
+        #[test] fn native_layouts_do_not_treat_a_third_state_as_a_view() {
+            assert_eq!(Mode::Overlap.name(),"OVERLAP");
+            assert_eq!(Mode::Stack.name(),"STACK");
+            assert!(stack_targets(Rect{left:0,top:0,right:500,bottom:700},
+                0,&[]).is_ok(),"no chat retains the full Kakao pane");
         }
     }
 }
