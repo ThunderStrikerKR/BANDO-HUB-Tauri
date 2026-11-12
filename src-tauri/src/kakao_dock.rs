@@ -443,80 +443,109 @@ mod native {
     // KakaoTalk. Only an actively opened chat (or the original main window)
     // is enrolled. Unrelated KakaoTalk settings/photo windows are not moved
     // merely because they exist in the enumeration.
+    // The Electron v0.8.10 helper enumerates ALL regular KakaoTalk windows.
+    // New conversations enter their original-position registry immediately;
+    // foreground changes decide which conversation is visible on top.
     pub fn sync_related(
-        s:&Session, tracked:&mut Vec<Tracked>, active_chat:&mut Option<isize>,
-        app:&AppHandle, region:Option<Region>,
+        s:&Session,tracked:&mut Vec<Tracked>,active_chat:&mut Option<isize>,
+        app:&AppHandle,region:Option<Region>,
     )->Result<(),String>{
         tracked.retain(tracked_live);
-        if active_chat.is_some_and(|hwnd| hwnd!=s.hwnd &&
-            !tracked.iter().any(|t|t.hwnd==hwnd&&t.kind=="CHAT")){
-            *active_chat=None;
-        }
-        let foreground=unsafe { GetForegroundWindow() };
-        let windows=candidates();
-        let primary_is_chat=windows.iter().any(|candidate|
-            candidate.handle==format!("{:016X}",s.hwnd as usize)&&candidate.kind=="CHAT");
-        for candidate in &windows {
-            if candidate.process_id!=s.pid { continue }
+        let list=candidates();
+        let mut newcomers=Vec::new();
+        for candidate in list.iter().filter(|c|c.process_id==s.pid) {
             let hwnd=parse(&candidate.handle)?;
             if hwnd==s.hwnd || tracked.iter().any(|t|t.hwnd==hwnd) {continue}
-            // The default KakaoTalk window remains behind conversations. New
-            // chats enter the dock only when the user activates that chat.
-            let should_enroll=(candidate.kind=="MAIN"&&primary_is_chat)
-                ||(candidate.kind=="CHAT"&&foreground==hwnd);
-            if !should_enroll || tracked.len()>=32 {continue}
-            tracked.push(Tracked{
-                hwnd,pid:candidate.process_id,original:placement(hwnd)?,
+            if tracked.len()>=32 {break}
+            newcomers.push((hwnd,candidate.kind));
+            tracked.push(Tracked {
+                hwnd,pid:candidate.process_id,
+                original:placement(hwnd)?,
                 original_topmost:topmost(hwnd),kind:candidate.kind,
             });
         }
-        if unsafe{IsIconic(s.main)}!=0 {
-            for window in tracked.iter(){set_z(window.hwnd,window.original_topmost);}
-            return Ok(())
+        let mut all=Vec::new();
+        if let Some(root)=list.iter().find(|c|
+            c.process_id==s.pid && parse(&c.handle).ok()==Some(s.hwnd)) {
+            all.push((s.hwnd,root.kind));
         }
-        let foreground_chat=windows.iter().find(|candidate|
-            candidate.kind=="CHAT"&&candidate.process_id==s.pid&&
-            parse(&candidate.handle).ok()==Some(foreground)
-        ).map(|_|foreground);
-        if let Some(chat)=foreground_chat {
-            if chat==s.hwnd || tracked.iter().any(|t|t.hwnd==chat) {
-                *active_chat=Some(chat);
+        for tracked_window in tracked.iter().filter(|t|tracked_live(t)){
+            all.push((tracked_window.hwnd,tracked_window.kind));
+        }
+        if all.is_empty(){return Err("연결된 카카오톡 창을 찾지 못했습니다.".into())}
+        let foreground=unsafe{GetForegroundWindow()};
+        if let Some((hwnd,_))=all.iter().find(|(hwnd,kind)|
+            *kind=="CHAT" && *hwnd==foreground) {
+            *active_chat=Some(*hwnd);
+        } else if let Some((hwnd,_))=newcomers.iter().rev()
+            .find(|(_,kind)|*kind=="CHAT") {
+            *active_chat=Some(*hwnd);
+        }
+        if active_chat.is_some_and(|hwnd|
+            !all.iter().any(|(h,kind)|*h==hwnd&&*kind=="CHAT")){
+            *active_chat=all.iter().rev()
+                .find(|(_,kind)|*kind=="CHAT").map(|(hwnd,_)|*hwnd);
+        }
+
+        // When BANDO HUB is minimized, leave minimized KakaoTalk windows
+        // alone. The original placement remains available for disconnect.
+        if unsafe{IsIconic(s.main)}!=0{return Ok(())}
+        let area=overlay_region(app,region.ok_or(
+            "카카오톡 배치 영역을 확인하지 못했습니다.")?)?;
+        let base=all.iter().find(|(_,kind)|*kind=="MAIN")
+            .map(|(hwnd,_)|*hwnd);
+        let chats=all.iter().filter(|(_,kind)|*kind=="CHAT")
+            .map(|(hwnd,_)|*hwnd).collect::<Vec<_>>();
+        let snapshots=all.iter().filter_map(|(hwnd,_)|
+            rect(*hwnd).ok().map(|before|(*hwnd,before))).collect::<Vec<_>>();
+        // No global HWND_TOPMOST flags: order KakaoTalk relatively to the hub.
+        // A foreign active application must never be covered by the dock.
+        let layout=(||->Result<(),String>{
+            let (main_target,chat_target)=if s.mode==Mode::Stack {
+                if let Some(base)=base {
+                    if unsafe{IsIconic(base)}!=0{
+                        (area,area)
+                    }else{
+                        stack_targets(area,base,&chats)?
+                    }
+                }else{(area,area)}
+            }else{(area,area)};
+            for (hwnd,kind) in &all {
+                if unsafe{IsIconic(*hwnd)}!=0{continue}
+                let target=if s.mode==Mode::Stack&&*kind=="MAIN" {
+                    main_target
+                }else if s.mode==Mode::Stack && base.is_some() {
+                    chat_target
+                }else{area};
+                set_visible_rect(*hwnd,target)?;
             }
-        }
-        let user_is_working=focus_on_app_or_kakao(s.hwnd,s.pid);
-        if s.mode==Mode::Overlap&&!user_is_working{
-            // Keep the position, but do not cover a third-party foreground app.
-            for t in tracked.iter(){set_z(t.hwnd,t.original_topmost);}
-            return Ok(())
-        }
-        let target=if s.mode==Mode::Overlap {
-            let area=region.ok_or("카카오톡 배치 영역을 확인하지 못했습니다.")?;
-            overlay_region(app,area)?
-        } else {rect(s.hwnd)?};
-        // Do not activate background windows; keep their original focus and
-        // avoid moving an explicitly minimized conversation.
-        for t in tracked.iter(){
-            if unsafe{IsIconic(t.hwnd)}!=0 {
-                set_z(t.hwnd,t.original_topmost);
-                continue;
+            Ok(())
+        })();
+        if let Err(problem)=layout{
+            for (hwnd,before) in snapshots{
+                // Failure must not leave any KakaoTalk windows half-moved.
+                let _=set_rect(hwnd,before,0);
             }
-            set_rect(t.hwnd,target,0)?;
-            if s.mode==Mode::Overlap {set_z(t.hwnd,true);}
-            else {set_z(t.hwnd,false);}
+            return Err(problem)
         }
-        // Exactly the last *activated* chat is above the KakaoTalk main window.
-        // Other open conversations stay in the same rectangle behind it.
-        // This must run after moving the default window, or its topmost update
-        // would obscure the active conversation.
-        if let Some(chat)=*active_chat {
-            if chat==s.hwnd || tracked.iter().any(|t|t.hwnd==chat&&tracked_live(t)){
-                if unsafe{IsIconic(chat)}==0 {
-                    let order=if s.mode==Mode::Overlap {HWND_TOPMOST} else {0};
-                    unsafe {
-                        SetWindowPos(chat,order,0,0,0,0,
-                            SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE);
+
+        if focus_on_app_or_kakao(s.hwnd,s.pid) {
+            let visible_chat=active_chat.filter(|hwnd|
+                all.iter().any(|(item,kind)|*item==*hwnd&&*kind=="CHAT")
+                    && unsafe{IsIconic(*hwnd)}==0);
+            if let Some(chat)=visible_chat {
+                // Put the messenger immediately behind the selected chat.
+                if let Some(base)=base {
+                    if base!=chat {
+                        unsafe{SetWindowPos(base,chat,0,0,0,0,
+                            SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE);}
                     }
                 }
+            }
+            if let Some(base)=base.or(visible_chat) {
+                // This is relative z-order, not always-on-top over the desktop.
+                unsafe{SetWindowPos(s.main,base,0,0,0,0,
+                    SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE);}
             }
         }
         Ok(())
