@@ -443,15 +443,26 @@ export function WorkflowQueue({
                 const bytes = await createFactoryWorkbook(preview);
                 const savedPath = await window.bando!.saveFactoryWorkbook(bytes);
                 if (!savedPath) return;
+                let savedExportId: string;
                 try {
                   const latest = await window.bando!.load();
                   const result = recordFactoryExport(latest, preview, savedPath);
                   await onSave(result.next);
+                  savedExportId = result.exportId;
                   setSelected([]);
-                  onNotice("공장 발송 " + preview.rows.length + "건의 출력 이력을 저장했습니다. 실제 공장 전달은 별도로 확인해 주세요.", "success");
                 } catch (error) {
                   throw Error("Excel 파일은 저장됐지만 출력 이력 기록에 실패했습니다. 공장에 전달하지 말고 파일을 확인하세요: " +
                     savedPath + " / " + String(error));
+                }
+                // Only after the XLSX and its output history have both been saved.
+                // Failing to open Explorer must not turn a completed save into an export failure.
+                try {
+                  await window.bando!.openExportDirectory(savedExportId);
+                  onNotice("공장 발송 " + preview.rows.length +
+                    "건의 Excel을 저장하고 폴더를 열었습니다. 실제 공장 전달은 별도로 확인해 주세요.", "success");
+                } catch (error) {
+                  onNotice("Excel 저장과 출력 이력 기록은 완료됐지만 폴더를 열지 못했습니다: " +
+                    String(error), "error");
                 }
               })
             }
