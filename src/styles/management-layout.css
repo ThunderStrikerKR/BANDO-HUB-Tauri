@@ -346,7 +346,8 @@
 
 /* Category filters follow the saved category tree at any depth.
    Keep the product table wide: additional levels wrap only inside its filter row. */
-.app-v03 .management-container .manager-filters > .product-category-filter {
+.app-v03 .management-container .manager-filters > .product-category-filter,
+.app-modal-layer .manager-filters > .product-category-filter {
   display: flex;
   flex: 1 1 360px;
   flex-wrap: wrap;
@@ -354,12 +355,14 @@
   align-items: center;
   gap: 8px;
 }
-.app-v03 .management-container .product-category-filter > select {
+.app-v03 .management-container .product-category-filter > select,
+.app-modal-layer .product-category-filter > select {
   flex: 1 1 150px;
   min-width: 135px;
   max-width: 260px;
 }
-.app-v03 .management-container .product-category-filter > button {
+.app-v03 .management-container .product-category-filter > button,
+.app-modal-layer .product-category-filter > button {
   flex: 0 0 auto;
 }
 
