@@ -656,7 +656,8 @@ function parseLegacy(raw: string, selectedClient: Client | undefined, state: Sta
     // configuration. Keep "미포함" distinct from the substring "포함".
     const qualifiers = (value: string) =>
       [...new Set((value.replace(/\s+/g, "").toLowerCase()
-        .match(/(?:가방|바퀴)(?:미포함|포함|미장착|장착)|[ab]타입|비타공상판|타공상판|\d+(?:\.\d+)?cm/g) ?? []))];
+        .match(/(?:가방|바퀴)(?:미포함|포함|미장착|장착)|[ab]타입|민판|무타공상판|무타공|비타공상판|타공상판|\d+(?:\.\d+)?cm/g) ?? [])
+        .map(token => /^(?:민판|무타공)/.test(token) ? "비타공상판" : token))];
     const configurationProof = qualifiers(line);
     if (configurationProof.length) {
       const proven = choices.filter((candidate) => {
@@ -664,7 +665,8 @@ function parseLegacy(raw: string, selectedClient: Client | undefined, state: Sta
         return configurationProof.every((token) => named.includes(token));
       });
       // Zero or multiple matches are unresolved; never pick a different item.
-      if (proven.length) choices = proven;
+      // A contradictory configuration must NEVER fall back to the bare model.
+      choices = proven;
     }
     const codeChoices = choices.slice();
     const alias = aliases[0];

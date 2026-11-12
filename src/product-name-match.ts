@@ -9,7 +9,7 @@ const escape = (term: string) =>
 
 export function productModelNames(product: Product): string[] {
   const first = product.name.split(/\s+\/\s+/)[0].trim();
-  const model = /^(?:BD\s+)?(?:\d{3}[A-Za-z0-9-]*|[A-Za-z][A-Za-z0-9]*(?:\s+[A-Za-z][A-Za-z0-9]*){0,3}[- ]\d+[A-Za-z0-9-]*)$/i.test(first);
+  const model = /^(?:BD\s+)?(?:\d{3}[A-Za-z0-9-]*|[A-Za-z][A-Za-z0-9]*(?:\s+[A-Za-z][A-Za-z0-9]*){0,3}[- ]\d+[A-Za-z0-9-]*|[A-Za-z][A-Za-z0-9]*(?:-[A-Za-z0-9]+)+)$/i.test(first);
   if (!model) return [];
   return /^BD\s+/i.test(first) ? [first, first.replace(/^BD\s+/i, "")] : [first];
 }

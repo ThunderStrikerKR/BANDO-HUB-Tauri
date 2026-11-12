@@ -185,3 +185,21 @@ test("T15: historical source IDs map without modifying a confirmed order", () =>
   assert.equal(resolved.product.variants[0].id, priceRecordId);
   assert.equal(JSON.stringify(order), before);
 });
+
+test("T22: Cart-10 is recognized by its registered name, not Cafe24 code", () => {
+  const item = itemFor("보면대카트 Cart-10 2개");
+  assert.equal(item.productId, bySite("83").id);
+  assert.equal(item.quantity, 2);
+});
+test("T23: Cart-20 remains a distinct registered product", () => {
+  assert.equal(itemFor("보면대카트 Cart-20 1개").productId, bySite("84").id);
+});
+test("T24: bare cart name never randomly chooses a model", () => {
+  const item = itemFor("보면대카트 2개");
+  assert.equal(item.productId, null);
+});
+test("T25: an unverified 709 민판 never silently selects the perforated 709", () => {
+  const item = itemFor("BD 709 민판 1개");
+  const found = seed.products.find(p=>p.id===item.productId);
+  assert.ok(!found || !/타공 상판/.test(found.name) || /비타공|무타공/.test(found.name));
+});
