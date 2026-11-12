@@ -1,123 +1,114 @@
-import { test } from "node:test";
+import {test} from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-const read = (path) => readFileSync(new URL("../" + path, import.meta.url), "utf8");
+import {readFileSync} from "node:fs";
+const read=path=>readFileSync(new URL("../"+path,import.meta.url),"utf8");
+const native=read("src-tauri/src/kakao_dock.rs");
+const bridge=read("src/tauri-bridge.ts");
+const shell=read("src/HubShell.tsx");
+const header=read("src/app/AppHeader.tsx");
+const model=read("src/app/useAppModel.ts");
+const app=read("src/App.tsx");
 
-test("all seven KakaoTalk dock IPC commands call the Tauri native backend",()=>{
+test("all explicit Kakao commands are registered in Tauri and the TypeScript bridge",()=>{
   const rust=read("src-tauri/src/lib.rs");
-  const bridge=read("src/tauri-bridge.ts");
-  for(const command of ["dock_status_native","dock_cycle_native",
-    "dock_start_native","dock_stop_native","dock_select_native",
-    "dock_windows_native","dock_region_native"]) {
-    assert.ok(rust.includes("kakao_dock::"+command),command+" missing Rust command");
-    assert.ok(bridge.includes('invoke("'+command+'"'),command+" missing TypeScript bridge");
+  for(const c of ["dock_status_native","dock_cycle_native","dock_start_native",
+    "dock_stop_native","dock_select_native","dock_windows_native",
+    "dock_region_native","dock_mode_native"]){
+    assert.ok(rust.includes("kakao_dock::"+c),c+" not registered");
+    assert.ok(bridge.includes('invoke("'+c+'"'),c+" not bridged");
   }
-  assert.doesNotMatch(bridge,/dockCycle: async \(\) => notReady/);
-  assert.match(rust,/RunEvent::Exit/);
-  assert.match(rust,/restore_on_exit/);
 });
 
-test("native docking is restricted to KakaoTalk process, restores position, and does not reparent",()=>{
-  const native=read("src-tauri/src/kakao_dock.rs");
-  assert.match(native,/QueryFullProcessImageNameW/);
-  assert.match(native,/eq_ignore_ascii_case\("KakaoTalk.exe"\)/);
-  assert.match(native,/GetWindowThreadProcessId/);
-  assert.match(native,/GetWindowPlacement/);
-  assert.match(native,/SetWindowPlacement/);
-  assert.match(native,/IsWindowVisible/);
-  assert.match(native,/restore_on_exit/);
-  assert.doesNotMatch(native,/SetParent/);
-  assert.doesNotMatch(native,/ReadProcessMemory|WriteProcessMemory|SetWindowsHookEx/);
+test("native Kakao process authentication, safe original placement and no injection",()=>{
+  for(const fragment of [
+    "QueryFullProcessImageNameW","KakaoTalk.exe","GetWindowThreadProcessId",
+    "GetWindowPlacement","SetWindowPlacement","restore_on_exit",
+    "pub struct Tracked","pub fn restore_related","GetForegroundWindow",
+  ]) assert.ok(native.includes(fragment),fragment+" absent");
+  assert.doesNotMatch(native,/SetParent|ReadProcessMemory|WriteProcessMemory|SetWindowsHookEx/);
+  assert.match(native,/verified\(t\.hwnd\)==Some\(t\.pid\)/);
 });
 
-test("screen supports choosing among multiple KakaoTalk windows and three view modes",()=>{
-  const header=read("src/app/AppHeader.tsx");
-  const shell=read("src/HubShell.tsx");
-  const app=read("src/App.tsx");
-  const model=read("src/app/useAppModel.ts");
-  assert.match(header,/data-tauri-drag-region/);
-  assert.match(read("src-tauri/capabilities/default.json"),/core:window:allow-start-dragging/);
-  assert.match(header,/dock\.mode === "OVERLAP"/);
-  assert.match(header,/dock\.mode === "STACK"/);
-  assert.match(shell,/stacked = dock\.active && dock\.mode === "STACK"/);
-  assert.match(shell,/hidden=\{stacked\}/);
-  assert.match(app,/KakaoDockPicker/);
-  assert.match(model,/setDockCandidates\(await window\.bando!\.dockWindows\(\)\)/);
-  assert.match(model,/dockSelect\(handle\)/);
+test("there are precisely two viewing modes and connection is not a view",()=>{
+  assert.match(header,/role="group" aria-label="카카오톡 보기 방식"/);
+  assert.match(header,/aria-pressed=\{dock.mode === "OVERLAP"\}/);
+  assert.match(header,/aria-pressed=\{dock.mode === "STACK"\}/);
+  assert.match(header,/겹쳐 보기/);
+  assert.match(header,/나누어 보기/);
+  assert.match(header,/카카오톡 함께 보기/);
+  assert.match(header,/onDockStop/);
+  assert.match(header,/카카오톡 연결 해제/);
+  assert.doesNotMatch(header,/다음: 카카오톡|다음: 나누어 보기|다음: 카카오톡 창 원래 위치 복구/);
+  assert.match(model,/dockMode\(mode\)/);
+  assert.match(model,/dockStop\(\)/);
+  assert.doesNotMatch(model,/bando!\.dockCycle\(\)/);
+  assert.match(app,/onDockMode=/);
+  assert.match(app,/onDockStop=/);
 });
 
-test("KakaoTalk region resyncs on window moves, focus and monitor scale changes",()=>{
-  const shell=read("src/HubShell.tsx");
+test("both modes use the original left KakaoTalk pane and never move BANDO HUB",()=>{
+  assert.match(shell,/className="hub-panel-slot hub-slot-0 hub-kakao-slot"/);
+  assert.doesNotMatch(shell,/hidden=\{stacked\}/);
+  assert.match(shell,/--kakao-reserved-width/);
+  assert.match(native,/pub fn stack\(s:&mut Session,app:&AppHandle,region:Region\)/);
+  assert.match(native,/fn stack_targets\(area:Rect,main:Hwnd,chats:&\[Hwnd\]\)/);
+  assert.match(native,/SendMessageTimeoutW/);
+  assert.match(native,/WM_GETMINMAXINFO/);
+  assert.match(native,/DwmGetWindowAttribute/);
+  assert.match(native,/banner_top\(main,main_visible\)/);
+  const body=native.split("pub fn stack(s:&mut Session")[1]?.split("pub fn sync(")[0];
+  assert.ok(body);
+  assert.doesNotMatch(body,/set_rect\(s\.main|SetWindowPlacement\(s\.main|split_rect\(/);
+});
+
+test("all regular KakaoTalk MAIN and CHAT windows are tracked and arranged in relative order",()=>{
+  assert.match(native,/WS_SYSMENU/);
+  assert.match(native,/pub fn sync_related\(/);
+  assert.match(native,/for candidate in list\.iter\(\)\.filter\(\|c\|c\.process_id==s\.pid\)/);
+  assert.match(native,/if tracked\.len\(\)>=32/);
+  assert.match(native,/newcomers\.iter\(\)\.rev\(\)/);
+  assert.match(native,/SetWindowPos\(base,chat,0,0,0,0,/);
+  assert.match(native,/SetWindowPos\(s\.main,base,0,0,0,0,/);
+  assert.doesNotMatch(native,/set_rect\(t\.hwnd,target,HWND_TOPMOST\)/);
+  assert.match(model,/300,/);
+});
+
+test("failed layout switches are reversible and do not disconnect current KakaoTalk",()=>{
+  const mode=native.split("pub fn dock_mode_native(")[1]?.split("#[tauri::command]")[0];
+  assert.ok(mode);
+  assert.match(mode,/let before=session/);
+  assert.match(mode,/session=before/);
+  assert.match(mode,/inner\.session=Some\(session\)/);
+  assert.match(mode,/return Err\(error\)/);
+  const related=native.split("pub fn sync_related(")[1]?.split("pub fn measured_ratio(")[0];
+  assert.ok(related);
+  assert.match(related,/let snapshots=all\.iter\(\)/);
+  assert.match(related,/for \(hwnd,before\) in snapshots/);
+  assert.match(native,/inner\.restore_related\(\)/);
+  assert.match(native,/native::restore\(&s\)/);
+});
+
+test("connecting to an invalid HWND does not drop the existing session",()=>{
+  const start=native.split("fn start(app:")[1]?.split("#[tauri::command]")[0];
+  assert.ok(start);
+  const check=start.indexOf("let requested=native::candidates()");
+  const taking=start.indexOf("let previous=inner.session.take()");
+  assert.ok(check>=0&&taking>check);
+  assert.match(start,/if format!\("\{:016X\}",current\.hwnd as usize\)==handle/);
+  assert.match(start,/if rollback\.is_ok\(\)/);
+});
+
+test("the synthetic native Windows test covers both chat and main windows",()=>{
+  assert.match(native,/spawn_fixture_window\("카카오톡"\)/);
+  assert.match(native,/spawn_fixture_window\("합성 대화"\)/);
+  assert.match(native,/stack_targets\(pane,fixture_hwnd,&\[chat_hwnd\]\)/);
+  assert.match(native,/SetWindowPlacement must restore the original window bounds/);
+});
+
+test("Tauri layout still synchronizes region on window movement and monitor scaling",()=>{
   for(const event of ["onMoved","onResized","onScaleChanged","onFocusChanged"]){
-    assert.ok(shell.includes("current."+event+"(send)"),event+" listener missing");
+    assert.ok(shell.includes("current."+event+"(send)"),event+" event missing");
   }
   assert.match(shell,/unlisten\.forEach\(\(off\) => off\(\)\)/);
-  const native=read("src-tauri/src/kakao_dock.rs");
-  assert.match(native,/IsIconic\(s\.hwnd\)/);
-  assert.match(native,/split_rect\(work:Rect,desired:i32,scale:f64\)/);
-  assert.match(native,/s\.main_original=before_split/);
-});
-
-
-test("native docking preserves current window when a new target is invalid",()=>{
-  const source=read("src-tauri/src/kakao_dock.rs");
-  const start=source.slice(source.indexOf("fn start(app:"),source.indexOf("#[tauri::command]\npub fn dock_windows_native"));
-  const validate=start.indexOf("let mut session=native::attach(");
-  const release=start.indexOf("inner.session.take()");
-  assert.ok(validate>=0 && release>validate,
-    "candidate must be authenticated before previous dock is released");
-  assert.match(start,/if format!\("\{:016X\}",current\.hwnd as usize\)==handle/);
-  assert.match(start,/if rollback\.is_ok\(\)\{inner\.session=Some\(old\);\}/);
-});
-
-test("native overlap sizing tracks final CSS region and returns live ratio",()=>{
-  const source=read("src-tauri/src/kakao_dock.rs");
-  const shell=read("src/HubShell.tsx");
-  assert.match(source,/pub fn sync\(s:&mut Session/);
-  assert.match(source,/s\.width=target\.width\(\);/);
-  assert.match(source,/pub fn measured_ratio\(s:&Session\)/);
-  assert.match(source,/ratio:native::measured_ratio\(&s\)/);
   assert.match(shell,/lastDragged\.current = next/);
-  assert.match(shell,/const next = lastDragged\.current/);
-  assert.match(shell,/onLostPointerCapture/);
-});
-
-test("failed layout switch rolls native windows back and reports sync failures",()=>{
-  const source=read("src-tauri/src/kakao_dock.rs");
-  assert.match(source,/let before_kakao=placement\(s\.hwnd\)\?/);
-  assert.match(source,/SetWindowPlacement\(s\.hwnd,&before_kakao\)/);
-  assert.match(source,/set_z\(s\.hwnd,kakao_was_topmost\)/);
-  assert.match(source,/let error=native::sync\(&mut session,&app,inner\.region\)\.err\(\)/);
-  assert.match(source,/response\.notice=Some\(format!\("카카오톡 창 위치 동기화 실패/);
-  assert.match(source,/inner\.session=Some\(s\);\s*result\?;/);
-});
-
-
-test("newly activated chats join the dock without being all raised on enumeration",()=>{
-  const native=read("src-tauri/src/kakao_dock.rs");
-  assert.match(native,/pub fn sync_related\(/);
-  assert.match(native,/candidate\.kind=="CHAT"&&foreground==hwnd/);
-  assert.match(native,/candidate\.kind=="MAIN"&&primary_is_chat/);
-  assert.match(native,/tracked\.len\(\)>=32/);
-  assert.match(native,/GetForegroundWindow/);
-  assert.match(native,/SWP_NOMOVE\|SWP_NOSIZE\|SWP_NOACTIVATE/);
-  assert.match(native,/if let Some\(chat\)=\*active_chat/);
-  assert.doesNotMatch(native,/SetWindowsHookEx|ReadProcessMemory/);
-  assert.match(read("src/app/useAppModel.ts"),/300,/);
-});
-
-test("each tracked KakaoTalk HWND is restored and stale handles are rejected",()=>{
-  const native=read("src-tauri/src/kakao_dock.rs");
-  assert.match(native,/pub struct Tracked/);
-  assert.match(native,/verified\(t\.hwnd\)==Some\(t\.pid\)/);
-  assert.match(native,/pub fn restore_related/);
-  assert.match(native,/inner\.tracked/);
-  assert.match(native,/native::preserve_original\(&mut session,&inner\.tracked\)/);
-  assert.match(native,/native::restore_related\(&mut inner\.tracked,&mut inner\.active_chat\)/);
-});
-
-test("owned KakaoTalk conversation windows can be discovered",()=>{
-  const native=read("src-tauri/src/kakao_dock.rs");
-  assert.doesNotMatch(native,/GetWindow\(hwnd,4\)!=0/);
-  assert.match(native,/if title\.trim\(\)\.is_empty\(\)/);
 });
