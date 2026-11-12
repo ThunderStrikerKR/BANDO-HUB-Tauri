@@ -140,12 +140,12 @@ try {
   // Compare each control and table to the page's full-width heading, not just
   // to each other. Otherwise uniformly shrunken content would still pass.
   const visualPages=[
-    ["상품 관리",".fixed-manager > .management-search-toolbar",".product-prices table.management-data-table thead th",".product-prices"],
+    ["상품 관리",".product-prices > .management-search-toolbar",".product-prices table.management-data-table thead th",".product-prices"],
     ["주문 내역",".order-history-list > .management-search-toolbar",".order-history-list table.management-data-table thead th",".order-history-list"],
-    ["엑셀 관리",".excel-workspace > .management-search-toolbar",".excel-table-scroll table.management-data-table thead th",".excel-table-scroll"],
+    ["엑셀 관리",".excel-list-panel > .management-search-toolbar",".excel-table-scroll table.management-data-table thead th",".excel-table-scroll"],
     ["일일 결산",".daily-settlement > .management-search-toolbar",".daily-settlement table.management-data-table thead th",".daily-settlement > section.card"],
     ["운임 관리",".shipping-product-list > .shipping-tools.management-search-toolbar",".shipping-product-list table.management-data-table thead th",".shipping-product-list"],
-    ["거래처 관리",".client-list-workspace > .management-search-toolbar",".client-list-workspace table.client-table thead th",".client-list-workspace > section.card"],
+    ["거래처 관리",".client-list-panel > .management-search-toolbar",".client-list-workspace table.client-table thead th",".client-list-workspace > section.card"],
   ];
   for(const [menu, toolbarSelector, headingSelector, tableContainerSelector] of visualPages) {
     await navigation.getByRole("button",{name:menu}).click();
