@@ -86,14 +86,14 @@ export function validateProduct(p: Product, products: Product[]) {
     products.some(
       (x) =>
         x.id !== p.id &&
-        normalizeCode(x.code) === normalizeCode(p.code) &&
-        p.variants.some((v) => v.source === "DEMO") ===
-          x.variants.some((v) => v.source === "DEMO") &&
-        p.name.trim().toLowerCase() === x.name.trim().toLowerCase() &&
-        (!p.siteId || !x.siteId || p.siteId === x.siteId),
+        !products.some((existing) => existing.id === p.id) &&
+        x.active !== false && !x.deletedAt && !x.supersededBy &&
+        x.catalog === p.catalog &&
+        x.name.normalize("NFKC").toLocaleLowerCase().replace(/\s+/g,"") ===
+          p.name.normalize("NFKC").toLocaleLowerCase().replace(/\s+/g,""),
     )
   )
-    throw Error("같은 상품코드가 이미 있습니다.");
+    throw Error("같은 상품명이 이미 있습니다. 판매 구성을 구별할 수 있게 이름을 수정하세요.");
   if (!p.variants.some((v) => normalizeColor(v.color) === normalizeColor(p.defaultColor)))
     throw Error("상품 색상이 가격 기록과 일치하지 않습니다.");
   for (const v of p.variants)

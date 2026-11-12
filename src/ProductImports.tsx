@@ -99,11 +99,10 @@ export function ProductImports({
       {preview && (
         <div className="official-product-preview">
           <h4>{preview.product.name}</h4>
-          <p>상품명: {preview.product.name}</p>
           <p>상품설명 (매장 참고): {preview.product.subtitle || "별도 설명 없음"}</p>
-          <p>등록 상품명: {preview.product.name}</p>
-          <p>모델 판정 근거: {preview.modelSource === "MODEL_FIELD" ? "공식 모델명" :
-            preview.modelSource === "CUSTOM_CODE" ? "자체 상품코드" :
+          <p>등록할 상품명: {preview.product.name}</p>
+          <p>상품명 확인 근거: {preview.modelSource === "MODEL_FIELD" ? "공식 모델명" :
+            preview.modelSource === "CUSTOM_CODE" ? "홈페이지 모델 표기" :
             preview.modelSource === "TITLE" ? "공식 상품명에서 추출 (확인 권장)" : "미확정"}</p>
           <p>공식 원본 상품명: {preview.product.originalName || "없음"}</p>
           <p>공식 상품 연동: {preview.product.siteId || "미연결"}</p>
