@@ -873,6 +873,14 @@ fn open_export_file(db: State<'_, Database>, id: String) -> Result<(), String> {
     open::that(file).map_err(err)
 }
 
+// Open the directory of a stored XLSX export; never accept a raw path from UI.
+#[tauri::command]
+fn open_export_directory(db: State<'_, Database>, id: String) -> Result<(), String> {
+    let snapshot = get_snapshot(&*lock_db(&db)?)?;
+    let folder = export_file::resolve_export_directory(&snapshot, &id)?;
+    open::that(folder).map_err(err)
+}
+
 #[tauri::command]
 fn open_factory_reply_file(db: State<'_, Database>, id: String) -> Result<(), String> {
     let digest = reply_digest(&id)?;
@@ -1088,7 +1096,7 @@ pub fn run() {
             factory_reply_watch::choose_factory_reply_directory,
             factory_reply_watch::factory_reply_watch_scan,
             factory_reply_watch::factory_reply_watch_commit,
-            save_product_workbook, save_registration_workbook, save_client_workbook, save_product_sync_workbook, save_factory_workbook, save_store_workbook, save_settlement_workbook, save_order_history_workbook, archive_factory_reply, open_factory_reply_file, open_export_file, factory_conflict::approve_factory_conflict,
+            save_product_workbook, save_registration_workbook, save_client_workbook, save_product_sync_workbook, save_factory_workbook, save_store_workbook, save_settlement_workbook, save_order_history_workbook, archive_factory_reply, open_factory_reply_file, open_export_file, open_export_directory, factory_conflict::approve_factory_conflict,
             fetch_official_product_html,
             kakao_dock::dock_windows_native, kakao_dock::dock_status_native,
             kakao_dock::dock_cycle_native, kakao_dock::dock_mode_native, kakao_dock::dock_start_native,
