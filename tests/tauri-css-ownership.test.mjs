@@ -5,7 +5,8 @@ import { readFileSync } from "node:fs";
 
 test("CSS ownership audit includes every imported stylesheet in actual cascade order", () => {
   const report = auditCSS();
-  assert.equal(report.files.length, 26);
+  assert.equal(report.files.length, 27);
+  assert.ok(report.files.includes("order-item-editor.css"), "Feature CSS owner must be audited");
   assert.equal(report.files[0], "tokens.css");
   assert.equal(report.files.at(-1), "management-layout.css");
   assert.equal(new Set(report.files).size, report.files.length);

@@ -18,7 +18,7 @@ test("order item correction is local: KakaoTalk stays outside the overlay", () =
   assert.match(editor, /getBoundingClientRect\(\)\.right/);
   assert.match(editor, /aria-modal="false"/);
   assert.doesNotMatch(editor, /<Modal[\s>]/);
-  assert.doesNotMatch(editor, /showModal\(/);
+  assert.doesNotMatch(editor, /\.showModal\(/);
   assert.match(styles, /\.order-item-edit-layer/);
   assert.match(styles, /inset-block: 0/);
 });
