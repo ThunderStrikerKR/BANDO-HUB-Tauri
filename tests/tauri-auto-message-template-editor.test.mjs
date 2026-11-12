@@ -16,11 +16,11 @@ test("new client management tab exposes editable situation templates",()=>{
   assert.match(editor,/기본 문구 복원/);
 });
 
-test("all 19 situations have defaults, example previews and permitted tokens",async()=>{
+test("all 20 situations have defaults, example previews and permitted tokens",async()=>{
   const {AUTOMATIC_TEMPLATE_IDS,AUTOMATIC_MESSAGE_TEMPLATES,
     previewAutomaticTemplate,renderAutomaticTemplate}=
     await tsImport("../src/automatic-message-templates.ts",import.meta.url);
-  assert.equal(AUTOMATIC_TEMPLATE_IDS.length,19);
+  assert.equal(AUTOMATIC_TEMPLATE_IDS.length,20);
   for(const key of AUTOMATIC_TEMPLATE_IDS) {
     const def=AUTOMATIC_MESSAGE_TEMPLATES[key];
     assert.ok(def.label && def.body);
