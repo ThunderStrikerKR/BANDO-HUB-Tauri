@@ -177,8 +177,6 @@ export function parseOfficialProductPage(urlText: string, html: string, state: S
     meta('meta[property="og:title"]');
   if (!name) throw Error("공식 상세페이지에서 상품명을 확인하지 못했습니다.");
   const { code, source: modelSource } = modelCode(field, name);
-  const siteCodeRaw = field("상품코드") || field("자체 상품코드");
-  const siteCode = CAFE24_CODE.test(siteCodeRaw) ? siteCodeRaw : undefined;
   const presentation = presentationName(name, code);
   const displayedPrice = field("판매가");
   // Never use a meta-tag base price to mask an ambiguous, explicit price range.
@@ -202,35 +200,32 @@ export function parseOfficialProductPage(urlText: string, html: string, state: S
     /\bBD\s*\d{3,4}[A-Z0-9-]*\s*(?:\/|,|\+)\s*(?:BD\s*)?\d{3,4}[A-Z0-9-]*/i.test(name) ||
     /\bBD\s*\d{3,4}[A-Z0-9-]*\s+\d{3,4}[A-Z][A-Z0-9-]*/i.test(name);
   const matches = exactSourceMatches(state, catalog, id);
-  const sameCode = registeredProducts(state.products).filter((p) =>
-    (p.catalog ?? "BANDOSTAND") === catalog && !!code && normalizeCode(p.code) === normalizeCode(code)
+  const sameName = registeredProducts(state.products).filter((p) =>
+    (p.catalog ?? "BANDOSTAND") === catalog &&
+    p.name.normalize("NFKC").trim().toLowerCase() === presentation.name.normalize("NFKC").trim().toLowerCase()
   );
   const reasons = [
-    ...(code === null ? ["모델코드를 확정할 수 없습니다. 카페24 상품코드와 상품번호는 모델명으로 사용하지 않습니다."] : []),
     ...(retail === null ? ["판매가를 확인하지 못했습니다. 가격을 임의로 입력하지 않습니다."] : []),
     ...(selectableOptions || unclearOptions ? ["상품 선택 옵션이 있습니다. 옵션별 모델, 포함 / 미포함 구성과 판매가를 직접 확인해야 합니다."] : []),
     ...(matches.length > 1 ? ["원본 상품번호에 여러 상품이 연결되어 있어 자동 반영할 수 없습니다."] : []),
     ...(matches.length === 1 && matches[0].variants.length !== 1 ?
       ["기존 상품에 여러 옵션이 연결되어 있어 대상 옵션을 확정할 수 없습니다."] : []),
-    ...(matches.length === 0 && sameCode.length > 0 ?
-      ["같은 모델코드의 기존 상품이 있습니다. 중복 또는 색상 구성을 확인해야 합니다."] : []),
+    ...(matches.length === 0 && sameName.length > 0 ?
+      ["같은 상품명의 기존 상품이 있습니다. 구성과 중복 여부를 확인해야 합니다."] : []),
     ...(state.products.some((p) => p.deletedAt &&
-      (p.siteId === id || ((p.catalog ?? "BANDOSTAND") === catalog && !!code &&
-        normalizeCode(p.code) === normalizeCode(code)))) ?
+      (p.siteId === id || ((p.catalog ?? "BANDOSTAND") === catalog &&
+        p.name === presentation.name))) ?
       ["삭제된 상품과 일치할 수 있으므로 자동 복원하지 않습니다."] : []),
   ];
   const product: Product = {
-    id: crypto.randomUUID(), code: code ?? "", name: presentation.name,
-    subtitle: presentation.subtitle, originalName: name, siteCode,
+    id: crypto.randomUUID(), name: presentation.name,
+    subtitle: presentation.subtitle, originalName: name,
     catalog, origin: catalog === "BANDOSTAND" ? "FACTORY" : "STORE",
     category: "", categories: [], active: true,
     siteId: id, siteRefs: [id],
     defaultColor: color, colorStatus: color === "단일" ? "NOT_REQUIRED" : "KNOWN",
     saleUnit: !selectableOptions && !unclearOptions,
     requiresOption: selectableOptions || unclearOptions,
-    manufacturerCode: code ?? undefined,
-    modelCodes: code ? [code] : [],
-    modelKey: code ? catalog + "|" + normalizeCode(code) : undefined,
     createdAt: now, updatedAt: now,
     variants: [{
       id: crypto.randomUUID(), color, option: "",
@@ -254,8 +249,7 @@ export function applyOfficialProductPreview(
   state: State, preview: ImportPreview, selectedCategoryId?: string,
 ): { next: State; created: boolean } {
   if (!preview.canApply || preview.product.requiresOption ||
-      preview.optionEvidence?.length || !preview.product.code?.trim() ||
-      CAFE24_CODE.test(preview.product.code)) {
+      preview.optionEvidence?.length || !preview.product.name.trim()) {
     throw Error("확인이 필요한 옵션 또는 모델이 있어 자동 반영을 중단했습니다.");
   }
   if ((state.revision ?? 0) !== preview.revision) {
@@ -273,9 +267,6 @@ export function applyOfficialProductPreview(
   if (matches.length === 1) {
     const product = next.products.find((item) => item.id === matches[0].id)!;
     if (product.variants.length !== 1) throw Error("여러 옵션 중 대상 옵션을 확정할 수 없습니다.");
-    if (normalizeCode(product.code) !== normalizeCode(imported.code)) {
-      throw Error("원본의 모델코드가 기존 상품과 다릅니다. 수동 확인이 필요합니다.");
-    }
     const variant = product.variants[0];
     const oldPrice = variant.retail;
     const newPrice = imported.variants[0].retail;
@@ -295,12 +286,12 @@ export function applyOfficialProductPreview(
   }
   if (registeredProducts(state.products).some((p) =>
     (p.catalog ?? "BANDOSTAND") === imported.catalog &&
-    normalizeCode(p.code) === normalizeCode(imported.code))) {
-    throw Error("같은 모델코드의 상품이 존재합니다. 자동 중복 등록을 막았습니다.");
+    p.name.normalize("NFKC").trim().toLowerCase() === imported.name.normalize("NFKC").trim().toLowerCase())) {
+    throw Error("같은 상품명의 기존 상품이 있습니다. 자동 중복 등록을 막았습니다.");
   }
   if (state.products.some((p) => p.deletedAt &&
     (p.siteId === id || ((p.catalog ?? "BANDOSTAND") === imported.catalog &&
-      normalizeCode(p.code) === normalizeCode(imported.code))))) {
+      p.name === imported.name)))) {
     throw Error("삭제된 상품을 자동 복구할 수 없습니다.");
   }
   const cats = withCatalogRoots(state.categories);
