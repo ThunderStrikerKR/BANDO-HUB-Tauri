@@ -23,7 +23,7 @@ const item = {
   unitPrice:17777, sources:[], issues:[],
 };
 const recipient = {
-  id:"ci-price-recipient", name:"과거단가보존", address:"서울특별시 검증로 13",
+  id:"ci-price-recipient", name:"과거단가보존", address:"서울특별시 검증로 13 "+ "상세주소긴문자열 ".repeat(110),
   phone:"", mobile:"010-0000-0000", note:"", items:[item],
   dispatchOrigin:"FACTORY",
 };
@@ -121,10 +121,49 @@ try {
   await historicalRow.waitFor();
   // Order history is read-only; do not restore a removed action for this test.
   assert.equal(await historicalRow.getByRole("button",{name:"주문 열기"}).count(),0);
-  await historicalRow.getByRole("button",{name:"과거단가보존"}).click();
+  // Column geometry must be identical before, during, and after expansion.
+  // The long synthetic address intentionally creates a vertical scrollbar and
+  // would make auto-sized table headers drift without the history-specific fix.
+  const geometry = () => page.evaluate(() => {
+    const root = document.querySelector(".order-history-list");
+    const headers = [...root.querySelectorAll("thead th")];
+    const table = root.querySelector("table");
+    const tableScroll = root.querySelector(".table-scroll");
+    const toolbar = root.querySelector(".management-search-toolbar");
+    const dimensions = element => {
+      const rect = element.getBoundingClientRect();
+      return [rect.x,rect.y,rect.width,rect.height].map(n => Math.round(n * 10) / 10);
+    };
+    return {
+      toolbar:dimensions(toolbar),
+      headerCells:headers.map(dimensions),
+      tableLayout:getComputedStyle(table).tableLayout,
+      gutter:getComputedStyle(tableScroll).scrollbarGutter,
+      scrollable:tableScroll.scrollHeight > tableScroll.clientHeight,
+    };
+  });
+  const headerBefore = await geometry();
+  assert.equal(headerBefore.tableLayout,"fixed");
+  assert.match(headerBefore.gutter,/stable/);
+  const recipientButton = historicalRow.getByRole("button",{name:"과거단가보존"});
+  await recipientButton.click();
   await historicalRow.getByText(/주문 당시:/).waitFor();
+  const expandedLayout = await geometry();
+  assert.deepEqual(expandedLayout.headerCells,headerBefore.headerCells,
+    "Opening recipient details must not shift any header column");
+  assert.deepEqual(expandedLayout.toolbar,headerBefore.toolbar,
+    "Opening recipient details must not shift search/date controls");
+  assert.equal(expandedLayout.scrollable,true,
+    "Long recipient details should scroll inside the table, not resize the page");
+  await recipientButton.click();
+  await historicalRow.getByText(/주문 당시:/).waitFor({state:"hidden"});
+  const headerAfter = await geometry();
+  assert.deepEqual(headerAfter.headerCells,headerBefore.headerCells,
+    "Closing recipient details must restore exactly the same header geometry");
+  assert.deepEqual(headerAfter.toolbar,headerBefore.toolbar);
   assert.equal(await page.getByRole("dialog",{name:"변경사항 저장"}).count(),0,
     "Expanding stored order details must not request edit confirmation");
+  console.log("ORDER_HISTORY_STABLE_HEADER",JSON.stringify({before:headerBefore,expanded:expandedLayout}));
 
   // Simulate background refresh of product and freight masters without
   // touching the saved order. The app polls native state periodically.
