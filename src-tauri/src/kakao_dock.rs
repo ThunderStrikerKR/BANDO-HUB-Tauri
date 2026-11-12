@@ -428,7 +428,7 @@ mod native {
                 return Err("대화창 표시 높이가 부족합니다.".into())
             }
             for hwnd in chats {
-                if min_visible_height(*hwnd)?>chat.height(){
+                if min_visible_height(*hwnd)? > chat.height(){
                     return Err("대화창 최소 높이보다 나누어 보기 영역이 작습니다.".into())
                 }
             }
@@ -530,7 +530,7 @@ mod native {
         }
 
         if focus_on_app_or_kakao(s.hwnd,s.pid) {
-            let visible_chat=active_chat.filter(|hwnd|
+            let visible_chat=(*active_chat).filter(|hwnd|
                 all.iter().any(|(item,kind)|*item==*hwnd&&*kind=="CHAT")
                     && unsafe{IsIconic(*hwnd)}==0);
             if let Some(chat)=visible_chat {
@@ -797,8 +797,16 @@ fn start(app:&AppHandle,inner:&mut Inner,handle:&str)->Result<Status,String>{
                 return Err("기존 카카오톡 창이 종료됐습니다. 창 목록을 다시 확인하세요.".into());
             }
         }
-        let mut session=native::attach(native::main_window(app)?,handle)?;
+        let requested=native::candidates().into_iter().find(|c|c.handle==handle)
+            .ok_or("선택한 카카오톡 창이 종료되었거나 허용되지 않았습니다.")?;
+        let selected_main=native::candidates().into_iter()
+            .find(|c|c.process_id==requested.process_id&&c.kind=="MAIN");
+        let root_handle=selected_main.map(|c|c.handle).unwrap_or_else(||handle.to_string());
+        let mut session=native::attach(native::main_window(app)?,&root_handle)?;
         native::preserve_original(&mut session,&inner.tracked);
+        let requested_chat=if requested.kind=="CHAT" {
+            usize::from_str_radix(handle,16).ok().map(|v|v as isize)
+        }else{None};
         let previous=inner.session.take();
         let previous_tracked=std::mem::take(&mut inner.tracked);
         let previous_active=inner.active_chat.take();
@@ -820,12 +828,30 @@ fn start(app:&AppHandle,inner:&mut Inner,handle:&str)->Result<Status,String>{
                     inner.tracked=previous_tracked;
                     inner.active_chat=previous_active;
                     if let Some(current)=inner.session {
-                        let _=native::sync_related(&current,&mut inner.tracked,
-                            &mut inner.active_chat,app,inner.region);
+                        let _=inner.sync_related(&current,app);
                     }
                 }else{native::restore(&old);}
             }
             return Err(e)
+        }
+        inner.active_chat=requested_chat;
+        if let Err(reason)=inner.sync_related(&session,app) {
+            inner.restore_related();
+            native::restore(&session);
+            if let Some(old)=previous {
+                let mut restored=old;
+                let rebuild=match old.mode {
+                    native::Mode::Overlap=>native::overlap(&mut restored,app,region),
+                    native::Mode::Stack=>native::stack(&mut restored,app,region),
+                };
+                if rebuild.is_ok() {
+                    inner.tracked=previous_tracked;
+                    inner.active_chat=previous_active;
+                    let _=inner.sync_related(&restored,app);
+                    inner.session=Some(restored);
+                }
+            }
+            return Err(reason)
         }
         inner.session=Some(session);
         return Ok(status(inner))
@@ -844,15 +870,15 @@ pub fn dock_status_native(app:AppHandle,dock:State<'_,Dock>)->Result<Status,Stri
     #[cfg(windows)]
     if let Some(session)=inner.session.take(){
         if !native::live(&session){
-            native::restore_related(&mut inner.tracked,&mut inner.active_chat);
+            inner.restore_related();
             native::restore(&session);
             let mut s=inactive();s.notice=Some("카카오톡 창 연결이 해제되었습니다.".into());
             return Ok(s)
         }
         let mut session=session;
-        let error=native::sync(&mut session,&app,inner.region)
-            .and_then(|()|native::sync_related(&session,&mut inner.tracked,
-                &mut inner.active_chat,&app,inner.region)).err();
+        let region=inner.region;
+        let error=native::sync(&mut session,&app,region)
+            .and_then(|()|inner.sync_related(&session,&app)).err();
         inner.session=Some(session);
         if let Some(reason)=error {
             let mut response=status(&inner);
@@ -866,31 +892,51 @@ pub fn dock_status_native(app:AppHandle,dock:State<'_,Dock>)->Result<Status,Stri
 #[tauri::command]
 pub fn dock_cycle_native(app:AppHandle,dock:State<'_,Dock>)->Result<Status,String>{
     let mut inner=lock(&dock)?;
-    #[cfg(windows)]
-    {
-        if let Some(mut session)=inner.session.take(){
-            if !native::live(&session){
-                native::restore_related(&mut inner.tracked,&mut inner.active_chat);
-                native::restore(&session);return Ok(inactive())
-            }
-            if session.mode==native::Mode::Overlap{
-                if let Err(e)=native::stack(&mut session,&app){inner.session=Some(session);return Err(e)}
-                let _=native::sync_related(&session,&mut inner.tracked,
-                    &mut inner.active_chat,&app,inner.region);
-                inner.session=Some(session);return Ok(status(&inner))
-            }
-            native::restore_related(&mut inner.tracked,&mut inner.active_chat);
-            native::restore(&session);return Ok(inactive())
-        }
+    #[cfg(windows)]{
+        // Legacy IPC retained for compatibility. Never cycle layouts or
+        // disconnect implicitly: only two explicit viewing modes exist.
+        if inner.session.is_some(){return Ok(status(&inner))}
         let windows=native::candidates();
         if windows.is_empty(){return Err("실행 중인 카카오톡 창을 찾지 못했습니다.".into())}
         if windows.len()>1{
-            let mut s=inactive();s.selection_required=true;
-            s.notice=Some("연결할 카카오톡 창을 선택하세요.".into());return Ok(s)
+            let mut response=inactive();
+            response.selection_required=true;
+            return Ok(response)
         }
         return start(&app,&mut inner,&windows[0].handle)
     }
     #[cfg(not(windows))]{let _=(app,inner);Err("Windows 전용 기능입니다.".into())}
+}
+
+#[tauri::command]
+pub fn dock_mode_native(
+    app:AppHandle,dock:State<'_,Dock>,mode:String,
+)->Result<Status,String>{
+    let mut inner=lock(&dock)?;
+    #[cfg(windows)]{
+        let region=inner.region.ok_or("카카오톡 화면 영역이 없습니다.")?;
+        let mut session=inner.session.take().ok_or("카카오톡을 먼저 연결하세요.")?;
+        if !native::live(&session){
+            inner.restore_related();
+            native::restore(&session);
+            return Err("연결된 카카오톡 창이 종료되었습니다.".into())
+        }
+        let before=session;
+        let result=match mode.as_str(){
+            "OVERLAP"=>native::overlap(&mut session,&app,region),
+            "STACK"=>native::stack(&mut session,&app,region),
+            _=>Err("겹쳐 보기 또는 나누어 보기만 선택할 수 있습니다.".into()),
+        }.and_then(|()|inner.sync_related(&session,&app));
+        if let Err(error)=result{
+            session=before;
+            let _=inner.sync_related(&session,&app);
+            inner.session=Some(session);
+            return Err(error)
+        }
+        inner.session=Some(session);
+        return Ok(status(&inner))
+    }
+    #[cfg(not(windows))]{let _=(app,inner,mode);Err("Windows 전용 기능입니다.".into())}
 }
 #[tauri::command]
 pub fn dock_start_native(app:AppHandle,dock:State<'_,Dock>,handle:String,ratio:f64)->Result<Status,String>{
@@ -903,13 +949,27 @@ pub fn dock_start_native(app:AppHandle,dock:State<'_,Dock>,handle:String,ratio:f
 #[tauri::command]
 pub fn dock_select_native(app:AppHandle,dock:State<'_,Dock>,handle:String)->Result<Status,String>{
     let mut inner=lock(&dock)?;
-    start(&app,&mut inner,&handle)
+    #[cfg(windows)]{
+        if let Some(session)=inner.session {
+            let target=native::candidates().into_iter().find(|c|c.handle==handle
+                && c.process_id==session.pid)
+                .ok_or("현재 카카오톡에서 열린 대화창이 아닙니다.")?;
+            if target.kind=="CHAT"{
+                inner.active_chat=Some(usize::from_str_radix(&handle,16)
+                    .map_err(|_|"카카오톡 창 식별자 오류")? as isize);
+            }else{inner.active_chat=None;}
+            inner.sync_related(&session,&app)?;
+            return Ok(status(&inner))
+        }
+        return start(&app,&mut inner,&handle)
+    }
+    #[cfg(not(windows))]{let _=(app,inner,handle);Err("Windows 전용 기능입니다.".into())}
 }
 #[tauri::command]
 pub fn dock_stop_native(dock:State<'_,Dock>)->Result<Status,String>{
     let mut inner=lock(&dock)?;
     #[cfg(windows)]{
-        native::restore_related(&mut inner.tracked,&mut inner.active_chat);
+        inner.restore_related();
         if let Some(s)=inner.session.take(){native::restore(&s);}
     }
     #[cfg(not(windows))]{inner.session=None;}
@@ -926,9 +986,9 @@ pub fn dock_region_native(app:AppHandle,dock:State<'_,Dock>,region:Region)->Resu
     }
     #[cfg(windows)]if let Some(mut s)=inner.session{
         if native::live(&s) {
-            let result=native::sync(&mut s,&app,inner.region)
-                .and_then(|()|native::sync_related(&s,&mut inner.tracked,
-                    &mut inner.active_chat,&app,inner.region));
+            let region=inner.region;
+            let result=native::sync(&mut s,&app,region)
+                .and_then(|()|inner.sync_related(&s,&app));
             inner.session=Some(s);
             result?;
         }
@@ -939,7 +999,7 @@ pub fn dock_region_native(app:AppHandle,dock:State<'_,Dock>,region:Region)->Resu
 pub fn restore_on_exit(dock:&Dock){
     if let Ok(mut inner)=lock(dock){
         #[cfg(windows)]{
-            native::restore_related(&mut inner.tracked,&mut inner.active_chat);
+            inner.restore_related();
             if let Some(s)=inner.session.take(){native::restore(&s);}
         }
         #[cfg(not(windows))]{inner.session=None;}
