@@ -43,7 +43,7 @@ export const quantityWords: Record<string, number> = {
 export function quantities(text: string) {
   const result: { value: number; start: number; end: number; text: string }[] = [];
   const pattern =
-    /(\d+|다섯|여섯|일곱|여덟|아홉|하나|둘|셋|넷|한|두|세|네|열|일|이|삼|사|오|육|칠|팔|구|십)\s*(?:개|대|세트|ea|pcs)(?![A-Za-z])|[x×*]\s*(\d+)(?!\d)/gi;
+    /(\d+|다섯|여섯|일곱|여덟|아홉|하나|둘|셋|넷|한|두|세|네|열|일|이|삼|사|오|육|칠|팔|구|십)\s*(?:개|대|세트|ea|pcs)(?![A-Za-z])|[x×*]\s*(\d+)(?!\d|\s*(?:cm|mm)\b)/gi;
   for (const m of text.matchAll(pattern))
     result.push({
       value: m[2] ? Number(m[2]) : /^\d+$/.test(m[1]) ? Number(m[1]) : quantityWords[m[1]],
