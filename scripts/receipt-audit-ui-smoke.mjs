@@ -369,9 +369,10 @@ try {
   // Two explicit layouts inside one Kakao pane; connection is not a view.
   await page.reload();
   await page.getByRole("button", { name: "카카오톡 함께 보기" }).click();
-  await page.getByText("연결할 카카오톡 창 선택").waitFor();
-  await page.getByRole("button", { name: /카카오톡 기본 창/ }).click();
   const modes = page.getByRole("group", { name: "카카오톡 보기 방식" });
+  await modes.waitFor();
+  assert.equal(await page.getByRole("dialog", { name: "연결할 카카오톡 창 선택" }).count(), 0,
+    "v0.8.10 connects directly without requiring an unnecessary picker");
   const overlap = modes.getByRole("button", { name: "겹쳐 보기" });
   const split = modes.getByRole("button", { name: "나누어 보기" });
   await overlap.waitFor();

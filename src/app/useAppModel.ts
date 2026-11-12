@@ -297,11 +297,14 @@ export function useAppModel() {
     setDockBusy(true);
     try {
       const windows = await window.bando!.dockWindows();
-      if (!windows.length) throw Error("실행 중인 카카오톡 창이 없습니다.");
-      if (windows.length === 1) {
-        setDock(await window.bando!.dockStart(windows[0].handle, 0.8));
-        setDockCandidates([]);
-      } else setDockCandidates(windows);
+      // Electron v0.8.10 connects in one click: prefer an existing
+      // conversation over the messenger, then track every other window.
+      const selected = windows.find((window) => window.kind === "CHAT")
+        ?? windows.find((window) => window.kind === "MAIN")
+        ?? windows[0];
+      if (!selected) throw Error("실행 중인 카카오톡 창이 없습니다.");
+      setDock(await window.bando!.dockStart(selected.handle, 0.8));
+      setDockCandidates([]);
     } finally { setDockBusy(false); }
   };
   const setDockMode = async (mode: "OVERLAP" | "STACK") => {

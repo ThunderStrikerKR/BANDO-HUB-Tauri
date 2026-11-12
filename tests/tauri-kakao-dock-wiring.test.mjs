@@ -48,6 +48,8 @@ test("there are precisely two viewing modes and connection is not a view",()=>{
   assert.match(header,/카카오톡 연결 해제/);
   assert.doesNotMatch(header,/다음: 카카오톡|다음: 나누어 보기|다음: 카카오톡 창 원래 위치 복구/);
   assert.match(model,/dockMode\(mode\)/);
+  assert.match(model,/windows\\.find\\(\\(window\\) => window\\.kind === "CHAT"\\)/);
+  assert.match(model,/dockStart\\(selected\\.handle, 0\\.8\\)/);
   assert.match(model,/dockStop\(\)/);
   assert.doesNotMatch(model,/bando!\.dockCycle\(\)/);
   assert.match(app,/onDockMode=/);
