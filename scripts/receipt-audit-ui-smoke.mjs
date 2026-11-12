@@ -415,6 +415,30 @@ try {
   await page.getByRole("button", { name: "선택한 실제 화면 열기" }).click();
   const modal = page.getByRole("dialog", { name: "UI 상태 시험 / 기본" });
   await modal.waitFor();
+  await page.waitForFunction(() =>
+    parseFloat(getComputedStyle(document.documentElement)
+      .getPropertyValue("--kakao-reserved-width")) > 0);
+  const geometry = await modal.evaluate((el) => {
+    const bounds = el.getBoundingClientRect();
+    const reserved = parseFloat(getComputedStyle(document.documentElement)
+      .getPropertyValue("--kakao-reserved-width")) || 0;
+    return {
+      left: bounds.left, right: bounds.right, width: bounds.width,
+      height: bounds.height, reserved, viewport: innerWidth,
+      center: bounds.left + bounds.width / 2,
+    };
+  });
+  const visibleCenter = geometry.reserved +
+    (geometry.viewport - geometry.reserved) / 2;
+  assert.ok(geometry.left >= geometry.reserved - 2,
+    "Common modal is hidden behind KakaoTalk: " + JSON.stringify(geometry));
+  assert.ok(geometry.right <= geometry.viewport + 2,
+    "Common modal extends beyond the visible workspace: " + JSON.stringify(geometry));
+  assert.ok(Math.abs(geometry.center - visibleCenter) < 3,
+    "Common modal is not centered in the KakaoTalk-free workspace: " + JSON.stringify(geometry));
+  assert.ok(geometry.height < 600,
+    "Simple modal still uses the former 820px blank layout: " + JSON.stringify(geometry));
+  console.log("COMMON_MODAL_REAL_DOM_GEOMETRY", JSON.stringify(geometry));
   await modal.getByRole("button", { name: "취소" }).click();
   await modal.waitFor({ state: "detached" });
   // Actual ProductSearchDialog, not only a mocked common modal title.
