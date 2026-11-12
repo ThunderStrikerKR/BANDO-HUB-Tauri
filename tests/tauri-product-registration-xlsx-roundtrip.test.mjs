@@ -45,7 +45,7 @@ execution(exports, (path) => {
   };
   if(path === "./product-registry") return {
     registryKey:key,
-    registryIdentity:(values)=>["제조사 모델코드","색상","규격","판매 단위"].map(k=>key(values[k]||"")).join("|"),
+    registryIdentity:(values)=>["최종 등록명","색상","규격","판매 단위"].map(k=>key(values[k]||"")).join("|"),
   };
   return nodeRequire(path);
 }, webcrypto, structuredClone);
@@ -54,8 +54,8 @@ const state = ()=>({
   revision:8, products:[], deletedProductKeys:[], categories:[root,leaf],
   brands:[], registrationBatches:[], settings:{operatorName:"검증 직원"},
 });
-const makeRow = (model="BD123",name="반도스탠드 신규 보면대")=>[
-  name + " / 블랙 / 기본",model,"","블랙","기본","","개","반도스탠드","반도스탠드 / 보면대",
+const makeRow = (name="반도스탠드 신규 보면대")=>[
+  name ? name + " / 블랙 / 기본" : "","","블랙","기본","","개","반도스탠드","반도스탠드 / 보면대",
   "10000","12000","15000","",""
 ];
 async function workbook(rows) {
@@ -70,7 +70,7 @@ async function workbook(rows) {
 test("real XLSX one new product, duplicate and invalid row are separated without changing prices",async()=>{
  const s=state(),original=JSON.stringify(s);
  const file=await workbook([
-   makeRow(),makeRow(),makeRow("","모델코드 누락 상품"),
+   makeRow(),makeRow(),makeRow(""),
  ]);
  const preview=await exports.previewRegistrationWorkbook(s,file);
  assert.deepEqual(preview.rows.map(r=>r.status),["READY","DUPLICATE","ERROR"]);
@@ -87,9 +87,9 @@ test("real XLSX one new product, duplicate and invalid row are separated without
  await book.xlsx.load(Buffer.from(bytes));
  const sheet=book.getWorksheet("등록 결과");
  assert.equal(sheet.rowCount,4);
- assert.deepEqual([2,3,4].map(row=>sheet.getRow(row).getCell(16).value),
+ assert.deepEqual([2,3,4].map(row=>sheet.getRow(row).getCell(15).value),
    ["등록 완료","중복","오류"]);
- assert.equal(sheet.getRow(2).getCell(18).value,next.products[0].id);
+ assert.equal(sheet.getRow(2).getCell(17).value,next.products[0].id);
 });
 
 test("stale revision and already-created product cannot be committed twice",async()=>{

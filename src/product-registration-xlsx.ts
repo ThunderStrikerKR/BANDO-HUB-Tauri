@@ -2,16 +2,20 @@ import type ExcelJS from "exceljs";
 import { categoryPath } from "./category-tree";
 import { catalogFromCategory, withCatalogRoots } from "./category-roots";
 import { normalizeCode, normalizeColor, validProductUrl, validateProduct } from "./domain";
-import { normalizeModel, productKey, registeredProducts } from "./product-models";
+import { productKey, registeredProducts } from "./product-models";
 import { registryIdentity, registryKey } from "./product-registry";
 import type { RegistrationBatch, RegistrationRow } from "./product-registry";
 import type { Catalog, Product, State } from "./types";
 
 /** A row is one actual selling configuration. Existing prices are never overwritten. */
 export const REGISTRATION_HEADERS = [
-  "최종 등록명", "제조사 모델코드", "브랜드", "색상", "구성 구분", "규격",
+  "최종 등록명", "브랜드", "색상", "구성 구분", "규격",
   "판매 단위", "상품군", "카테고리 경로", "도매가", "반도매가",
   "소매가", "상품 링크", "비고",
+] as const;
+/** Previous column order is accepted only as a separate legacy format. */
+const LEGACY_REGISTRATION_HEADERS = [
+  "최종 등록명", "제조사 모델코드", ...REGISTRATION_HEADERS.slice(1),
 ] as const;
 export interface RegistrationWorkbookPreview {
   fingerprint: string;
@@ -60,7 +64,6 @@ function existingMatches(state: State, product: Product): string[] {
     // Full sale configuration name differentiates independent products that share a model and color.
     if (registryKey(p.name) !== registryKey(product.name)) return false;
     if (product.registrationIdentity && p.registrationIdentity === product.registrationIdentity) return true;
-    if (normalizeCode(p.code) !== normalizeCode(product.code)) return false;
     if (registryKey(p.specification ?? "") !== registryKey(product.specification ?? "")) return false;
     if (registryKey(p.sellingUnit ?? "개") !== registryKey(product.sellingUnit ?? "개")) return false;
     return p.variants.some((v) =>
@@ -75,16 +78,16 @@ export async function exportRegistrationTemplate(state: State): Promise<number[]
   const sheet = wb.addWorksheet("상품 등록");
   sheet.addRow([...REGISTRATION_HEADERS]);
   sheet.views = [{ state: "frozen", ySplit: 1 }];
-  sheet.autoFilter = { from: "A1", to: "N1" };
+  sheet.autoFilter = { from: "A1", to: "M1" };
   sheet.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
   sheet.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF303030" } };
-  const widths = [34, 22, 20, 15, 19, 21, 13, 17, 55, 14, 14, 14, 48, 36];
+  const widths = [34, 20, 15, 19, 21, 13, 17, 55, 14, 14, 14, 48, 36];
   sheet.columns.forEach((column, i) => {
     column.width = widths[i];
-    if (i >= 9 && i <= 11) column.numFmt = "#,##0";
+    if (i >= 8 && i <= 10) column.numFmt = "#,##0";
   });
   for (let row = 2; row <= 500; row++) {
-    sheet.getCell(row, 8).dataValidation = {
+    sheet.getCell(row, 7).dataValidation = {
       type: "list", allowBlank: false, formulae: ['"반도스탠드,반도몰"'],
       showErrorMessage: true, error: "반도스탠드 또는 반도몰을 선택하세요.",
     };
@@ -127,30 +130,31 @@ export async function previewRegistrationWorkbook(state: State, file: File): Pro
   await wb.xlsx.load(bytes as unknown as Parameters<typeof wb.xlsx.load>[0]);
   const sheet = wb.getWorksheet("상품 등록");
   if (!sheet) throw Error("반도허브 등록 양식의 '상품 등록' 시트가 없습니다.");
-  REGISTRATION_HEADERS.forEach((header, index) => {
-    if (cellText(sheet.getRow(1).getCell(index + 1)) !== header) {
-      throw Error("상품 등록 양식의 열 이름 또는 순서가 다릅니다: " + header);
-    }
-  });
+  const headerMatches = (headers: readonly string[]) =>
+    headers.every((header, index) => cellText(sheet.getRow(1).getCell(index + 1)) === header) &&
+    !cellText(sheet.getRow(1).getCell(headers.length + 1));
+  const headers = headerMatches(REGISTRATION_HEADERS)
+    ? REGISTRATION_HEADERS
+    : headerMatches(LEGACY_REGISTRATION_HEADERS)
+      ? LEGACY_REGISTRATION_HEADERS : undefined;
+  if (!headers) throw Error("상품 등록 양식의 열 이름 또는 순서가 다릅니다.");
   if (sheet.rowCount > MAX_ROWS + 1) throw Error("한 번에 최대 2,000행까지 등록할 수 있습니다.");
   const rows: RegistrationRow[] = [];
   const seen = new Map<string, number>();
   const prior: Product[] = [...state.products];
   for (let rowNo = 2; rowNo <= sheet.rowCount; rowNo++) {
-    const cells = REGISTRATION_HEADERS.map((_, i) => sheet.getRow(rowNo).getCell(i + 1));
+    const cells = headers.map((_, i) => sheet.getRow(rowNo).getCell(i + 1));
     const data = cells.map(cellText);
     if (!data.some(Boolean)) continue;
     const values: Record<string, string> = {};
-    REGISTRATION_HEADERS.forEach((header, index) => { values[header] = data[index]; });
+    headers.forEach((header, index) => { values[header] = data[index]; });
     const errors: string[] = [], holds: string[] = [];
     if (cells.some((cell) => cell.isMerged ||
       (typeof cell.value === "object" && cell.value !== null && "formula" in cell.value))) {
       errors.push("병합 셀과 수식은 허용하지 않습니다.");
     }
     const name = values["최종 등록명"];
-    const code = normalizeModel(values["제조사 모델코드"]);
     if (!name) errors.push("최종 등록명을 입력하세요.");
-    if (!code) errors.push("제조사 모델코드를 입력하세요.");
     const configuration = values["구성 구분"].trim();
     if (configuration && !registryKey(name).includes(registryKey(configuration))) {
       holds.push("구성 구분 정보는 별도 옵션이 아니라 최종 등록명에 포함해야 합니다.");
@@ -177,11 +181,12 @@ export async function previewRegistrationWorkbook(state: State, file: File): Pro
     if (url && !validProductUrl(url)) errors.push("반도스탠드 / 반도몰 공식 상품 링크만 허용됩니다.");
     const color = normalizeColor(values["색상"] || "단일");
     const identity = (catalog ?? "UNKNOWN") + "|" +
-      registryIdentity({ ...values, "제조사 모델코드": code, "색상": color }) +
+      registryIdentity({ ...values, "색상": color }) +
       "|" + registryKey(name);
     const at = new Date().toISOString();
-    const product: Product | undefined = name && code && catalog && category && !errors.length ? {
-      id: crypto.randomUUID(), code, name, manufacturerCode: code, catalog,
+    const productId = crypto.randomUUID();
+    const product: Product | undefined = name && catalog && category && !errors.length ? {
+      id: productId, code: productId, name, catalog,
       origin: catalog === "BANDOSTAND" ? "FACTORY" : "STORE",
       brandId: brands[0]?.id,
       category: category.map((c) => c.name).join(" > "),
@@ -190,8 +195,8 @@ export async function previewRegistrationWorkbook(state: State, file: File): Pro
       sellingUnit: values["판매 단위"],
       saleUnit: true, registrationIdentity: identity,
       verificationStatus: "REGISTERED",
-      familyKey: catalog + "|" + normalizeCode(code),
-      modelKey: "REG|" + identity, modelCodes: [code],
+      familyKey: productId,
+      modelKey: "REG|" + identity,
       defaultColor: color, colorStatus: color === "단일" ? "NOT_REQUIRED" : "KNOWN",
       active: true,
       variants: [{
@@ -265,7 +270,7 @@ export async function exportRegistrationResults(batch: RegistrationBatch): Promi
       item.errors.join(" / ") || item.duplicateIds.join(", "), id]);
   }
   sheet.views = [{ state: "frozen", ySplit: 1 }];
-  sheet.columns.forEach((column, i) => { column.width = i === 0 ? 9 : i === 15 ? 40 : 23; });
+  sheet.columns.forEach((column, i) => { column.width = i === 0 ? 9 : i === 14 ? 40 : 23; });
   const output = await wb.xlsx.writeBuffer();
   return Array.from(new Uint8Array(output as ArrayBuffer));
 }
