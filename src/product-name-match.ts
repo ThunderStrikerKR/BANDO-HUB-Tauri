@@ -130,8 +130,18 @@ const colorWords: Array<[string, RegExp]> = [
   ["White", /화이트|흰색|\bwhite\b/i],
   ["Brown", /브라운|\bbrown\b/i],
 ];
-const writtenColor = (source: string) =>
-  colorWords.find(([, pattern]) => pattern.test(source))?.[0];
+const writtenColor = (source: string) => {
+  // 708 BR and 709 G are explicit catalog color suffixes, not a bare
+  // 708/709 default-black order. Keep the code anchored to the model.
+  const suffix = source.match(
+    /(?<![A-Za-z0-9-])(?:BD[\s-]*)?\d{3}(?:-1)?\s*(BR|BK|G|W)(?![A-Za-z0-9-])/i,
+  )?.[1]?.toUpperCase();
+  const suffixColors: Record<string, string> = {
+    BR: "Brown", BK: "Black", G: "Gray", W: "White",
+  };
+  return (suffix && suffixColors[suffix]) ||
+    colorWords.find(([, pattern]) => pattern.test(source))?.[0];
+};
 const productColor = (product: Product, color: string) =>
   product.variants.some(variant => variant.color.toLowerCase() === color.toLowerCase()) ||
   colorWords.some(([label, pattern]) => label === color && pattern.test(product.name));
