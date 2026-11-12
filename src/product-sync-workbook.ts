@@ -18,7 +18,7 @@ const MAX_BYTES = 20 * 1024 * 1024;
 const MAX_ROWS = 20000;
 const EMPTY = "[비우기]";
 const modelKey = (value: string) => normalizeCode(value).replace(/[\s-]/g, "");
-const identity = (p: Product) => (p.catalog ?? "BANDOSTAND") + "|" + modelKey(p.code);
+const identity = (p: Product) => (p.catalog ?? "BANDOSTAND") + "|" + modelKey(p.name);
 const isArchived = (p: Product) => !!(p.deletedAt || p.supersededBy);
 const displayGroup = (group: Catalog | undefined) => group === "BANDOMALL" ? "반도몰" : "반도스탠드";
 const groupValue = (text: string): Catalog => {
@@ -215,18 +215,16 @@ function updateExistingProduct(state: State, current: Product, cells: string[]):
 }
 function createProduct(state: State, cells: string[]): Product {
   const at = new Date().toISOString();
-  const code = cells[4];
-  if (!code || code === EMPTY || /^P[A-Z0-9]{6,}$/i.test(code)) {
-    throw Error("신규 모델코드를 입력하세요. 카페24 P코드는 업무용 모델코드가 아닙니다.");
-  }
+  // Legacy workbook column 4 is read for compatibility, but is not a required product identity.
   const group = groupValue(cells[5]);
   const p: Product = {
-    id: crypto.randomUUID(), name: cells[2], code, manufacturerCode: code,
+    id: crypto.randomUUID(), name: cells[2], code: "",
     catalog: group, origin: group === "BANDOMALL" ? "STORE" : "FACTORY",
     category: "", defaultColor: cells[11], active: yesNo(cells[12], true),
     variants: [], createdAt: at, updatedAt: at, saleUnit: true,
-    modelCodes: [code], colorStatus: "KNOWN", verificationStatus: "REGISTERED",
+    colorStatus: "KNOWN", verificationStatus: "REGISTERED",
   };
+  p.code = p.id; // Transitional SQL legacy column, not an employee-facing code.
   if (!p.name.trim()) throw Error("신규 상품명을 입력하세요.");
   if (!p.defaultColor) throw Error("신규 상품의 기본 색상을 입력하세요.");
   if (cells[6] && cells[6] !== (p.origin === "STORE" ? "매장" : "공장")) {
@@ -237,7 +235,7 @@ function createProduct(state: State, cells: string[]): Product {
   p.sellingUnit = optional(cells[10]);
   categoryEdit(state, p, cells[7]);
   brandEdit(state, p, cells[8]);
-  p.familyKey = identity(p);
+  p.familyKey = p.id;
   return p;
 }
 function newVariant(cells: string[]): Variant {
@@ -382,7 +380,7 @@ export function previewProductSyncRows(state: State, source: WorkbookSource): Pr
       if (!original) {
         const duplicates = next.filter((p) =>
           p.id !== product.id && !isArchived(p) && identity(p) === identity(product) && p.name.trim() === product.name.trim());
-        if (duplicates.length) throw Error("같은 모델코드와 상품명을 가진 기존 상품이 있습니다.");
+        if (duplicates.length) throw Error("같은 상품명으로 등록된 기존 상품이 있습니다.");
         validateProduct(product, registeredProducts(state.products));
       }
       product.saleUnit = true;
@@ -393,7 +391,7 @@ export function previewProductSyncRows(state: State, source: WorkbookSource): Pr
         sheet: "상품 목록", row: source.products.find((x) => x.cells[0] === product.id ||
           (x.cells[1] && keys.get(x.cells[1]) === product.id))?.row ?? 0,
         id: product.id, name: product.name,
-        status: /동일 모델코드|같은 상품코드|중복 상품/.test(message) ? "HOLD" : "ERROR",
+        status: /같은 상품명|동일 모델코드|같은 상품코드|중복 상품/.test(message) ? "HOLD" : "ERROR",
         changes: [], errors: [message],
       });
     }

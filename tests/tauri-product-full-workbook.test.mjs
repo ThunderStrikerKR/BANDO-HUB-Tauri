@@ -121,8 +121,9 @@ test("real XLSX: two colors create two independent products with one price each"
   assert.equal(preview.createdProducts, 2);
   assert.equal(preview.createdOptions, 2);
   const applied = exports.applyProductSyncWorkbook(state, preview);
-  const added = applied.next.products.filter((p) => p.code === "BD 900");
+  const added = applied.next.products.filter((p) => /^BD 900/.test(p.name));
   assert.equal(added.length, 2);
+  assert.ok(added.every(p=>p.code===p.id),"new products must not inherit an employee-entered code");
   assert.deepEqual(added.map((p) => p.name), ["BD 900 / 블랙", "BD 900 / 화이트"]);
   assert.ok(added.every((p) => p.variants.length === 1 && p.saleUnit && !p.siteId));
   assert.deepEqual(added.map((p) => p.variants[0].retail), [90000, 99000]);
