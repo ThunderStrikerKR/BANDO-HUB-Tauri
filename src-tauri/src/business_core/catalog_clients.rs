@@ -357,6 +357,68 @@ mod tests {
         assert!(execute("upsert_product",json!({"state":s,"product":update})).is_ok());
     }
     #[test]
+    fn archival_keeps_history_and_is_not_a_physical_delete() {
+        let mut s=state();
+        let mut p=product();
+        p["saleUnit"]=json!(true);
+        p["code"]=json!("bd 709");
+        s["products"]=json!([p]);
+        s["clients"]=json!([client()]);
+        s["aliases"]=json!([
+            {"id":"a1","productId":"product-1","text":"보면대"},
+            {"id":"a2","productId":"other","text":"기타"}
+        ]);
+        let result=execute("archive_product",json!({
+            "state":s,"productId":"product-1","at":"2026-11-14T00:00:00+09:00"
+        })).unwrap();
+        assert_eq!(result["state"]["products"][0]["deletedAt"],"2026-11-14T00:00:00+09:00");
+        assert_eq!(result["state"]["deletedProductKeys"][0],"BANDOSTAND|BD709|sale:variant-1");
+        assert_eq!(result["state"]["aliases"].as_array().unwrap().len(),1);
+        assert_eq!(result["state"]["orders"][0]["id"],"old-order");
+        let client_result=execute("archive_client",json!({
+            "state":result["state"],"clientId":"client-1",
+            "at":"2026-11-14T00:00:00+09:00"
+        })).unwrap();
+        assert_eq!(client_result["state"]["clients"][0]["deletedAt"],
+            "2026-11-14T00:00:00+09:00");
+        assert_eq!(client_result["state"]["orders"][0]["id"],"old-order");
+    }
+    #[test]
+    fn invalid_archive_target_is_rejected_without_any_replacements() {
+        let s=state();
+        assert!(execute("archive_product",json!({
+            "state":s,"productId":"missing","at":"2026-11-14"
+        })).is_err());
+        assert!(execute("archive_client",json!({
+            "state":s,"clientId":"missing","at":"2026-11-14"
+        })).is_err());
+    }
+    #[test]
+    fn approved_workbook_transitions_preserve_all_existing_orders() {
+        let s=state();
+        let p=product();
+        let result=execute("apply_product_workbook",json!({
+            "state":s,"preview":{
+                "revision":11,"products":[p],"rows":[{"status":"ADD"}],
+                "createdProducts":1,"updatedProducts":0,
+                "createdOptions":1,"updatedOptions":0
+            }
+        })).unwrap();
+        assert_eq!(result["createdProducts"],1);
+        assert_eq!(result["next"]["orders"][0]["id"],"old-order");
+        let stale=execute("apply_product_workbook",json!({
+            "state":s,"preview":{"revision":10,"products":[],"rows":[]}
+        }));
+        assert!(stale.unwrap_err().contains("검토 후 데이터"));
+        let mut approved=client();
+        approved["id"]=json!("client-1");
+        let result=execute("apply_client_workbook",json!({
+            "state":s,"preview":{"revision":11,"rows":[{"status":"ADD","client":approved}]}
+        })).unwrap();
+        assert_eq!(result["created"],1);
+        assert_eq!(result["next"]["orders"][0]["id"],"old-order");
+    }
+    #[test]
     fn untrusted_url_and_negative_prices_are_rejected() {
         let s=state();
         let mut p=product();
