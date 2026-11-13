@@ -121,3 +121,17 @@ jobs:
         run: npm install --no-audit --no-fund --ignore-scripts
       - name: Real native Rust recognition to React draft parity and preservation
         run: node --test tests/rust-migration/recognition/react-reception.test.mjs
+
+  history-ts-rust-parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install TypeScript oracle dependencies
+        run: npm install --no-audit --no-fund --ignore-scripts
+      - name: Compare original TS order history with compiled Rust
+        run: node --test tests/rust-migration/rules/history-parity.test.mjs
