@@ -12,6 +12,10 @@ mod registration_preview;
 mod product_sync_preview;
 #[path = "catalog_clients/official_import.rs"]
 mod official_import;
+#[path = "catalog_clients/brands.rs"]
+mod brands;
+#[path = "catalog_clients/categories.rs"]
+mod categories;
 use unicode_normalization::UnicodeNormalization;
 use url::Url;
 
@@ -273,6 +277,9 @@ pub fn execute(operation: &str, payload: Value) -> Result<Value, String> {
     let state = payload.get("state").ok_or("현재 상태가 없습니다.")?;
     match operation {
         "preview_client_rows" => client_preview::preview(&payload),
+        "upsert_brand" | "validate_brands" => brands::execute(operation, &payload),
+        "change_category" | "delete_category" | "legacy_add_category" |
+        "legacy_rename_category" | "validate_categories" => categories::execute(operation, &payload),
         "apply_official_product_import" => official_import::apply(&payload),
         "prepare_registration_commit" => registration::commit(&payload),
         "preview_registration_rows" => registration_preview::preview(&payload),
