@@ -1,7 +1,5 @@
-import { resolvePrice } from "../domain";
 import { matchingRecipient, rebindEvidence, type OrderEvidence } from "../order-evidence";
 import { addressParts, mergeParsedItem } from "../parser";
-import { recommendShipping } from "../shipping";
 import type { Client, Order, Recipient, State } from "../types";
 
 /** Exact result envelope returned by recognition::execute("analyze_order"). */
@@ -94,7 +92,7 @@ export function applyRustReceptionAnalysis(
     at: string;
   },
 ): Order {
-  const { raw, state, pricingClient, at } = options;
+  const { raw, pricingClient, at } = options;
   assertRustReceptionAnalysis(evidence, raw);
   if (!receptionAnalysisAllowed(previous, raw, pricingClient.id)) return previous;
 
@@ -144,9 +142,9 @@ export function applyRustReceptionAnalysis(
         rebindEvidence(candidates, "itemId", item.id, priorItem.id);
         item.id = priorItem.id;
         Object.assign(item, mergeParsedItem(item, priorItem));
-        const product = state.products.find((p) => p.id === item.productId);
-        if (product && item.variantId)
-          item.unitPrice = resolvePrice(product, item.variantId, pricingClient);
+        // The asynchronous native Rust reprice_order effect is authoritative
+        // for previously recognized and employee-matched catalog items.
+        if (item.variantId) item.unitPrice = null;
       }
       // Even newly recognized items must reference the retained recipient,
       // not Rust's provisional recipient ID.
@@ -184,9 +182,10 @@ export function applyRustReceptionAnalysis(
     postpaidApproved: false,
     status: "REVIEW",
   };
-  const freight = recommendShipping(next, state);
-  next.shippingFee = pricingClient.shippingFeeExcluded ? 0 : freight.total;
+  // The live reception hook resolves freight with Rust calculate_shipping.
+  // Keep an explicit pending marker so Save also awaits native freight.
+  next.shippingFee = null;
   next.shippingMode = "AUTO";
-  next.shippingVersion = freight.version;
+  next.shippingVersion = "";
   return next;
 }
