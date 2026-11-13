@@ -8,7 +8,8 @@ import { useEffect, useMemo, useState } from "react";
 import { AliasManager } from "./AliasManager";
 import { ClassificationFilters, RegistrySettings } from "./Classification";
 import { confirmAction } from "./dialogs";
-import { normalizeColor, uid, validateProduct } from "./domain";
+import { normalizeColor, uid } from "./domain";
+import { businessCoreCall } from "./tauri-bridge";
 import { PriceCell } from "./PriceCell";
 import {
   colorLabel,
@@ -153,11 +154,11 @@ export function ProductManager({
         const rootCatalog = catalogFromCategory(withCatalogRoots(state.categories), p.categories.at(-1)!);
         if (rootCatalog) p.catalog = rootCatalog;
       }
-      validateProduct(p, registeredProducts(state.products));
-      const next = clone(state),
-        index = next.products.findIndex((x) => x.id === p.id);
-      if (index >= 0) next.products[index] = p;
-      else next.products.push(p);
+      // Keep UI-only normalization above; Rust owns product validation,
+      // duplicate-name policy, and the authoritative candidate mutation.
+      const { state: next } = await businessCoreCall<{ state: State }>(
+        "catalog_clients", "upsert_product", { state, product: p },
+      );
       await onSave(next);
       setEdit(undefined);
       setOriginalEdit(undefined);
