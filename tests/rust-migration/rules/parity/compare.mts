@@ -3052,18 +3052,18 @@ shippingDeleteCase("delete already deleted group blocked",s=>{
   s.shipping.groups[0].deletedAt=now;
 },true,false);
 function basisCase(name:string,change:(s:any)=>void,groupId?:string){
-  const shipping:any=copy(shipping);
-  change(shipping);
-  const ruleIds=Object.keys(shipping.productRules??{});
-  const ids=Array.from({length:ruleIds.length+shipping.groups.length+2},
+  const basisShipping:any=copy(shipping);
+  change(basisShipping);
+  const ruleIds=Object.keys(basisShipping.productRules??{});
+  const ids=Array.from({length:ruleIds.length+basisShipping.groups.length+2},
     (_,i)=>"shipping-basis-"+i);
   const productVersions=Object.fromEntries(ruleIds.map((id,i)=>[id,ids[i]]));
-  const groupVersions=Object.fromEntries(shipping.groups.map((g:any,i)=>
+  const groupVersions=Object.fromEntries(basisShipping.groups.map((g:any,i)=>
     [g.id,ids[ruleIds.length+i]]));
   add("shipping basis: "+name,"apply_shipping_action",{
-    action:"change_basis",shipping,groupId,now:actionNow,
+    action:"change_basis",shipping:basisShipping,groupId,now:actionNow,
     productVersions,groupVersions
-  },()=>({shipping:deterministicIds(ids,()=>changeShippingBasis(shipping,groupId))}));
+  },()=>({shipping:deterministicIds(ids,()=>changeShippingBasis(basisShipping,groupId))}));
   cases[cases.length-1].expectedOk=true;
 }
 basisCase("reset current group only",()=>{},"music");
