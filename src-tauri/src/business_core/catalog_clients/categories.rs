@@ -159,7 +159,7 @@ fn delete(input:&Value,id:&str,destination:&str)->Result<Value,String>{
         if !ids.iter().any(|category|category==id){continue}
         let mut new_ids=Vec::new();
         let mut unique=HashSet::new();
-        for category in ids.iter().filter(|cat|!removed_path.contains(cat))
+        for category in ids.iter().filter(|cat|!removed_path.contains(cat.as_str()))
             .map(String::as_str).chain((!destination.is_empty()).then_some(destination)){
             if unique.insert(category.to_owned()){new_ids.push(category.to_owned());}
         }
