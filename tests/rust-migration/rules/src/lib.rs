@@ -680,4 +680,112 @@ mod regression {
             .contains("같은 최초 발주서"));
     }
 
+
+    #[test]
+    fn tariff_basis_rollover_preserves_history_and_invalidates_old_versions() {
+        let old=shipping_state()["shipping"].clone();
+        let result=run("apply_shipping_action",json!({
+            "action":"change_basis","shipping":old,
+            "groupVersions":{"music":"v2"},"productVersions":{},
+            "now":"2026-11-13T15:00:00+09:00"
+        }));
+        let next=&result["shipping"];
+        assert_eq!(next["epoch"],8);
+        assert_eq!(next["groups"][0]["history"][0],old["groups"][0]["current"]);
+        assert_eq!(next["groups"][0]["current"]["version"],"v2");
+        assert!(next["groups"][0]["current"]["fees"]["1"].is_null());
+        assert!(next["groups"][0]["current"]["fees"]["2"].is_null());
+        assert_eq!(next["groups"][0]["current"]["notes"],"새 기준의 운임 확인 필요");
+        let old_rate=run("apply_shipping_action",json!({
+            "action":"combination_current","combination":{
+                "id":"old","key":"FACTORY|p1@v1:1","epoch":7,
+                "active":true,
+                "versions":{"assignment:p1":"music","group:music":"v1"}
+            },
+            "state":{"shipping":next,"products":[product()]}
+        }));
+        assert_eq!(old_rate["current"],false);
+        let new_rate=run("apply_shipping_action",json!({
+            "action":"combination_current","combination":{
+                "id":"fresh","key":"FACTORY|p1@v1:1","epoch":8,
+                "active":true,
+                "versions":{"assignment:p1":"music","group:music":"v2"}
+            },
+            "state":{"shipping":next,"products":[product()]}
+        }));
+        assert_eq!(new_rate["current"],true);
+    }
+
+    #[test]
+    fn save_combination_archives_previous_without_changing_charged_shipments() {
+        let mut shipping=shipping_state()["shipping"].clone();
+        shipping["combinations"]=json!([{
+            "id":"old","key":"FACTORY|p1@v1:1","active":true,
+            "charge":3000,"epoch":7,"versions":{"group:music":"v1"},
+            "at":"2026-11-13T08:00:00+09:00"
+        }]);
+        let saved=run("apply_shipping_action",json!({
+            "action":"save_combination","shipping":shipping,
+            "bundle":{"key":"FACTORY|p1@v1:1",
+                "description":"가상 묶음",
+                "versions":{"assignment:p1":"music","group:music":"v1"}},
+            "charge":4250,"actual":4000,
+            "combinationId":"new","now":"2026-11-13T15:00:00+09:00"
+        }));
+        assert_eq!(saved["shipping"]["combinations"][0]["active"],false);
+        assert_eq!(saved["shipping"]["combinations"][0]["charge"],3000);
+        assert_eq!(saved["shipping"]["combinations"][1]["active"],true);
+        assert_eq!(saved["shipping"]["combinations"][1]["charge"],4250);
+        assert_eq!(saved["shipping"]["combinations"][1]["actual"],4000);
+        assert_eq!(saved["shipping"]["combinations"][1]["epoch"],7);
+        assert!(execute("apply_shipping_action",json!({
+            "action":"save_combination","shipping":shipping,
+            "bundle":{"key":"FACTORY|p1@v1:1"},"charge":-1,
+            "combinationId":"x","now":"2026-11-13T15:00:00+09:00"
+        })).is_err());
+    }
+
+    #[test]
+    fn delete_shipping_group_requires_detach_and_deactivates_prior_combinations() {
+        let mut state=shipping_state();
+        state["shipping"]["combinations"]=json!([{
+            "id":"combo-1","key":"FACTORY|p1@v1:1","active":true,"epoch":7,
+            "versions":{"group:music":"v1"},"charge":3000
+        }]);
+        let args=|detach:bool|json!({
+            "action":"delete_group","state":state,"groupId":"music",
+            "detach":detach,"now":"2026-11-13T15:00:00+09:00"
+        });
+        assert!(execute("apply_shipping_action",args(false)).unwrap_err()
+            .contains("사용 중인 상품: 가상 상품"));
+        let result=run("apply_shipping_action",args(true));
+        assert_eq!(result["state"]["shipping"]["groups"][0]["deletedAt"],
+            "2026-11-13T15:00:00+09:00");
+        assert!(result["state"]["products"][0].get("shippingGroupId").is_none());
+        assert_eq!(result["state"]["shipping"]["combinations"][0]["active"],false);
+    }
+
+    #[test]
+    fn legacy_per_item_rule_converts_to_independent_single_bundle_rate() {
+        let mut rule=shipping_state()["shipping"]["groups"][0]["current"].clone();
+        rule["perItem"]=json!(5000);
+        let result=run("apply_shipping_action",json!({
+            "action":"editable_rule","rule":rule
+        }));
+        assert_eq!(result["rule"]["fees"]["1"],5000);
+        assert_eq!(result["rule"]["maxBundle"],1);
+        assert_eq!(result["rule"]["maxConfirmed"],true);
+        assert!(result["rule"]["perItem"].is_null());
+    }
+
+    #[test]
+    fn shipping_combination_versions_use_active_assignment() {
+        let r=run("apply_shipping_action",json!({
+            "action":"combination_versions","key":"FACTORY|p1@v1:2",
+            "state":shipping_state()
+        }));
+        assert_eq!(r["versions"],
+            json!({"assignment:p1":"music","group:music":"v1"}));
+    }
+
 }
