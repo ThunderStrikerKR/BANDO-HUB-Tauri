@@ -238,7 +238,7 @@ fn selected_item(product:&Value,client:&Value,chosen_color:&str,quantity:&Value,
         "id":new_id,"productId":field(product,"id"),"variantId":variant_id,
         "raw":field(product,"name"),"name":visible,"color":normalized,
         "quantity":quantity,"unitPrice":price,
-        "origin":field(product,"origin"),"defaulted":false,
+        "origin":field(product,"origin"),"defaulted":chosen_color.is_empty(),
         "issues":issues,"url":selected.map(|v|str_field(v,"url")).unwrap_or("")
     });
     if let Some(catalog)=product.get("catalog"){set(&mut item,"catalog",catalog.clone())?;}
@@ -315,6 +315,7 @@ fn resolve(payload:&Value)->Result<Value,String>{
     }
     let mut chosen=selected_item(&product,&client,str_field(variant,"color"),
         field(&old,"quantity"),required_str(payload,"newItemId")?)?;
+    let dispatch_origin=order["recipients"][ri].get("dispatchOrigin").cloned();
     // Object.assign(originalItem, selectedCatalogItem, employeeEvidence, flags).
     let updated=&mut order["recipients"][ri]["items"][ii];
     let map=updated.as_object_mut().ok_or("상품 데이터 오류")?;
@@ -340,8 +341,7 @@ fn resolve(payload:&Value)->Result<Value,String>{
     else{updated.as_object_mut().ok_or("상품 데이터 오류")?.remove("appliedDefaultColor");}
     if let Some(value)=representative {set(updated,"appliedRepresentativeModel",value)?;}
     else{updated.as_object_mut().ok_or("상품 데이터 오류")?.remove("appliedRepresentativeModel");}
-    if has_value(field(&order["recipients"][ri],"dispatchOrigin")){
-        let origin=field(&order["recipients"][ri],"dispatchOrigin").clone();
+    if let Some(origin)=dispatch_origin.filter(|v|!v.is_null()){
         set(updated,"origin",origin)?;
     }
     if changed{updated.as_object_mut().ok_or("상품 데이터 오류")?.remove("quantityApproval");}
