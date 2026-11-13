@@ -621,8 +621,15 @@ pub(super) fn apply(payload:&Value)->Result<Value,String> {
                 let sender=state["workflow"]["shipments"][si].get("sender")
                     .filter(|v|!v.is_null()).unwrap_or(&client).clone();
                 let totals=shipment_totals(&state,&ship_id)?;
-                for key in ["total","subtotal","shipping","vat"] {
-                    if safe(field(&totals,key)).is_none() {return Err("청구액 미확정".into());}
+                // The original processGroup persists RETAIL queue snapshots
+                // even when their outside-payment accounting fields are null.
+                // Other order types still require confirmed numeric totals.
+                if str_field(&order,"orderType")!="RETAIL" {
+                    for key in ["total","subtotal","shipping","vat"] {
+                        if safe(field(&totals,key)).is_none() {
+                            return Err("청구액 미확정".into());
+                        }
+                    }
                 }
                 let freight_code=shipment_freight_code(&order,&row).to_string();
                 for origin in row_origins(&row) {
