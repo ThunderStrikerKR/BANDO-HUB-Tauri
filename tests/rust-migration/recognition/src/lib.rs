@@ -269,6 +269,175 @@ mod regressions {
     }
 
     #[test]
+    fn common_total_is_not_copied_to_every_recipient_without_each_evidence() {
+        let state=seed();
+        let suffix="\n김가상\n경기도 의정부시 시민로 100\n박가상\n서울특별시 마포구 월드컵로 20";
+        let raw=format!("모두 709 4개{suffix}");
+        let result=recognition::execute("analyze_order",json!({
+            "raw":raw,"state":state
+        })).unwrap();
+        let rows=result["recipients"].as_array().unwrap();
+        assert_eq!(rows.len(),2);
+        for row in rows {
+            assert_eq!(row["items"].as_array().unwrap().len(),1);
+            assert!(row["items"][0]["quantity"].is_null(),
+                "TypeScript common total is not 4 items for each recipient");
+            assert_eq!(row["items"][0]["quantityConfirmed"],false);
+        }
+        let each=format!("모두 각각 709 4개{suffix}");
+        let result=recognition::execute("analyze_order",json!({
+            "raw":each,"state":seed()
+        })).unwrap();
+        let rows=result["recipients"].as_array().unwrap();
+        assert_eq!(rows.len(),2);
+        for row in rows {
+            assert_eq!(row["items"][0]["quantity"],4);
+            assert_eq!(row["items"][0]["quantityConfirmed"],true);
+        }
+    }
+
+    #[test]
+    fn source_requires_option_keeps_variant_unconfirmed() {
+        let state=json!({"products":[{
+            "id":"sku-option","name":"BD OPTION-X / 가방 선택","code":"BD OPTION-X",
+            "category":"기타","defaultColor":"Black","active":true,
+            "origin":"FACTORY","requiresOption":true,"saleUnit":false,
+            "variants":[{"id":"bag","color":"Black","url":"https://example.com/option","wholesale":100}]
+        }],"aliases":[]});
+        let match_result=recognition::execute("match_products",json!({
+            "text":"BD OPTION-X","state":state
+        })).unwrap();
+        assert_eq!(match_result["productId"],"sku-option");
+        assert!(match_result["variantId"].is_null());
+        let order=recognition::execute("analyze_order",json!({
+            "raw":"BD OPTION-X 2개\n김가상\n경기도 의정부시 시민로 100",
+            "state":state
+        })).unwrap();
+        let item=&order["recipients"][0]["items"][0];
+        assert_eq!(item["productId"],"sku-option");
+        assert!(item["variantId"].is_null());
+        assert!(item["issues"].as_array().unwrap().iter()
+            .any(|x|x.as_str().unwrap_or("").contains("상품 구성 미확정")));
+    }
+
+    #[test]
+    fn source_item_color_default_url_catalog_and_price_snapshot() {
+        let state=json!({"products":[{
+            "id":"sku-solo","name":"BD SOLO-X / 블랙","code":"BD SOLO-X",
+            "category":"기타","defaultColor":"Black","active":true,
+            "origin":"STORE","saleUnit":true,"requiresOption":false,
+            "catalog":"BANDOSTAND",
+            "variants":[{
+                "id":"vsolo","color":"Black","url":"https://example.com/sku",
+                "wholesale":1234,"semi":1500,"retail":1800,"source":"OFFICIAL"
+            }]
+        }],"aliases":[]});
+        let client=json!({"id":"buyer","tier":"wholesale","overrides":{}});
+        let output=recognition::execute("analyze_order",json!({
+            "raw":"BD SOLO-X 2개\n김가상\n경기도 의정부시 시민로 100",
+            "client":client,"state":state
+        })).unwrap();
+        let item=&output["recipients"][0]["items"][0];
+        assert_eq!(item["productId"],"sku-solo");
+        assert_eq!(item["variantId"],"vsolo");
+        assert_eq!(item["name"],"BD SOLO-X / 블랙");
+        assert_eq!(item["color"],"Black");
+        assert_eq!(item["defaulted"],true);
+        assert_eq!(item["url"],"https://example.com/sku");
+        assert_eq!(item["catalog"],"BANDOSTAND");
+        assert_eq!(item["origin"],"STORE");
+        assert_eq!(item["unitPrice"],1234);
+    }
+
+    #[test]
+    fn original_brand_and_catalog_candidates_are_filtered() {
+        let branded=json!({"products":[
+            {"id":"brand-a","name":"BD ZZZ-X / 타입A","code":"BD ZZZ-X",
+             "category":"기타","brandId":"a","active":true,
+             "origin":"FACTORY","defaultColor":"Black",
+             "variants":[{"id":"a-v","color":"Black","source":"OFFICIAL"}]},
+            {"id":"brand-b","name":"BD ZZZ-X / 타입B","code":"BD ZZZ-X",
+             "category":"기타","brandId":"b","active":true,
+             "origin":"FACTORY","defaultColor":"Black",
+             "variants":[{"id":"b-v","color":"Black","source":"OFFICIAL"}]}
+        ],"aliases":[],"brands":[
+            {"id":"a","name":"Alpha Stand","korean":"알파","aliases":[]},
+            {"id":"b","name":"Beta Stand","korean":"베타","aliases":[]}
+        ]});
+        let result=recognition::execute("match_products",json!({
+            "text":"알파 BD ZZZ-X","state":branded
+        })).unwrap();
+        assert_eq!(result["productId"],"brand-a");
+        let catalog=json!({"products":[
+            {"id":"factory","name":"709 / 타공 상판","code":"709",
+             "catalog":"BANDOSTAND","category":"보면대","active":true,
+             "origin":"FACTORY","defaultColor":"Black",
+             "variants":[{"id":"f-v","color":"Black","source":"OFFICIAL"}]},
+            {"id":"mall","name":"709 / 타공 상판","code":"709",
+             "catalog":"BANDOMALL","category":"보면대","active":true,
+             "origin":"STORE","defaultColor":"Black",
+             "variants":[{"id":"m-v","color":"Black","source":"OFFICIAL"}]}
+        ],"aliases":[]});
+        let result=recognition::execute("match_products",json!({
+            "text":"709 1개","state":catalog
+        })).unwrap();
+        assert_eq!(result["productId"],"factory");
+    }
+
+    #[test]
+    fn original_model_color_prefix_and_suffix() {
+        let state=json!({"products":[
+            {"id":"black","name":"BD 970 / 블랙","code":"BD 970",
+             "category":"기타","active":true,"defaultColor":"Black",
+             "origin":"FACTORY","variants":[{"id":"vb","color":"Black","source":"OFFICIAL"}]},
+            {"id":"chrome","name":"BD 970 / 크롬","code":"BD 970",
+             "category":"기타","active":true,"defaultColor":"Chrome",
+             "origin":"FACTORY","variants":[{"id":"vc","color":"Chrome","source":"OFFICIAL"}]}
+        ],"aliases":[]});
+        for input in ["970 C","C 970","970(크롬)"] {
+            let output=recognition::execute("match_products",json!({
+                "text":input,"state":state
+            })).unwrap();
+            assert_eq!(output["productId"],"chrome","case: {input}, {output}");
+        }
+        let output=recognition::execute("match_products",json!({
+            "text":"B 970","state":state
+        })).unwrap();
+        assert_eq!(output["productId"],"black");
+    }
+
+    #[test]
+    fn note_stops_when_next_line_is_registered_product() {
+        let result=recognition::execute("analyze_order",json!({
+            "raw":"배송메모: 문앞에 부탁\nBD 709 2개\n김가상\n경기도 의정부시 시민로 100",
+            "state":seed()
+        })).unwrap();
+        let row=&result["recipients"][0];
+        assert!(row["note"].as_str().unwrap_or("").contains("문앞에 부탁"));
+        assert!(!row["note"].as_str().unwrap_or("").contains("709"));
+        assert_eq!(row["items"][0]["quantity"],2);
+    }
+
+    #[test]
+    fn bundled_sale_unit_does_not_become_order_quantity() {
+        let state=json!({"products":[{
+            "id":"bundle","name":"BD BUNDLE-X / 2개 구성","code":"BD BUNDLE-X",
+            "category":"기타","active":true,"origin":"FACTORY",
+            "defaultColor":"Black","sellingUnit":"2개 구성","requiresOption":false,
+            "saleUnit":true,
+            "variants":[{"id":"v-bundle","color":"Black","option":"2개 구성",
+                "source":"OFFICIAL"}]
+        }],"aliases":[]});
+        let result=recognition::execute("analyze_order",json!({
+            "raw":"BD BUNDLE-X 2개 구성\n김가상\n경기도 의정부시 시민로 100",
+            "state":state
+        })).unwrap();
+        let item=&result["recipients"][0]["items"][0];
+        assert!(item["quantity"].is_null());
+        assert_eq!(item["quantityConfirmed"],false);
+    }
+
+    #[test]
     fn a_negative_quantity_never_becomes_approved() {
         let state=json!({"products":[],"aliases":[]});
         let result=recognition::execute("analyze_order",json!({
