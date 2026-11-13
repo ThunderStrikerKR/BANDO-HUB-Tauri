@@ -98,6 +98,15 @@ jobs:
           BANDO_NATIVE_OUT: audit-real-native-reception
           BANDO_NATIVE_BIN_COMMIT: 3eca217fe2a045e25c6caf0cbedb0bdd234a9afb
         run: node scripts/migration03-reception-native-ui.mjs
+      - name: Enable bundled Python for read-only TEST SQLite inspection
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Save settings by native UIA; verify TEST SQLite after EXE relaunch
+        env:
+          BANDO_NATIVE_EXE: ${{ github.workspace }}\audit-exe\unpacked\bando_hub.exe
+          BANDO_NATIVE_OUT: audit-real-native-reception
+        run: node scripts/audit-native-settings-save.mjs
       - name: Remove temporary policy
         if: always()
         shell: pwsh
