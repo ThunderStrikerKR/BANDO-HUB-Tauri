@@ -1,5 +1,217 @@
 # TSBH Rust migration — session 2/3: Price, freight and workflow rules
 
+## Session 2 function inventory and cross-module gap audit — 2026-11-13
+
+**Verdict: SECURITY_LIMITED / INCOMPLETE; no session-2 final PASS.**
+
+Audited actual GitHub branch `migration/02-rules` at
+`54511a1dd7ab540f70249b13ae477027e45ce633` against the unchanged
+TypeScript source baseline
+`d5ea8ed20b8120b844437263c2eb2b8963559e8d`. The most recent
+passing isolated CI run was
+https://github.com/ThunderStrikerKR/TSBH/actions/runs/43380248456.
+It verifies **478/478 direct TS/Rust named examples and 47/47
+Rust-only unit tests**, but is **not** a complete function inventory
+coverage claim. Windows/Tauri/SQLite integration is skipped.
+
+Source scope discovery was expanded beyond only `src/workflow.ts` and
+`src/shipping.ts` by inspecting the original recursive repository
+tree (720 entries; not truncated) and separately reading
+`src/orders/reception.ts`, `src/orders/retail.ts`,
+`src/group-trash.ts`, `src/corrections.ts`, `src/working-raw.ts`,
+`src/receipt.ts`, `src/replies.ts`, `src/issue-actions.ts`,
+`src/factory-replies.ts`, `src/actual-freight.ts`,
+`src/orders/passive-pricing.ts`, `src/order-types.ts`,
+`src/sale-status.ts`, and other supporting business modules.
+
+### Category A: Implemented and exercised against original TypeScript
+
+The `tests/rust-migration/rules/parity/compare.mts` program actually
+imports and executes TypeScript functions for these 15 of the 20
+top-level operations exposed by Rust `execute`:
+
+| Rust operation | Original TypeScript source |
+| --- | --- |
+| `calculate_price` | `domain.ts::totals` |
+| `resolve_unit_price` | `domain.ts::resolvePrice` |
+| `calculate_shipping` | `shipping.ts::recommendShipping` |
+| `calculate_shipment_totals` | `workflow.ts::shipmentTotals` |
+| `apply_shipping_action` (partial action set) | `shipping.ts`: `upgradeShipping`, `editableShippingRule`, `combinationVersions`, `combinationCurrent`, `saveCombination` |
+| `reconcile_workflow` | `workflow.ts::reconcileWorkflow` |
+| `workflow_issues` | `workflow.ts::workflowIssues` |
+| `stage_issues` | `workflow.ts::stageIssues` |
+| `order_issues` | `validation.ts::orderIssues` |
+| `apply_issue_action` | `validation.ts::approveMissingQuantity` and `pendingIssue` |
+| `delete_order` | `workflow.ts::deleteOrder` |
+| `apply_order_raw_edit` | `workflow.ts::applyOrderRawEdit` (original TS parser output injected) |
+| `migrate_workflow` | `workflow.ts::migrateWorkflow` |
+| `validate_workflow` | `workflow.ts::validateWorkflow` |
+| `validate_reception_boundary` | `orders/reception.ts::validateReceptionBoundary` |
+
+**LIMIT:** "tested against TS" means selected structured inputs,
+not every branch, arbitrary evidence ordering or all possible state.
+The `apply_shipping_action` envelope has seven Rust actions but the
+direct corpus does not cover `delete_group` or `change_basis`.
+
+### Category B: Implemented, but NO direct TS/Rust differential
+for their standalone operation
+
+| Rust operation or sub-action | Original TypeScript comparison missing |
+| --- | --- |
+| `reprice_order` | `domain.ts::repriceOrder`, combined with persisted/explicit edit policy |
+| `should_refresh_pricing` | `orders/passive-pricing.ts::shouldRefreshUncommittedOrderPricing` |
+| `evaluate_workflow` | `workflow.ts::groupStep` and stage/evaluation summary |
+| `evaluate_dispatch_state` | `factory-replies.ts::dispatchState` |
+| `apply_workflow_action` | all **14** source mutation actions listed below |
+| `apply_shipping_action: delete_group` | `shipping.ts::deleteShippingGroup` |
+| `apply_shipping_action: change_basis` | `shipping.ts::changeShippingBasis` |
+
+All **14** supported `apply_workflow_action` names were inspected
+in `workflow.rs`:
+`advance_group`, `undo_group`, `set_shipment_freight`,
+`process_group`, `record_actual_freight`,
+`confirm_group_payment`, `record_payment`,
+`restore_shipment`, `mark_store_sent`,
+`record_change_request`, `set_group_account`,
+`detach_shipment`, `regroup_shipment`, `complete_delivery`.
+
+The direct TypeScript parity script contains **zero**
+`apply_workflow_action` invocations and does not invoke the original
+`advanceGroup`, `undoGroup`, `setShipmentFreight`,
+`confirmGroupPayment`, `recordPayment`, `completeDelivery`, etc.
+Rust-only regression tests do invoke each sub-action at least once,
+but cannot prove exact TypeScript State, billing snapshot, event
+order, generated UUID sequence or error priority. Do **not** promote
+these to direct parity PASS based on the independent 47 tests.
+
+### Category C: Original TypeScript exports without a complete Rust
+operation in the current session-2 rules boundary
+
+**Confirmed missing workflow-related state mutations**
+- `src/group-trash.ts`: `deleteGroup` and `restoreGroup`,
+  including soft-delete constraints and audit events. The existing
+  Rust `delete_order` deletes an ORDER, not a GROUP; the tariff
+  `delete_group` deletes a SHIPPING GROUP. Neither is a substitute.
+- `src/corrections.ts`: `requestCorrection`,
+  `copiedCorrection`, `confirmCorrection`,
+  `markFactoryDelivered`, `markCollected` and
+  `reopenUnsentExport`. `record_change_request` and
+  `restore_shipment` cover other narrower actions, not these
+  structured correction, handoff and collection flows.
+- `src/working-raw.ts`: `rawCorrectionAllowed`,
+  `rawCorrectableIssue` and `correctWorkingRaw`.
+  `apply_order_raw_edit` supplies a lower-level primitive, not the
+  before/after `analysisRaw`, eligibility and `rawCorrections`
+  orchestration.
+- `src/receipt.ts`: `correctReceipt`
+  (reason, receipt fallback, and correction audit). The generic
+  raw edit primitive does not add the original
+  `rawCorrections` record.
+- `src/orders/reception.ts`:
+  `newReception`, `replaceReception` and
+  `persistedReceptionState` (do not persist unsaved drafts or
+  their transient sources, groups, shipments and events).
+  `validateReceptionBoundary` **is** ported, but is not a
+  replacement for draft filtering.
+- `src/orders/retail.ts`:
+  `newRetailOrder` and especially `confirmRetail` (retail
+  source/confirmation snapshot, step 4, event and `processGroup`).
+  Retail boundary validation **is** ported; retail confirmation
+  mutation is not.
+- `src/replies.ts`: `billingSnapshot`,
+  `proposeReply` and `applyReply`, with billing history and
+  reapproval requirements; parser/proposal crosses into session 1,
+  but applying the state change is still a business-rule handoff.
+- `src/issue-actions.ts`: `resolveProduct` and
+  `confirmProposedProduct`. These interact with recognition,
+  alias persistence, default-model/color rules and customer confirmation,
+  so coordinate ownership with session 1 before porting.
+- `src/factory-replies.ts`: `replyNeedsReview` and
+  `connectFactoryReply`, plus `trackingMessage`. These originate
+  from factory Excel reply/import and message output, so coordinate
+  ownership with session 3 rather than expanding session 2
+  into workbook parsing/UI.
+- `src/domain.ts`: `reviewIssues` and legacy `canQueue`
+  are not standalone Rust operations. Current workflow issue
+  projections are not proof of the legacy public helper's full
+  output. `messages` and `workflow.ts::groupMessages` belong
+  to session-3 messaging output; product matching/normalization
+  exported from `domain.ts` belongs to session 1.
+- `src/shipping.ts`: `bundleCounts` is a minor UI rule
+  with no independent Rust operation. `initialShipping` is only
+  a **deterministic fallback approximation** in Rust: original
+  TypeScript generates real random rule version IDs and timestamps.
+  Preserve persisted shipping state or inject equivalent IDs/time
+  before claiming exact parity on newly initialized state.
+
+**Implemented inside other Rust functions, but not independently
+proven:** `workflow.ts::clientChangeIssue` has an **inline guard**
+in `reconciliation.rs` using the original rejection text;
+it is not wholly missing. Its direct isolated comparison is missing.
+Similarly `orderInformationIssues`, `paymentBalance`,
+`groupTotals`, `groupAccount`, `shipmentVat`, `roundVat`,
+`senderFor`, `saleIssues` and `synchronizeIssueDecisions`
+are represented partly through composite Rust routes. Composite
+test success alone does not prove each helper across all inputs.
+
+### Category D: Known risk even inside directly exercised routes
+
+- Original TypeScript `JSON.stringify` preserves significant
+  object insertion order in several historical strings and
+  snapshots. Plain Rust `serde_json::Value` equality uses unordered
+  object semantics, and not all arbitrary evidence key orders have
+  been tested.
+- `explicitSender` is a JavaScript regular-expression parser;
+  Rust uses a hand-written matcher for the same common formats,
+  not a fully proven equivalent for arbitrary raw input.
+- `apply_order_raw_edit` requires **verified output** of the
+  session-1 parser from the same raw text/context. An arbitrary
+  caller-provided `parsedRecipients` list is not a trusted substitute.
+- `migrate_workflow` is NOT idempotent. Running the same
+  conversion twice may append duplicated historical events.
+- `reprice_order` intentionally combines original repricing with
+  a persisted-order refresh gate; it is **not identical by public
+  signature** to `domain.ts::repriceOrder`. Exact explicit-staff-edit
+  and persisted/locked order semantics need direct TS examples.
+- Some original modules are outside session 2's source ownership:
+  image/product matching is session 1, and Excel generation,
+  tracking message output and Tauri/SQLite/Windows app wiring
+  are session 3. This audit identifies **coverage and ownership
+  gaps**, not authorization to alter those owners' files.
+
+### Required completion gates
+
+1. **P0:** Add actual original-TS-to-Rust differential test
+   cases for all 14 `apply_workflow_action` names, including
+   successful state mutation, blocked mutation, undo/recheck,
+   partial payment cancellation, confirmation reapproval,
+   exports and delivery finalization. Freeze UUIDs and clocks,
+   compare full State and audit order; do not count equivalent
+   failures unless success/failure expectation is asserted.
+2. **P0:** Assign, implement and directly compare the missing
+   workflow mutation families in group-trash, corrections,
+   reception/working-raw/receipt, retail confirmation and
+   reply application. Keep session 1's recognition parser and
+   session 3's Excel/UI/DB interfaces isolated.
+3. **P1:** Expand direct cases for pricing refresh, shipping
+   basis/group deletion, group evaluation, dispatch summary,
+   deleted/frozen/historical recipients and evidence order.
+4. **P1:** Run a mixed cross-order, cross-group,
+   PREPAID/POSTPAID and STORE/FACTORY scenario matrix,
+   including conflicting historical receipts, rechecks
+   and manual/automatic tariff versions.
+5. **Integration (session 3):** Run both independent validators
+   at their original transition boundaries, use atomic SQLite
+   transactions/backup, verify Windows Tauri end-to-end, and
+   do not enable Rust as the sole workflow approval authority
+   before these blockers are resolved.
+
+**Audit conclusion: implementation is substantial, but the
+session-2 migration is NOT yet proven fully equivalent to the
+TypeScript source.** A merged/production-ready claim is BLOCKED.
+
+---
+
 ## Session 2 continuation: validateReceptionBoundary original-TS parity — 2026-11-13
 
 **Latest audited source / test checkpoint**
