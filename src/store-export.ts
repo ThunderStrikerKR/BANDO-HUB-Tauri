@@ -88,13 +88,22 @@ export async function createStoreWorkbook(preview: StoreExportPreview): Promise<
 
 /** Persist only after Save As completes; never mark the parcel as shipped here. */
 export function recordStoreExport(state: State, preview: StoreExportPreview, savedPath: string) {
+  if (!trim(savedPath) || !/\.xlsx$/i.test(savedPath)) throw Error("저장된 Excel 파일 경로가 올바르지 않습니다.");
+  if ((state.revision ?? 0) !== preview.revision) throw Error("파일 저장 중 주문 데이터가 변경됐습니다. 이 파일을 사용하지 말고 매장 출고 목록을 다시 확인하세요.");
+  const fresh = previewStoreExport(state, preview.ids);
+  return recordStoreExportPrepared(state, preview, savedPath, fresh);
+}
+
+/** Only call with a fresh, revision-matched Rust business_core_call preview.
+ * XLSX serialization is deliberately separate from this history recording step. */
+export function recordStoreExportPrepared(state: State, preview: StoreExportPreview, savedPath: string, fresh: StoreExportPreview) {
   if (!trim(savedPath) || !/\.xlsx$/i.test(savedPath)) {
     throw Error("저장된 Excel 파일 경로가 올바르지 않습니다.");
   }
   if ((state.revision ?? 0) !== preview.revision) {
     throw Error("파일 저장 중 주문 데이터가 변경됐습니다. 이 파일을 사용하지 말고 매장 출고 목록을 다시 확인하세요.");
   }
-  const fresh = previewStoreExport(state, preview.ids);
+  // Revalidation is already performed by the Rust IPC caller.
   if (JSON.stringify(fresh.rows) !== JSON.stringify(preview.rows)) {
     throw Error("출력하려는 매장 배송 내용이 변경됐습니다. 파일을 사용하지 말고 다시 검토하세요.");
   }
