@@ -79,26 +79,12 @@ export function ProductManager({
     edit.imageOverride === "MANUAL" ? edit.imageData :
     (localImage?.id === edit.id ? localImage.data : edit.imageData)
   );
-  const classified = useNativeProductIds(
-    state, "classified_products", {category, brand}, [category, brand],
+  const { products: selectedProducts, error: productQueryError } = useNativeProductIds(
+    state, "management_products", { category, brand, query: search, missing },
+    [category, brand, search, missing],
   );
-  const classifiedIds = useMemo(
-    () => new Set(classified.products.map((p) => p.id)),
-    [classified.products],
-  );
-  const products = sortProducts(
-    state.products.filter((p) => !p.deletedAt && !p.supersededBy),
-  ).filter(
-    (p) =>
-      p.catalog !== "DEMO" &&
-      !p.variants.some((v) => v.source === "DEMO") &&
-      classifiedIds.has(p.id) &&
-      (p.name + " " + (p.subtitle ?? ""))
-        .toLowerCase()
-        .replace(/\s/g, "")
-        .includes(search.toLowerCase().replace(/\s/g, "")) &&
-      (!missing || p.variants.some((v) => !v.wholesale || !v.semi || !v.retail)),
-  );
+  // Only locale-aware presentation ordering remains in React.
+  const products = useMemo(() => sortProducts(selectedProducts), [selectedProducts]);
   const create = () => {
     setDetailPriceMode(false);
     setCategoryPicker(false);
@@ -355,6 +341,7 @@ export function ProductManager({
           <CategoryManager state={state} onSave={onSave} onNotice={onNotice}
             query={search} onQueryChange={setSearch} />
         )}
+        {productQueryError && <p role="alert" className="warnings">{productQueryError}</p>}
         {section === "모델군 관리" && <ColorGuidanceManager state={state} onRefresh={onRefresh}
           query={search} onQueryChange={setSearch} />}
         {section === "별칭 관리" && (
