@@ -3,7 +3,7 @@
 //! stageIssues have their own original-TypeScript differential coverage.
 use std::collections::HashSet;
 use serde_json::{json,Map,Value};
-use super::{field,rows,set,str_field};
+use super::{field,req,required_str,rows,set,str_field};
 
 fn js_evidence(value:Option<&Value>)->Option<String> {
     value.map(|v|serde_json::to_string(v).unwrap_or_else(|_|"null".to_string()))
@@ -59,13 +59,13 @@ fn contact_problem(value:&str,mobile:bool)->String {
     let digits:String=value.chars()
         .filter(|c|!c.is_whitespace()&&!['(',')','.','-'].contains(c)).collect();
     if value.trim().is_empty(){
-        return if mobile {"휴대폰 번호가 없습니다."}else{"전화번호가 없습니다."}.into();
+        return (if mobile {"휴대폰 번호가 없습니다."}else{"전화번호가 없습니다."}).to_string();
     }
     if digits.starts_with("010") && digits.len()!=11 {
         return format!("휴대폰 번호가 {}자리입니다. 010으로 시작하는 번호는 숫자 11자리가 필요합니다.",digits.len());
     }
-    if mobile{"휴대폰 번호의 형식과 자릿수를 확인해주세요."}
-    else{"일반전화 번호의 지역번호와 자릿수를 확인해주세요."}.into()
+    (if mobile{"휴대폰 번호의 형식과 자릿수를 확인해주세요."}
+    else{"일반전화 번호의 지역번호와 자릿수를 확인해주세요."}).to_string()
 }
 fn unassigned_detail(row:&Value)->String {
     let candidates=rows(field(row,"unassignedEvidence"));
@@ -317,4 +317,60 @@ pub(super) fn synchronize(order:&mut Value)->Result<(),String>{
     }
     set(order,"issueResolutions",Value::Object(next))?;
     Ok(())
+}
+
+
+/// Port of validation.ts approveMissingQuantity and pendingIssue.
+pub(super) fn issue_action(payload:&Value)->Result<Value,String> {
+    let action=required_str(payload,"action")?;
+    let mut order=req(payload,"order")?.clone();
+    match action {
+        "approve_missing_quantity"=>{
+            let rid=required_str(payload,"recipientId")?;
+            let iid=required_str(payload,"itemId")?;
+            let ri=rows(field(&order,"recipients")).iter()
+                .position(|row|str_field(row,"id")==rid);
+            let ii=ri.and_then(|ri|rows(field(&order["recipients"][ri],"items"))
+                .iter().position(|i|str_field(i,"id")==iid));
+            let bad=ri.zip(ii).is_none_or(|(ri,ii)|{
+                let i=&order["recipients"][ri]["items"][ii];
+                str_field(i,"productId").is_empty() ||
+                str_field(i,"variantId").is_empty() ||
+                field(i,"quantityConfirmed").as_bool()!=Some(false) ||
+                str_field(field(i,"match"),"kind")=="QUANTITY" ||
+                rows(field(i,"issues")).iter().any(|v|v.as_str().is_some_and(|s|
+                    s.contains("여러")||s.contains("불명확")))
+            });
+            if bad{return Err("수량 미기재로 확인된 실제 상품만 1개 잠정 처리할 수 있습니다.".into());}
+            let ri=ri.unwrap();
+            let ii=ii.unwrap();
+            let now=required_str(payload,"now")?;
+            let actor=required_str(payload,"actor")?;
+            let i=&mut order["recipients"][ri]["items"][ii];
+            set(i,"quantity",json!(1))?;
+            set(i,"quantityApproval",json!({"at":now,"actor":actor,"quantity":1}))?;
+            set(i,"manuallyConfirmed",json!(true))?;
+            Ok(json!({"order":order}))
+        }
+        "pending_issue"=>{
+            let id=required_str(payload,"issueId")?;
+            let matching=order_issues(&order).into_iter()
+                .find(|issue|str_field(issue,"issueId")==id &&
+                    str_field(issue,"severity")=="ACTION");
+            if let Some(issue)=matching {
+                let now=required_str(payload,"now")?;
+                let actor=required_str(payload,"actor")?;
+                if !field(&order,"issueResolutions").is_object(){
+                    set(&mut order,"issueResolutions",json!({}))?;
+                }
+                let evidence=issue.get("evidence").and_then(Value::as_str).unwrap_or("");
+                set(&mut order["issueResolutions"],id,json!({
+                    "resolution":"PENDING_CUSTOMER","resolutionSource":actor,
+                    "updatedAt":now,"evidence":evidence
+                }))?;
+            }
+            Ok(json!({"order":order}))
+        }
+        _=>Err(format!("지원하지 않는 주문 이슈 action: {action}"))
+    }
 }
