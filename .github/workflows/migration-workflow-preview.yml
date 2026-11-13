@@ -38,6 +38,9 @@ jobs:
         run: npm test
       - name: Rust and original TypeScript rules parity
         run: npx tsx tests/rust-migration/rules/parity/compare.mts
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Original TS oracle vs compiled Rust workflow and order preview (19 cases)
+        run: node --test tests/rust-migration/rules/parity.test.mjs
   windows-native:
     name: Windows native compile and app library tests (two known Kakao fixtures excluded)
     runs-on: windows-latest
