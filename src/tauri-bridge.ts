@@ -2,6 +2,16 @@
  * Planned mobile networking remains explicitly unavailable offline.
  */
 import { invoke } from "@tauri-apps/api/core";
+
+/** Shared Tauri IPC entry point; domain operations remain checked by Rust. */
+export function businessCoreCall<T>(
+  domain: "recognition" | "rules" | "output",
+  operation: string,
+  payload: unknown,
+): Promise<T> {
+  return invoke<T>("business_core_call", { domain, operation, payload });
+}
+
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { Api, State, CatalogReport, OcrCapture } from "./types";
 import productImages from "./tauri-product-images.json";
