@@ -18,7 +18,7 @@ import {
   combinationCurrent,
   upgradeShipping,
 } from "../../../../src/shipping.ts";
-import { shipmentTotals, validateWorkflow, reconcileWorkflow, deleteOrder } from "../../../../src/workflow.ts";
+import { shipmentTotals, validateWorkflow, reconcileWorkflow, deleteOrder, workflowIssues, stageIssues } from "../../../../src/workflow.ts";
 import { orderIssues, approveMissingQuantity, pendingIssue } from "../../../../src/validation.ts";
 
 const root=resolve(dirname(fileURLToPath(import.meta.url)),"../../../..");
@@ -382,6 +382,89 @@ const upgradedShipping:any=deterministicIds(upgradeIds,
 add("upgrade existing classifications is idempotent","apply_shipping_action",{
   action:"upgrade",shipping:upgradedShipping,now:actionNow,groupVersions:{}
 },()=>({shipping:upgradeShipping(upgradedShipping)}));
+
+
+// Original TypeScript workflowIssues and stageIssues are executed directly.
+// Each fixture copies the same state, including matching order/group/payment
+// context. The Rust returned issue fields and list ordering are compared.
+function wfCase(name:string,mutate:(state:any)=>void,stages:number[]=[1,2,3,4]){
+  const state:any=copy(baseState);
+  mutate(state);
+  add("workflow issues: "+name,"workflow_issues",
+    {state,groupId:"group:o1"},
+    ()=>({issues:workflowIssues(state,"group:o1")}));
+  for(const next of stages){
+    add("stage "+next+" blockers: "+name,"stage_issues",
+      {state,groupId:"group:o1",next},
+      ()=>({issues:stageIssues(state,"group:o1",next)}));
+  }
+}
+wfCase("clean unconfirmed order",()=>{});
+wfCase("missing receiver name and delivery address",(s)=>{
+  s.orders[0].recipients[0].name="";
+  s.orders[0].recipients[0].address="";
+});
+wfCase("sender missing",s=>{
+  s.clients[0].name="";
+  s.clients[0].address="";
+  s.clients[0].phone="";
+});
+wfCase("payment account missing",s=>{
+  s.settings.accounts=[];
+  s.settings.defaultAccountId="";
+  s.clients[0].preferredAccountId="";
+});
+wfCase("reconfirmation notice",s=>{s.workflow.groups[0].needsNotice=true;});
+wfCase("unknown product origin",s=>{
+  s.orders[0].recipients[0].items[0].origin="UNKNOWN";
+});
+wfCase("missing selected product",s=>{
+  s.orders[0].recipients[0].items[0].variantId="other-v";
+});
+wfCase("out of sale status",s=>{
+  s.products[0].saleStatus="품절";
+});
+wfCase("deleted product",s=>{
+  s.products[0].deletedAt=now;
+});
+wfCase("archived historical product",s=>{
+  s.products[0].sourceProductId="parent-p";
+  s.orders[0].recipients[0].items[0].productId="parent-p";
+  s.productMappings={"parent-p|v1":"p1"};
+});
+wfCase("confirmed order with model mismatch",s=>{
+  s.orders[0].confirmedAt=now;
+  s.orders[0].recipients[0].items[0].variantId="missing-v";
+});
+wfCase("collect shipping no confirmed charge",s=>{
+  s.orders[0].freightCode="020";
+  s.workflow.shipments[0].charges={FACTORY:null};
+});
+wfCase("prepaid payment balance",s=>{
+  s.clients[0].payment="PREPAID";
+  s.workflow.shipments[0].step=3;
+});
+wfCase("postpaid payment",s=>{
+  s.clients[0].payment="POSTPAID";
+  s.workflow.shipments[0].step=3;
+});
+wfCase("retail order skip payment blockers",s=>{
+  s.orders[0].orderType="RETAIL";
+  s.orders[0].clientSnapshot={...copy(client),payment:"PREPAID"};
+  s.workflow.shipments[0].step=0;
+  s.workflow.shipments[0].charges={FACTORY:null};
+});
+wfCase("multiple recipients same group",s=>{
+  const second=copy(s.orders[0].recipients[0]);
+  second.id="r2";
+  second.name="두번째 수취인";
+  const secondItem=copy(second.items[0]);
+  secondItem.id="item2";second.items=[secondItem];
+  s.orders[0].recipients.push(second);
+  const secondShip=copy(s.workflow.shipments[0]);
+  secondShip.id="shipment:o1:r2";secondShip.recipientId="r2";
+  s.workflow.shipments.push(secondShip);
+},[1,2,4]);
 
 function normalized(v:unknown):string {
   if(Array.isArray(v))return "["+v.map(normalized).join(",")+"]";
