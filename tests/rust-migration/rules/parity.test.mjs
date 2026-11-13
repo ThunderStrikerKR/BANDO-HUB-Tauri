@@ -7,7 +7,7 @@ import {tsImport} from "tsx/esm/api";
 const {resolvePrice,totals,repriceOrder}=await tsImport("../../../src/domain.ts",import.meta.url);
 const {shouldRefreshUncommittedOrderPricing}=await tsImport("../../../src/orders/passive-pricing.ts",import.meta.url);
 const {recommendShipping}=await tsImport("../../../src/shipping.ts",import.meta.url);
-const {shipmentTotals,stageIssues,groupStep,groupShipments}=
+const {shipmentTotals,stageIssues,groupStep,groupShipments,orderGrandTotal,shipmentVat,groupTotals,workflowIssues,shipmentFreightCode,paymentBalance,shipmentContext,reconcileWorkflow}=
   await tsImport("../../../src/workflow.ts",import.meta.url);
 const root=fileURLToPath(new URL("../../../",import.meta.url));
 const manifest=fileURLToPath(new URL("./Cargo.toml",import.meta.url));
@@ -214,6 +214,281 @@ checkWorkflow("prepaid step 3",s=>{
 });
 checkWorkflow("needs new notice",s=>{s.workflow.groups[0].needsNotice=true;});
 
+// The source of truth for the order detail summary is still the original
+// TS orderGrandTotal/shipmentVat oracle, not a hand-entered expected amount.
+function checkOrderPreview(name, mutate = () => {}) {
+  const state = workflowState();
+  let draft = state.orders[0];
+  mutate(state);
+  draft = state.orders[0] ?? draft;
+  const orderId = draft.id;
+  const rows = state.workflow.shipments.filter((ship) =>
+    ship.orderId === orderId && !ship.legacyArchived &&
+    !state.workflow.groups.find((g) => g.id === ship.groupId)?.deletedAt,
+  );
+  const applies = draft.recipients.map((row) => shipmentVat(draft, row));
+  const vatLabel = applies.some(Boolean) && applies.some((v) => !v)
+    ? "부가세 포함/별도"
+    : applies.some(Boolean) ? "부가세 포함" : "부가세 별도";
+  add("order preview " + name, "preview_order",
+    { state, draft, orderId },
+    () => ({
+      orderId,
+      shipmentCount: rows.length,
+      lineAmounts: draft.recipients.flatMap((row) => row.items.map((item) => ({
+        recipientId: row.id,
+        itemId: item.id,
+        amount: item.unitPrice !== null && item.quantity !== null &&
+          item.productId && item.variantId ? item.unitPrice * item.quantity : null,
+      }))),
+      total: orderGrandTotal(state, orderId),
+      vatLabel,
+    }));
+}
+checkOrderPreview("normal subtotal and VAT");
+checkOrderPreview("recipient VAT disabled", (s) => {
+  s.orders[0].recipients[0].vatOverride = false;
+});
+checkOrderPreview("collect freight has no billed freight", (s) => {
+  s.orders[0].recipients[0].freightCode = "020";
+});
+checkOrderPreview("unknown freight yields null total", (s) => {
+  s.workflow.shipments[0].charges = {};
+});
+checkOrderPreview("deleted group omitted", (s) => {
+  s.workflow.groups[0].deletedAt = "2026-11-13T21:00:00+09:00";
+});
+checkOrderPreview("archived shipment omitted", (s) => {
+  s.workflow.shipments[0].legacyArchived = true;
+});
+checkOrderPreview("transferred frozen invoice totals", (s) => {
+  s.workflow.shipments[0].transferred = true;
+  s.workflow.queue = [{
+    id: "q1", shipmentId: "shipment:o1:r1", origin: "FACTORY",
+    status: "EXPORTED", snapshot: { subtotal: 20000, shipping: 4000, vat: 2400, total: 26400 },
+  }];
+});
+checkOrderPreview("two shipments with mixed VAT", (s) => {
+  const second = structuredClone(s.orders[0].recipients[0]);
+  second.id = "r2";
+  second.vatOverride = false;
+  s.orders[0].recipients.push(second);
+  const ship = structuredClone(s.workflow.shipments[0]);
+  ship.id = "shipment:o1:r2";
+  ship.recipientId = "r2";
+  s.workflow.shipments.push(ship);
+});
+checkOrderPreview("draft-only before dealer selection", (s) => {
+  s.orders = [];
+  s.workflow.shipments = [];
+  s.workflow.groups = [];
+});
+
+// The entire live board projection must agree with the original TypeScript
+// oracle, not just the order footer. The Rust engine owns stage blockers,
+// item issues, per-origin shipping and payment allocations.
+function checkBoardPreview(name, mutate = () => {}) {
+  const state = workflowState();
+  mutate(state);
+  const expected = () => ({
+    groups: state.workflow.groups.flatMap((group) => {
+      const ships = groupShipments(state, group.id);
+      if (!ships.length) return [];
+      const step = groupStep(state, group.id);
+      const needsNotice = group.needsNotice === true;
+      const nextStep = needsNotice && step >= 2 ? 3 : step + 1;
+      const vats = ships.map((ship) => {
+        const {order,recipient} = shipmentContext(state,ship);
+        return shipmentVat(order,recipient);
+      });
+      return [{
+        groupId: group.id,
+        step,
+        nextStep,
+        needsNotice,
+        transferred: ships.some((ship) => ship.transferred === true),
+        shipmentCount: ships.length,
+        totals: groupTotals(state,group.id),
+        vatLabel: vats.every(Boolean) ? "부가세 포함" :
+          vats.some(Boolean) ? "부가세 포함/별도" : "부가세 별도",
+        shipments: ships.map((ship) => {
+          const {order,recipient} = shipmentContext(state,ship);
+          return {
+            shipmentId:ship.id,
+            paid:paymentBalance(state,ship).paid,
+            totals:shipmentTotals(state,ship),
+            freightCode:shipmentFreightCode(order,recipient),
+            displayCharges:Object.fromEntries([...new Set(recipient.items.map((item) => item.origin))]
+              .filter((origin) => origin === "FACTORY" || origin === "STORE")
+              .map((origin) => [origin, shipmentFreightCode(order,recipient) === "020" ||
+                shipmentContext(state,ship).client.shippingFeeExcluded ? 0 :
+                ship.charges[origin] ?? null])),
+            freightEditingBlocked:shipmentFreightCode(order,recipient) === "020" ||
+              shipmentContext(state,ship).client.shippingFeeExcluded === true,
+            vatIncluded:shipmentVat(order,recipient),
+          };
+        }),
+        issues: workflowIssues(state,group.id),
+        nextStageBlockers: nextStep <= 4 ? stageIssues(state,group.id,nextStep) : [],
+      }];
+    }),
+  });
+  // A Rust IPC response is JSON: TypeScript's own undefined-valued
+  // properties disappear at serialization. Compare the wire payloads,
+  // not the JS object's unobservable property-presence distinction.
+  add("board preview " + name, "preview_workflow", {state},
+    () => JSON.parse(JSON.stringify(expected())));
+}
+checkBoardPreview("normal confirmed postpaid");
+checkBoardPreview("prepaid stage 3", (s) => {
+  s.clients[0].payment = "PREPAID";
+  s.orders[0].clientSnapshot.payment = "PREPAID";
+});
+checkBoardPreview("notice again", (s) => { s.workflow.groups[0].needsNotice = true; });
+checkBoardPreview("collect COD and excluded VAT", (s) => {
+  s.orders[0].recipients[0].freightCode = "020";
+  s.orders[0].recipients[0].vatOverride = false;
+});
+checkBoardPreview("freight uncertain", (s) => { s.workflow.shipments[0].charges = {}; });
+checkBoardPreview("matched account payment", (s) => {
+  s.workflow.payments.push({
+    id:"pay-1",dealerId:"dealer-1",
+    account:s.settings.accounts[0],allocations:[{
+      shipmentId:"shipment:o1:r1",amount:10000,
+    }],
+  });
+});
+checkBoardPreview("dealer excludes customer freight", (s) => {
+  s.clients[0].shippingFeeExcluded = true;
+  s.orders[0].clientSnapshot.shippingFeeExcluded = true;
+});
+checkBoardPreview("unmatched account payment excluded", (s) => {
+  s.workflow.payments.push({
+    id:"pay-1",dealerId:"dealer-1",
+    account:{id:"another",bank:"가상은행",number:"987",holder:"다른사람"},
+    allocations:[{shipmentId:"shipment:o1:r1",amount:10000}],
+  });
+});
+checkBoardPreview("transferred frozen invoice", (s) => {
+  s.workflow.shipments[0].transferred = true;
+  s.workflow.queue.push({
+    id:"q1",shipmentId:"shipment:o1:r1",origin:"FACTORY",
+    status:"EXPORTED",snapshot:{subtotal:20000,shipping:4000,vat:2400,total:26400},
+  });
+});
+checkBoardPreview("archived shipment not shown", (s) => {
+  s.workflow.shipments[0].legacyArchived = true;
+});
+
+
+// Compare the live, unsaved order-draft reconciliation itself, not just
+// the Rust board display fed by an already-computed workflow state.
+function freshReconcileState() {
+  const state = shippingState();
+  const c = client("wholesale");
+  c.preferredAccountId = "account-1";
+  state.clients = [c];
+  state.orders = [order(1,30000)];
+  state.orders[0].createdAt = "2026-11-13T08:00:00+09:00";
+  state.orders[0].updatedAt = "2026-11-13T08:00:00+09:00";
+  state.settings = {
+    operatorName: "가상 담당자",
+    accounts: [{
+      id: "account-1", bank: "가상은행", number: "123-456",
+      holder: "가상상호",
+    }],
+    defaultAccountId: "account-1",
+  };
+  return state;
+}
+function checkReconcile(name, change = () => {}) {
+  const state = freshReconcileState();
+  const draft = structuredClone(state.orders[0]);
+  change(state, draft);
+  const payload = {
+    state, draft,
+    now: "2026-11-13T16:00:00+09:00",
+    eventIds: Array.from({length: 128}, (_,i) => "synthetic-audit-" + i),
+  };
+  add("live draft reconcile " + name, "reconcile_workflow", payload, () => {
+    const next = reconcileWorkflow(state,draft);
+    return {
+      state:next,
+      emittedEvents:(next.workflow?.events.length ?? 0) -
+        (state.workflow?.events.length ?? 0),
+    };
+  });
+}
+checkReconcile("single recipient and new source");
+checkReconcile("shipment with VAT override", (_s,draft) => {
+  draft.recipients[0].vatOverride = false;
+});
+checkReconcile("customer pays collect freight", (_s,draft) => {
+  draft.freightCode = "020";
+  draft.recipients[0].freightCode = "020";
+});
+checkReconcile("explicit manual customer freight", (_s,draft) => {
+  draft.recipients[0].shippingCharges = { FACTORY: 5500 };
+});
+checkReconcile("two recipients", (_s,draft) => {
+  const another = structuredClone(draft.recipients[0]);
+  another.id = "r2";
+  another.name = "박가상";
+  another.phone = "010-2222-3333";
+  another.items[0].id = "item-r2";
+  draft.recipients.push(another);
+});
+checkReconcile("deleted/empty recipient ignored", (_s,draft) => {
+  draft.recipients.push({
+    id:"empty-r2",name:"",address:"",phone:"",mobile:"",items:[],
+  });
+});
+checkReconcile("different retail order skipped without recipient", (state,draft) => {
+  state.orders = [];
+  state.clients = [];
+  draft.clientId = "";
+  draft.orderType = "AGENCY";
+});
+checkReconcile("draft with multiple catalog items", (_s,draft) => {
+  draft.recipients[0].items.push({
+    ...structuredClone(draft.recipients[0].items[0]),
+    id:"item-second",quantity:2,origin:"FACTORY",
+  });
+});
+checkReconcile("unknown product freight requires staff review", (_s,draft) => {
+  draft.recipients[0].items[0].productId = "";
+  draft.recipients[0].items[0].variantId = "";
+  draft.recipients[0].items[0].unitPrice = null;
+});
+checkReconcile("unsaved customer edit with prior order", (state,draft) => {
+  const second=structuredClone(draft);
+  second.id = "o2";
+  second.recipients[0].id = "r2";
+  state.orders.push(second);
+  draft.recipients[0].name = "변경 수취인";
+});
+
+// Normalize the JSON IPC boundary: undefined is omitted in JS, not sent
+// to Rust. Event IDs/timestamps are independently generated by both
+// implementations. Their stable semantic fields must still match.
+function wireReconcileResult(answer) {
+  if (!answer.ok) return answer;
+  const copy=JSON.parse(JSON.stringify(answer));
+  const w=copy.value?.state?.workflow;
+  if(w) {
+    for(const event of w.events ?? []) {
+      delete event.id;
+      delete event.at;
+    }
+    for(const ship of w.shipments ?? [])
+      for(const check of ship.rechecks ?? []) {
+        delete check.at;
+        delete check.resolvedAt;
+      }
+  }
+  return copy;
+}
+
 test("actual TS price, freight and refresh decisions match staged Rust rules",()=>{
   const proc=spawnSync("cargo",["run","--quiet","--manifest-path",manifest,
     "--bin","parity_runner"],{cwd:root,encoding:"utf8",
@@ -225,8 +500,12 @@ test("actual TS price, freight and refresh decisions match staged Rust rules",()
   assert.equal(results.length,cases.length);
   const failures=[];
   for(const [index,c] of cases.entries()){
-    try{assert.deepStrictEqual(results[index],c.ts);}
-    catch{failures.push({name:c.name,ts:c.ts,rust:results[index]});}
+    const actual = c.operation === "reconcile_workflow"
+      ? wireReconcileResult(results[index]) : results[index];
+    const expected = c.operation === "reconcile_workflow"
+      ? wireReconcileResult(c.ts) : c.ts;
+    try{assert.deepStrictEqual(actual,expected);}
+    catch{failures.push({name:c.name,ts:expected,rust:actual});}
   }
   if(failures.length)console.error(JSON.stringify({
     cases:cases.length,mismatchCount:failures.length,mismatches:failures.slice(0,35),

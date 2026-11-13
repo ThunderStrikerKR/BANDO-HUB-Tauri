@@ -15,7 +15,9 @@ test("workflow summary is a compact pair of lines with normalized tax status", (
   assert.equal((block.match(/className="flow-summary-line"/g) || []).length, 2);
   assert.ok(block.indexOf("배송 {ss.length}건") < block.indexOf("총 운임"));
   assert.ok(block.indexOf("총 운임") < block.indexOf("입금 예정"));
-  for (const label of ["부가세 포함", "부가세 별도", "부가세 포함/별도"]) assert.ok(block.includes(label));
+  assert.match(block, /nativeGroup\?\.vatLabel/);
+  const rust = read("src-tauri/src/business_core/rules/workflow_preview.rs");
+  for (const label of ["부가세 포함", "부가세 별도", "부가세 포함/별도"]) assert.ok(rust.includes(label));
   assert.doesNotMatch(block, /부가세 적용|부가세 미추가/);
   assert.match(css, /\.flow-fixed-summary \.flow-summary-line\s*\{[^}]*justify-content: space-between;/);
 });

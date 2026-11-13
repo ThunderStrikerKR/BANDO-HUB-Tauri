@@ -9,9 +9,10 @@ import { OrderDesk } from "./OrderDesk";
 import { WorkflowBoard, type WorkflowSelection } from "./WorkflowBoard";
 import { newReception } from "./orders/reception";
 import { nativeReconcileWorkflow } from "./orders/native-rules";
+import { useNativeWorkflowReconcile } from "./orders/useNativeWorkflowReconcile";
 import { retainUnsavedOrderEdits } from "./order-edit-snapshots";
 import type { Order } from "./types";
-import { groupShipments, reconcileWorkflow } from "./workflow";
+import { groupShipments } from "./workflow";
 import { activeShipments, validSelection } from "./workspace-selection";
 type Props = ComponentProps<typeof OrderDesk> & {
   externalKakao: boolean;
@@ -95,17 +96,22 @@ export function HubWorkspace(props: Props) {
     );
     return () => clearTimeout(timer);
   }, [selected?.shipmentId]);
-  const base = useMemo(() => {
-    let next = state;
-    for (const order of Object.values(edits))
-      if (order.id !== draft.id && order.clientId) next = reconcileWorkflow(next, order);
-    return next;
-  }, [state, edits, draft.id]);
-  const preview = useMemo(
-    () => (draft.clientId ? reconcileWorkflow(base, draft) : base),
-    [base, draft],
+  // The old synchronous TypeScript reconciliation must not be the live
+  // workflow board's authority. Rust evaluates each employee draft overlay,
+  // returning only temporary preview state with no SQLite writes.
+  const independentEdits = useMemo(
+    () => Object.values(edits).filter((order) => order.id !== draft.id && order.clientId),
+    [edits, draft.id],
   );
+  const nativeBase = useNativeWorkflowReconcile(state, independentEdits);
+  const base = nativeBase.state;
+  const nativePreview = useNativeWorkflowReconcile(base, draft.clientId ? [draft] : []);
+  const preview = nativePreview.state;
+  const previewReady = nativeBase.ready && nativePreview.ready;
   useEffect(() => {
+    // Selection and active shipment identity must never be rewritten from a
+    // pending, non-authoritative render of the previous draft.
+    if (!previewReady) return;
     const fresh = receptionId === draft.id && !state.orders.some((o) => o.id === draft.id);
     const next = fresh
       ? draft.recipients.length
@@ -121,7 +127,7 @@ export function HubWorkspace(props: Props) {
       commitSelection(next);
       if (next) setReceptionId(next.orderId);
     }
-  }, [selected, preview, receptionId, draft]);
+  }, [selected, preview, receptionId, draft, previewReady]);
   useEffect(() => {
     if (selected) props.onRememberSelection(selected);
   }, [selected, props.onRememberSelection]);
@@ -270,9 +276,19 @@ export function HubWorkspace(props: Props) {
       setEdits((old) => ({ ...old, [next.id]: next }));
     }
   };
-  const messageOrder = receptionOrder,
-    messageState = messageOrder.clientId ? reconcileWorkflow(base, messageOrder) : base,
-    messageGroup =
+  const messageOrder = receptionOrder;
+  const messageOverlay = useMemo(
+    () => messageOrder.id !== draft.id && (messageOrder.clientId || messageOrder.orderType === "RETAIL")
+      ? [messageOrder] : [],
+    [messageOrder, draft.id],
+  );
+  const nativeMessage = useNativeWorkflowReconcile(base, messageOverlay);
+  // Reuse the already reconciled draft preview instead of dispatching a
+  // second identical Rust IPC for the currently edited reception.
+  const messageState = messageOrder.id === draft.id ? preview : nativeMessage.state;
+  const messageReady = messageOrder.id === draft.id
+    ? previewReady : nativeBase.ready && nativeMessage.ready;
+  const messageGroup =
       selected?.orderId === messageOrder.id &&
       selected?.groupId &&
       groupShipments(messageState, selected.groupId).length > 0
@@ -400,6 +416,8 @@ export function HubWorkspace(props: Props) {
             </header>
             <WorkflowBoard
               state={preview}
+              previewReady={previewReady}
+              previewError={nativeBase.error || nativePreview.error}
               persistedState={base}
               selection={selected}
               activeKey={active}
@@ -418,7 +436,7 @@ export function HubWorkspace(props: Props) {
             <MessageWorkspace
               state={messageState}
               order={messageOrder}
-              gid={messageGroup}
+              gid={messageReady ? messageGroup : undefined}
               onOrder={(o) => {
                 changeReception(o);
               }}

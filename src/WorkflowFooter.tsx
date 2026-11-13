@@ -1,9 +1,12 @@
 import type { Origin, Price, State } from "./types";
-import { shipmentContext, shipmentFreightCode, shipmentVat } from "./workflow";
+import { shipmentContext } from "./workflow";
 import type { WorkflowShipment } from "./workflow-types";
 type FreightProps = {
   state: State;
   shipment: WorkflowShipment;
+  freightCode: string;
+  displayCharges: Partial<Record<Origin, Price>>;
+  freightEditingBlocked: boolean;
   activeKey?: string;
   onFreight: (origin: Origin, value: Price) => void;
   onCode: (v: "010" | "020") => void;
@@ -11,18 +14,20 @@ type FreightProps = {
 export function WorkflowFreightRows({
   state,
   shipment,
+  freightCode,
+  displayCharges,
+  freightEditingBlocked,
   onFreight,
   onCode,
   activeKey,
 }: FreightProps) {
-  const { order, recipient, client } = shipmentContext(state, shipment),
+  const { recipient } = shipmentContext(state, shipment),
     origins = [...new Set(recipient.items.map((item) => item.origin))],
-    disabled = shipment.transferred,
-    collect = shipmentFreightCode(order, recipient) === "020";
+    disabled = shipment.transferred;
   return (
     <>
       {origins.map((origin, index) => {
-        const value = collect || client.shippingFeeExcluded ? 0 : shipment.charges[origin];
+        const value = displayCharges[origin];
         return (
           <tr
             key={origin}
@@ -47,7 +52,7 @@ export function WorkflowFreightRows({
                   <input
                     aria-label={`${recipient.name} ${origin === "FACTORY" ? "공장" : "매장"} 적용 운임`}
                     inputMode="numeric"
-                    disabled={disabled || collect || client.shippingFeeExcluded}
+                    disabled={disabled || freightEditingBlocked}
                     value={
                       value === null || value === undefined ? "" : value.toLocaleString("ko-KR")
                     }
@@ -79,7 +84,7 @@ export function WorkflowFreightRows({
                     <span aria-hidden="true">(</span>
                     <select
                       aria-label={index ? "운임구분 " + origin : "운임구분"}
-                      value={shipmentFreightCode(order, recipient)}
+                      value={freightCode}
                       disabled={disabled}
                       onChange={(e) => onCode(e.target.value as "010" | "020")}
                     >
@@ -107,17 +112,17 @@ export function WorkflowFreightRows({
   );
 }
 export function WorkflowFooter({
-  state,
   shipment,
+  vatIncluded,
   onVat,
 }: {
   state: State;
   shipment: WorkflowShipment;
+  vatIncluded: boolean;
   groupId: string;
   onVat: (v: boolean | undefined) => void;
 }) {
-  const { order, recipient } = shipmentContext(state, shipment),
-    disabled = shipment.transferred;
+  const disabled = shipment.transferred;
   return (
     <section className="workflow-footer order-settings" aria-label="발주 설정">
       <div className="shipment-vat">
@@ -126,7 +131,7 @@ export function WorkflowFooter({
             type="checkbox"
             aria-label="배송 건 부가세"
             disabled={disabled}
-            checked={shipmentVat(order, recipient)}
+            checked={vatIncluded}
             onChange={(e) => onVat(e.target.checked)}
           />{" "}
           부가세 포함

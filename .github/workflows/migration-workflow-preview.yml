@@ -1,0 +1,59 @@
+name: Rust workflow preview migration
+on:
+  push:
+    branches:
+      - migration/04-workflow-preview
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: migration-workflow-preview-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  rust-parity:
+    name: Rust workflow projection and existing rules tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Run isolated Rust rules tests including read-only preview
+        run: cargo test --manifest-path tests/rust-migration/rules/Cargo.toml -- --nocapture
+      - name: Verify all three-domain Rust dispatcher tests
+        run: cargo test --manifest-path tests/rust-migration/integration/Cargo.toml
+  frontend:
+    name: React native preview build and regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install existing application dependencies
+        run: npm install --no-audit --no-fund --ignore-scripts
+      - name: TypeScript compilation and Vite build
+        run: npm run build
+      - name: Existing application regressions
+        run: npm test
+      - name: Rust and original TypeScript rules parity
+        run: npx tsx tests/rust-migration/rules/parity/compare.mts
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Original TS oracle vs compiled Rust workflow and order preview (19 cases)
+        run: node --test tests/rust-migration/rules/parity.test.mjs
+  windows-native:
+    name: Windows native compile and app library tests (two known Kakao fixtures excluded)
+    runs-on: windows-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+      - name: Verify Windows Tauri library excluding known pre-migration Kakao CI fixtures
+        shell: pwsh
+        run: >
+          cargo test --manifest-path src-tauri/Cargo.toml --lib --
+          --skip kakao_dock::native::tests::native_layouts_do_not_treat_a_third_state_as_a_view
+          --skip kakao_dock::native::tests::synthetic_win32_kakao_window_is_moved_and_restored

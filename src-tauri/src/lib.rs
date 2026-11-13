@@ -11,6 +11,8 @@ mod relational_store;
 mod sale_unit_migration;
 mod product_name_enrichment;
 mod business_core;
+#[cfg(test)]
+mod workflow_sqlite_integration_tests;
 #[cfg(target_os = "windows")]
 mod single_instance;
 use chrono::{Datelike, Local, DateTime};
