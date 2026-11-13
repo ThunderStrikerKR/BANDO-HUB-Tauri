@@ -1,10 +1,102 @@
 # TSBH Rust migration — session 2/3: Price, freight and workflow rules
 
+## Current continuation checkpoint — 2026-11-13
+
+**Latest CI status:** 47 / 47 independent Rust tests passed, 0 failed, source
+commit `a9aabdb6e5eb730f4a4c9372045c41e39fecd3b4`.
+GitHub Actions: https://github.com/ThunderStrikerKR/TSBH/actions/runs/43358837376
+Integrated Tauri Windows job: SKIPPED. This is Rust implementation coverage,
+**not** direct TypeScript parity.
+
+New session-2 owned files and changes:
+- `src-tauri/src/business_core/rules/reconciliation.rs`:
+  `reconcile_workflow` JSON operation for stable source/group/shipment
+  registration; draft merge; client-change audit guard; tariff and item
+  signature drift; charge updates; stage downgrade, audit recheck and
+  confirmation-warning events; removed-recipient history preservation.
+  Caller injects `now` and a sufficiently long `eventIds` array.
+- `src-tauri/src/business_core/rules/workflow.rs`:
+  `detach_shipment` (input `newGroupId`) and `regroup_shipment` (input
+  `targetGroupId`, `ack`) with source/client/account/stage/transfer guards,
+  preserved historical notices, explicit audit evidence. Existing public
+  workflow helper `account_for` is reused by the reconciliation module.
+- `src-tauri/src/business_core/rules/shipping.rs`:
+  `apply_shipping_action` supports `save_combination`, `delete_group`,
+  `change_basis`, `editable_rule`, `combination_versions`,
+  `combination_current`. Caller supplies generated IDs and timestamps.
+- `src-tauri/src/business_core/rules/validation.rs`:
+  matches TS historical confirmation cancellation exceptions for pre-approval
+  shipments; separately rejects duplicate confirmation IDs; checks original
+  actual-freight evidence; permits the narrowly evidenced exported-file
+  metadata change and pre-delivery print disposal while retaining frozen
+  snapshot constraints.
+- `tests/rust-migration/rules/src/lib.rs`: 16 additional synthetic fixtures
+  for group changes, tariff lifecycle, audit exceptions, reconciliation
+  lifecycle and preservation of financial evidence.
+- `tests/rust-migration/rules/src/bin/json_rules.rs`: Rust JSON Lines CLI
+  that executes the actual `rules::execute` function.
+- `tests/rust-migration/rules/parity/compare.mts`: a differential harness
+  that imports the **original** `src/domain.ts`, `src/shipping.ts` and
+  `src/workflow.ts`, executes the real Rust CLI on the same synthetic
+  fixtures, compares structured success and errors, and exits nonzero
+  on mismatches.
+
+Differential harness invocation from repository root when Cargo, Node and
+the repository's npm dependencies are installed:
+
+    npx tsx tests/rust-migration/rules/parity/compare.mts
+
+**Differential harness execution: NOT_RUN.** No Cargo or local repo
+worktree is available in the chat executor; the branch GitHub Actions CI
+currently runs the independent Rust crates only. The harness was added and
+the Rust CLI compiled under Cargo CI, but the actual TS-vs-Rust comparison
+has not been performed. Never substitute the 47 Rust PASS results for
+a 47-case TS parity statement.
+
+**Known parity gaps and blockers still open:**
+1. `reconcile_workflow` does not yet faithfully execute
+   `synchronizeIssueDecisions` and `orderIssues` for every candidate,
+   item and customer decision. It also does not parse explicit sender
+   information from original order raw text as `explicitSender` does.
+   Its billing signature comparison should be checked against the TS
+   serializer and actual persisted snapshots.
+2. Full `workflowIssues` and `stageIssues` are NOT ported for all
+   branches; native Rust approval-gating must not use this port alone.
+   The delivery address/contact checks use approximations rather than
+   the exact TS parser.
+3. `applyOrderRawEdit`, `deleteOrder`, `migrateWorkflow`, all auxiliary
+   issue-decision operations, and `upgradeShipping` remain outside
+   implemented Rust actions. Factory reply ingestion and match conflict
+   handling belong to session 3 coordination.
+4. `undoGroup`, `completeDelivery`, payment and notification exceptional
+   paths still require direct TS differential tests, including partial
+   cancellations and transferred shipment revalidation.
+5. `reconcile_workflow` is **not automatically invoked** from existing
+   Rust action routes. Session 3 must establish atomic order of calls
+   only after TS parity is confirmed. Do not assume it is wired to the app.
+6. `shipping::initial_shipping` has stable placeholder versions rather
+   than TS random IDs; persisted shipping data must be supplied for
+   production parity.
+7. The Rust JSON adapter and TS harness are authored but **not executed
+   together**. TypeScript output parity is NOT_RUN, Windows native
+   integration is NOT_RUN, app UI and SQLite wiring is NOT_RUN.
+8. The branch contains the same out-of-scope CI workflow file committed
+   by another concurrent writer as previously documented. Session 2
+   did not modify that CI file.
+
+Classification: **Rust standalone PASS**, **TS parity NOT_RUN**,
+**Windows integration SKIPPED**, **overall migration INCOMPLETE**.
+Do not merge these rules as a replacement for the full TypeScript authority
+until differential failures are closed.
+
+---
+
+
 Date: 2026-11-13 KST
 Repository: ThunderStrikerKR/TSBH
 Branch: migration/02-rules (created at d5ea8ed20b8120b844437263c2eb2b8963559e8d)
 Last implementation/test-source commit before this document: 0a168943b78390f5c97e0a7f335860add0d35db1
-Last independent Cargo test-verified code commit: 0a168943b78390f5c97e0a7f335860add0d35db1 (31/31 PASS; GitHub Actions run 43354719292; not full TS parity or Windows validation)
+Prior independent Cargo checkpoint: 0a168943b78390f5c97e0a7f335860add0d35db1 (31/31 PASS; superseded by current continuation checkpoint above)
 
 ## Scope and ownership
 
