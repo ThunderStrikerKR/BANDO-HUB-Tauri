@@ -145,9 +145,10 @@ fn connect(input:&Value,source:&Value,approve:bool,context:&Value)->Result<Value
         if !found{return Err("실제 출고지와 배송 건을 확인하세요.".into())}
         if prev_actual!=*wanted{
             let at=s(context,"freightAt");
+            let freight_actor=actor(&next);
             add_event(&mut next,json!({
                 "id":audit_id(context,"freightEventIds",index),
-                "at":at,"actor":actor(&next),"action":"실제 출고 운임 입력",
+                "at":at,"actor":freight_actor,"action":"실제 출고 운임 입력",
                 "shipmentIds":[shipment_id],"before":prev_actual,
                 "after":{"origin":"FACTORY","amount":wanted}
             }))?;
@@ -341,7 +342,8 @@ mod tests {
         req["sourceRows"][0]["address"]=json!("서울 다른 구 22");
         assert_eq!(analyze(&req).unwrap()["held"],1);
         let mut duplicate=input(s,"001234567890","4000");
-        duplicate["sourceRows"][1]=duplicate["sourceRows"][0].clone();
+        let another=duplicate["sourceRows"][0].clone();
+        duplicate["sourceRows"].as_array_mut().unwrap().push(another);
         duplicate["sourceRowCount"]=json!(2);
         assert_eq!(analyze(&duplicate).unwrap()["held"],2);
     }
