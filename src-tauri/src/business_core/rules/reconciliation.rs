@@ -42,23 +42,80 @@ fn party<'a>(state:&'a Value,order:&'a Value)->Option<&'a Value> {
     find_by_id(field(state,"clients"),str_field(order,"clientId"))
         .or_else(||order.get("clientSnapshot"))
 }
+fn company_client(state:&Value)->Value{
+    let settings=field(state,"settings");
+    let name=if str_field(settings,"senderName").trim().is_empty() {"반도스탠드"}
+        else{str_field(settings,"senderName").trim()};
+    json!({"postcode":str_field(settings,"senderPostcode"),"id":"",
+        "name":name,"displayName":name,
+        "address":str_field(settings,"senderAddress"),
+        "phone":str_field(settings,"senderPhone"),
+        "mobile":str_field(settings,"senderMobile"),
+        "contact":"","tier":"retail","payment":"POSTPAID",
+        "shippingFeeExcluded":false,"active":true,"identifiers":"","overrides":{}})
+}
+// src/explicit-sender.ts: recognize only a line that begins with the
+// sender marker (after optional whitespace), followed by a colon.
+fn explicit_sender_name(line:&str)->Option<String>{
+    let line=line.trim_start();
+    let rest=if let Some(after)=line.strip_prefix("보내는"){
+        after.trim_start().strip_prefix("분")
+            .or_else(||after.trim_start().strip_prefix("사람"))
+    }else{
+        line.strip_prefix("송하인명").or_else(||line.strip_prefix("송하인"))
+    }?;
+    let rest=rest.trim_start();
+    let content=rest.strip_prefix(':').or_else(||rest.strip_prefix('：'))?;
+    Some(content.trim().to_string())
+}
+// Match the first complete address label following the explicit sender line.
+// Preserve the full remainder, not only a guessed first address line.
+fn explicit_sender_address(text:&str)->String{
+    for (idx,_) in text.char_indices(){
+        let suffix=&text[idx..];
+        for label in ["보내는곳","송하인주소","주소"]{
+            let Some(after_label)=suffix.strip_prefix(label) else{continue};
+            let after_label=after_label.trim_start();
+            let Some(rest)=after_label.strip_prefix(':')
+                .or_else(||after_label.strip_prefix('：')) else{continue};
+            return rest.trim().lines().map(str::trim).collect::<Vec<_>>().join(" ");
+        }
+    }
+    String::new()
+}
+fn explicit_sender(raw:&str,base:&Value)->Option<Value>{
+    let mut offset=0;
+    for line in raw.split_inclusive('\n'){
+        if let Some(name)=explicit_sender_name(line.trim_end_matches('\n').trim_end_matches('\r')){
+            let relevant=&raw[offset..];
+            let mut sender=base.clone();
+            let map=sender.as_object_mut()?;
+            map.insert("name".into(),json!(name));
+            map.insert("displayName".into(),json!(name));
+            map.insert("address".into(),json!(explicit_sender_address(relevant)));
+            map.insert("phone".into(),json!(super::workflow_issues::sender_phone(relevant)));
+            map.insert("mobile".into(),json!(""));
+            map.insert("postcode".into(),json!(""));
+            return Some(sender);
+        }
+        offset+=line.len();
+    }
+    None
+}
 pub(super) fn sender_for(state:&Value,order:&Value)->Value {
-    if has_value(field(order,"senderSnapshot")) {
+    if has_value(field(order,"senderSnapshot")){
         return field(order,"senderSnapshot").clone();
     }
-    if ["DEALER","RETAIL"].contains(&str_field(order,"orderType")) {
-        let settings=field(state,"settings");
-        let name=if str_field(settings,"senderName").trim().is_empty() {"반도스탠드"}
-            else {str_field(settings,"senderName").trim()};
-        return json!({"postcode":str_field(settings,"senderPostcode"),"id":"",
-            "name":name,"displayName":name,
-            "address":str_field(settings,"senderAddress"),
-            "phone":str_field(settings,"senderPhone"),
-            "mobile":str_field(settings,"senderMobile"),
-            "contact":"","tier":"retail","payment":"POSTPAID",
-            "shippingFeeExcluded":false,"active":true,"identifiers":"","overrides":{}});
+    if ["DEALER","RETAIL"].contains(&str_field(order,"orderType")){
+        return company_client(state);
     }
-    party(state,order).cloned().unwrap_or(Value::Null)
+    // senderFor uses the frozen order clientSnapshot BEFORE a changing
+    // master-client record, independently of the order confirmation stage.
+    let base=order.get("clientSnapshot").filter(|c|!c.is_null())
+        .or_else(||find_by_id(field(state,"clients"),str_field(order,"clientId")))
+        .cloned().unwrap_or_else(||company_client(state));
+    let raw=field(order,"analysisRaw").as_str().unwrap_or_else(||str_field(order,"raw"));
+    explicit_sender(raw,&base).unwrap_or(base)
 }
 fn signature(order:&Value,recipient:&Value,sender:&Value)->String {
     let sender_data=json!([field(sender,"name"),field(sender,"displayName"),
