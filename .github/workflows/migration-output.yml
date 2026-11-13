@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - migration/03-integration
+      - fix/03-kakao-native-ci-20261113
   workflow_dispatch:
 permissions:
   contents: read
