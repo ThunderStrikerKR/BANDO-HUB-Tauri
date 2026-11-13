@@ -24,6 +24,8 @@ mod editor;
 mod aliases;
 #[path = "catalog_clients/model_groups.rs"]
 mod model_groups;
+#[path = "catalog_clients/official_html.rs"]
+mod official_html;
 use unicode_normalization::UnicodeNormalization;
 use url::Url;
 
@@ -291,6 +293,7 @@ pub fn execute(operation: &str, payload: Value) -> Result<Value, String> {
         "upsert_product_from_editor" => editor::execute(&payload),
         "save_alias" | "alias_problems" | "alias_problems_one" => aliases::execute(operation,&payload),
         "validate_model_groups" | "validate_model_group_products" => model_groups::execute(operation,&payload),
+        "preview_official_product_html" => official_html::preview(&payload),
         "client_candidates" | "classified_products" | "category_ids" |
         "management_products" | "search_products" | "representative_products" | "suggest_group_representative" |
         "official_links" => queries::execute(operation, &payload),
