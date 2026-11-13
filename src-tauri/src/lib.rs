@@ -10,6 +10,7 @@ mod backup_manager;
 mod relational_store;
 mod sale_unit_migration;
 mod product_name_enrichment;
+mod business_core;
 #[cfg(target_os = "windows")]
 mod single_instance;
 use chrono::{Datelike, Local, DateTime};
@@ -303,6 +304,15 @@ fn initialize_database(path: &Path) -> Result<Connection, String> {
     relational_store::verify(&conn)?;
     Ok(conn)
 }
+// Read-only output preparation; save/commit remains a separately guarded action.
+#[tauri::command]
+fn business_core_call(domain: String, operation: String, payload: Value) -> Result<Value, String> {
+    match domain.as_str() {
+        "output" => business_core::output::execute(&operation, payload),
+        _ => Err(format!("아직 통합되지 않은 Rust 업무 영역입니다: {}", domain)),
+    }
+}
+
 #[tauri::command]
 fn state_load(db: State<'_, Database>) -> Result<Value, String> { get_snapshot(&*lock_db(&db)?) }
 
@@ -1139,7 +1149,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            state_load, state_save, settings_patch, price_set, clipboard_write, clipboard_read,
+            state_load, state_save, business_core_call, settings_patch, price_set, clipboard_write, clipboard_read,
             ocr::capture_ocr,
             product_open, catalog_report, catalog_approve, receipt_archive, backup_create, backup_list, backup_restore, choose_excel_directory, open_excel_directory, open_daily_excel_directory,
             factory_reply_watch::choose_factory_reply_directory,
