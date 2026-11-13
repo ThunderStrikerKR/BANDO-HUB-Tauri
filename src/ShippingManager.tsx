@@ -116,7 +116,7 @@ export function ShippingManager({
   };
   const editingDirty = !!editing && !!initialEditing && !sameFreightEditor(editing.rule, initialEditing);
   const saveEditedRule = async (): Promise<boolean> => {
-    if (!editing) return true;
+    if (!editing || !editingDirty) return true;
               const next = structuredClone(shipping),
                 g = next.groups.find((g) => g.id === editing.id)!;
               g.history.push(g.current);
@@ -401,9 +401,9 @@ export function ShippingManager({
               )}
             </span>
             <div>
-              <button disabled={!changes.length || busy} onClick={() => setPending({})}>
-                변경 취소
-              </button>
+              {changes.length > 0 && <button disabled={busy} onClick={() => setPending({})}>
+                미저장 변경 초기화
+              </button>}
               <button
                 className="primary"
                 disabled={!changes.length || busy}
@@ -750,15 +750,13 @@ export function ShippingManager({
               }
             />
           </label>
-          <button
-            className="primary"
-            disabled={busy}
-            onClick={async () => {
-              await saveEditedRule();
-            }}
-          >
-            확인한 운임 저장
-          </button>
+          <div className="actions">
+            <button type="button" disabled={busy} onClick={() => void closeEditing()}>닫기</button>
+            <button type="button" className="primary" disabled={busy || !editingDirty}
+              onClick={() => void saveEditedRule()}>
+              확인한 운임 저장
+            </button>
+          </div>
         </Modal>
       )}
     </div>

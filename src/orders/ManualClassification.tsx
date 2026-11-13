@@ -2,6 +2,7 @@ import { useRef, useState, type KeyboardEvent } from "react";
 import { ProductSearchDialog } from "../ProductSearchDialog";
 import { deliveryRequirements } from "../delivery-requirements";
 import { usePendingChanges } from "../shared/pending-changes";
+import { confirmDiscardDraft } from "../shared/editor-flow";
 import type { NoticeSink } from "../shared/notices";
 import type { Order, Product, State } from "../types";
 import { orderIssues } from "../validation";
@@ -58,7 +59,10 @@ export function ManualClassification({
     beforeProduct = useRef<Frame | undefined>(undefined);
   const editStart = useRef<{ cell: Cell; frame: Frame } | undefined>(undefined),
     applying = useRef(false);
-  usePendingChanges(JSON.stringify(model) !== initial.current || Object.keys(entry).length > 0);
+  const dirty = JSON.stringify(model) !== initial.current || Object.keys(entry).length > 0 ||
+    count !== String(model.rows.length);
+  usePendingChanges(dirty);
+  const closeDraft = () => void confirmDiscardDraft("수동 분류", dirty, onClose);
   const frame = (): Frame =>
     structuredClone({ model, entry, quantityText, pending, rollback: beforeProduct.current });
   const checkpoint = () => {
@@ -617,7 +621,7 @@ export function ManualClassification({
           >
             초기화
           </button>
-          <button onClick={onClose}>닫기 ×</button>
+          <button onClick={closeDraft}>닫기 ×</button>
         </header>
         <div className="manual-classification">
           <div className="manual-status" role="status" data-error-cell={error?.key}>
@@ -761,7 +765,7 @@ export function ManualClassification({
           </div>
           <footer className="manual-footer">
             <span>적용 후 확인 {issues.length}개 / 정식 접수는 주문 확인 완료</span>
-            <button onClick={onClose}>취소</button>
+            <button onClick={closeDraft}>닫기</button>
             <button
               className="primary"
               disabled={

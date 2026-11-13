@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { confirmDiscardDraft } from "./shared/editor-flow";
 import { Modal } from "./ui";
 import { itemFromProduct, resolvePrice } from "./domain";
 import { productModelNames } from "./product-name-match";
@@ -44,6 +45,7 @@ export function OrderItemEditor({
 
   const product = state.products.find((product) => product.id === draft.productId);
   const changed = draft.productId !== item.productId || draft.variantId !== item.variantId;
+  const closeDraft = () => void confirmDiscardDraft("상품 상세 수정", changed, onClose);
 
   const results = useMemo(
     () => searchProducts(state, query, client.id)
@@ -118,7 +120,7 @@ export function OrderItemEditor({
     <Modal
       title="상품 상세 수정"
       draft={draft}
-      onClose={onClose}
+      onClose={closeDraft}
       className="order-item-editor-modal"
     >
         <div className="order-item-edit-content">
@@ -213,7 +215,7 @@ export function OrderItemEditor({
           <button type="button" className="danger" disabled={locked} onClick={onRemove}>
             삭제
           </button>
-          <button type="button" onClick={onClose}>취소</button>
+          <button type="button" onClick={closeDraft}>닫기</button>
           <button
             type="button"
             className="primary"

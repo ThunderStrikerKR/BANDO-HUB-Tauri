@@ -59,7 +59,7 @@ export function ProductFreightPanel({
       })
     ).ok;
   const writeRule = async (): Promise<boolean> => {
-    if (!editing) return true;
+    if (!editing || !editingDirty) return true;
     const next = clone(state),
       shipping = next.shipping!;
     if (Object.entries(editing.rule.fees).some(([count, amount]) =>
@@ -354,9 +354,13 @@ export function ProductFreightPanel({
             />
           </Field>
           <HelpTooltip title="최대 합포장 수량 초과" purpose="한 상자에 넣을 수 있는 최대 수량을 넘을 때 배송비를 어떻게 처리하는지 알려줍니다." when="주문 수량이 등록한 합포장 수량보다 많을 때 확인합니다." steps={["실제로 포장 가능한 조합을 확인합니다.", "확인된 조합의 운임을 따로 등록합니다.", "등록된 운임을 사용합니다."]} result="확인된 조합 운임을 다음 주문에서도 참고할 수 있습니다." caution="확인되지 않은 배송비는 자동으로 추측해 계산하지 않습니다." />
-          <button className="primary" disabled={busy} onClick={() => void writeRule()}>
-            기본 운임 저장
-          </button>
+          <div className="actions">
+            <button type="button" disabled={busy} onClick={() => void closeEditing()}>닫기</button>
+            <button type="button" className="primary" disabled={busy || !editingDirty}
+              onClick={() => void writeRule()}>
+              기본 운임 저장
+            </button>
+          </div>
         </Modal>
       )}
     </>

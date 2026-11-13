@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { requestEditorLeave, usePageLeaveGuard } from "./shared/page-leave";
+import { refreshAfterCommittedSave } from "./shared/committed-state";
 import { sameValue } from "./shared/draft";
 import { confirmAction } from "./dialogs";
 import { uid } from "./domain";
@@ -72,8 +73,10 @@ export function ColorGuidanceManager({state,onRefresh,query="",onQueryChange}: {
         {colorGuidanceGroups:baseline.settings.colorGuidanceGroups??null}
       );
       setDraft(structuredClone(updated));setBaseline(structuredClone(updated));
-      await onRefresh(updated);
-      setStatus("모델군 설정을 저장했습니다. 기존 상품과 주문은 변경하지 않았습니다.");
+      const refreshed = await refreshAfterCommittedSave("모델군",updated,onRefresh,setStatus);
+      setStatus(refreshed
+        ? "모델군 설정을 저장했습니다. 기존 상품과 주문은 변경하지 않았습니다."
+        : "모델군 저장 완료 / 화면 갱신 확인 필요");
       return true;
     }catch(error){setStatus(String(error));return false;}
     finally{setBusy(false);}
@@ -129,7 +132,12 @@ export function ColorGuidanceManager({state,onRefresh,query="",onQueryChange}: {
         {rows.filter(g=>!query.trim()||(g.name+" "+g.productIds.map(id=>
           draft.products.find(p=>p.id===id)?.name??"").join(" ")).toLocaleLowerCase()
             .includes(query.trim().toLocaleLowerCase())).map(g=>
-          <button type="button" key={g.id} onClick={()=>{setSelected(g.id);setSearch("");}}
+          <button type="button" key={g.id} onClick={()=>void (async()=>{
+            if (g.id===activeId) return;
+            const leave=await requestEditorLeave(leaveGuard,setStatus);
+            if (!leave.proceed) return;
+            setSelected(g.id);setSearch("");setStatus("");
+          })()}
             className={"family-list-row"+(activeId===g.id?" selected":"")}>
             <span><strong>{g.name}</strong><small>대표모델: {draft.products.find(p=>p.id===g.representativeProductId)?.name ?? (g.representativeColor ? "이전 대표색상 " + colorLabel(g.representativeColor) + " / 대표모델 재지정 필요" : "미지정")}</small></span>
             <span className="family-member-count">{g.productIds.length}개 상품</span>

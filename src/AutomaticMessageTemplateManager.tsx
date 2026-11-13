@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { HelpTooltip } from "./ui/HelpTooltip";
 import { usePendingChanges } from "./shared/pending-changes";
-import { usePageLeaveGuard } from "./shared/page-leave";
+import { requestEditorLeave, usePageLeaveGuard } from "./shared/page-leave";
+import { refreshAfterCommittedSave } from "./shared/committed-state";
 import {
   AUTOMATIC_MESSAGE_TEMPLATES, AUTOMATIC_TEMPLATE_IDS,
   previewAutomaticTemplate, validateAutomaticMessageTemplates,
@@ -66,9 +67,9 @@ export function AutomaticMessageTemplateManager({
       );
       const saved=structuredClone(updated.settings.automaticMessageTemplates??{});
       setBaseline(saved);setDraft(structuredClone(saved));
-      await onRefresh(updated);
-      setStatus("상황별 자동 메시지를 저장했습니다.");
-      onNotice("자동 메시지 설정을 저장했습니다.","success");
+      const refreshed = await refreshAfterCommittedSave("자동 메시지",updated,onRefresh,onNotice);
+      setStatus(refreshed ? "상황별 자동 메시지를 저장했습니다." : "저장 완료 / 화면 갱신 확인 필요");
+      if (refreshed) onNotice("자동 메시지 설정을 저장했습니다.","success");
       return true;
     }catch(error){
       setStatus(String(error));
@@ -76,13 +77,20 @@ export function AutomaticMessageTemplateManager({
       return false;
     }finally{setBusy(false);}
   };
-  usePageLeaveGuard({
+  const leaveGuard = {
     label: "상황별 자동 메시지",
     hasChanges: () => dirty,
     busy: () => busy,
     save,
     discard: () => { setDraft(structuredClone(baseline)); setStatus(""); },
-  });
+  };
+  usePageLeaveGuard(leaveGuard);
+  const chooseTemplate = async (id: AutomaticTemplateId) => {
+    if (id === selected) return;
+    const leave = await requestEditorLeave(leaveGuard,(message)=>onNotice(message,"error"));
+    if (!leave.proceed) return;
+    setSelected(id);setStatus("");
+  };
   return <section className="family-admin-workspace" aria-label="자동 메시지 편집">
     <aside className="family-list-panel">
       <header className="family-list-heading">
@@ -94,7 +102,7 @@ export function AutomaticMessageTemplateManager({
             <h3>{category}</h3>
             {AUTOMATIC_TEMPLATE_IDS.filter(id=>AUTOMATIC_MESSAGE_TEMPLATES[id].category===category)
               .map(id=><button key={id} type="button"
-                onClick={()=>{setSelected(id);setStatus("");}}
+                onClick={()=>void chooseTemplate(id)}
                 className={"family-list-row"+(id===selected?" selected":"")}>
                   <span><strong>{AUTOMATIC_MESSAGE_TEMPLATES[id].label}</strong>
                     <small>{draft[id]!==undefined?"수정됨":"기본 문구"}</small>
@@ -130,9 +138,7 @@ export function AutomaticMessageTemplateManager({
       <footer className="family-editor-footer">
         <span role="status" className="muted">{status||(dirty?"저장하지 않은 변경사항 있음":"변경사항 없음")}</span>
         <div className="family-footer-actions">
-          <button type="button" disabled={!dirty||busy} onClick={()=>{
-            setDraft(structuredClone(baseline));setStatus("");
-          }}>변경 취소</button>
+
           <button type="button" className="primary" disabled={!dirty||busy} onClick={()=>void save()}>
             {busy?"저장 중":"변경사항 저장"}
           </button>

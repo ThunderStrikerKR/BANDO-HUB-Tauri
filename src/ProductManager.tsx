@@ -536,8 +536,8 @@ export function ProductManager({
               </details>
             </div>
             <div className="product-detail-footer">
-              <button type="button" disabled={savingView} onClick={() => void closeDetail()}>취소</button>
-              <button type="button" className="primary" disabled={savingView} onClick={() => void save()}>
+              <button type="button" disabled={savingView} onClick={() => void closeDetail()}>닫기</button>
+              <button type="button" className="primary" disabled={savingView || (!editDirty && state.products.some((p) => p.id === edit.id))} onClick={() => void save()}>
                 {savingView ? "저장 중" : "변경사항 저장"}
               </button>
             </div>

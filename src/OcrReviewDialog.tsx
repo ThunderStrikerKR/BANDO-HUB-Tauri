@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { confirmDiscardDraft } from "./shared/editor-flow";
 import { Modal } from "./ui";
 import type { OcrCapture } from "./types";
 
@@ -10,8 +11,9 @@ export function OcrReviewDialog({
   onApply: (text: string, mode: "replace" | "append") => void;
 }) {
   const [edited, setEdited] = useState(result.text);
+  const closeDraft = () => void confirmDiscardDraft("OCR 문자 인식 검토", edited !== result.text, onCancel);
   return (
-    <Modal title="OCR 문자 인식 검토" onClose={onCancel} draft={edited}>
+    <Modal title="OCR 문자 인식 검토" onClose={closeDraft} draft={edited}>
       <p className="muted">
         선택한 화면과 인식 문구를 비교하고 오타를 고쳐 주세요.
         확인 전에는 발주 원문이나 주문 데이터베이스가 변경되지 않습니다.
@@ -23,7 +25,7 @@ export function OcrReviewDialog({
         className="ocr-review-textarea" value={edited} maxLength={20000}
         onChange={(event) => setEdited(event.target.value)} />
       <div className="actions ocr-review-actions">
-        <button type="button" onClick={onCancel}>취소</button>
+        <button type="button" onClick={closeDraft}>닫기</button>
         <button type="button" disabled={!edited.trim()} onClick={() => onApply(edited, "append")}>
           원문에 추가
         </button>

@@ -26,7 +26,11 @@ test("direct price and settings updates apply the native response, not a reload"
     "src/ColorGuidanceManager.tsx",
     "src/AutomaticMessageTemplateManager.tsx",
     "src/ProvisionalProductNoticeManager.tsx",
-  ]) assert.match(read(p),/await onRefresh\(updated\)/);
+  ]) assert.match(read(p),/refreshAfterCommittedSave\(/);
+  const refresh=read("src/shared/committed-state.ts");
+  assert.match(refresh,/await refresh\(committed\)/);
+  assert.match(refresh,/return true/);
+  assert.match(refresh,/화면 갱신에 실패했습니다/);
 });
 test("bulk saves no longer re-read after the common commit", () => {
   for (const p of [

@@ -470,8 +470,8 @@ export function ClientManager({
               </button>}
               </div>
               <div className="client-editor-footer-actions">
-                <button type="button" disabled={savingView} onClick={() => void closeEdit()}>취소</button>
-              <button className="primary" disabled={savingView} onClick={() => void save()}>
+                <button type="button" disabled={savingView} onClick={() => void closeEdit()}>닫기</button>
+              <button className="primary" disabled={savingView || (!editDirty && state.clients.some((c) => c.id === edit.id))} onClick={() => void save()}>
                 {savingView ? "저장 중…" : state.clients.some((c) => c.id === edit.id) ? "변경사항 저장" : "거래처 등록"}
               </button>
               </div>
