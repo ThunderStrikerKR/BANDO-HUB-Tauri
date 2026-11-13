@@ -112,7 +112,10 @@ test("20 actual orders: TS oracle and Rust parser produce identical business fie
     const badSpans=inspectSpans(rust[i],s.raw);
     if(badSpans.length)spans.push({id:s.id,problems:badSpans.slice(0,10)});
     if(fields.length)discrepancies.push({id:s.id,label:s.label,fields:fields.slice(0,50),
-      fieldCount:fields.length});
+      fieldCount:fields.length,
+      tsIssues:ts.ok?ts.value.recipients.flatMap(row=>row.items.flatMap(item=>item.issues??[])):[],
+      rustIssues:rust[i].ok?rust[i].value.recipients.flatMap(row=>row.items.flatMap(item=>item.issues??[])):[],
+    });
     summary.push({id:s.id,tsRecipients:tsRecipients.length,
       rustRecipients:rust[i].ok?rust[i].value.recipients?.length:null,
       differences:fields.length,spanErrors:badSpans.length,tsBaselinePass:basicOkay});
