@@ -304,13 +304,12 @@ fn initialize_database(path: &Path) -> Result<Connection, String> {
     relational_store::verify(&conn)?;
     Ok(conn)
 }
-// Read-only output preparation; save/commit remains a separately guarded action.
+// Pure Rust domain computation only: returning a new workflow state does
+// NOT write SQLite. Existing checked state_save/transaction boundaries must
+// commit approved results against a fresh persisted revision.
 #[tauri::command]
 fn business_core_call(domain: String, operation: String, payload: Value) -> Result<Value, String> {
-    match domain.as_str() {
-        "output" => business_core::output::execute(&operation, payload),
-        _ => Err(format!("아직 통합되지 않은 Rust 업무 영역입니다: {}", domain)),
-    }
+    business_core::execute(&domain, &operation, payload)
 }
 
 #[tauri::command]
