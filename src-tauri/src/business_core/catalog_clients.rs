@@ -16,6 +16,10 @@ mod official_import;
 mod brands;
 #[path = "catalog_clients/categories.rs"]
 mod categories;
+#[path = "catalog_clients/queries.rs"]
+mod queries;
+#[path = "catalog_clients/editor.rs"]
+mod editor;
 use unicode_normalization::UnicodeNormalization;
 use url::Url;
 
@@ -277,6 +281,10 @@ pub fn execute(operation: &str, payload: Value) -> Result<Value, String> {
     let state = payload.get("state").ok_or("현재 상태가 없습니다.")?;
     match operation {
         "preview_client_rows" => client_preview::preview(&payload),
+        "upsert_product_from_editor" => editor::execute(&payload),
+        "client_candidates" | "classified_products" | "category_ids" |
+        "search_products" | "representative_products" | "suggest_group_representative" |
+        "official_links" => queries::execute(operation, &payload),
         "upsert_brand" | "validate_brands" => brands::execute(operation, &payload),
         "change_category" | "delete_category" | "legacy_add_category" |
         "legacy_rename_category" | "validate_categories" => categories::execute(operation, &payload),
