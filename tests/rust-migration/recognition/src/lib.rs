@@ -212,6 +212,29 @@ mod regressions {
     }
 
     #[test]
+    fn source_multiline_address_and_parenthetical_note_are_retained() {
+        // Source: order-evidence.ts:140-188; samples 08 and 09.
+        let samples=samples();
+        let note_raw=samples[7]["raw"].as_str().unwrap();
+        let noted=recognition::execute("analyze_order",json!({
+            "raw":note_raw,"state":seed()
+        })).unwrap();
+        assert!(noted["recipients"][0]["note"].as_str().unwrap_or("")
+            .contains("문안에 넣어주세요"),
+            "sample 08: parenthesized delivery note must survive");
+        let address_raw=samples[8]["raw"].as_str().unwrap();
+        let addressed=recognition::execute("analyze_order",json!({
+            "raw":address_raw,"state":seed()
+        })).unwrap();
+        assert!(addressed["recipients"][0]["address"].as_str().unwrap_or("")
+            .contains("가상카페 1층"),
+            "sample 09: indented building/floor detail must be part of delivery address");
+        assert!(!addressed["recipients"][0]["address"].as_str().unwrap_or("")
+            .contains("가상오디오"),
+            "sample 09: sender section must never bleed into recipient");
+    }
+
+    #[test]
     fn old_false_manual_flag_does_not_block_reanalysis() {
         let state=json!({"products":[],"aliases":[]});
         let order=json!({
