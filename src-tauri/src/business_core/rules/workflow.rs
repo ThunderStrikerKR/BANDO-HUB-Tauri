@@ -478,16 +478,117 @@ pub(super) fn apply(payload:&Value)->Result<Value,String> {
                 if !rows(field(&state["workflow"],"confirmations")).is_empty() {
                     return Err("입금 재확인 이벤트 입력이 필요합니다.".into());
                 }
-                state["workflow"]["shipments"][si]["rechecks"].as_array_mut().map(|v|v.push(json!({
+                if !state["workflow"]["shipments"][si]["rechecks"].is_array() {
+                    set(&mut state["workflow"]["shipments"][si],"rechecks",json!([]))?;
+                }
+                state["workflow"]["shipments"][si]["rechecks"].as_array_mut()
+                    .ok_or("재확인 이력 목록 오류")?.push(json!({
                     "at":required_str(payload,"now")?,"reason":"직원이 운임 변경",
                     "fromStage":old_step,"toStage":1
-                })));
+                }));
             }
             append_event(&mut state,payload,"배송 건 운임 수정",&[ship_id.to_string()],
                 json!({"origin":origin,"value":previous}),
                 json!({"origin":origin,"value":value}),&group_id)?;
             let result_step=field(&state["workflow"]["shipments"][si],"step").clone();
             Ok(json!({"state":state,"step":result_step}))
+        }
+        "process_group" => {
+            let group_id=required_str(payload,"groupId")?;
+            let (gi,ships)=group_indices(&state,group_id)?;
+            if ships.iter().all(|i|flag(&state["workflow"]["shipments"][*i],"transferred")) {
+                return Ok(json!({"state":state,"entries":[]}));
+            }
+            if ships.iter().any(|i|flag(&state["workflow"]["shipments"][*i],"transferred")) {
+                return Err("이미 일부가 이관되어 있습니다. 이관 상태를 먼저 확인하세요.".into());
+            }
+            if ships.iter().any(|i|field(&state["workflow"]["shipments"][*i],"step").as_i64()!=Some(4))
+                || flag(&state["workflow"]["groups"][gi],"needsNotice") {
+                return Err("네 단계와 변경 금액 재안내를 먼저 완료하세요.".into());
+            }
+            let issues=stage_issues(&state,group_id,4)?;
+            if !issues.is_empty(){return Err(issues.join("\n"));}
+            let actor=if str_field(payload,"actor").is_empty() {"직원(이름 미설정)"}
+                else {str_field(payload,"actor")}.to_string();
+            let now=required_str(payload,"now")?.to_string();
+            let mut entries=Vec::new();
+            let ids=ships.iter().map(|si|str_field(&state["workflow"]["shipments"][*si],"id")
+                .to_string()).collect::<Vec<_>>();
+            for si in ships {
+                let ship_id=str_field(&state["workflow"]["shipments"][si],"id").to_string();
+                let (_index,oi,ri)=shipment_indices(&state,&ship_id)?;
+                let order=&state["orders"][oi];
+                let row=&order["recipients"][ri];
+                let client=party(&state,order).ok_or("거래처 정보를 확인하세요.")?;
+                let sender=state["workflow"]["shipments"][si].get("sender")
+                    .filter(|v|!v.is_null()).unwrap_or(client).clone();
+                let totals=shipment_totals(&state,&ship_id)?;
+                for key in ["total","subtotal","shipping","vat"] {
+                    if safe(field(&totals,key)).is_none() {return Err("청구액 미확정".into());}
+                }
+                let freight_code=shipment_freight_code(order,row).to_string();
+                for origin in row_origins(row) {
+                    let entry_id=format!("excel:{ship_id}:{origin}");
+                    let existing_index=index_by_id(field(&state["workflow"],"queue"),&entry_id);
+                    if existing_index.is_some_and(|i|str_field(
+                        &state["workflow"]["queue"][i],"status")!="CANCELLED") {
+                        return Err("이미 등록된 배송 건입니다.".into());
+                    }
+                    let mut selected=row.clone();
+                    set(&mut selected,"items",json!(rows(field(row,"items")).iter()
+                        .filter(|item|str_field(item,"origin")==origin)
+                        .cloned().collect::<Vec<_>>()))?;
+                    let entry=json!({
+                        "id":entry_id,"shipmentId":ship_id,"origin":origin,
+                        "at":now,"actor":actor,"status":"QUEUED",
+                        "snapshot":{"recipient":selected,"sender":sender,
+                            "freightCode":freight_code,"total":field(&totals,"total"),
+                            "vat":field(&totals,"vat"),"subtotal":field(&totals,"subtotal"),
+                            "shipping":field(&totals,"shipping")}
+                    });
+                    if let Some(i)=existing_index {
+                        state["workflow"]["queue"][i]=entry.clone();
+                    } else {
+                        state["workflow"]["queue"].as_array_mut()
+                            .ok_or("엑셀 관리 대기열 형식 오류")?.push(entry.clone());
+                    }
+                    entries.push(entry);
+                }
+                set(&mut state["workflow"]["shipments"][si],"transferred",json!(true))?;
+            }
+            append_event(&mut state,payload,"처리완료 / 엑셀 관리 목록 이관",&ids,
+                Value::Null,json!({"entries":entries}),group_id)?;
+            Ok(json!({"state":state,"entries":entries}))
+        }
+        "record_actual_freight" => {
+            let ship_id=required_str(payload,"shipmentId")?;
+            let origin=required_str(payload,"origin")?;
+            if !["FACTORY","STORE"].contains(&origin) {
+                return Err("실제 운임은 0 이상의 원 단위 정수로 입력하세요.".into());
+            }
+            let value=req(payload,"value")?;
+            if !value.is_null() && safe(value).is_none() {
+                return Err("실제 운임은 0 이상의 원 단위 정수로 입력하세요.".into());
+            }
+            let (si,oi,ri)=shipment_indices(&state,ship_id)?;
+            if !row_origins(&state["orders"][oi]["recipients"][ri]).contains(&origin) {
+                return Err("실제 출고지와 배송 건을 확인하세요.".into());
+            }
+            let ship=&state["workflow"]["shipments"][si];
+            let group_id=str_field(ship,"groupId").to_string();
+            let before=if ship.get("actualFreight").and_then(|v|v.get(origin)).is_some() {
+                field(field(ship,"actualFreight"),origin).clone()
+            } else {
+                field(&state["orders"][oi]["recipients"][ri],"actualFreight").clone()
+            };
+            if before==*value {return Ok(json!({"state":state,"unchanged":true}));}
+            if !state["workflow"]["shipments"][si]["actualFreight"].is_object() {
+                set(&mut state["workflow"]["shipments"][si],"actualFreight",json!({}))?;
+            }
+            set(&mut state["workflow"]["shipments"][si]["actualFreight"],origin,value.clone())?;
+            append_event(&mut state,payload,"실제 출고 운임 입력",&[ship_id.to_string()],
+                before,json!({"origin":origin,"amount":value}),&group_id)?;
+            Ok(json!({"state":state,"unchanged":false}))
         }
         _ => Err(format!("지원하지 않는 업무 action: {action}")),
     }
