@@ -10,6 +10,10 @@ test("all active product and client management save paths are native without TS 
   const productExcel=read("src/ProductSyncWorkbookTools.tsx");
   const registration=read("src/RegistrationManager.tsx");
   const official=read("src/ProductImports.tsx");
+  const classification=read("src/Classification.tsx");
+  const categories=read("src/CategoryManager.tsx");
+  const categoryBridge=read("src/native-category.ts");
+  const legacyCategories=read("src/ManagementUI.tsx");
   const bridge=read("src/tauri-bridge.ts");
   const dispatcher=read("src-tauri/src/business_core/mod.rs");
   const native=read("src-tauri/src/business_core/catalog_clients.rs");
@@ -22,6 +26,11 @@ test("all active product and client management save paths are native without TS 
     [productExcel,"apply_product_workbook"],
     [registration,"prepare_registration_commit"],
     [official,"apply_official_product_import"],
+    [classification,"upsert_brand"],
+    [legacyCategories,"legacy_add_category"],
+    [legacyCategories,"legacy_rename_category"],
+    [categoryBridge,"change_category"],
+    [categoryBridge,"delete_category"],
   ]){
     assert.match(source,new RegExp('"catalog_clients", "'+command+'"'));
   }
@@ -35,6 +44,19 @@ test("all active product and client management save paths are native without TS 
   assert.doesNotMatch(clientExcel,/applyClientWorkbook\(current, preview\)/);
   assert.doesNotMatch(productExcel,/applyUnifiedProductWorkbook\(state, review\)/);
   assert.doesNotMatch(registration,/prepareRegistrationCommit\(current, preview,/);
+  assert.match(categories,/nativeChangeCategory as changeCategory/);
+  assert.match(categories,/nativeDeleteCategory as deleteCategory/);
+  assert.doesNotMatch(categories,/import \{[^\n]*changeCategory[^\n]*\} from "\.\/category-tree"/);
+  assert.match(classification,/await onSave\(next\)/);
+  assert.doesNotMatch(classification,/validateBrands\(next,\s*state\)/);
+  const nativeBrands=read("src-tauri/src/business_core/catalog_clients/brands.rs");
+  const nativeCategories=read("src-tauri/src/business_core/catalog_clients/categories.rs");
+  assert.match(nativeBrands,/fn upsert_brand\(/);
+  assert.match(nativeCategories,/fn change\(/);
+  assert.match(nativeCategories,/fn delete\(/);
+  assert.match(nativeCategories,/fn legacy_add\(/);
+  assert.match(nativeCategories,/fn legacy_rename\(/);
+
   assert.doesNotMatch(official,/applyOfficialProductPreview\(latest, preview,/);
   assert.match(official,/await window\.bando!\.backup\(\)/);
   assert.match(official,/await onSave\(result\.next\)/);
