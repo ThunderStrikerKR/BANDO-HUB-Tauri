@@ -53,5 +53,9 @@ test("Image and brand fixes keep existing SQLite schema and product references",
   assert.match(rust, /CREATE TABLE IF NOT EXISTS product_index/);
   assert.match(manager, /imageOverride: "MANUAL"/);
   assert.match(manager, /imageOverride: "HIDDEN"/);
-  assert.match(manager, /validateProduct\(p, registeredProducts\(state\.products\)\)/);
+  const native = read("src-tauri/src/business_core/catalog_clients.rs");
+  assert.match(manager, /"catalog_clients", "upsert_product"/);
+  assert.match(native, /fn validate_product\(/);
+  assert.match(native, /fn product_url_ok\(/);
+  assert.match(native, /normalized_color\(field\(v, "color"\)\)/);
 });
