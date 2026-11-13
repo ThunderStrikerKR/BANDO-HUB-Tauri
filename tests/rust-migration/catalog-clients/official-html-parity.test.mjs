@@ -87,7 +87,7 @@ const cases=[];
 function add(name,url,body,s=state()){
   let oracle;
   try{oracle={ok:true,value:JSON.parse(JSON.stringify(parseTS(url,body,s)))}}
-  catch(error){oracle={ok:false,error:String(error instanceof Error?error.message:error)}}
+  catch(error){oracle={ok:false,error:String(error?.message??error)}}
   cases.push({name,url,html:body,state:s,oracle});
 }
 add("normal Cafe24 product and website P-code",official,html());
