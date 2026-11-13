@@ -472,10 +472,16 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
             for (from,to) in spans.into_iter().rev() {
                 without_phones.replace_range(from..to,&" ".repeat(to-from));
             }
-            let value=without_phones.trim();
+            // src/order-evidence.ts sees the address after the optional
+            // parenthesized five-digit postcode. Both the stored value and
+            // the source span must exclude the post code prefix.
+            let postal_prefix=Regex::new(r"^\s*\(\d{5}\)\s*")
+                .expect("parenthesized postcode");
+            let skip=postal_prefix.find(&without_phones).map_or(0,|m|m.end());
+            let value=without_phones[skip..].trim();
             if !value.is_empty() {
                 let end=start+without_phones.trim_end().len();
-                add_match(&mut events,line,start,end,"address",
+                add_match(&mut events,line,start+skip,end,"address",
                     value.to_owned(),"배송주소 원문 구간");
             }
         }
@@ -568,8 +574,11 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
                 .expect("recipient title").captures(text) {
                 if let Some(name) = c.get(1) {
                     if is_person(name.as_str()) {
-                        if let Some(at) = line.text.find(name.as_str()) {
-                            add_match(&mut events,line,at,at+name.len(),"name",
+                        if let Some(at) = line.text.find(text) {
+                            // The original evidence highlights the complete
+                            // "정가상 목사" while the recognized field is
+                            // just "정가상".
+                            add_match(&mut events,line,at,at+text.len(),"name",
                                 name.as_str().to_owned(),"직함 앞 독립 수취인 이름");
                         }
                     }
@@ -697,7 +706,19 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
         let p_start = p_start.min(skip_until.len());
         let p_end = p_end.min(skip_until.len()).max(p_start);
         let p_start = if skip_until.is_char_boundary(p_start) { p_start } else { 0 };
-        let p_end = if skip_until.is_char_boundary(p_end) { p_end } else { skip_until.len() };
+        let mut p_end = if skip_until.is_char_boundary(p_end) { p_end } else { skip_until.len() };
+        // A parenthetical color after an identified BD numeric model is a
+        // separate qualifier, not part of the source model token in the
+        // TypeScript order-evidence parser.
+        if p_start < p_end {
+            let evidence=&skip_until[p_start..p_end];
+            if Regex::new(r"(?i)^BD\s*\d[A-Za-z0-9-]*\s*\((?:블랙|검정|화이트|그레이|실버|black|white|gray|grey|silver)\)$")
+                .expect("model color qualifier").is_match(evidence) {
+                if let Some(color_at)=evidence.rfind('(') {
+                    p_end=p_start+evidence[..color_at].trim_end().len();
+                }
+            }
+        }
         let product_evidence = add_match(&mut events,line,offset+p_start,offset+p_end,
             "product",trimmed.to_owned(),"상품명/모델명/별칭 인식 근거");
         product_hits.push(ProductHit {
@@ -946,6 +967,13 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
             if recipients[idx].get("unassignedEvidence").is_none() {
                 recipients[idx]["unassignedEvidence"]=json!([e_json(raw,e)]);
             }
+        }
+    }
+    // Source evidence is displayed in original document order, regardless
+    // of which field the Rust recognizer happened to detect first.
+    for row in &mut recipients {
+        if let Some(sources)=row.get_mut("sources").and_then(Value::as_array_mut) {
+            sources.sort_by_key(|source|source["start"].as_u64().unwrap_or(u64::MAX));
         }
     }
     // The TypeScript evidence extractor emits items in raw reading order.
