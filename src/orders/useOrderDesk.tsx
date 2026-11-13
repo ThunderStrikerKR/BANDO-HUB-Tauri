@@ -11,6 +11,9 @@ import {
 import type { StaffBlock } from "../hub-messages";
 import { hubMessages } from "../hub-messages";
 import { businessCoreCall } from "../tauri-bridge";
+import { useNativeWorkflowReconcile } from "./useNativeWorkflowReconcile";
+import { useNativeWorkflowBoard } from "./useNativeWorkflowBoard";
+import { useNativeOrderPreview } from "./useNativeOrderPreview";
 import { applyRustReceptionAnalysis, assertRustReceptionAnalysis, receptionAnalysisAllowed } from "./rust-reception";
 import { registeredProducts, sortProducts } from "../product-models";
 import { billingSnapshot } from "../replies";
@@ -19,7 +22,7 @@ import type { Item, Order, Product, State } from "../types";
 import { clone } from "../ui";
 import { pendingIssue } from "../validation";
 import { shouldRefreshUncommittedOrderPricing } from "./passive-pricing";
-import { groupMessages, groupShipments, reconcileWorkflow } from "../workflow";
+import { groupMessages, groupShipments } from "../workflow";
 type SaveMode = "save" | "notify" | "pay" | "queue" | "wait";
 export type OrderDeskProps = {
   onRawEditDirty?: (dirty: boolean) => void;
@@ -99,7 +102,15 @@ export function useOrderDesk({
     () => sortProducts(registeredProducts(state.products)),
     [state.products],
   );
-  const flowState = useMemo(() => reconcileWorkflow(state, draft), [state, draft]);
+  // Live order-detail reconciliation is a read-only Rust computation.
+  // In-flight calculations never fall back to the old TS workflow engine.
+  const overlay = useMemo(() => [draft], [draft]);
+  const nativeFlow = useNativeWorkflowReconcile(state, overlay);
+  const flowState = nativeFlow.state;
+  const flowReady = nativeFlow.ready;
+  const nativeBoard = useNativeWorkflowBoard(flowState);
+  const nativeOrder = useNativeOrderPreview(flowState, draft, flowReady);
+  const flowSummaryReady = flowReady && nativeBoard.ready && nativeOrder.ready;
   const flowGroups = (flowState.workflow?.groups ?? []).filter((g) =>
     groupShipments(flowState, g.id).some((s) => s.orderId === draft.id),
   );
@@ -112,6 +123,9 @@ export function useOrderDesk({
   const activeShipments = activeGroupId ? groupShipments(flowState, activeGroupId) : [];
   const activeShipment =
     activeShipments.find((s) => s.id === workflowSelection?.shipmentId) ?? activeShipments[0];
+  const activeShipmentPreview = flowSummaryReady && activeGroupId && activeShipment
+    ? nativeBoard.byId[activeGroupId]?.shipments.find((entry) => entry.shipmentId === activeShipment.id)
+    : undefined;
 
   const generated = activeGroupId
     ? groupMessages(flowState, activeGroupId, links)
@@ -121,7 +135,9 @@ export function useOrderDesk({
     // Saved orders retain historical prices even when their preview state
     // contains a revised product/shipping master.
     passivePricingAllowed = shouldRefreshUncommittedOrderPricing(draft, persisted),
-    exported = draft.status === "EXPORTED" || activeShipment?.transferred === true;
+    exported = draft.status === "EXPORTED" || activeShipment?.transferred === true ||
+      (!flowReady && (state.workflow?.shipments.some((ship) =>
+        ship.orderId === draft.id && ship.transferred && !ship.legacyArchived) ?? false));
   useEffect(() => {
     if (viewMode === "details" && highlight)
       document
@@ -366,7 +382,9 @@ export function useOrderDesk({
     }
     onChange((previous) => {
       const next = clone(previous);
-      if (previous.pricesLocked && !activeGroupId)
+      if (previous.pricesLocked && !activeGroupId &&
+          !(state.workflow?.shipments.some((ship) =>
+            ship.orderId === previous.id && !ship.legacyArchived) ?? false))
         next.billingHistory = [
           ...(next.billingHistory ?? []),
           billingSnapshot(previous, state, reason),
@@ -635,7 +653,12 @@ export function useOrderDesk({
     setItemEditing,
     itemEdit,
     activeShipment,
+    activeShipmentPreview,
     flowState,
+    flowReady,
+    flowSummaryReady,
+    flowSummaryError: nativeFlow.error || nativeBoard.error || nativeOrder.error,
+    orderPreview: nativeOrder.result,
     setProductSearch,
     edit,
     activeGroupId,
