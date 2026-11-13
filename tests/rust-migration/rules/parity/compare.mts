@@ -1757,15 +1757,20 @@ receptionCase("agency stage 1 blocked by unassigned evidence",s=>{
   o.confirmationSnapshot.recipients=copy(o.recipients);
   o.confirmationSnapshot.data.recipients=copy(o.recipients);
 },false);
-receptionCase("existing confirmed raw edited",s=>{
+receptionCase("existing confirmed raw edited",(s,before)=>{
+  before.orders[0].confirmedAt=now;
   s.orders[0].confirmedAt=now;s.orders[0].raw="변경됨";
 },false,"AGENCY",false);
-receptionCase("existing confirmed timestamp edited",s=>{
+receptionCase("existing confirmed timestamp edited",(s,before)=>{
+  before.orders[0].confirmedAt=now;
+  s.orders[0].confirmedAt="2020-01-01T00:00:00Z";
+},false,"AGENCY",false);
+receptionCase("existing confirmed snapshot edited",(s,before)=>{
+  before.orders[0].confirmedAt=now;
+  before.orders[0].confirmationSnapshot={at:now};
   s.orders[0].confirmedAt=now;
-},true,"AGENCY",false);
-receptionCase("existing confirmed snapshot edited",s=>{
-  s.orders[0].confirmationSnapshot={at:now};
-},true,"AGENCY",false);
+  s.orders[0].confirmationSnapshot={at:"2020-01-01T00:00:00Z"};
+},false,"AGENCY",false);
 receptionCase("existing order type changed",s=>{
   s.orders[0].orderType="DEALER";
 },false,"AGENCY",false);
