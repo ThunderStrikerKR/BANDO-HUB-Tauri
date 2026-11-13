@@ -1,14 +1,14 @@
 # TSBH Rust 이전 세션 1 — recognition 인계 기록
 
-**판정: Rust 컴파일 성공, 발주서 회귀 검증 실패/중단. 시연 빌드 통합 금지.**
+**최신 판정 (2026-11-13): Rust 독립 CI 50/50 통과, 발주서 20/20 통과, 등록 상품 360건 전수 테스트 수행. 잘못된 활성 SKU 확정 0건. 활성 상품 16건은 데이터/표기 모호성으로 미확정. TypeScript 전체 필드 동등성 및 Windows/Tauri 통합은 미검증.**
 
 ## 저장소와 커밋
 - 저장소: ThunderStrikerKR/TSBH (Public 변경 없음)
 - 독점 브랜치: migration/01-recognition
 - 공통 기준: d5ea8ed20b8120b844437263c2eb2b8963559e8d
 - 선행 모델 선택 구현: 3f8e062e1e049b5297b0fd78a285dad7a679d6f5
-- 마지막 소스 수정 커밋: 24e53a5acfc48301af14e5bf4a2fc201f5b20955
-- 마지막 **Rust 컴파일 확인 커밋: `61dc08d428c3447fc0336a0f793587aa04b1b5c8`**, GitHub Actions에서 컴파일 성공 후 테스트 실행 확인. 전체 테스트 통과는 아님.
+- 초기 소스 수정 기록: 24e53a5acfc48301af14e5bf4a2fc201f5b20955 (현재 최신은 문서 최하단 참조)
+- 초기 **Rust 컴파일 확인 커밋: `61dc08d428c3447fc0336a0f793587aa04b1b5c8`** (과거 이력). 최신 50개 회귀 통과 커밋은 문서 최하단 참조.
 - 작업 경로는 사용자 지정 허용 경로로 제한. 기존 TS 및 공통 Rust/설정 파일은 미수정.
 
 ## 담당 소스 및 구현 상태
@@ -43,7 +43,7 @@
 
 입력 상태가 잘못되거나 작업명이 지원되지 않으면 명시적 Err 반환.
 
-## 기존 코드와의 차이 및 위험
+## 기존 코드와의 차이 및 위험 (초기 조사 당시 기록)
 
 - 기존 TypeScript의 핵심 호출은 parser.ts의 parseEvidence → order-evidence.ts의 analyzeEvidence → parseLegacy. 상품 후보는 product-name-match.ts의 registeredNameCandidates 등과 별칭 판정.
 - Rust는 현 단계에서 **기능 동등성이 검증되지 않은 별도 구현**. 수량/수취인/주소/품목 매칭 결과를 비교해야 함.
@@ -55,7 +55,7 @@
 - 분할 주소, 일부 비정형 OCR 표, 브랜드/옵션별 정책, 모든 원문 케이스의 동등성 검증은 미완료.
 - TS 감사의 18/19/20번 오류는 선행 정보이며 Rust에서 고쳐졌다고 확인한 사실이 아님.
 
-## 실제 검증 결과
+## 실제 검증 결과 (초기 조사 당시 기록)
 
 확인:
 - 원격 브랜치와 지정 기준선 확인.
@@ -99,8 +99,8 @@
 - [x] 수량/주소/연락처/수취인/상품 근거 코드
 - [x] 실제 20건 원본 fixture를 참조하는 Rust 테스트 작성
 - [x] 독점 브랜치 소스 커밋
-- [x] Rust 컴파일 성공 (GitHub Actions, `61dc08d4`; 회귀 테스트는 미통과)
-- [x] 20건 Rust 회귀 실측: 원본 발주서 표본 20건 모두 합격 (커밋 f49015be / CI 43356394941)
+- [x] Rust 컴파일 및 전체 독립 테스트 성공 (GitHub Actions, 최신 50개 통과; 문서 최하단 확인)
+- [x] 20건 Rust 회귀 실측: 원본 발주서 표본 20건 모두 합격 (최신 CI 43364615494)
 - [ ] TS 결과/신규 오류 비교
 - [ ] JSON 스키마/기존 React 연결 실측
 - [ ] Windows/Tauri 최종 통합(세션 3)
@@ -211,3 +211,70 @@
 - 가격 스냅샷의 단가 원본과 세션 2 Rust 가격 엔진을 비교하는 통합 테스트, Windows Tauri 연동 및 EXE 빌드는 **미실행**.
 - 이 브랜치는 세션 1 인식 모듈만 수정했다. 다른 세션 파일의 병합, 앱 설정과 Cargo.toml 수정, 기존 TS 기준선 수정은 하지 않았다.
 - 임시 합성 데이터로 검사한 brand / catalog / requiresOption / 복수 옵션 관련 규칙은 초기 seed의 360개 단일 SKU만으로는 검증할 수 없으므로 별도 테스트를 유지해야 한다.
+
+
+## 2026-11-13: 상품 360건 실측 전수검사 결과 — 최신 상태
+
+### 검증 원본 및 범위
+
+- immutable 입력 데이터: src-tauri/resources/state-seed.json, blob b1d529237b8cea5a0b91eb8b826e94b5b607484f.
+- 총 상품 360개. 이 중 활성 358개, inactive=true 및 supersededBy가 지정된 후속 SKU 교체 2개.
+- 실제 Rust 실행 경로: tests/rust-migration/recognition/src/catalog_audit.rs가 src-tauri/src/business_core/recognition/mod.rs의 match_products를 호출. 가짜 엔진 및 예상값 하드코딩으로 전체 결과를 대체하지 않았다.
+- 시험 집합: 등록 상품명 360개 전부, 고유 모델명(이름의 첫 / 이전 부분을 공백 제거한 기준) 289개, 정상적으로 등록된 색상과 모델의 의미 있는 입력 조합 84개. 이전 데이터 단순 집계의 78개보다 실제 시험 조합이 큰 것은 한글 색상값과 영문 색상값의 정규화 범위를 확장했기 때문이다.
+- 중복 원본 데이터: 동일 상품명 7개 그룹, 총 14개 활성 SKU (마이크물림쇠 세트 관련); 해당 이름만으로 단일 SKU 확정 금지.
+- 등록 기본 색상 값 '색상 미표기' 267개. 이 중 이름에 색상 단서가 있으나 등록된 색상값과 불일치하는 사례도 존재.
+
+### 최종 동적 분석 실측
+
+- **검증 소스 SHA: c92de3fca0c80fa4b74db0484dc6b581aab37bf6**
+- **GitHub Actions run: https://github.com/ThunderStrikerKR/TSBH/actions/runs/43364615494**
+- **독립 Cargo test: 50 passed / 0 failed** (47개 기존 회귀/기타 테스트 + 전수감사 2개 + 등록 모델 접미 문자 보호 테스트 1개).
+- 원본 발주서 20건: **20/20 PASS**.
+- 등록명 360회 결과:
+  - 정확한 활성 SKU 확정: **328**
+  - 비활성/대체된 과거 SKU에서 등록된 후속 활성 상품으로 올바르게 연결: **2**
+  - 완전히 동일한 이름을 가진 복수 활성 SKU를 안전하게 미확정: **14**
+  - 개별 등록명으로도 확정 불가: **16**
+  - 잘못된 활성 SKU 선택: **0**
+  - 동일 이름에 대해 임의로 한 SKU를 선택한 사례: **0**
+  - 합계 328+2+14+16=360.
+- 모델명 289회: 고유 모델 확정 250, 미확정 39, 모델 계열 밖 잘못된 확정 0, 모호한 후보 임의 확정 0.
+- 모델+등록 색상 84회: 고유 SKU 확정 82, 미확정 2, 잘못된 확정 0, 모호한 후보 임의 확정 0.
+- 미확정 16건은 안전한 미확정이므로, **자동확정 정확도/안전성 시험 통과를 '360건 전부 자동확정 성공'으로 보고하지 말 것**.
+
+### 활성 상품 16건 미확정 목록 및 원인
+
+| 원인 | 상품 ID | 등록 상품명 |
+| --- | --- | --- |
+| 공백 정규화에 따른 다중 후보 | bando-site-81 | 마우스트레이 |
+| 상품명에 색상은 있으나 variant/defaultColor='색상 미표기' | bando-site-104 | BD 911R / 레드 |
+| 동상 | bando-site-337 | BD Floor-BTS / 블랙 / 높이 27cm |
+| 동상 | bando-site-334 | BD Desk-BTS / 블랙 / 높이 27cm |
+| 동상 | bando-site-324 | BD Floor TS-3 / 실버 / 높이 32cm |
+| 동상 | bando-site-323 | BD Floor TS-2 / 실버 / 높이 22cm |
+| 동상 | bando-site-322 | BD Floor TS-1 / 실버 / 높이 17cm |
+| 동상 | bando-site-321 | BD FloorJS-4BK / 블랙 / 자바라 길이 60cm |
+| 동상 | bando-site-320 | BD FloorJS-3BK / 블랙 / 자바라 길이 43cm |
+| 동상 | bando-site-319 | BD FloorJS-2BK / 블랙 / 자바라 길이 35cm |
+| 동상 | bando-site-252 | BD Desk IS-1 / 블랙 / Bar 길이 10cm |
+| 동상 | bando-site-251 | BD Desk IS-2 / 블랙 / Bar 길이 15cm |
+| 동상 | bando-site-250 | BD Desk IS-3 / 블랙 / Bar 길이 26cm |
+| 동상 | bando-site-249 | BD Desk TS-3 / 실버 / Bar 길이 32cm |
+| 동상 | bando-site-248 | BD Desk TS-2 / 실버 / Bar 길이 22cm |
+| 동상 | bando-site-247 | BD Desk TS-1 / 실버 / Bar 길이 15cm |
+
+### 근본 원인 수정 및 데이터 보호 정책
+
+- 이전 360건 감사에서 등록명만으로 미확정인 상품은 28, 잘못 연결된 것으로 잠정 분류된 2건이 있었다.
+- 검사 결과 그 2건은 실제로 active=false 및 supersededBy 지정이 존재했고, 정상 후속 SKU로 연결된 것임을 확인해 감사 기준을 교정했다.
+- 700W, 801C, 719B, 930BK 등의 정식 모델명 끝 문자(W/C/B/BK)를 실제 색상 약자로 재해석하던 Rust 버그는 원본 parser.ts::protectedCode에 맞춰 고쳤다. 해당 회귀 테스트를 고정했다. 이 변경 후 등록명 미확정 수가 28에서 16으로 감소했다.
+- 남은 15개 등록 색상 누락을 코드에서 임의로 'Black' 또는 'Silver'로 확정하여 테스트를 통과시키지 않았다. 상품 데이터 원본의 색상 표준화 확인이 필요하다.
+- 마우스트레이와 마우스 트레이는 공백 정규화로 동일해지므로 독립 SKU가 둘 다 활성인지 데이터 중복 점검 후 조치가 필요하다.
+- 독립 rust 모델 파일의 정규표현식 컴파일만 캐시했다. 후보 판단·업무 로직 조건을 바꾸지 않는 성능 개선이며 Rust CI 50개 전체 재검증을 수행했다.
+
+### 세션 경계와 남은 검증
+
+- 작업은 src-tauri/src/business_core/recognition/** 및 tests/rust-migration/recognition/**, 이 문서 경로로 한정했다.
+- 상품 원본 seed, TS 원본, 별도 세션 2 가격/운임, 세션 3 Tauri 연동, 공통 설정 파일은 수정하지 않았다.
+- 이번 테스트는 Rust 360개 실데이터 인식 검증이다. **TypeScript와 Rust의 동일 JSON 출력 전체 필드 differential 검증은 아직 미수행.**
+- Windows Tauri/React 실행 및 엔진 통합, 운영 SQLite 실측은 세션 3 소관이며 이번 시험 범위 밖.
