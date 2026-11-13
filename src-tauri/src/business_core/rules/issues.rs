@@ -95,7 +95,7 @@ struct Info<'a>{
     resolution:Option<&'a str>,
 }
 fn emit(result:&mut Vec<Value>,order:&Value,info:Info<'_>){
-    let Info{row,item,kind,title,evidence,field,stage,customer,resolution}=info;
+    let Info{row,item,kind,title,evidence,field:field_name,stage,customer,resolution}=info;
     let id=issue_id(order,row,item,kind);
     let evidence=js_evidence(evidence);
     let decision=field(order,"issueResolutions").get(&id);
@@ -136,10 +136,10 @@ fn emit(result:&mut Vec<Value>,order:&Value,info:Info<'_>){
     if let Some(item)=item {let _=set(&mut issue,"itemId",field(item,"id").clone());}
     if let Some(row)=row{
         let key=item.map(|i|str_field(i,"id")).unwrap_or_else(||str_field(row,"id"));
-        let _=set(&mut issue,"linkKey",json!(format!("{key}:{field}")));
+        let _=set(&mut issue,"linkKey",json!(format!("{key}:{field_name}")));
     }
     let sources=item.and_then(|i|i.get("sources")).or_else(||row.and_then(|r|r.get("sources")));
-    if let Some(span)=sources.and_then(|s|rows(s).iter().find(|v|str_field(v,"field")==field)){
+    if let Some(span)=sources.and_then(|s|rows(s).iter().find(|v|str_field(v,"field")==field_name)){
         let _=set(&mut issue,"sourceSpan",span.clone());
     }
     if let Some(customer)=customer{let _=set(&mut issue,"customer",json!(customer));}
