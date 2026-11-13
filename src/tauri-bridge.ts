@@ -5,7 +5,7 @@ import { invoke } from "@tauri-apps/api/core";
 
 /** Shared Tauri IPC entry point; domain operations remain checked by Rust. */
 export function businessCoreCall<T>(
-  domain: "recognition" | "rules" | "output",
+  domain: "recognition" | "rules" | "output" | "catalog_clients",
   operation: string,
   payload: unknown,
 ): Promise<T> {
@@ -13,10 +13,10 @@ export function businessCoreCall<T>(
 }
 
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import type { Api, State, CatalogReport, OcrCapture } from "./types";
+import type { Api, State, CatalogReport, OcrCapture, OfficialLink, ImportPreview } from "./types";
 import productImages from "./tauri-product-images.json";
-import { parseOfficialProductPage } from "./official-product-import";
-import { officialLinksFromSnapshot } from "./official-links";
+
+
 
 const notReady = (feature: string): never => {
   throw new Error(`${feature} 기능은 아직 구현되지 않았습니다.`);
@@ -91,11 +91,21 @@ const api: Api = {
   previewImport: async (url) => {
     const html = await invoke<string>("fetch_official_product_html", { target: url });
     const state = await invoke<State>("state_load");
-    return parseOfficialProductPage(url, html, state);
+    return businessCoreCall<ImportPreview>("catalog_clients", "preview_official_product_html", {
+      state, url, html, now: new Date().toISOString(),
+      productId: crypto.randomUUID(), variantId: crypto.randomUUID(),
+    });
   },
   // Suggests links from the bundled historical catalog; individual previews
   // still fetch their official product detail pages live.
-  officialList: async () => officialLinksFromSnapshot(await invoke<CatalogReport>("catalog_report")),
+  officialList: async () => {
+    const links = await businessCoreCall<OfficialLink[]>("catalog_clients", "official_links", {
+      report: await invoke<CatalogReport>("catalog_report"),
+    });
+    // Presentation-only sorting: business URL validation and deduplication
+    // are authoritative in Rust, matching the original Korean UI ordering.
+    return links.sort((a,b) => a.name.localeCompare(b.name,"ko"));
+  },
   mobileStart: async () => notReady("스마트폰 연동"),
   mobileStop: async () => notReady("스마트폰 연동"),
   mobileStatus: async () => ({ running: false, urls: [] }),

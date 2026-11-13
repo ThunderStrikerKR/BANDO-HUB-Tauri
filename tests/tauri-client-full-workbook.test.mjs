@@ -147,7 +147,11 @@ test("client Excel is native saved, previewed, backed up, and revision checked",
   assert.match(bridge, /invoke<string \| null>\("save_client_workbook"/);
   assert.match(manager, /<ClientWorkbookTools onSave=\{onSave\}/);
   assert.match(ui, /await exportClientWorkbook\(current\)/);
-  assert.match(ui, /await previewClientWorkbook\(current, file\)/);
+  const adapter=read("src/native-client-workbook.ts");
+  const native=read("src-tauri/src/business_core/catalog_clients/client_preview.rs");
+  assert.match(ui, /await previewNativeClientWorkbook\(current, file\)/);
+  assert.match(adapter, /"catalog_clients", "preview_client_rows"/);
+  assert.match(native, /fn collision\(/);
   assert.match(ui, /await window\.bando!\.backup\(\)/);
   assert.match(ui, /await onSave\(next\)/);
   assert.doesNotMatch(manager, /<BulkTools kind="clients"/);

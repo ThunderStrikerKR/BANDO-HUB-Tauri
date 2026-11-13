@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { confirmAction } from "./dialogs";
 import { won } from "./domain";
-import { applyOfficialProductPreview, leafCategories } from "./official-product-import";
+import { leafCategories } from "./official-product-import";
+import { businessCoreCall } from "./tauri-bridge";
 import type { NoticeSink } from "./shared/notices";
 import { useAsyncTask } from "./shared/useAsyncTask";
 import type { ImportPreview, OfficialLink, State } from "./types";
@@ -40,7 +41,12 @@ export function ProductImports({
     const title = preview.existingId ? "기존 상품의 공식 소매가만 변경" : "새 상품 등록";
     if (!(await confirmAction(title + "을 진행할까요? 도매가와 반도매가는 수정하지 않습니다."))) return;
     const latest = await window.bando!.load();
-    const result = applyOfficialProductPreview(latest, preview, categoryId || undefined);
+    const result = await businessCoreCall<{ next: State; created: boolean }>(
+      "catalog_clients", "apply_official_product_import", {
+        state: latest, preview, selectedCategoryId: categoryId || undefined,
+        historyAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      },
+    );
     // Keep a consistent copy of user data before changing the canonical state.
     await window.bando!.backup();
     await onSave(result.next);

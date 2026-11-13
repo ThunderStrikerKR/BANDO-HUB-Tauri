@@ -3,10 +3,10 @@ import { confirmDiscardDraft } from "./shared/editor-flow";
 import { useState } from "react";
 import { ProductSearchDialog } from "./ProductSearchDialog";
 import { nativeResolveProduct } from "./orders/native-rules";
-import { suggestGroupRepresentative } from "./model-groups";
+import { useNativeCatalogQuery, useNativeProductIds } from "./native-catalog-queries";
 import { internalModel } from "./matching";
 import { colorLabel } from "./product-models";
-import { representativeProducts } from "./product-search";
+
 import type { NoticeSink } from "./shared/notices";
 import type { Item, Order, Product, Recipient, State } from "./types";
 import { Modal } from "./ui";
@@ -37,6 +37,13 @@ export function IssueResolver({
     [confirmed, setConfirmed] = useState(false),
     [busy, setBusy] = useState(false),
     [useRepresentativeModel, setUseRepresentativeModel] = useState(false);
+  // The Rust engines decide historical suggestions and the representative.
+  // The React screen only presents returned products for explicit staff choice.
+  const { products: historicalCandidates, error: recommendationError } = useNativeProductIds(
+    state, "representative_products", {
+      text: item.raw, clientId: order.clientId,
+    }, [item.raw, order.clientId],
+  );
   const candidates = [
     ...new Map(
       [
@@ -51,7 +58,7 @@ export function IssueResolver({
               p.catalog !== "DEMO" &&
               !p.variants.some((v) => v.source === "DEMO"),
           ),
-        ...representativeProducts(state, item.raw, order.clientId),
+        ...historicalCandidates,
       ]
         .filter((p) => p.catalog !== "DEMO" && !p.variants.some((v) => v.source === "DEMO"))
         .map((p) => [p.id, p]),
@@ -60,7 +67,12 @@ export function IssueResolver({
   const exactCandidates = (item.productCandidates ?? [])
     .map(candidate => state.products.find(product => product.id === candidate.productId))
     .filter((product): product is Product => !!product);
-  const representativeGuidance = suggestGroupRepresentative(state, exactCandidates);
+  const {value: representativeGuidance, error: groupRecommendationError} =
+    useNativeCatalogQuery<{groupId: string; productId: string; productName: string} | null>(
+      state, "suggest_group_representative", {
+        candidateIds: exactCandidates.map((p) => p.id),
+      }, [exactCandidates.map((p) => p.id).join("|")], null,
+    );
   const representativeCandidate = representativeGuidance
     ? candidates.find(product => product.id === representativeGuidance.productId)
     : undefined;
@@ -78,6 +90,8 @@ export function IssueResolver({
             중복 / 오독 항목 제거
           </button>
         )}
+        {(recommendationError || groupRecommendationError) &&
+          <p role="alert" className="warnings">{recommendationError || groupRecommendationError}</p>}
         <p className="resolver-progress">{step} / 3 단계</p>
         <ol className="resolver-steps">
           {step === 1 && (

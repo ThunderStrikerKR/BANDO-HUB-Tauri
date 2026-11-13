@@ -1,7 +1,9 @@
 import { useRef, useState } from "react";
 import { confirmAction } from "./dialogs";
+import { previewNativeClientWorkbook } from "./native-client-workbook";
+import { businessCoreCall } from "./tauri-bridge";
 import {
-  applyClientWorkbook, exportClientWorkbook, previewClientWorkbook,
+  exportClientWorkbook,
   type ClientWorkbookPreview,
 } from "./client-workbook";
 import type { NoticeSink } from "./shared/notices";
@@ -42,7 +44,7 @@ export function ClientWorkbookTools({
       setPreview(undefined);
       setAccepted(false);
       const current = await window.bando!.load();
-      const result = await previewClientWorkbook(current, file);
+      const result = await previewNativeClientWorkbook(current, file);
       setPreview(result);
       setFileName(file.name);
     });
@@ -55,7 +57,9 @@ export function ClientWorkbookTools({
       "건을 저장할까요? 기존 거래처, 주문과 특수 단가는 보존합니다."
     ))) return;
     const current = await window.bando!.load();
-    const { next, created, updated } = applyClientWorkbook(current, preview);
+    const { next, created, updated } = await businessCoreCall<{
+      next: State; created: number; updated: number;
+    }>("catalog_clients", "apply_client_workbook", { state: current, preview });
     await window.bando!.backup();
     await onSave(next);
     // The common save already applied the committed SQLite snapshot.

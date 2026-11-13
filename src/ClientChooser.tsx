@@ -1,5 +1,5 @@
-import { useMemo, useRef, useState } from "react";
-import { clientCandidates } from "./domain";
+import { useRef, useState } from "react";
+import { useNativeClients } from "./native-catalog-queries";
 import { readableError } from "./errors";
 import { TierBadge } from "./ManagementUI";
 import type { Client } from "./types";
@@ -19,10 +19,8 @@ export function ClientChooser({
   const [query, setQuery] = useState(""),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
-  const rows = useMemo(
-    () => (query.trim() ? clientCandidates(query, clients) : clients.filter((c) => !c.deletedAt)),
-    [query, clients],
-  );
+  const {results: matches, error: searchError, pending} = useNativeClients(clients, query);
+  const rows = query.trim() ? matches : clients.filter((c) => !c.deletedAt);
   return (
     <Modal
       title="거래처 변경"
@@ -49,12 +47,12 @@ export function ClientChooser({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
-        {error && (
+        {(error || searchError) && (
           <p role="alert" className="warnings">
-            {error}
+            {error || searchError}
           </p>
         )}
-        <small>{rows.length}개 거래처</small>
+        <small>{pending && query.trim() ? "검색 중" : rows.length + "개 거래처"}</small>
         <div className="client-chooser-list">
           {rows.map((c) => (
             <button
