@@ -117,6 +117,26 @@ for(const [query,clientId,major,brand] of [
   add("product search "+query+"/"+clientId+"/"+major,"search_products",
     {state:s,query,clientId,major,brand,excludeDemo:true},()=>oracle);
 }
+for(const [category,brand,query,missing] of [
+  ["","","",false],["보면대","","",false],["보면대","","BD 709",false],
+  ["","","BD",true],["마이크 스탠드","","마이크",false],
+  ["","","없는상품",false],["","brand1","",false],
+]){
+  const s=state();
+  s.products.find(p=>p.id==="p709b").variants[0].retail=null;
+  s.products.find(p=>p.id==="pD").deletedAt="2026-11-10";
+  const classified=new Set(classifiedProducts(s,category,"",brand).map(p=>p.id));
+  const expected=s.products.filter(p=>
+    !p.deletedAt && !p.supersededBy &&
+    p.catalog!=="DEMO" && !p.variants.some(v=>v.source==="DEMO") &&
+    classified.has(p.id) &&
+    (p.name+" "+(p.subtitle??"")).toLowerCase().replace(/\\s/g,"")
+      .includes(query.toLowerCase().replace(/\\s/g,"")) &&
+    (!missing || p.variants.some(v=>!v.wholesale||!v.semi||!v.retail))
+  ).map(p=>p.id);
+  add("management products "+category+"/"+query+"/"+missing,"management_products",
+    {state:s,category,brand,query,missing},()=>expected);
+}
 for(const text of ["보면대","악보대","마이크","키보드 스탠드","없는 모델","709"]){
   const s=state();
   add("representative "+text,"representative_products",{state:s,text,clientId:"c1"},
