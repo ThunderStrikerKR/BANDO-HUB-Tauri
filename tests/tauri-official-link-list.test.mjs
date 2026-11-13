@@ -46,7 +46,8 @@ test("duplicates, unrecognized IDs and unsafe URLs are excluded",()=>{
 });
 test("bridge and screen load cached snapshot but fetch live official detail separately",()=>{
   const bridge=read("src/tauri-bridge.ts"), ui=read("src/ProductImports.tsx");
-  assert.match(bridge,/officialList: async \(\) => businessCoreCall\("catalog_clients", "official_links"/);
+  assert.match(bridge,/businessCoreCall<OfficialLink\[\]>\("catalog_clients", "official_links"/);
+  assert.match(bridge,/links\.sort\(\(a,b\) => a\.name\.localeCompare\(b\.name,"ko"\)\)/);
   assert.match(bridge,/fetch_official_product_html/);
   assert.doesNotMatch(bridge,/officialList: async \(\) => notReady/);
   assert.match(ui,/내장 수집본에서 상품 찾기/);
