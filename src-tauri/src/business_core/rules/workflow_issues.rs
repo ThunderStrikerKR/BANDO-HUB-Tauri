@@ -233,7 +233,7 @@ pub(super) fn workflow_issues(state:&Value,group_id:&str)->Result<Vec<Value>,Str
     Ok(issues)
 }
 fn won(value:Option<i64>)->String{
-    let Some(value)=value else{return "금액 미확정".into()};
+    let Some(value)=value else{return "확인 필요".into()};
     let chars=value.to_string();
     let parts=chars.chars().rev().enumerate().map(|(i,ch)|
         if i>0&&i%3==0{format!(",{ch}")}else{ch.to_string()})
@@ -243,8 +243,12 @@ fn won(value:Option<i64>)->String{
 pub(super) fn stage_issues(state:&Value,group_id:&str,next:i64)->Result<Vec<String>,String>{
     let (_,ships)=active_shipments(state,group_id)?;
     let (first_order,_) = context(state,ships[0])?;
-    let client=w::party(state,first_order)
-        .ok_or("배송 건의 발주서 / 수취인 / 거래처 연결을 확인하세요.")?;
+    // orderParty in TypeScript synthesizes the house client for a retail
+    // order even if it has no dealer ID and no client snapshot.
+    let retail_company=json!({"payment":"POSTPAID"});
+    let client=w::party(state,first_order).or_else(||{
+        (str_field(first_order,"orderType")=="RETAIL").then_some(&retail_company)
+    }).ok_or("배송 건의 발주서 / 수취인 / 거래처 연결을 확인하세요.")?;
     let wf_issues=workflow_issues(state,group_id)?;
     let mut messages=Vec::new();
     for issue in wf_issues {
