@@ -34,6 +34,8 @@ jobs:
         run: node --test tests/rust-migration/catalog-clients/parity.test.mjs
       - name: Compare complete client workbook row previews with original TS
         run: node --test tests/rust-migration/catalog-clients/client-preview-parity.test.mjs
+      - name: Compare product registration previews with original XLSX TS
+        run: node --test tests/rust-migration/catalog-clients/registration-preview-parity.test.mjs
 
   frontend-regression:
     runs-on: ubuntu-latest
