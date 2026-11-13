@@ -201,7 +201,7 @@ export function ColorGuidanceManager({state,onRefresh,query="",onQueryChange}: {
           </div>
         </div>
       </>:<p className="muted">모델군을 만든 다음 상품을 추가하고 대표모델을 직접 지정하세요.</p>}
-      {active && <footer className="family-editor-footer">
+      {(active || unsaved) && <footer className="family-editor-footer">
         <span role="status" className="muted">{status||(unsaved?"저장하지 않은 변경사항 있음":"변경사항 없음")}</span>
         <div className="family-footer-actions">
           <Button disabled={busy} onClick={()=>void closeEditor()}>닫기</Button>
