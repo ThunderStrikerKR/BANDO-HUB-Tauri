@@ -138,6 +138,110 @@ add("full reconcile output (must match decision synchronization)","reconcile_wor
   state:beforeReconcile,now,eventIds:[]},
   ()=>({state:reconcileWorkflow(beforeReconcile as any),emittedEvents:0}));
 
+
+const frozenOrder:any=copy(order),frozenClient:any=copy(client);
+frozenClient.shippingFeeExcluded=true;
+frozenOrder.confirmedAt=now;
+frozenOrder.pricesLocked=true;
+frozenOrder.clientSnapshot=frozenClient;
+frozenOrder.vatAmount=3000;
+add("frozen VAT and dealer fee terms","calculate_price",{
+  order:frozenOrder,client},()=>totals(frozenOrder,frozenClient));
+
+const unknownProduct:any=copy(order);
+unknownProduct.recipients[0].items[0].productId="unregistered";
+add("unknown product has manual shipping","calculate_shipping",{
+  order:unknownProduct,state:baseState
+},()=>recommendShipping(unknownProduct,baseState as any));
+
+const zeroQuantity:any=copy(order);
+zeroQuantity.recipients[0].items[0].quantity=0;
+add("zero quantity is not a priceable bundle","calculate_shipping",{
+  order:zeroQuantity,state:baseState
+},()=>recommendShipping(zeroQuantity,baseState as any));
+
+const negativeQuantity:any=copy(order);
+negativeQuantity.recipients[0].items[0].quantity=-2;
+add("negative quantity exact baseline outcome","calculate_shipping",{
+  order:negativeQuantity,state:baseState
+},()=>recommendShipping(negativeQuantity,baseState as any));
+
+const dualOrigin:any=copy(order);
+const storeItem:any=copy(item);
+storeItem.id="store-item";
+storeItem.origin="STORE";
+storeItem.name="가상 매장 상품";
+storeItem.productId="store-p";
+storeItem.variantId="store-v";
+storeItem.quantity=1;
+dualOrigin.recipients[0].items.push(storeItem);
+const dualState:any=copy(baseState);
+dualState.products.push({
+  ...copy(product),id:"store-p",name:"가상 매장 상품",
+  origin:"STORE",shippingGroupId:"store-group",
+  variants:[{id:"store-v",color:"Black",retail:15000,semi:14000,wholesale:13000}]
+});
+dualState.shipping.groups.push({
+  id:"store-group",name:"매장 포장",
+  current:{version:"store-v1",at:now,maxBundle:null,maxConfirmed:false,
+    fees:{"1":2500},perItem:null,notes:"가상 매장"},
+  history:[]
+});
+add("mixed STORE FACTORY bundles","calculate_shipping",{
+  order:dualOrigin,state:dualState
+},()=>recommendShipping(dualOrigin,dualState));
+
+const multipleRecipients:any=copy(order);
+const otherRecipient:any=copy(recipient);
+otherRecipient.id="r2";
+otherRecipient.name="가상 수취인 2";
+multipleRecipients.recipients.push(otherRecipient);
+add("two recipients and independent shipping","calculate_shipping",{
+  order:multipleRecipients,state:baseState
+},()=>recommendShipping(multipleRecipients,baseState as any));
+
+const duplicateConfirmation:any=copy(baseState);
+duplicateConfirmation.workflow.confirmations=[
+  {id:"confirm-1",groupId:"group:o1",dealerId:"dealer-1",
+    amount:0,allocations:[],shipmentIds:[]},
+  {id:"confirm-1",groupId:"group:o1",dealerId:"dealer-1",
+    amount:0,allocations:[],shipmentIds:[]}
+];
+add("duplicate confirmation ID rejection","validate_workflow",{
+  state:duplicateConfirmation
+},()=>{validateWorkflow(duplicateConfirmation);return {valid:true};});
+
+const immutableBefore:any=copy(baseState);
+immutableBefore.workflow.queue.push({
+  id:"excel-1",shipmentId:"shipment:o1:r1",origin:"FACTORY",
+  at:now,actor:"가상 담당자",status:"EXPORTED",
+  snapshot:{total:34000,subtotal:30000,shipping:4000,vat:0}
+});
+const immutableAfter:any=copy(immutableBefore);
+immutableAfter.workflow.queue[0].snapshot.total=1;
+add("exported billing snapshot cannot be rewritten","validate_workflow",{
+  state:immutableAfter,before:immutableBefore
+},()=>{validateWorkflow(immutableAfter,immutableBefore);return {valid:true};});
+
+const missingRecipientName:any=copy(baseState);
+delete missingRecipientName.workflow;
+missingRecipientName.orders[0].recipients[0].name="";
+add("reconciliation synchronizes missing receiver issue","reconcile_workflow",{
+  state:missingRecipientName,now,eventIds:[]
+},()=>({state:reconcileWorkflow(missingRecipientName),emittedEvents:0}));
+
+const staleDecision:any=copy(baseState);
+delete staleDecision.workflow;
+staleDecision.orders[0].issueResolutions={
+  "issue:o1:r1:item1:OPTION":{
+    resolution:"UNRESOLVED",resolutionSource:"직원",
+    evidence:"stale-option",updatedAt:now
+  }
+};
+add("reconciliation resolves obsolete issue decision","reconcile_workflow",{
+  state:staleDecision,now,eventIds:[]
+},()=>({state:reconcileWorkflow(staleDecision),emittedEvents:0}));
+
 function normalized(v:unknown):string {
   if(Array.isArray(v))return "["+v.map(normalized).join(",")+"]";
   if(v&&typeof v==="object") {
