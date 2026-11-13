@@ -11,7 +11,6 @@ import { Field, Modal } from "./ui";
 import { blocking, orderIssues } from "./validation";
 import {
   groupShipments,
-  groupStep,
   paymentBalance,
   shipmentContext,
 } from "./workflow";
@@ -96,9 +95,11 @@ export function WorkflowBoard({
   useEffect(() => {
     const id = hoveredGroup.current;
     if (!id) return;
-    const step = groupStep(state, id);
+    if (!ready) return;
+    const step = native.byId[id]?.step;
+    if (step === undefined) return;
     onStageHover?.(step < 4 ? { groupId: id, step: step + 1 } : undefined);
-  }, [state.workflow, onStageHover]);
+  }, [ready, native.byId, onStageHover]);
   const [collapsed, setCollapsed] = useState<string[]>([]),
     [busy, setBusy] = useState(false),
     [manage, setManage] = useState<string>();
@@ -152,7 +153,7 @@ export function WorkflowBoard({
     } catch (e) {
       const issue = native.ready && stageGroupId
         ? native.byId[stageGroupId]?.issues.find((issue) =>
-            blocking(issue, Math.min(4, groupStep(state, stageGroupId) + 1)),
+            blocking(issue, Math.min(4, native.byId[stageGroupId]?.nextStep ?? 4)),
           )
         : undefined;
       if (stageGroupId && issue) {
@@ -194,7 +195,7 @@ export function WorkflowBoard({
       {groups.map((g) => {
         const nativeGroup = native.byId[g.id];
         const ss = groupShipments(state, g.id),
-          step = groupStep(state, g.id),
+          step = nativeGroup?.step ?? 0,
           first = shipmentContext(state, ss[0]),
           open = !collapsed.includes(g.id),
           selected = selection?.groupId === g.id;
@@ -291,7 +292,7 @@ export function WorkflowBoard({
             </header>
             {first.order.orderType !== "RETAIL" && (
               <div className="workflow-progress">
-                <SignalLights step={step} notice={g.needsNotice} />
+                {ready && nativeGroup && <SignalLights step={step} notice={g.needsNotice} />}
                 {step === 3 && (
                   <b className="waiting-payment">{won(nativeGroup?.totals.total ?? null)}</b>
                 )}
@@ -563,7 +564,7 @@ function GroupManagement({
                   {groupShipments(state, t.id)
                     .map((s) => shipmentContext(state, s).recipient.name)
                     .join(", ")}{" "}
- / {groupStep(state, t.id)}/4 / {won(native.byId[t.id]?.totals.total ?? null)}
+ / {native.byId[t.id]?.step ?? "—"}/4 / {won(native.byId[t.id]?.totals.total ?? null)}
                 </option>
               ))}
             </select>
