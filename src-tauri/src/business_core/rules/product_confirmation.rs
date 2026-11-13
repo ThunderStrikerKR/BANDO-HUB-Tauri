@@ -3,6 +3,7 @@
 use regex::Regex;
 use serde_json::{json,Value};
 use std::collections::HashSet;
+use unicode_normalization::UnicodeNormalization;
 use super::{field,find_by_id,flag,has_value,req,required_str,rows,set,str_field};
 
 fn active(product:&Value)->bool {
@@ -38,7 +39,7 @@ fn color_label(value:&str)->String{
     normalized.to_string()
 }
 fn key(s:&str)->String {
-    let upper=s.chars().flat_map(char::to_uppercase).filter(|c|!c.is_whitespace())
+    let upper=s.nfkc().flat_map(char::to_uppercase).filter(|c|!c.is_whitespace())
         .collect::<String>();
     upper.strip_prefix("BD").unwrap_or(&upper).to_string()
 }
@@ -199,7 +200,7 @@ fn validate_color_group(state:&Value,ids:&Value,representative:&str)->Result<(),
 }
 fn quantity_text(raw:&str,source:bool)->String{
     let pattern=if source {
-        r"\s*(?:\d+)\s*(?:개|대|세트|ea).*$"
+        r"(?i)\s*(?:\d+)\s*(?:개|대|세트|ea).*$"
     }else{
         r"\s*\d+\s*(?:개|대).*$"
     };
