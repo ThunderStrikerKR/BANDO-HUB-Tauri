@@ -260,6 +260,40 @@ pub(super) fn shipping_action(payload: &Value) -> Result<Value, String> {
             }
             Ok(json!({"shipping":shipping}))
         }
+        "save_group_rule" => {
+            // Port of ShippingManager::saveEditedRule. Preserve the old
+            // current rate as immutable history, and leave other groups
+            // untouched. The caller supplies version and timestamp.
+            let mut shipping=req(payload,"shipping")?.clone();
+            let group_id=required_str(payload,"groupId")?;
+            let rule=req(payload,"rule")?;
+            let over_limit=field(rule,"maxBundle").as_f64().is_some_and(|max| {
+                field(rule,"fees").as_object().is_some_and(|fees| fees.iter().any(|(count,fee)| {
+                    fee.is_number() && count.parse::<f64>().is_ok_and(|qty|qty>max)
+                }))
+            });
+            if over_limit {
+                return Err("최대 묶음 수량을 초과하는 운임 구간을 확인하세요.".into());
+            }
+            let version=required_str(payload,"versionId")?;
+            let at=required_str(payload,"now")?;
+            let index=rows(field(&shipping,"groups")).iter()
+                .position(|g|str_field(g,"id")==group_id)
+                .ok_or("수정할 운임 그룹이 없습니다.")?;
+            let previous=field(&shipping["groups"][index],"current").clone();
+            shipping["groups"][index]["history"].as_array_mut()
+                .ok_or("그룹 운임 변경 이력을 확인하세요.")?.push(previous);
+            let mut next=rule.clone();
+            set(&mut next,"maxConfirmed",json!(!field(rule,"maxBundle").is_null()))?;
+            set(&mut next,"version",json!(version))?;
+            set(&mut next,"at",json!(at))?;
+            let object=next.as_object_mut().ok_or("운임 규칙 형식 오류")?;
+            for field in ["validFrom","validUntil","basis","packable"] {
+                object.remove(field);
+            }
+            set(&mut shipping["groups"][index],"current",next)?;
+            Ok(json!({"shipping":shipping}))
+        }
         "save_combination" => {
             let mut shipping=req(payload,"shipping")?.clone();
             let bundle=req(payload,"bundle")?;
