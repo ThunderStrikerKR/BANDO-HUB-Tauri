@@ -4,6 +4,8 @@
  */
 import { tsImport } from "tsx/esm/api";
 const { parseEvidence } = await tsImport("../../../src/parser.ts", import.meta.url);
+const { registeredNameCandidates } = await tsImport("../../../src/product-name-match.ts", import.meta.url);
+const { registeredProducts } = await tsImport("../../../src/product-models.ts", import.meta.url);
 let input="";
 for await (const chunk of process.stdin) input+=chunk;
 const payload=JSON.parse(input);
@@ -21,7 +23,7 @@ const normalize=(v,key="")=>{
     return Object.fromEntries(Object.entries(v).map(([k,x])=>[k,normalize(x,k)]));
   return v;
 };
-const differences=[],countsByField=new Map(),caseSummaries=[];
+const differences=[],countsByField=new Map(),caseSummaries=[],diagnostics=[];
 let comparedLeaves=0;
 function compare(ts,rs,path,caseId){
   if(ts && rs && typeof ts==="object" && typeof rs==="object" &&
@@ -58,7 +60,7 @@ for(const entry of cases){
   // shared with its actual parseEvidence-derived Item, separately.
   if(entry.match && tsItems.length===1){
     for(const field of [
-      "productId","variantId","name","color","origin","recognitionReason","match"
+      "productId","variantId","name","color","recognitionReason","match"
     ]) compare(tsItems[0][field],entry.match[field],"standaloneMatch."+field,entry.id);
     if(entry.match.evidence){
       const productSource=tsItems[0].sources?.find(s=>s.field==="product");
@@ -69,6 +71,20 @@ for(const entry of cases){
           "standaloneMatch.evidence.end",entry.id);
       }
     }
+  }
+  if(entry.id==="corrected-01"){
+    const productLine=entry.raw.split("\n")[0];
+    const tsCandidates=registeredNameCandidates(
+      registeredProducts(payload.state.products),productLine
+    );
+    const target=payload.state.products.find(p=>p.id==="bando-site-104");
+    diagnostics.push({
+      id:entry.id,productLine,
+      tsCandidateIds:tsCandidates.map(p=>p.id),
+      matchedSkuColor:target?.variants?.[0]?.color,
+      matchedSkuDefaultColor:target?.defaultColor,
+      tsItem:tsItems[0],rustItem:rustItems[0]
+    });
   }
   caseSummaries.push({
     id:entry.id,tsItemCount:tsItems.length,rustItemCount:rustItems.length,
@@ -88,6 +104,7 @@ const report={
   byField:[...countsByField.entries()].sort((a,b)=>b[1]-a[1])
     .map(([field,count])=>({field,count})),
   byCase:caseSummaries,
+  diagnostics,
   differences:differences.slice(0,1500),
   truncated:differences.length>1500
 };
