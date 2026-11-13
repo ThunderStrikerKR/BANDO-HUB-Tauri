@@ -909,6 +909,132 @@ pub(super) fn apply(payload:&Value)->Result<Value,String> {
                 Value::Null,json!(account_id.unwrap_or("AUTO")),group_id)?;
             Ok(json!({"state":state,"accountMode":mode,"accountId":account_id}))
         }
+        "complete_delivery" => {
+            let shipment_id=required_str(payload,"shipmentId")?;
+            let (si,oi,ri)=shipment_indices(&state,shipment_id)?;
+            if !flag(&state["workflow"]["shipments"][si],"transferred") {
+                return Err("발송 처리한 배송 건을 선택하세요.".into());
+            }
+            if has_value(field(&state["workflow"]["shipments"][si],"delivery")) {
+                return Ok(json!({"state":state,"unchanged":true}));
+            }
+            let order=state["orders"][oi].clone();
+            let recipient=state["orders"][oi]["recipients"][ri].clone();
+            let ship=state["workflow"]["shipments"][si].clone();
+            let origins=row_origins(&recipient);
+            for q in rows(field(&state["workflow"],"queue"))
+                .iter().filter(|q|str_field(q,"shipmentId")==shipment_id) {
+                if str_field(q,"status")=="EXPORTED" && flag(q,"fileOnly") {
+                    return Err("실제 공장 전달 확인 후 배송 완료를 처리하세요.".into());
+                }
+                if str_field(q,"status")=="QUEUED" {
+                    return Err("공장 전달 또는 매장 발송 확인 후 배송 완료를 기록하세요.".into());
+                }
+            }
+            let actual=req(payload,"actual")?;
+            for origin in &origins {
+                if safe(field(actual,origin)).is_none() {
+                    return Err("출고지별 실제 택배 운임을 확인하세요.".into());
+                }
+            }
+            if !has_value(field(&state,"shipping")) {
+                return Err("배송 완료에 적용할 운임표가 없습니다.".into());
+            }
+            let mut order_single=order.clone();
+            set(&mut order_single,"recipients",json!([recipient]))?;
+            let reco=super::shipping::recommend(&order_single,&state)?;
+            let bundles=rows(field(&reco,"bundles")).to_vec();
+            let combo_ids=rows(req(payload,"combinationIds")?);
+            let delivery_ids=rows(req(payload,"deliveryIds")?);
+            if bundles.len()!=combo_ids.len() || bundles.len()!=delivery_ids.len() {
+                return Err("출고지별 운임 확인 기록 ID가 누락되었습니다.".into());
+            }
+            let now=required_str(payload,"now")?.to_string();
+            let actor=if str_field(payload,"actor").is_empty() {"직원(이름 미설정)"}
+                else {str_field(payload,"actor")}.to_string();
+            let group_id=str_field(&ship,"groupId").to_string();
+            let mut record_ids=Vec::new();
+            let mut versions=serde_json::Map::new();
+            let confirmed_version=if has_value(field(&ship,"confirmedFreightVersion")) {
+                field(&ship,"confirmedFreightVersion").clone()
+            } else {field(&reco,"version").clone()};
+            for (index,bundle) in bundles.iter().enumerate() {
+                let origin=str_field(bundle,"origin");
+                let amount=safe(field(actual,origin))
+                    .ok_or("출고지별 실제 택배 운임을 확인하세요.")?;
+                let charged=if shipment_freight_code(&order,&order_single["recipients"][0])=="020" {
+                    0
+                } else {
+                    safe(field(field(&ship,"charges"),origin))
+                        .ok_or("청구 운임 확인 필요")?
+                };
+                let applied=if has_value(field(&ship,"latestRecipient")) {None}
+                    else {rows(field(&ship,"appliedBundles")).iter()
+                        .find(|b|str_field(b,"origin")==origin)};
+                let key=applied.map(|v|field(v,"key")).unwrap_or_else(||field(bundle,"key")).clone();
+                let basis_versions=applied.map(|v|field(v,"versions"))
+                    .unwrap_or_else(||field(bundle,"versions")).clone();
+                if let Some(map)=basis_versions.as_object() {
+                    for (key,v) in map {versions.insert(key.clone(),v.clone());}
+                }
+                let combo_id=combo_ids[index].as_str().filter(|v|!v.is_empty())
+                    .ok_or("운임 조합 ID 누락")?.to_string();
+                let delivery_id=delivery_ids[index].as_str().filter(|v|!v.is_empty())
+                    .ok_or("배송 증빙 ID 누락")?.to_string();
+                if find_by_id(field(field(&state,"shipping"),"combinations"),&combo_id).is_some()
+                    || find_by_id(field(field(&state,"workflow"),"deliveries"),&delivery_id).is_some() {
+                    return Err("운임 및 배송 증빙 ID가 중복됩니다.".into());
+                }
+                if rows(field(field(&state,"workflow"),"deliveries")).iter().any(|d|
+                    str_field(d,"shipmentId")==shipment_id && str_field(d,"origin")==origin) {
+                    return Err("같은 배송 건 / 출고지의 배송 완료 기록이 중복됩니다.".into());
+                }
+                for previous in state["shipping"]["combinations"].as_array_mut()
+                    .ok_or("운임 조합 목록 오류")? {
+                    if field(previous,"key")==&key && flag(previous,"active") {
+                        set(previous,"active",json!(false))?;
+                    }
+                }
+                let epoch=field(&ship,"appliedEpoch").as_i64()
+                    .unwrap_or_else(||field(field(&state,"shipping"),"epoch").as_i64().unwrap_or(1));
+                let active=epoch==field(field(&state,"shipping"),"epoch").as_i64().unwrap_or(1)
+                    && basis_versions==*field(bundle,"versions");
+                let count=rows(field(&state["workflow"],"deliveries")).iter().filter(|d|{
+                    let prior_combo=find_by_id(field(&state["shipping"],"combinations"),
+                        str_field(d,"combinationId"));
+                    prior_combo.is_some_and(|c|field(c,"key")==&key) &&
+                        field(d,"version")==&confirmed_version
+                }).count()+1;
+                let combination=json!({"id":combo_id,"key":key,"epoch":epoch,
+                    "versions":basis_versions,"charge":amount,"actual":amount,
+                    "observedCharge":charged,"shipmentId":shipment_id,
+                    "verifiedAt":now,"at":now,"active":active,
+                    "sampleCount":count,"description":field(bundle,"description")});
+                state["shipping"]["combinations"].as_array_mut()
+                    .ok_or("운임 조합 목록 오류")?.push(combination);
+                let items=rows(field(bundle,"items")).iter().map(|item|{
+                    let pid=str_field(item,"productId");
+                    let product=find_by_id(field(&state,"products"),pid);
+                    json!({"productId":field(item,"productId"),
+                        "variantId":field(item,"variantId"),"quantity":field(item,"quantity"),
+                        "shippingGroupId":product.and_then(|p|p.get("shippingGroupId"))})
+                }).collect::<Vec<_>>();
+                let record=json!({"id":delivery_id,"shipmentId":shipment_id,
+                    "recipientId":field(&ship,"recipientId"),
+                    "origin":origin,"at":now,"actor":actor,"items":items,
+                    "bundles":null,"charge":charged,"actual":amount,
+                    "version":confirmed_version,"combinationId":combo_id});
+                state["workflow"]["deliveries"].as_array_mut()
+                    .ok_or("배송 증빙 목록 오류")?.push(record);
+                record_ids.push(combo_id);
+            }
+            let delivery=json!({"at":now,"actor":actor,"actual":actual,
+                "versions":Value::Object(versions),"recordIds":record_ids});
+            set(&mut state["workflow"]["shipments"][si],"delivery",delivery.clone())?;
+            append_event(&mut state,payload,"실제 배송 완료 / 운임 검증",
+                &[shipment_id.to_string()],Value::Null,delivery,&group_id)?;
+            Ok(json!({"state":state,"completed":true}))
+        }
         _ => Err(format!("지원하지 않는 업무 action: {action}")),
     }
 }
