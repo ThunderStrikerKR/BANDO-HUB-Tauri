@@ -1070,10 +1070,10 @@ for(const name of ["sources","groups","shipments","payments","queue",
 validationCase("invalid shipment missing recipient",unchanged,s=>{
   s.workflow.shipments[0].recipientId="missing-r";
 },false);
-validationCase("archived missing recipient is skipped",unchanged,s=>{
+validationCase("archived missing recipient is skipped with no prior immutable link",unchanged,s=>{
   s.workflow.shipments[0].legacyArchived=true;
   s.workflow.shipments[0].recipientId="missing-r";
-},true);
+},true,false);
 validationCase("retail missing transfer",unchanged,s=>{
   s.orders[0].orderType="RETAIL";s.workflow.groups[0].dealerId="dealer-1";
   s.workflow.shipments[0].transferred=false;
