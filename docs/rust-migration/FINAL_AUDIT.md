@@ -1,3 +1,5 @@
+> **동등성 최신 확인:** 185개 TS 원본 대 Rust 실제 실행 비교 사례가 일치함 ([실측 기록](PARITY_AUDIT.md), [CI](https://github.com/ThunderStrikerKR/TSBH/actions/runs/43356375386)). 범위는 Excel 출력 준비, 메시지 템플릿과 payment 11건, 결산, 가격/운임 및 일부 업무 단계. 인식 전체/상태 전환 전체/TS 코드 제거/GUI 시연은 **미완료**. 세션 2 소스는 비활성 상태로 검사용 복사되었으며 승인 엔진으로 활성화하지 않음.
+
 # Rust migration final audit — IN PROGRESS
 
 This document reports measurements, **not** a full Rust migration or on-site installation certificate.
