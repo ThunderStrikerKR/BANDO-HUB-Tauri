@@ -99,7 +99,18 @@ public static class BandoNativeTestInput {
     }
     Start-Sleep -Milliseconds 420
   }
-  $before=Nodes
+  # Native WebView2 renders asynchronously after HWND creation. Poll for
+  # the real input control rather than treating the first 1-2 UIA nodes as a
+  # finished React screen.
+  $before=@()
+  for($attempt=0;$attempt -lt 60;$attempt++){
+    $before=Nodes
+    $ready=@($before|Where-Object {
+      $_.name -eq "대리발송" -and $_.type -match "Button"
+    }).Count -gt 0
+    if($ready){break}
+    Start-Sleep -Milliseconds 350
+  }
   $result.initialNodes=$before.Count
   Capture "01-test-reception-initial"
   Verify "Native reception command visible" (@($before|Where-Object {
