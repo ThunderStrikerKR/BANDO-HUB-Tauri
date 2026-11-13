@@ -1,0 +1,68 @@
+name: Native Windows reception UI verification (actual Tauri EXE)
+on:
+  push:
+    branches:
+      - migration/03-integration
+    paths:
+      - scripts/migration03-reception-native-ui.mjs
+      - .github/workflows/migration-reception-native-ui.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  actual-webview2-reception:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      # Run 43395350910 built and packaged code at 861ddcfb.
+      # The only source-branch commit after that binary was a test fixture
+      # extension: 26c12f1. Audit it explicitly; never substitute a stale EXE.
+      - name: Assert binary source is unchanged
+        shell: bash
+        run: |
+          git diff --exit-code 861ddcfb4aaecebc84174a5c921c52f7b4fb8da8 HEAD -- src src-tauri
+      - name: Download real Windows Tauri portable candidate
+        uses: actions/download-artifact@v4
+        with:
+          name: TSBH-migration03-preview-NOT-FINAL
+          path: native-release
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 43395350910
+      - name: Extract actual native EXE
+        shell: pwsh
+        run: |
+          Expand-Archive -LiteralPath "native-release/BANDO-HUB-migration03-preview.zip" -DestinationPath "native-release/unpacked" -Force
+          if (!(Test-Path "native-release/unpacked/bando_hub.exe")) { throw "Native portable EXE missing" }
+      - name: Install Playwright as WebView2 CDP client (no browser emulator)
+        run: npm install --no-save --no-package-lock --no-audit --no-fund playwright@1.55.1
+      - name: Enable WebView2 loopback debugging only in CI test runner
+        shell: pwsh
+        run: |
+          $path="HKCU:\Software\Policies\Microsoft\Edge\WebView2\AdditionalBrowserArguments"
+          New-Item -Path $path -Force | Out-Null
+          New-ItemProperty -Path $path -Name "bando_hub.exe" -Value "--remote-debugging-port=19651 --remote-debugging-address=127.0.0.1" -PropertyType String -Force | Out-Null
+      - name: Interact with actual Tauri EXE reception UI and native Rust IPC
+        env:
+          BANDO_NATIVE_EXE: ${{ github.workspace }}\\native-release\\unpacked\\bando_hub.exe
+          BANDO_NATIVE_OUT: native-reception-evidence
+          BANDO_NATIVE_BIN_COMMIT: 861ddcfb4aaecebc84174a5c921c52f7b4fb8da8
+        run: node scripts/migration03-reception-native-ui.mjs
+      - name: Remove temporary developer policy
+        if: always()
+        shell: pwsh
+        run: |
+          $path="HKCU:\Software\Policies\Microsoft\Edge\WebView2\AdditionalBrowserArguments"
+          Remove-ItemProperty -Path $path -Name "bando_hub.exe" -ErrorAction SilentlyContinue
+      - name: Upload screenshots, native IPC trace and failure diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: TSBH-native-reception-evidence
+          path: native-reception-evidence/
+          if-no-files-found: warn
+          retention-days: 7

@@ -1,0 +1,219 @@
+// Actual Windows Tauri EXE + real WebView2 + real Rust IPC, no mocked commands.
+import assert from "node:assert/strict";
+import { spawn, execFileSync } from "node:child_process";
+import { promises as fs } from "node:fs";
+import { dirname, resolve, join, basename } from "node:path";
+import { tmpdir } from "node:os";
+import { setTimeout as sleep } from "node:timers/promises";
+import { chromium } from "playwright";
+
+if (process.platform !== "win32") throw Error("Native reception audit requires Windows");
+const exe = resolve(process.env.BANDO_NATIVE_EXE || "");
+assert.match(exe,/\.exe$/i);
+await fs.access(exe);
+const out=resolve(process.env.BANDO_NATIVE_OUT || "native-reception-evidence");
+await fs.mkdir(out,{recursive:true});
+const root=await fs.mkdtemp(join(tmpdir(),"bando-native-reception-"));
+const port=19651;
+const binCommit=process.env.BANDO_NATIVE_BIN_COMMIT || "";
+const report={
+  type:"real-Windows-Tauri-WebView2-IPC",
+  automationCommit:process.env.GITHUB_SHA || "",
+  sourceBinaryCommit:binCommit,exe:basename(exe),
+  testWorkspace:true,usesMockIPC:false,
+  started:new Date().toISOString(),status:"STARTED",
+  screens:[],checks:[],issues:[],diagnostics:{},
+};
+const persist=()=>fs.writeFile(join(out,"native-reception-audit.json"),
+  JSON.stringify(report,null,2),"utf8");
+await persist();
+let stderr="",stdout="",browser;
+const app=spawn(exe,["--bando-developer-test"],{
+  cwd:dirname(exe),windowsHide:false,stdio:["ignore","pipe","pipe"],
+  env:{
+    ...process.env,
+    WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS:
+      "--remote-debugging-port="+port+" --remote-debugging-address=127.0.0.1",
+    WEBVIEW2_USER_DATA_FOLDER:join(root,"webview2"),
+  },
+});
+app.stderr?.on("data",b=>stderr+=b.toString());
+app.stdout?.on("data",b=>stdout+=b.toString());
+report.pid=app.pid;
+const record=(name,payload={})=>{report.checks.push({name,...payload});console.log("NATIVE_RECEPTION_CHECK",name,JSON.stringify(payload));};
+const snap=async(page,name)=>{
+  const file=name+".png";
+  await page.screenshot({path:join(out,file),animations:"disabled",timeout:30000});
+  report.screens.push({name,file,viewport:await page.evaluate(()=>({
+    width:innerWidth,height:innerHeight
+  }))});
+  await persist();
+};
+try{
+  let target;
+  for(let n=0;n<160;n++){
+    if(app.exitCode!==null)throw Error("Native EXE terminated early "+app.exitCode+": "+stderr.slice(-1500));
+    try{
+      const response=await fetch("http://127.0.0.1:"+port+"/json/list",
+        {signal:AbortSignal.timeout(850)});
+      if(response.ok){
+        const targets=await response.json();
+        report.diagnostics.targets=targets.map(x=>({
+          type:x.type,title:x.title,url:x.url
+        }));
+        target=targets.find(x=>x.type==="page"&&/tauri|localhost/i.test(x.url||""));
+        if(target)break;
+      }
+    }catch{/* startup */}
+    await sleep(350);
+  }
+  if(!target){
+    try{
+      const outText=execFileSync("pwsh.exe",[
+        "-NoProfile","-ExecutionPolicy","Bypass",
+        "-File",resolve("scripts/stage9-windows-desktop-probe.ps1"),
+        "-ProcessId",String(app.pid),"-OutDir",out,
+      ],{encoding:"utf8",timeout:35000});
+      report.diagnostics.desktopProbe=JSON.parse(outText);
+    }catch(e){report.diagnostics.desktopProbeError=String(e);}
+    throw Error("Real Windows WebView2 CDP endpoint was unavailable; native GUI interaction is NOT verified");
+  }
+  browser=await chromium.connectOverCDP("http://127.0.0.1:"+port,{timeout:20000});
+  const context=browser.contexts()[0];
+  const page=context?.pages().find(x=>/tauri|localhost/i.test(x.url()))??context?.pages()[0];
+  assert.ok(page,"Real Tauri WebView2 page missing");
+  page.setDefaultTimeout(30000);
+  page.on("pageerror",e=>report.issues.push("pageerror: "+e.message));
+  page.on("console",m=>{if(m.type()==="error")report.issues.push("console: "+m.text())});
+  await page.locator("nav[aria-label='업무 메뉴']").waitFor({timeout:60000});
+  const native=await page.evaluate(async()=>{
+    if(!window.bando || !window.__TAURI_INTERNALS__?.invoke)
+      throw Error("Actual native Tauri bridge missing");
+    return {
+      href:location.href,userAgent:navigator.userAgent,
+      testWorkspace:window.bando.isTestWorkspace,
+      workspaceMode:await window.bando.workspaceMode(),
+      startup:await window.bando.startupStatus(),
+      before:await window.bando.load(),
+    };
+  });
+  report.diagnostics.native={
+    href:native.href,userAgent:native.userAgent,
+    testWorkspace:native.testWorkspace,workspaceMode:native.workspaceMode,
+    startup:native.startup,
+    initialOrders:native.before.orders?.length??null,
+  };
+  assert.ok(!native.href.startsWith("http://127.0.0.1:517"),"Vite page is not native");
+  assert.equal(native.workspaceMode,true,"Must be an isolated developer TEST DB");
+  assert.equal(native.startup.phase,"READY");
+  record("actual Windows EXE and TEST SQLite started",report.diagnostics.native);
+  await snap(page,"01-real-tauri-reception-initial");
+
+  // Instrument the genuine Tauri IPC function, but forward every call to the
+  // same original native dispatcher. This is NOT a mock or substitute.
+  await page.evaluate(()=>{
+    window.__bandoNativeCalls=[];
+    const api=window.__TAURI_INTERNALS__;
+    const original=api.invoke;
+    api.invoke=function(command,args,...rest){
+      window.__bandoNativeCalls.push({
+        command,domain:args?.domain,operation:args?.operation
+      });
+      return Reflect.apply(original,this,[command,args,...rest]);
+    };
+  });
+
+  const raw=[
+    "김가상","010-1234-5678","경기도 의정부시 시민로 100",
+    "709 2개","박가상","010-2345-6789",
+    "서울특별시 마포구 월드컵로 20","GT-1 1개"
+  ].join("\n");
+  await page.evaluate(async text=>window.bando.copy(text),raw);
+  await page.getByRole("button",{name:"대리발송",exact:true}).click();
+  await page.waitForFunction(()=>{
+    const calls=window.__bandoNativeCalls||[];
+    return calls.some(x=>x.command==="business_core_call"&&
+      x.domain==="recognition"&&x.operation==="analyze_order");
+  },null,{timeout:50000});
+  await page.waitForFunction(()=>{
+    const el=document.querySelector(".source-document");
+    return el && el.querySelectorAll(".linked-token").length>=5 &&
+      document.querySelector(".review-pane")?.textContent?.includes("김가상") &&
+      document.querySelector(".review-pane")?.textContent?.includes("박가상");
+  },null,{timeout:50000});
+  const details=await page.evaluate(async()=>{
+    const invoke=window.__bandoNativeCalls || [];
+    const linked=[...document.querySelectorAll(".source-document .linked-token")]
+      .map(e=>({text:e.textContent,link:e.getAttribute("data-link-key")}));
+    const review=document.querySelector(".review-pane");
+    const snapshot=await window.bando.load();
+    const clipped=window.__bandoNativeCalls.some(c=>c.command==="clipboard_read");
+    return {
+      invoke,linked,reviewText:(review?.textContent||"").slice(0,5000),
+      clipped,orders:snapshot.orders?.length||0,
+    };
+  });
+  assert.ok(details.invoke.some(c=>c.command==="business_core_call"&&
+    c.domain==="recognition"&&c.operation==="analyze_order"),
+    "React must actually invoke native Rust recognition");
+  assert.ok(details.clipped,"Native clipboard read must be used");
+  assert.ok(details.linked.some(x=>x.text?.includes("709")));
+  assert.ok(details.linked.some(x=>x.text?.includes("GT-1")));
+  assert.equal(details.orders,native.before.orders?.length??0,
+    "Viewing an unconfirmed order must not write to SQLite");
+  assert.ok(!details.invoke.some(x=>x.command==="state_save"),
+    "Unconfirmed analysis must not persist a draft");
+  record("actual Rust recognize_order reached from rendered reception UI",{
+    nativeIPC:details.invoke.filter(x=>x.command==="business_core_call"),
+    linkedEvidence:details.linked.length,readClipboard:details.clipped,
+    persistedOrders:details.orders,
+  });
+  await snap(page,"02-native-rust-recognized-two-shipments");
+
+  // Validate the reception UI at compact viewport without claiming a true
+  // physical monitor reconfiguration. Record exact CSS geometry / overflow.
+  await page.setViewportSize({width:1024,height:768});
+  await sleep(350);
+  const geometry=await page.evaluate(()=>{
+    const selectors=[".source-pane",".source-heading",".source-heading-actions",
+      ".source-document",".review-pane"];
+    const visible=(el)=>!!el&&getComputedStyle(el).display!=="none"&&
+      el.getBoundingClientRect().width>0;
+    return {
+      viewport:[innerWidth,innerHeight],
+      documentWidth:document.documentElement.scrollWidth,
+      items:selectors.map(selector=>{
+        const el=document.querySelector(selector);
+        if(!visible(el))return {selector,missing:true};
+        const rect=el.getBoundingClientRect();
+        return {selector,x:rect.x,y:rect.y,width:rect.width,height:rect.height,
+          font:getComputedStyle(el).fontSize,
+          scrollWidth:el.scrollWidth,clientWidth:el.clientWidth};
+      }),
+    };
+  });
+  report.diagnostics.compactGeometry=geometry;
+  assert.ok(geometry.items.find(x=>x.selector===".source-pane"&&!x.missing));
+  assert.ok(geometry.items.find(x=>x.selector===".source-document"&&!x.missing));
+  record("compact WebView2 reception layout",geometry);
+  await snap(page,"03-native-reception-compact-1024");
+
+  assert.equal(report.issues.length,0,
+    "Browser UI errors: "+report.issues.join("\n"));
+  report.status="REAL_NATIVE_RECEPTION_SMOKE_PASSED";
+  console.log("NATIVE_RECEPTION_PASS",JSON.stringify({
+    binaryCommit:binCommit,checks:report.checks.length,
+    screenshots:report.screens.length,status:report.status,
+  }));
+}catch(e){
+  report.status="FAILED";
+  report.failure=e?.stack||String(e);
+  console.error("NATIVE_RECEPTION_FAILED",report.failure);
+  process.exitCode=1;
+}finally{
+  report.stderrTail=stderr.slice(-2000);
+  report.stdoutTail=stdout.slice(-2000);
+  await persist();
+  await browser?.close().catch(()=>{});
+  if(app.exitCode===null)app.kill();
+}
