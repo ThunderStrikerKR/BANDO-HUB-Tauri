@@ -21,7 +21,7 @@ test("all active product and client management save paths are native without TS 
   assert.match(dispatcher, /"catalog_clients" => catalog_clients::execute/);
   for(const [source,command] of [
     [clients,"upsert_client"],[clients,"archive_client"],
-    [products,"upsert_product"],[products,"archive_product"],
+    [products,"upsert_product_from_editor"],[products,"archive_product"],
     [clientExcel,"apply_client_workbook"],
     [productExcel,"apply_product_workbook"],
     [registration,"prepare_registration_commit"],
@@ -80,4 +80,39 @@ test("reviewed workbook writes remain backed up before single SQLite save",()=>{
   assert.match(save,/fn state_save\(/);
   assert.match(save,/validate_clients\(&current, &state\)\?/);
   assert.match(save,/validate_brands\(&current, &state\)\?/);
+});
+
+test("live catalog search, native model guidance and official link browsing have no TS business fallback",()=>{
+  const source=read("src-tauri/src/business_core/catalog_clients/queries.rs");
+  const editor=read("src-tauri/src/business_core/catalog_clients/editor.rs");
+  const product=read("src/ProductManager.tsx");
+  const search=read("src/ProductSearchDialog.tsx");
+  const item=read("src/OrderItemEditor.tsx");
+  const issue=read("src/IssueResolver.tsx");
+  const clients=read("src/ClientManager.tsx");
+  const chooser=read("src/ClientChooser.tsx");
+  const picker=read("src/ManagementUI.tsx");
+  const brand=read("src/Classification.tsx");
+  const bridge=read("src/tauri-bridge.ts");
+  const hook=read("src/native-catalog-queries.ts");
+  for(const command of [
+    "client_candidates","search_products","classified_products",
+    "representative_products","suggest_group_representative","official_links",
+  ])assert.match(source,new RegExp('"'+command+'"'));
+  assert.match(editor,/fn prepare\(/);
+  assert.match(product,/"upsert_product_from_editor"/);
+  assert.doesNotMatch(product,/p\.modelKey = productKey/);
+  assert.match(search,/"search_products"/);
+  assert.match(item,/"search_products"/);
+  assert.match(issue,/"suggest_group_representative"/);
+  assert.match(issue,/"representative_products"/);
+  assert.doesNotMatch(issue,/suggestGroupRepresentative\(state,/);
+  assert.doesNotMatch(issue,/representativeProducts\(state,/);
+  assert.match(clients,/useNativeClients\(/);
+  assert.match(chooser,/useNativeClients\(/);
+  assert.match(picker,/useNativeClients\(/);
+  assert.match(brand,/"classified_products"/);
+  assert.match(bridge,/"official_links"/);
+  assert.doesNotMatch(bridge,/officialLinksFromSnapshot\(/);
+  assert.match(hook,/return \(\) => \{ active = false; \}/);
 });
