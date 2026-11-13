@@ -26,6 +26,8 @@ import { dispatchState } from "../../../../src/factory-replies.ts";
 import { shouldRefreshUncommittedOrderPricing } from "../../../../src/orders/passive-pricing.ts";
 import { deleteGroup, restoreGroup } from "../../../../src/group-trash.ts";
 import { correctionStatus, requestCorrection, copiedCorrection, confirmCorrection, markFactoryDelivered, markCollected, reopenUnsentExport } from "../../../../src/corrections.ts";
+import { recordCopy } from "../../../../src/message-model.ts";
+import { paymentSignature } from "../../../../src/automatic-message.ts";
 import { orderIssues, approveMissingQuantity, pendingIssue } from "../../../../src/validation.ts";
 import { validateReceptionBoundary, newReception, replaceReception, persistedReceptionState } from "../../../../src/orders/reception.ts";
 import { confirmRetail, newRetailOrder } from "../../../../src/orders/retail.ts";
@@ -2717,6 +2719,39 @@ retailCase("deleted product blocked",(s,d)=>{
   s.products[0].deletedAt=now;
 },false);
 
+
+// State-changing clipboard audit is native, while its text signature still
+// comes from the exact original payment generator until message parity is full.
+const copiedState:any=copy(baseState);
+copiedState.aliases=[];
+for(const copyType of ["REQUEST","PAYMENT"] as const) {
+  const token="synthetic-copy-"+copyType;
+  const payload:any={
+    state:copiedState,groupId:"group:o1",copyType,token,
+    now:actionNow,eventId:"synthetic-event-"+copyType
+  };
+  if(copyType==="PAYMENT")payload.signature=paymentSignature(copiedState,"group:o1");
+  add("message copy audit: "+copyType,"record_message_copy",payload,
+    ()=>({state:deterministicIds([payload.eventId],
+      ()=>recordCopy(copiedState,"group:o1",copyType,token))}));
+}
+const duplicateCopyState:any=copy(copiedState);
+duplicateCopyState.workflow.events.push({
+  id:"existing-copy",at:now,actor:"직원",groupId:"group:o1",
+  shipmentIds:[],action:"메시지 복사",
+  after:{type:"REQUEST",token:"already-recorded"}
+});
+add("message copy audit: duplicate token no-op","record_message_copy",{
+  state:duplicateCopyState,groupId:"group:o1",copyType:"REQUEST",
+  token:"already-recorded",now:actionNow,eventId:"unused"
+},()=>({state:recordCopy(duplicateCopyState,"group:o1","REQUEST","already-recorded")}));
+const unavailableCopy:any=copy(copiedState);
+unavailableCopy.workflow.groups[0].deletedAt=actionNow;
+add("message copy audit: deleted group has no shipment IDs","record_message_copy",{
+  state:unavailableCopy,groupId:"group:o1",copyType:"REQUEST",token:"copy-deleted",
+  now:actionNow,eventId:"synthetic-deleted"
+},()=>({state:deterministicIds(["synthetic-deleted"],
+  ()=>recordCopy(unavailableCopy,"group:o1","REQUEST","copy-deleted"))}));
 
 // Original correction eligibility and receipt fallback tests are fully
 // independent of recognition. Mutations use genuine TS parseOrder output
