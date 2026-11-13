@@ -121,6 +121,80 @@ scenario("mixed active deleted group",s=>{
   s.workflow.shipments.push({...clone(s.workflow.shipments[0]),id:"s2",groupId:"g2"});
   s.workflow.groups.push({id:"g2",deletedAt:"2026-11-14"});
 });
+// Financial cases are also sent through the complete history -> settlement
+// differential, so the banking clock cannot be conflated with reception day.
+function bankRecord(id,at,amount,allocated=amount){
+  return {id,dealerId:"c1",paidAt:at,amount,
+    account:{id:"bank-1",bank:"국민",holder:"반도",number:"12345"},
+    allocations:allocated===null?[]:[{id:"allocation-"+id,shipmentId:"s1",amount:allocated}],
+    memo:"원본 입금"};
+}
+scenario("same-day payment allocated",s=>{
+  s.workflow.payments=[bankRecord("p1","2026-11-13T12:00:00+09:00",40000)];
+});
+scenario("different-day payment not in cash clock",s=>{
+  s.workflow.payments=[bankRecord("p1","2026-11-12T12:00:00+09:00",40000)];
+});
+scenario("UTC payment crossing Seoul midnight",s=>{
+  s.workflow.payments=[bankRecord("p1","2026-11-12T16:00:00Z",40000)];
+});
+scenario("unallocated bank cash",s=>{
+  s.workflow.payments=[bankRecord("p1","2026-11-13T12:00:00+09:00",40000,null)];
+});
+scenario("partial bank allocation",s=>{
+  s.workflow.payments=[bankRecord("p1","2026-11-13T12:00:00+09:00",40000,25000)];
+});
+scenario("two distinct receipts",s=>{
+  s.workflow.payments=[
+    bankRecord("p1","2026-11-13T09:00:00+09:00",40000,20000),
+    bankRecord("p2","2026-11-13T14:00:00+09:00",30000,15000)];
+});
+scenario("duplicate bank receipt ID rejected",s=>{
+  s.workflow.payments=[bankRecord("p1","2026-11-13T09:00:00+09:00",40000),
+    bankRecord("p1","2026-11-13T14:00:00+09:00",30000)];
+});
+scenario("bank allocations above actual refused",s=>{
+  s.workflow.payments=[bankRecord("p1","2026-11-13T09:00:00+09:00",40000,45000)];
+});
+scenario("invalid negative bank amount refused",s=>{
+  s.workflow.payments=[bankRecord("p1","2026-11-13T09:00:00+09:00",-1)];
+});
+scenario("unknown bank allocation refused",s=>{
+  s.workflow.payments=[bankRecord("p1","2026-11-13T09:00:00+09:00",40000,NaN)];
+});
+scenario("manual payment approval is not bank cash",s=>{
+  s.workflow.confirmations=[{id:"approval-1",dealerId:"c1",
+    allocations:[{shipmentId:"s1",amount:30000}]}];
+});
+scenario("approval recheck invalidates acknowledgement",s=>{
+  s.workflow.confirmations=[{id:"approval-1",dealerId:"c1",
+    allocations:[{shipmentId:"s1",amount:30000}]}];
+  s.workflow.events=[{action:"입금 승인 재확인 필요",before:"approval-1",shipmentIds:["s1"]}];
+});
+scenario("duplicate approval IDs rejected",s=>{
+  const record={id:"approval-1",dealerId:"c1",
+    allocations:[{shipmentId:"s1",amount:30000}]};
+  s.workflow.confirmations=[record,clone(record)];
+});
+scenario("actual freight on shipment",s=>{
+  s.workflow.shipments[0].actualFreight={FACTORY:2900};
+});
+scenario("actual freight recipient fallback",s=>{
+  s.orders[0].recipients[0].actualFreight=3000;
+});
+scenario("actual freight explicit null holds unknown",s=>{
+  s.workflow.shipments[0].actualFreight={FACTORY:null};
+  s.orders[0].recipients[0].actualFreight=3000;
+});
+scenario("retail without bank payment is not cash evidence",s=>{
+  s.orders[0].orderType="RETAIL";s.orders[0].paid=true;
+});
+scenario("shipment has two actual origin charges",s=>{
+  s.orders[0].recipients[0].items.push({...clone(s.orders[0].recipients[0].items[0]),
+    id:"item-store",origin:"STORE"});
+  s.workflow.shipments[0].actualFreight={FACTORY:2900,STORE:2500};
+});
+
 test("original TS order history and compiled Rust match every whole JSON result",()=>{
   const result=spawnSync("cargo",["run","--quiet","--manifest-path",manifest,
     "--bin","parity_runner"],{cwd:root,encoding:"utf8",
