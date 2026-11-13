@@ -8,17 +8,16 @@ import { useEffect, useMemo, useState } from "react";
 import { AliasManager } from "./AliasManager";
 import { ClassificationFilters, RegistrySettings } from "./Classification";
 import { confirmAction } from "./dialogs";
-import { normalizeColor, uid } from "./domain";
+import { uid } from "./domain";
 import { businessCoreCall } from "./tauri-bridge";
 import { PriceCell } from "./PriceCell";
 import {
   colorLabel,
-  productKey,
   registeredProducts,
   sortProducts,
   variantLabel,
 } from "./product-models";
-import { classifiedProducts } from "./product-registry";
+import { useNativeProductIds } from "./native-catalog-queries";
 import { ProductImports } from "./ProductImports";
 import { ProductSyncWorkbookTools } from "./ProductSyncWorkbookTools";
 import { optimizeProductImage } from "./product-image-preprocess";
@@ -80,9 +79,12 @@ export function ProductManager({
     edit.imageOverride === "MANUAL" ? edit.imageData :
     (localImage?.id === edit.id ? localImage.data : edit.imageData)
   );
+  const classified = useNativeProductIds(
+    state, "classified_products", {category, brand}, [category, brand],
+  );
   const classifiedIds = useMemo(
-    () => new Set(classifiedProducts(state, category, "", brand).map((p) => p.id)),
-    [state.products, state.categories, category, brand],
+    () => new Set(classified.products.map((p) => p.id)),
+    [classified.products],
   );
   const products = sortProducts(
     state.products.filter((p) => !p.deletedAt && !p.supersededBy),
@@ -134,30 +136,12 @@ export function ProductManager({
   const save = async (): Promise<boolean> => {
     if (!edit) return true;
     const result = await runSave(async () => {
-      const p = clone(edit);
-      p.name = p.name.trim();
-      // Existing databases still have a legacy code column; new rows store
-      // an opaque immutable ID there until the versioned SQLite migration.
-      p.code ||= p.id;
-      if (p.variants.length !== 1) throw Error("상품은 한 가지 판매 구성으로만 등록할 수 있습니다. 기존 복수 구성은 각각 별도 상품으로 전환하세요.");
-      p.saleUnit = true;
-      p.familyKey ??= p.id;
-      p.modelKey = productKey(p);
-      // No new model-code list: the model is part of the product name.
-      p.variants = p.variants.map((v) => ({
-        ...v,
-        color: normalizeColor(v.color),
-      }));
-      p.defaultColor = normalizeColor(p.defaultColor);
-      p.updatedAt = new Date().toISOString();
-      if (p.categories?.length) {
-        const rootCatalog = catalogFromCategory(withCatalogRoots(state.categories), p.categories.at(-1)!);
-        if (rootCatalog) p.catalog = rootCatalog;
-      }
-      // Keep UI-only normalization above; Rust owns product validation,
-      // duplicate-name policy, and the authoritative candidate mutation.
+      // The native reducer owns normalization, legacy modelKey semantics,
+      // category-root reconciliation and the final candidate validation.
       const { state: next } = await businessCoreCall<{ state: State }>(
-        "catalog_clients", "upsert_product", { state, product: p },
+        "catalog_clients", "upsert_product_from_editor", {
+          state, product: edit, updatedAt: new Date().toISOString(),
+        },
       );
       await onSave(next);
       setEdit(undefined);
