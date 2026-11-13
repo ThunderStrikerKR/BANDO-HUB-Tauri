@@ -223,8 +223,9 @@ fn address_info(value: &str) -> (String, String, Value) {
             }
         }
     }
-    let road = Regex::new(r"([가-힣A-Za-z0-9·.]+(?:대로|로|길))\s+(\d+(?:-\d+)?)")
-        .expect("road component").captures(rest).and_then(|c| {
+    let road_pattern = Regex::new(r"([가-힣A-Za-z0-9·.]+(?:대로|로|길))\s+(\d+(?:-\d+)?)")
+        .expect("road component");
+    let road = road_pattern.captures(rest).and_then(|c| {
             let m=c.get(0)?;
             // JS negative lookahead: (?!\d|개|대)
             if rest[m.end()..].chars().next().is_some_and(|ch|
