@@ -1,6 +1,6 @@
 import { trackingMessage } from "../factory-replies";
 import { DateNavigator } from "./DateNavigator";
-import { useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { won } from "../domain";
 import { internalModel } from "../matching";
 import { resolveHistoricalProductReference } from "../historical-product-reference";
@@ -9,7 +9,8 @@ import { ManagementSearch } from "../ui/ManagementSearch";
 import { HelpTooltip } from "../ui/HelpTooltip";
 import { EmptyState, PageHeading } from "../ui/PageHeading";
 import { ManagementTable } from "../ui/ManagementTable";
-import { orderHistory } from "./order-history";
+import type { orderHistory } from "./order-history";
+import { businessCoreCall } from "../tauri-bridge";
 import type { NoticeSink } from "../shared/notices";
 export function OrderHistory({
   state,
@@ -26,7 +27,27 @@ export function OrderHistory({
   onNotice: NoticeSink;
 }) {
   const [expanded, setExpanded] = useState<string[]>([]);
-  const rows = useMemo(() => orderHistory(state, query, date), [state, query, date]);
+  type HistoryRow = ReturnType<typeof orderHistory>[number];
+  const serial = useRef(0);
+  const [loaded, setLoaded] = useState<{
+    state: State; query: string; date: string; rows: HistoryRow[]
+  } | null>(null);
+  const [failure, setFailure] = useState("");
+  useEffect(() => {
+    const request = ++serial.current;
+    setLoaded(null);
+    setFailure("");
+    void businessCoreCall<HistoryRow[]>("rules", "list_order_history", {
+      state, query, date,
+    }).then((rows) => {
+      if (serial.current === request) setLoaded({ state, query, date, rows });
+    }).catch((error: unknown) => {
+      if (serial.current === request) setFailure(String(error));
+    });
+    return () => { if (serial.current === request) serial.current++; };
+  }, [state, query, date]);
+  const rows = loaded?.state === state && loaded.query === query &&
+    loaded.date === date ? loaded.rows : [];
   return (
     <>
       <PageHeading title="주문 내역" actions={<HelpTooltip title="주문 내역 조회" purpose="이전에 접수한 주문과 배송 처리 상태를 찾아 확인합니다." when="거래처 문의가 오거나 지난 발주 내용을 확인할 때 사용합니다." steps={["접수 날짜를 선택하거나 날짜 선택을 해제합니다.", "거래처명이나 주문 내용을 검색합니다.", "배송 건 / 상품 항목을 펼쳐 주문 내용을 확인합니다."]} result="해당 조건에 맞는 주문의 접수 내용과 처리 상태를 확인할 수 있습니다." caution="지난 주문을 조회하는 것만으로 당시 저장된 상품 및 금액 정보는 바뀌지 않습니다." />} />
@@ -38,6 +59,8 @@ export function OrderHistory({
             onChange={onDate} onClear={() => onDate("")} />
           <small className="result-count">{rows.length}건</small>
         </div>
+        {failure && <p role="alert" className="form-error">{failure}</p>}
+        {!loaded && !failure && <p role="status">주문 이력을 확인 중입니다.</p>}
         <div className="table-scroll">
           <ManagementTable>
             <thead>
