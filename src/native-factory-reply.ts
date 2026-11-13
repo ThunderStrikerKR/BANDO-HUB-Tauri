@@ -61,6 +61,8 @@ export async function readFactoryReplyCells(file: File): Promise<FactoryReplySou
   await book.xlsx.load(new Uint8Array(bytes) as unknown as Parameters<typeof book.xlsx.load>[0]);
   const sheet = book.worksheets[0];
   if (!sheet) throw Error("로젠 회신 Excel의 첫 번째 시트를 찾지 못했습니다.");
+  // Reject oversized row maps before materializing thousands of JS objects.
+  if (sheet.rowCount - 1 > 1000) throw Error("공장 회신은 한 번에 최대 1,000행을 처리합니다.");
   const sourceRows: FactoryReplySourceRow[] = [];
   for (let i = 2; i <= sheet.rowCount; i++) {
     const row = sheet.getRow(i);
