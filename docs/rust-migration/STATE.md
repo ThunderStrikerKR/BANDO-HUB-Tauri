@@ -25,7 +25,7 @@ Updated: 2026-11-13 KST (session 3)
 - Output bundle scan: 12 emitted HTML/JS assets, 0 source maps, 0 raw TS/TSX/JSX; message-template fingerprint remains. Therefore full frontend algorithm removal FAIL.
 - Recognition independent audit: action run `43350613859` found Rust E0425 at `recognition/model.rs:394,395` and E0597 at `recognition/model.rs:105` / `recognition/quantity.rs:58`. No integration until owner commits passing build.
 - Older (pre-feature-merge) intermediate Windows Release and PaddleOCR Portable ZIP: verified action run `43349166374`, artifact name `TSBH-migration03-preview-NOT-FINAL`, not a complete/full demo build.
-- Latest feature-merge Windows candidate: build/packaging action `43349685089`; inspect final run status before claiming completion.
+- Latest feature-merge Windows candidate: action `43349685089` **passed** Windows Release EXE, Portable ZIP generation, embedded PaddleOCR model/runtime checks, Korean-path ZIP extraction and packaged OCR CLI validation. Artifact `TSBH-migration03-preview-NOT-FINAL` (ID `14003597952`, 316,946,362 bytes). **Not an approved demonstration release**: recognition/rules integration and real GUI tests remain unfinished.
 
 ## Still incomplete
 - Recognition and rules branch merged/production IPC wired: NO.
