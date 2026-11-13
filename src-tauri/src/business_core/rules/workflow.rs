@@ -303,8 +303,22 @@ fn ensure_clock(payload:&Value)->Result<(),String>{
 }
 pub(super) fn apply(payload:&Value)->Result<Value,String> {
     ensure_clock(payload)?;
-    let mut state=req(payload,"state")?.clone();
     let action=required_str(payload,"action")?;
+    let mut state=req(payload,"state")?.clone();
+    // All original workflow mutations except the three direct-clone
+    // operations first run reconcileWorkflow(input). Keep that transition
+    // inside this pure Rust entry point: without it, recipientSnapshot,
+    // infoSignature and tariff revisions can remain stale between actions.
+    // Any reconcile-created audit IDs are caller-injected independently of
+    // the action's own eventId, preserving the original chronology.
+    if !["record_actual_freight","mark_store_sent","record_change_request"]
+        .contains(&action) {
+        let reconciled=super::reconciliation::reconcile(&json!({
+            "state":state,"now":required_str(payload,"now")?,
+            "eventIds":field(payload,"reconcileEventIds")
+        }))?;
+        state=field(&reconciled,"state").clone();
+    }
     match action {
         "advance_group" => {
             let id=required_str(payload,"groupId")?;
