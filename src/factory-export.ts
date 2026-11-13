@@ -171,10 +171,19 @@ export async function createFactoryWorkbook(preview: FactoryExportPreview): Prom
 /** Call only after native Save As succeeded; SQLite enforces the revision. */
 export function recordFactoryExport(state: State, preview: FactoryExportPreview, savedPath: string) {
   if (!trim(savedPath) || !/\.xlsx$/i.test(savedPath)) throw Error("저장된 Excel 파일 경로가 올바르지 않습니다.");
+  if ((state.revision ?? 0) !== preview.revision) throw Error("파일 저장 중 주문 데이터가 변경되었습니다. 저장된 파일은 공장에 전달하지 말고 최신 출고 목록을 다시 확인하세요.");
+  const fresh = previewFactoryExport(state, preview.ids);
+  return recordFactoryExportPrepared(state, preview, savedPath, fresh);
+}
+
+/** Only call with a fresh, revision-matched Rust business_core_call preview.
+ * XLSX serialization is deliberately separate from this history recording step. */
+export function recordFactoryExportPrepared(state: State, preview: FactoryExportPreview, savedPath: string, fresh: FactoryExportPreview) {
+  if (!trim(savedPath) || !/\.xlsx$/i.test(savedPath)) throw Error("저장된 Excel 파일 경로가 올바르지 않습니다.");
   if ((state.revision ?? 0) !== preview.revision) {
     throw Error("파일 저장 중 주문 데이터가 변경되었습니다. 저장된 파일은 공장에 전달하지 말고 최신 출고 목록을 다시 확인하세요.");
   }
-  const fresh = previewFactoryExport(state, preview.ids);
+  // Revalidation is already performed by the Rust IPC caller.
   if (JSON.stringify(fresh.rows) !== JSON.stringify(preview.rows)) {
     throw Error("출력하려는 배송 내용이 변경되었습니다. 방금 저장한 파일은 공장에 전달하지 마세요.");
   }
