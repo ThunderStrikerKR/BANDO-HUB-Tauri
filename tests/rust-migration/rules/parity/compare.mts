@@ -2095,7 +2095,7 @@ wfActionCase("advance stage from zero","advance_group",
 wfActionCase("advance transferred blocked","advance_group",
   s=>{s.workflow.shipments[0].transferred=true;},
   actionProps,s=>advanceGroup(s,WFG,WFA),false);
-wfActionCase("undo stage two","undo_group",()=>{},actionProps,
+wfActionCase("undo stage two","undo_group",s=>{s.workflow.shipments[0].step=2;},actionProps,
   s=>undoGroup(s,WFG,WFA),true);
 wfActionCase("undo transferred blocked","undo_group",
   s=>{s.workflow.shipments[0].transferred=true;},
@@ -2256,6 +2256,12 @@ for(let i=0;i<cases.length;i++){
   let rust:unknown;
   try{rust=JSON.parse(output[i]);}
   catch {console.error("Invalid Rust JSON",c.name,output[i]);process.exit(2);}
+  // Rust action adapters return auxiliary metadata (step, paymentId,
+  // entries, etc.) not returned by the pure TypeScript mutation functions.
+  // Compare the COMPLETE resulting State, never only selected state fields.
+  if(c.operation==="apply_workflow_action" && (rust as any)?.ok===true){
+    rust={ok:true,value:{state:(rust as any).value?.state}};
+  }
   if(normalized(ts)===normalized(rust)){
     console.log("PARITY PASS",c.name);passed++;
   } else {
