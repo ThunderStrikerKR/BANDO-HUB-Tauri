@@ -4,6 +4,7 @@
 //! byte identity, and the final revision-checked SQLite commit.
 use super::*;
 use serde::Serialize;
+use unicode_normalization::UnicodeNormalization;
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::io::Write;
@@ -143,11 +144,11 @@ pub(super) fn factory_reply_watch_scan(
     scan_files(&directory, &mut seen, &registered)
 }
 
-// Mirror the business matching keys (whitespace and common punctuation are
-// ignored). Unicode compatibility normalization remains in the XLSX parser,
-// so the Rust boundary is intentionally conservative for unusual characters.
+// Apply the exact NFKC recipient normalization used by the original TS
+// matcher and the Rust matching engine. Native auto-import validation must
+// not reject a shipment that the reviewed Rust preview uniquely matched.
 fn compact_recipient(text: &str) -> String {
-    text.chars().filter(|c| !c.is_whitespace() && !"(),.-[]".contains(*c))
+    text.nfkc().filter(|c| !c.is_whitespace() && !"(),.-[]".contains(*c))
         .flat_map(char::to_lowercase).collect()
 }
 fn same_recipient(row: &Value, queue: &Value) -> bool {
