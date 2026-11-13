@@ -502,3 +502,14 @@
 - 세션 1 소유 파일: `src-tauri/src/business_core/recognition/mod.rs`, `tests/rust-migration/recognition/**`, `docs/rust-migration/01-recognition.md`. 타 세션 파일 변경 없음.
 - 사용자 합의로 제외한 마이크물림쇠/마우스트레이 중복 데이터는 그대로 두며 근거 없는 SKU 자동 선택 금지 유지.
 - Rust 테스트 57개 통과는 검증 로직과 회귀가 성공했다는 뜻이지 TypeScript와 Rust의 모든 반환값이 완전히 같다는 뜻은 아니다.
+
+
+## 2026-11-13: 공용 TypeScript 수취인 원본 오류 5건 / 세션 3 인계
+
+- **GitHub 인계 이슈:** https://github.com/ThunderStrikerKR/TSBH/issues/2
+- **담당:** 세션 3 통합 담당의 공용 TS 원본 `src/parser.ts` 및 `src/order-evidence.ts` 수정 책임자. 세션 1은 원본 TS를 직접 수정하지 않음. 세션 2 가격/운임 규칙과 무관.
+- **수정 전 실측:** 44개 발주서 수취인 비교 중 39개 완전 일치, 5개 사례에서 65개 필드 차이. CI https://github.com/ThunderStrikerKR/TSBH/actions/runs/43384721427. 정확한 원문과 TS/Rust 기대값은 `tests/rust-migration/recognition/ts-rust-recipient-reviewed-exceptions-20261113.json` 및 이슈 #2 참고.
+- **우선순위:** (P0) 원본 19/20번 표에서 날짜/품명을 수취인으로 오인식하는 배송건 분할 방지, (P0) `709 민판 2개`의 `민판` 가짜 수취인 제거, (P0) 동일 행 수취인 `이가상` 보존 및 상세 주소 `101동 1102호` 결합.
+- **검수:** TS 원본 20건 발주서 정상 수량 및 배송건 수, 44건 동일 입력 Rust 차등 검사, 원문 근거 위치 및 직원 확정값 회귀. 다섯 사례의 원본 수정 후 기존 예외 보고서는 실측 값에 따라 갱신. 비교 수치만 줄이도록 출력 필드를 제거하거나 Rust의 안전한 동작을 퇴행시키지 않는다.
+- **별도 문제:** `reanalyzeWithAliases()`의 변경된 상품 Item `sources[].recipientId` 낡은 참조는 5개 수취인 인식 오류와 분리하여 검증 및 수정한다.
+- **통합 인계 한계:** GitHub 이슈 및 본 문서에 수정 지시를 기록한 것으로, 다른 독립 대화 세션이 자동으로 이 문서를 읽거나 작업에 착수한다는 의미가 아니다. 세션 3 담당자는 이슈 #2를 기준으로 작업을 인수한다.
