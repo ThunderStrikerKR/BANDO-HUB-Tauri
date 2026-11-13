@@ -77,7 +77,8 @@ public static class BandoNativeTestInput {
     if(-not $condition){throw "$check : $detail"}
   }
   function Press([string]$name){
-    $matches=@(Nodes|Where-Object {
+    $available=Nodes
+    $matches=@($available | Where-Object {
       $_.name -eq $name -and $_.type -match "Button|TabItem" -and
       !$_.hidden -and $_.w -gt 0 -and $_.h -gt 0
     })
