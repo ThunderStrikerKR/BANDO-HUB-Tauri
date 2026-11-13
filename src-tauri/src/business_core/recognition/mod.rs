@@ -209,13 +209,30 @@ fn address_info(value: &str) -> (String, String, Value) {
         .expect("province").find(value).map(|m| m.as_str().to_owned());
     let mut parts = json!({});
     if let Some(p) = province { parts["province"] = json!(p); }
-    if let Some(m) = Regex::new(r"([가-힣A-Za-z0-9.]+(?:대로|로|길))\s+(\d+(?:-\d+)?)")
-        .expect("road component").captures(value) {
+    for (field, pattern) in [
+        ("city", r"(?:^|\s)([가-힣]+(?:시|군))(?:\s|$)"),
+        ("district", r"(?:^|\s)([가-힣]+구)(?:\s|$)"),
+        ("town", r"(?:^|\s)([가-힣0-9]+(?:읍|면|동|리))(?:\s|$)"),
+    ] {
+        if let Some(c)=Regex::new(pattern).expect("administrative component").captures(value) {
+            if let Some(m)=c.get(1){parts[field]=json!(m.as_str());}
+        }
+    }
+    let road=Regex::new(r"([가-힣A-Za-z0-9.]+(?:대로|로|길))\s+(\d+(?:-\d+)?)")
+        .expect("road component").captures(value);
+    if let Some(m)=road {
         parts["road"] = json!(&m[1]);
         parts["building"] = json!(&m[2]);
-        if let Some(full) = m.get(0) {
-            let detail = value[full.end()..].trim();
-            if !detail.is_empty() { parts["detail"] = json!(detail); }
+        if let Some(full)=m.get(0){
+            let detail=value[full.end()..].trim();
+            if !detail.is_empty(){parts["detail"]=json!(detail);}
+        }
+    } else if let Some(m)=Regex::new(r"[동리읍면]\s+(?:산\s*)?(\d+(?:-\d+)?)")
+        .expect("lot number").captures(value) {
+        parts["building"]=json!(&m[1]);
+        if let Some(full)=m.get(0){
+            let detail=value[full.end()..].trim();
+            if !detail.is_empty(){parts["detail"]=json!(detail);}
         }
     }
     (kind.into(), status.into(), parts)
