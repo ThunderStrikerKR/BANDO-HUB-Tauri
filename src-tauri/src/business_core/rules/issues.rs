@@ -5,8 +5,28 @@ use std::collections::HashSet;
 use serde_json::{json,Map,Value};
 use super::{field,req,required_str,rows,set,str_field};
 
+fn evidence_value(value:&Value)->String {
+    match value {
+        Value::Array(xs)=>format!("[{}]",xs.iter().map(evidence_value)
+            .collect::<Vec<_>>().join(",")),
+        Value::Object(map)=>{
+            // The original TS match objects place their discriminant
+            // before other fields. serde_json's default BTreeMap sorts
+            // keys, which changes JSON.stringify evidence and staff
+            // decision fingerprints.
+            let mut keys=map.keys().cloned().collect::<Vec<String>>();
+            if map.contains_key("kind"){
+                keys.retain(|key|key.as_str()!="kind");
+                keys.insert(0,"kind".to_string());
+            }
+            format!("{{{}}}",keys.iter().map(|key|format!("{}:{}",
+                json!(key),evidence_value(&map[key]))).collect::<Vec<_>>().join(","))
+        },
+        _=>serde_json::to_string(value).unwrap_or_else(|_|"null".to_string())
+    }
+}
 fn js_evidence(value:Option<&Value>)->Option<String> {
-    value.map(|v|serde_json::to_string(v).unwrap_or_else(|_|"null".to_string()))
+    value.map(evidence_value)
 }
 fn issue_id(order:&Value,row:Option<&Value>,item:Option<&Value>,kind:&str)->String {
     format!("issue:{}:{}:{}:{kind}",str_field(order,"id"),
