@@ -3,6 +3,7 @@
 mod export;
 mod export_history;
 mod messages;
+mod automatic_request;
 mod settlement;
 
 use serde_json::Value;
@@ -24,6 +25,7 @@ pub fn execute(operation: &str, payload: Value) -> Result<Value, String> {
         ),
         "finalize_export" => export_history::finalize(&payload),
         "render_messages" => messages::execute(&payload),
+        "render_automatic_request" => automatic_request::execute(&payload),
         "prepare_settlement" => settlement::prepare(
             payload.get("state").unwrap_or(&Value::Null),
             payload.get("date").and_then(Value::as_str).unwrap_or(""),
