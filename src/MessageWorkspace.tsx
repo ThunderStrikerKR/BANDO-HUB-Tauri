@@ -1,7 +1,6 @@
-import { useLayoutEffect, useRef, useState } from "react";
-import { automaticMessage, withGreeting } from "./automatic-message";
-import { validProductUrl } from "./domain";
-import { groupOrder } from "./workflow";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { withGreeting } from "./automatic-message";
+import { nativeAutomaticMessage, type NativeAutomaticMessage } from "./native-automatic-message";
 import { nativeRecordMessageCopy } from "./native-message-audit";
 import { LinkedText, messageSpans } from "./LinkedText";
 import type { NoticeSink } from "./shared/notices";
@@ -24,33 +23,58 @@ export function MessageWorkspace({
   const [busy, setBusy] = useState(false),
     [status, setStatus] = useState(""),
     [includeLinks, setIncludeLinks] = useState(false),
+    [rendered, setRendered] = useState<{
+      source: State;
+      groupId: string;
+      includeLinks: boolean;
+      data?: NativeAutomaticMessage;
+      error?: string;
+    }>(),
     latest = useRef(order);
   latest.current = order;
   useLayoutEffect(() => {
     setStatus("");
     setIncludeLinks(false);
   }, [order.id, order.raw, gid]);
-  const automatic = gid && order.orderType !== "RETAIL"
-      ? automaticMessage(state, gid, includeLinks)
-      : undefined,
+  // The Rust projection supplies both the exact payment text and the
+  // signature for its copy audit. Never calculate either independently in TS.
+  useEffect(() => {
+    if (!gid || order.orderType === "RETAIL") return;
+    let current = true;
+    void nativeAutomaticMessage(state, gid, includeLinks)
+      .then((data) => {
+        if (current) setRendered({ source: state, groupId: gid, includeLinks, data });
+      })
+      .catch((error) => {
+        if (current) setRendered({
+          source: state, groupId: gid, includeLinks,
+          error: "자동 메시지 생성 실패: " + String(error),
+        });
+      });
+    return () => { current = false; };
+  }, [state, gid, order.orderType, includeLinks]);
+  const currentRender = rendered?.source === state &&
+      rendered.groupId === gid && rendered.includeLinks === includeLinks
+      ? rendered
+      : undefined;
+  const automatic = currentRender?.data,
     request = automatic?.phase !== "payment",
     baseText = automatic
       ? request
         ? (order.requestMessages?.[gid!] ?? automatic.text)
         : automatic.text
       : "",
-    // Confirmation links already required by the request remain as-is.
-    // The checkbox adds only other valid product links, without duplicates.
-    optionalRequestLinks = includeLinks && request && gid
-      ? [...new Set(groupOrder(state, gid).recipients.flatMap((recipient) =>
-          recipient.items
-            .filter((item) => item.url && validProductUrl(item.url) && !baseText.includes(item.url))
-            .map((item) => item.name + "\n" + item.url),
-        ))].join("\n\n")
+    // Rust selects valid official links. The UI only toggles and formats the
+    // extra links that are not already present in the editable request draft.
+    optionalRequestLinks = includeLinks && request && automatic
+      ? automatic.validRequestLinks
+          .filter((entry) => !baseText.includes(entry.split("\n").at(-1) ?? ""))
+          .join("\n\n")
       : "",
     optionalSuffix = optionalRequestLinks ? "\n\n" + optionalRequestLinks : "",
     text = baseText + optionalSuffix;
-  const disabled = busy || !text.trim() || (!request && !!automatic?.paymentIssues.length);
+  const disabled = busy || !automatic || !text.trim() ||
+    (!request && !!automatic.paymentIssues.length);
   const copy = async (greeting: boolean) => {
     if (disabled || !gid) return;
     setBusy(true);
@@ -58,7 +82,10 @@ export function MessageWorkspace({
       await window.bando!.copy(greeting ? withGreeting(text) : text);
       if (latest.current.id !== order.id || latest.current.raw !== order.raw) return;
       if (order.confirmedAt)
-        await onSave(await nativeRecordMessageCopy(state, gid, request ? "REQUEST" : "PAYMENT", crypto.randomUUID()));
+        await onSave(await nativeRecordMessageCopy(
+          state, gid, request ? "REQUEST" : "PAYMENT", crypto.randomUUID(),
+          request ? undefined : automatic.signature,
+        ));
       else if (request)
         onOrder({
           ...latest.current,
@@ -107,7 +134,7 @@ export function MessageWorkspace({
         />
       </div>
       <div className="message-inline-status" role="status">
-        {status}
+        {status || currentRender?.error || ""}
       </div>
       <footer className="message-copy-actions">
         <button disabled={disabled} onClick={() => void copy(false)}>
