@@ -555,6 +555,40 @@ wfCase("unknown quantity but freight already entered",s=>{
   s.orders[0].recipients[0].items[0].quantity=null;
   s.workflow.shipments[0].charges={FACTORY:4000};
 });
+
+wfCase("retail without any dealer or historical snapshot",s=>{
+  s.orders[0].orderType="RETAIL";
+  s.orders[0].clientId="";
+  delete s.orders[0].clientSnapshot;
+  s.workflow.groups[0].dealerId="";
+});
+wfCase("prepaid missing total with unconfirmed quantity",s=>{
+  s.clients[0].payment="PREPAID";
+  s.workflow.shipments[0].step=3;
+  s.orders[0].recipients[0].items[0].quantity=0;
+});
+wfCase("missing source all recipient inputs",s=>{
+  s.orders[0].recipients[0].name="";
+  s.orders[0].recipients[0].address="";
+  s.orders[0].recipients[0].phone="";
+  s.orders[0].recipients[0].mobile="";
+  s.orders[0].recipients[0].items=[];
+});
+wfCase("recipient confirmedFields with conflicting candidates",s=>{
+  s.orders[0].recipients[0].candidates=[
+    {field:"name",value:"A"},{field:"name",value:"B"}
+  ];
+  s.orders[0].recipients[0].confirmedFields=[];
+});
+wfCase("customer model proposal pending",s=>{
+  s.orders[0].recipients[0].items[0].modelProposal={required:true};
+});
+wfCase("historical confirmed order skips missing product validation",s=>{
+  s.orders[0].confirmedAt=now;
+  s.orders[0].recipients[0].items[0].productId="missing-p";
+  s.orders[0].recipients[0].items[0].variantId="other-v";
+});
+
 function normalized(v:unknown):string {
   if(Array.isArray(v))return "["+v.map(normalized).join(",")+"]";
   if(v&&typeof v==="object") {
