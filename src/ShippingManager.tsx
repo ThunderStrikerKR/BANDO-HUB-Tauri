@@ -13,7 +13,6 @@ import { requestEditorLeave, requestPageLeave, usePageLeaveGuard } from "./share
 
 import {
   combinationCurrent,
-  combinationVersions,
   editableShippingRule,
   initialShipping,
 } from "./shipping";
@@ -620,26 +619,22 @@ export function ShippingManager({
                             onNotice("올바른 운임을 입력하세요.");
                             return;
                           }
-                          const next = structuredClone(shipping),
-                            old = next.combinations.find((x) => x.id === c.id)!;
-                          old.active = false;
-                          next.combinations.push({
-                            ...old,
-                            verifiedAt: undefined,
-                            shipmentId: undefined,
-                            sampleCount: 0,
-                            observedCharge: undefined,
-                            id: crypto.randomUUID(),
-                            charge: n,
-                            epoch: next.epoch,
-                            versions: combinationVersions(old.key, state),
-                            at: new Date().toISOString(),
-                            active: true,
-                          });
-                          void save(
-                            { ...state, shipping: next },
-                            "새 예외 운임을 저장하고 이전 값을 이력으로 보존했습니다.",
-                          );
+                          try {
+                            const { shipping: updated } = await businessCoreCall<{ shipping: ShippingState }>(
+                              "rules", "apply_shipping_action", {
+                                action: "revise_combination",
+                                state, shipping, combinationId: c.id,
+                                newId: crypto.randomUUID(), charge: n,
+                                now: new Date().toISOString(),
+                              },
+                            );
+                            await save(
+                              { ...state, shipping: updated },
+                              "새 예외 운임을 저장하고 이전 값을 이력으로 보존했습니다.",
+                            );
+                          } catch (error) {
+                            onNotice(error instanceof Error ? error.message : String(error), "error");
+                          }
                         }}
                       >
                         예외 운임 변경
