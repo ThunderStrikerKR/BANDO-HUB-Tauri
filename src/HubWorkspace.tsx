@@ -8,6 +8,7 @@ import { MessageWorkspace } from "./MessageWorkspace";
 import { OrderDesk } from "./OrderDesk";
 import { WorkflowBoard, type WorkflowSelection } from "./WorkflowBoard";
 import { newReception } from "./orders/reception";
+import { nativeReconcileWorkflow } from "./orders/native-rules";
 import { retainUnsavedOrderEdits } from "./order-edit-snapshots";
 import type { Order } from "./types";
 import { groupShipments, reconcileWorkflow } from "./workflow";
@@ -180,7 +181,7 @@ export function HubWorkspace(props: Props) {
     if (choice === "cancel") return { proceed: false, handledDraft: false };
     if (choice === "save") {
       try {
-        await onSave(reconcileWorkflow(state, pending));
+        await onSave(await nativeReconcileWorkflow(state, pending));
       } catch (error) {
         props.onNotice(error instanceof Error ? error.message : String(error), "error");
         return { proceed: false, handledDraft: false };
@@ -464,7 +465,7 @@ export function HubWorkspace(props: Props) {
           onSelectWorkflow={setSelected}
           onChange={changeDetail}
           onWorkflowSave={onSave}
-          onSave={() => onSave(reconcileWorkflow(base, detail ?? draft))}
+          onSave={async () => onSave(await nativeReconcileWorkflow(base, detail ?? draft))}
         />
       </div>
       {manual && (
