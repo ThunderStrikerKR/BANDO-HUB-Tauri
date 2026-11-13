@@ -30,7 +30,7 @@ fn client_search(state:&Value,payload:&Value)->Value{
             .iter().any(|key|no_whitespace(field(c,key)).contains(&query))
     });
     let suggested=clients.iter().filter(|c|{
-        active(c)&&["name","displayName"].iter().any(|key|{
+        field(c,"deletedAt").is_empty()&&["name","displayName"].iter().any(|key|{
             let term=field(c,key).trim();
             term.encode_utf16().count()>=2 && raw.contains(term)
         })
