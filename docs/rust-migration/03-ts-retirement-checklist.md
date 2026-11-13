@@ -24,9 +24,9 @@ functions or claim full Windows release readiness.
 | Working raw correction | `WorkingRawDialog.tsx` | `recognition.analyze_order` plus `rules.apply_raw_correction` | Handler wired but **dialog is not reached from the active receipt UI**. End-to-end parity and explicit UX entrypoint approval needed |
 | Factory/store Excel row preparation | `WorkflowQueue.tsx` | `output.prepare_factory_export`, `prepare_store_export` | UI wired, TS ExcelJS generates bytes |
 | **Factory/store Excel export history** | `WorkflowQueue.tsx` | `output.finalize_export` | UI wired, fresh Rust revalidation, EXPORTED and fileOnly snapshots and audit; original `record*ExportPrepared` kept as oracle |
-| **Clipboard message-copy audit** | `MessageWorkspace.tsx` | `rules.record_message_copy` | UI wired and token-idempotent. **TS `paymentSignature` still computes the text signature**; the message generation engine is not retired |
+| **Clipboard message-copy audit** | `MessageWorkspace.tsx`, `WorkflowBoard.tsx` | `rules.record_message_copy`, `output.payment_copy_status` | UI wired; Rust signs the invoice and checks previously copied signatures; original TS `paymentSignature` is retained as a differential oracle only |
 | Editable pricing/freight and order writes | `OrderDesk.tsx`, `ShippingManager.tsx` and selectors | `rules.resolve_unit_price`, `save_order`, `apply_shipping_action`, `apply_workflow_action` | Main writes wired; inspect remaining synchronous snapshots and quote paths separately |
-| Automatic message generation | `MessageWorkspace.tsx`, `automatic-message.ts`, `hub-messages.ts` | `output.render_messages` (partial renderer) | **BLOCKED**: full request/payment phase, conditional notices, custom templates, links, mixed VAT, signatures and copy parity. Do not replace with partial Rust output |
+| **Automatic message generation** | `MessageWorkspace.tsx`, `WorkflowBoard.tsx` | `output.render_automatic_message`, `decorate_automatic_copy`, `payment_copy_status` | **UI WIRED**: original TS inquiry/payment, templates, conditional notices, links, mixed VAT, invoice signature and edited copy greeting now generated in Rust. Production-path TS original `automatic-message.ts` is no longer reachable from entrypoint. 18 full-message differential scenarios, legacy copy signature, and copy greeting test pass. **Installed Windows GUI and real order dataset parity still unverified** |
 | Live workflow previews/totals | `HubWorkspace.tsx`, `orders/useOrderDesk.tsx`, `WorkflowBoard.tsx` | `rules.reconcile_workflow`, `workflow_issues`, `calculate_shipment_totals`, `evaluate_workflow` | **BLOCKED**: live TS memoized projections used during edits. Must port async preview without stale result overwrites or UI redesign |
 | Factory-reply workbook import and matching | `FactoryReplyImport.tsx`, `factory-reply-workbook.ts`, `factory-replies.ts` | Native file storage/conflict tools exist, but not full reply parsing/match engine | **BLOCKED**: ambiguous row matches, actual freight, shipping identity and historical audit need full parity and GUI tests |
 | Customer reply proposal/apply | `replies.ts`, draft review paths | `rules.apply_reply_action` (partial caller integration) | **BLOCKED** until proposal, address parsing input and UI caller provenance verified |
@@ -60,11 +60,13 @@ functions or claim full Windows release readiness.
 7. CI Windows native failures are resolved or explicitly isolated with validated real-window evidence. Do not describe partial CI as all-green.
 
 ## Suggested bounded next commits
-A. Make `MessageWorkspace` request/payment body and signature Rust-native with broad original TS parity, without moving the position of product notices or changing conditional messages.
+A. **Implemented** `MessageWorkspace` request/payment, exact signature and edited-copy greeting Rust-native. Maintain broader real catalog fixture testing before original oracle deletion.
 B. Port live workflow preview and financial read projections using stale-response cancellation.
 C. Port factory-reply match/approve and the source of settlement history rows.
 D. Review and only then retire unused TypeScript business helper functions.
 
-**Current conclusion:** exporter and copy-audit live reducers may be candidates
-for future removal **after usage and oracle review**, but the application
-cannot yet remove the TypeScript business layer as a whole.
+**Current conclusion:** automatic-message, exporter and copy-audit live
+reducers are now Rust-routed in the current UI; keep original TS oracles for
+comparison. **The application cannot yet remove the TypeScript business layer
+as a whole** because unrelated order, workflow, settlement and factory reply
+calculators remain live and installed Windows GUI verification is pending.
