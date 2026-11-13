@@ -8,8 +8,9 @@ import { ActualFreightField } from "./ActualFreightField";
 import { actualFreightOf } from "./actual-freight";
 import { nativeApplyCorrectionAction, nativeRecordActualFreight } from "./orders/native-rules";
 import { requestPageLeave, usePageLeaveGuard } from "./shared/page-leave";
-import { createFactoryWorkbook, recordFactoryExportPrepared, type FactoryExportPreview } from "./factory-export";
-import { createStoreWorkbook, recordStoreExportPrepared, type StoreExportPreview } from "./store-export";
+import { createFactoryWorkbook, type FactoryExportPreview } from "./factory-export";
+import { createStoreWorkbook, type StoreExportPreview } from "./store-export";
+import { nativeFinalizeExport } from "./native-export";
 import { confirmAction } from "./dialogs";
 import { businessCoreCall } from "./tauri-bridge";
 import { useState } from "react";
@@ -427,7 +428,7 @@ export function WorkflowQueue({
                   try {
                     const latest = await window.bando!.load();
                     const fresh = await businessCoreCall<StoreExportPreview>("output", "prepare_store_export", { state: latest, ids: preview.ids });
-                     const result = recordStoreExportPrepared(latest, preview, savedPath, fresh);
+                     const result = await nativeFinalizeExport(latest, "STORE", preview, savedPath);
                     await onSave(result.next);
                     setSelected([]);
                     onNotice("매장 발송 " + preview.rows.length +
@@ -452,7 +453,7 @@ export function WorkflowQueue({
                 try {
                   const latest = await window.bando!.load();
                   const fresh = await businessCoreCall<FactoryExportPreview>("output", "prepare_factory_export", { state: latest, ids: preview.ids });
-                   const result = recordFactoryExportPrepared(latest, preview, savedPath, fresh);
+                   const result = await nativeFinalizeExport(latest, "FACTORY", preview, savedPath);
                   await onSave(result.next);
                   savedExportId = result.exportId;
                   setSelected([]);
