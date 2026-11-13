@@ -45,3 +45,17 @@ jobs:
           workspaces: src-tauri -> target
       - name: Compile actual Tauri Rust and SQLite tests on Windows
         run: cargo test --manifest-path src-tauri/Cargo.toml --lib
+
+  output-ts-rust-parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install TypeScript oracle dependencies
+        run: npm install --no-audit --no-fund --ignore-scripts
+      - name: Compare TypeScript oracle with real Rust engine
+        run: node --test tests/rust-migration/output/parity.test.mjs
