@@ -311,8 +311,9 @@ pub(super) fn apply(payload:&Value)->Result<Value,String> {
     // infoSignature and tariff revisions can remain stale between actions.
     // Any reconcile-created audit IDs are caller-injected independently of
     // the action's own eventId, preserving the original chronology.
-    if !["record_actual_freight","mark_store_sent","record_change_request"]
-        .contains(&action) {
+    if payload.get("reconcileEventIds").is_some() &&
+        !["record_actual_freight","mark_store_sent","record_change_request"]
+            .contains(&action) {
         let reconciled=super::reconciliation::reconcile(&json!({
             "state":state,"now":required_str(payload,"now")?,
             "eventIds":field(payload,"reconcileEventIds")
