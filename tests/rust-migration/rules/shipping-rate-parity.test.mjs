@@ -231,3 +231,56 @@ for(let i=0;i<assignmentCases.length;i++){
     assert.equal(assignmentState.shipping.productHistory["p1"],undefined);
   });
 }
+
+const copyState={
+  ...structuredClone(shipping),
+  productRules:{"p1":productPrevious},
+  productHistory:{"p1":[{...productPrevious,version:"p1-older"}]},
+};
+const copyCases=[
+  ["copy a confirmed group rate into a new product",["p2"]],
+  ["copy a group rate and archive old product-specific price",["p1"]],
+  ["copy same group rate into multiple products",["p1","p2"]],
+  ["empty selection does not change tariff data",[]],
+];
+function copyOracle(payload){
+  const next=structuredClone(payload.shipping);
+  const group=next.groups.find(g=>g.id===payload.groupId);
+  next.productRules??={};
+  next.productHistory??={};
+  for(const pid of payload.productIds){
+    const previous=next.productRules[pid];
+    if(previous)next.productHistory[pid]=[
+      ...(next.productHistory[pid]??[]),previous
+    ];
+    next.productRules[pid]={
+      ...structuredClone(group.current),version:payload.versionIds[pid],at:payload.now,
+    };
+  }
+  return {shipping:next};
+}
+const copyRequests=copyCases.map(([,ids])=>({
+  domain:"rules",operation:"apply_shipping_action",
+  payload:{
+    action:"copy_group_rule",shipping:copyState,groupId:"g1",
+    productIds:ids,versionIds:{"p1":"new-p1","p2":"new-p2"},now,
+  },
+}));
+const copyRun=spawnSync("cargo",["run","--quiet","--manifest-path",cargo,
+  "--bin","reception_runner"],{
+  cwd:root,input:JSON.stringify(copyRequests),encoding:"utf8",
+  timeout:900000,maxBuffer:64*1024*1024
+});
+if(copyRun.error)throw copyRun.error;
+assert.equal(copyRun.status,0,copyRun.stderr);
+const copyActual=JSON.parse(copyRun.stdout);
+assert.equal(copyActual.length,copyCases.length);
+for(let i=0;i<copyCases.length;i++){
+  const [name]=copyCases[i];
+  test("Rust group-to-product copy: "+name,()=>{
+    assert.equal(copyActual[i].ok,true,JSON.stringify(copyActual[i].error));
+    assert.deepEqual(copyActual[i].value,copyOracle(copyRequests[i].payload));
+    assert.equal(copyState.productHistory.p1.length,1);
+    assert.equal(copyState.groups[0].current.version,"old-version");
+  });
+}
