@@ -359,7 +359,11 @@ test("report screens keep live read-only views while Excel export buttons are de
   assert.match(model, /from "\.\/seoul-date"/);
   assert.match(reportWorkbook, /from "\.\/seoul-date"/);
   assert.doesNotMatch(model, /from "\.\/settlement-report"/);
-  assert.doesNotMatch(reportWorkbook, /from "\.\/settlement-report"/);
+  // A type-only import disappears from JavaScript output. Prohibit runtime
+  // imports of the old TS business module without rejecting TypeScript types.
+  assert.doesNotMatch(reportWorkbook, /^import\\s+(?!type\\b)[^\\n]*from\\s+["']\\.\\/settlement-report["']/m);
+  assert.match(reportWorkbook, /^import type \\{[^\\n]+\\} from "\\.\\/settlement-report";/m);
+
   assert.doesNotMatch(historyFormat, /^import /m);
   assert.doesNotMatch(dateFormat, /^import /m);
 
