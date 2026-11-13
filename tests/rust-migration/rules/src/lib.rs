@@ -554,4 +554,28 @@ mod regression {
         assert!(execute("apply_workflow_action",make(&state)).is_err());
     }
 
+    #[test]
+    fn freight_change_preserves_existing_payment_approval_and_rechecks() {
+        let mut state=workflow_state("PREPAID");
+        state["workflow"]["confirmations"]=json!([{
+            "id":"confirmation-1","groupId":"group:o1","dealerId":"dealer-1",
+            "shipmentIds":["shipment:o1:r1"],"amount":36300,
+            "confirmedAt":"2026-11-13T09:00:00+09:00","actor":"직원",
+            "allocations":[{"shipmentId":"shipment:o1:r1","amount":36300}]
+        }]);
+        let updated=run("apply_workflow_action",json!({
+            "state":state,"action":"set_shipment_freight",
+            "shipmentId":"shipment:o1:r1","origin":"FACTORY","value":7000,
+            "eventId":"event-1","now":"2026-11-13T13:30:00+09:00"
+        }));
+        assert_eq!(updated["state"]["workflow"]["shipments"][0]["step"],1);
+        assert_eq!(updated["state"]["workflow"]["events"].as_array().unwrap().len(),3);
+        assert_eq!(updated["state"]["workflow"]["events"][0]["action"],"입금 승인 재확인 필요");
+        assert_eq!(updated["state"]["workflow"]["events"][1]["action"],"재검증 필요");
+        assert_eq!(updated["state"]["workflow"]["events"][2]["action"],"배송 건 운임 수정");
+        assert_eq!(updated["state"]["workflow"]["confirmations"][0],
+            state["workflow"]["confirmations"][0]);
+        assert_eq!(run("validate_workflow",json!({"state":updated["state"],"before":state}))["valid"],true);
+    }
+
 }
