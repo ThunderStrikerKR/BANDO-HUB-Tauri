@@ -210,10 +210,11 @@ export function ProductManager({
     )
       return;
     try {
-      const next = clone(state);
-      next.products.find((x) => x.id === p.id)!.deletedAt = new Date().toISOString();
-      next.deletedProductKeys = [...new Set([...(next.deletedProductKeys ?? []), productKey(p)])];
-      next.aliases = next.aliases.filter((a) => a.productId !== p.id);
+      const { state: next } = await businessCoreCall<{ state: State }>(
+        "catalog_clients", "archive_product", {
+          state, productId: p.id, at: new Date().toISOString(),
+        },
+      );
       await onSave(next);
       setEdit(undefined);
       setOriginalEdit(undefined);
