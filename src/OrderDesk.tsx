@@ -11,10 +11,10 @@ import { SourceDocument } from "./SourceDocument";
 import { StaffChecks } from "./StaffChecks";
 import { WorkflowFooter, WorkflowFreightRows } from "./WorkflowFooter";
 import { won } from "./domain";
-import { confirmProposedProduct } from "./issue-actions";
+
 import { internalModel } from "./matching";
 import { useOrderDesk, type OrderDeskProps } from "./orders/useOrderDesk";
-import { nativeRepriceEditedOrder, nativeReconcileWorkflow } from "./orders/native-rules";
+import { nativeConfirmProposedProduct, nativeRepriceEditedOrder, nativeReconcileWorkflow } from "./orders/native-rules";
 import { businessCoreCall } from "./tauri-bridge";
 import { addressParts } from "./parser";
 import { billingSnapshot } from "./replies";
@@ -668,7 +668,7 @@ export function OrderDesk(props: OrderDeskProps) {
                 }}
                 onConfirm={() =>
                   void run(async () => {
-                    const result = confirmProposedProduct(state, draft, r.id, i.id);
+                    const result = await nativeConfirmProposedProduct(state, draft, r.id, i.id);
                     if (JSON.stringify(result.state.aliases) !== JSON.stringify(state.aliases))
                       await onSaveState(result.state);
                     onChange(result.order);
