@@ -630,6 +630,9 @@ function rawCase(name:string,raw:string,mutate:(s:any)=>void=()=>{},
   const state:any=copy(baseState);
   // The source parser's normal app state has an alias list.
   state.aliases=[];
+  state.products[0].defaultColor="Black";
+  state.products[0].createdAt=now;
+  state.products[0].updatedAt=now;
   mutate(state);
   const generated=Array.from({length:120},(_,i)=>"source-raw-"+(i+1));
   const orderRow=state.orders.find((o:any)=>o.id==="o1");
