@@ -343,6 +343,29 @@ fn apply_registered_item(
     item["issues"]=json!(issues);
 }
 
+/// Product label colors use src/product-models.ts::colorLabel, which is
+/// intentionally different from src/domain.ts::normalizeColor. This is a
+/// display-only mapping; SKU selection continues to use canonical colors.
+fn ts_candidate_color_label(value: &str) -> String {
+    let lower=value.trim().to_lowercase();
+    match lower.as_str() {
+        "gold"|"골드"=>"골드".to_owned(),
+        "rose gold"|"로즈골드"=>"로즈골드".to_owned(),
+        "cosmo black"|"cosmoblack"|"코스모블랙"=>"코스모블랙".to_owned(),
+        "black"|"검정"|"블랙"=>"블랙".to_owned(),
+        "gray"|"grey"|"회색"|"그레이"=>"그레이".to_owned(),
+        "brown"|"브라운"=>"브라운".to_owned(),
+        "white"|"흰색"|"화이트"=>"화이트".to_owned(),
+        "clear"|"클리어"=>"클리어".to_owned(),
+        "frost"|"frosted"|"프로스트"=>"프로스트".to_owned(),
+        "silver"=>"실버".to_owned(),
+        "blue"=>"블루".to_owned(),
+        "red"=>"레드".to_owned(),
+        "색상 미표기"=>"".to_owned(),
+        _=>value.to_owned(),
+    }
+}
+
 fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, String> {
     let client_id = client_id(client);
     let lines = physical_lines(raw);
@@ -755,25 +778,52 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
             if chosen.is_none() {
                 issues.push("제품명이 확인되지 않습니다.".into());
             }
-            if !unique {
-                issues.push(if hit.quantities.is_empty() {
-                    "수량 미기재 / 거래처 확인 필요".to_owned()
-                } else {
-                    "한 줄에 여러 상품과 수량 확인 필요".to_owned()
-                });
+            // analyzeEvidence.ts::attach strips unresolved single-quantity
+            // notices from the Item. quantityConfirmed remains the only
+            // explicit approval state; ambiguous multiple quantities persist.
+            if !unique && !hit.quantities.is_empty() {
+                issues.push("한 줄에 여러 상품과 수량 확인 필요".to_owned());
             }
-            let term = if hit.common {json!({
+            let mut term = if hit.common {json!({
                 "kind":"COMMON_INHERIT",
                 "term":hit.raw,
                 "productIds":chosen.into_iter().collect::<Vec<_>>()
             })} else {hit.decision["match"].clone()};
+            if !hit.common {
+                // parseLegacy.ts::match.term is the entire product line for
+                // registered NAME matches (not the small regex evidence).
+                if term["kind"]=="NAME"
+                    && term.get("aliasId").map_or(true,Value::is_null) {
+                    term["term"]=json!(hit.raw);
+                }
+                // TypeScript omits undefined aliasId, not JSON null.
+                if term["aliasId"].is_null() {
+                    term.as_object_mut().map(|obj|obj.remove("aliasId"));
+                }
+            }
             let mut products=hit.decision["productCandidates"].clone();
             if let Some(candidates)=products.as_array_mut() {
-                let base=utf16(raw,hit.source_start);
+                // This is the local parseLegacy(line) candidate contract.
+                // Full-document offsets belong only to source evidence.
+                let end=hit.raw.encode_utf16().count();
                 for candidate in candidates {
-                    if let (Some(start),Some(end))=(candidate["start"].as_u64(),candidate["end"].as_u64()) {
-                        candidate["start"]=json!(base+start as usize);
-                        candidate["end"]=json!(base+end as usize);
+                    candidate["start"]=json!(0);
+                    candidate["end"]=json!(end);
+                    if let Some(pid)=candidate.get("productId").and_then(Value::as_str) {
+                        if let Some(p)=model::products(state).into_iter()
+                            .find(|p|p.get("id").and_then(Value::as_str)==Some(pid)) {
+                            let name=p.get("name").and_then(Value::as_str).unwrap_or("");
+                            let suppress=p.get("colorStatus").and_then(Value::as_str)
+                                ==Some("NOT_REQUIRED");
+                            let color=if suppress {String::new()} else {
+                                let first=p.get("variants").and_then(Value::as_array)
+                                    .and_then(|v|v.first());
+                                ts_candidate_color_label(first
+                                    .and_then(|v|v.get("color"))
+                                    .and_then(Value::as_str).unwrap_or(""))
+                            };
+                            candidate["label"]=json!(format!("{name} {color}"));
+                        }
                     }
                 }
             }
@@ -783,10 +833,12 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
                 "color":hit.decision["color"],"quantity":quantity_value,
                 "quantityConfirmed":unique,"unitPrice":null,
                 "origin":hit.decision.get("origin").and_then(Value::as_str).unwrap_or("FACTORY"),
-                "defaulted":false,"recognitionReason":reason,"issues":issues,
+                "defaulted":false,"issues":issues,
                 "url":"","match":term,
                 "productCandidates":products,"sources":[],
             });
+            // An absent TypeScript optional property is not JSON null.
+            if !reason.is_null() {item["recognitionReason"]=reason;}
             apply_registered_item(&mut item,state,client,
                 hit.decision.get("color").and_then(Value::as_str).unwrap_or(""));
             let mut sources = vec![source_json(raw,&events[hit.evidence],&rid,&id)];
