@@ -398,7 +398,7 @@ pub(super) fn validate_reception(before: &Value, state: &Value) -> Result<(),Str
                 return Err("최초 확정 원문 / 시각 / 주문 스냅샷은 변경할 수 없습니다.".into());
             }
             if field(old,"orderType")!=field(order,"orderType")||
-                field(old,"senderSnapshot")!=field(order,"senderSnapshot"){
+                old.get("senderSnapshot")!=order.get("senderSnapshot"){
                 return Err("확정 주문의 유형과 송하인 스냅샷은 변경할 수 없습니다.".into());
             }
         }
@@ -417,7 +417,7 @@ pub(super) fn validate_reception(before: &Value, state: &Value) -> Result<(),Str
                 truthy(field(order,"analysisSnapshot"))||
                 rows(field(order,"recipients")).iter().any(|row|
                     rows(field(row,"items")).iter().any(|item|
-                        !field(item,"unitPrice").is_null()))||
+                        item.get("unitPrice")!=Some(&Value::Null)))||
                 !truthy(field(order,"paid")){
                 return Err("소매 주문은 별도 판매금액 / 원문 분석 없이 접수하세요.".into());
             }
