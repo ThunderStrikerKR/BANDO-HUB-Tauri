@@ -268,7 +268,7 @@ pub(super) fn decorate_copy(payload:&Value)->Result<Value,String>{
     let include_greeting=is_true(payload,"includeGreeting");
     let decorated=if include_greeting &&
         !original.trim_start().starts_with("안녕하세요 반도스탠드입니다."){
-        format!("안녕하세요 반도스탠드입니다.\\n\\n{original}")
+        format!("안녕하세요 반도스탠드입니다.\n\n{original}")
     }else{original.to_string()};
     Ok(json!({"text":decorated}))
 }
