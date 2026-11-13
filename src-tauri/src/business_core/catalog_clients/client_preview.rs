@@ -225,7 +225,7 @@ pub(super) fn preview(payload:&Value)->Result<Value,String>{
         let Some(client)=row.get("client").cloned() else{continue};
         let previous=existing.iter().find(|c|strv(c,"id")==strv(&client,"id"));
         if !identity_changed(previous,&client){continue}
-        let peers=proposed.iter().filter(|candidate|strv(candidate,"row")!=strv(row,"row"))
+        let peers=proposed.iter().filter(|candidate|candidate.get("row")!=row.get("row"))
             .filter_map(|item|item.get("client").cloned()).collect::<Vec<_>>();
         let conflicts=collision(&client,peers);
         if !conflicts.is_empty(){
