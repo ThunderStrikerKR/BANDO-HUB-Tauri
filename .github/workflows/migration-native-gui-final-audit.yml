@@ -1,0 +1,113 @@
+name: Native Windows GUI final audit (real Tauri EXE)
+on:
+  push:
+    branches:
+      - audit/08-windows-real-gui
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: native-gui-final-${{ github.ref }}-${{ github.sha }}
+  cancel-in-progress: true
+jobs:
+  real-screen-navigation:
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Download EXACT integrated Windows executable from proven build
+        uses: actions/download-artifact@v4
+        with:
+          name: TSBH-migration03-preview-NOT-FINAL
+          run-id: 43460648913
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: audit-exe
+      - name: Extract and check EXE and isolated workspace
+        shell: pwsh
+        run: |
+          $zip="audit-exe/BANDO-HUB-migration03-preview.zip"
+          if (!(Test-Path $zip)) { throw "Exact final-integration ZIP missing" }
+          Expand-Archive -LiteralPath $zip -DestinationPath "audit-exe/unpacked" -Force
+          $exe="audit-exe/unpacked/bando_hub.exe"
+          if (!(Test-Path $exe)) { throw "Expected native Tauri EXE missing" }
+          Write-Host "AUDIT_BINARY_COMMIT 3eca217fe2a045e25c6caf0cbedb0bdd234a9afb"
+          Write-Host "AUDIT_EXE_SHA256 $((Get-FileHash $exe -Algorithm SHA256).Hash)"
+          Write-Host "AUDIT_EXE_BYTES $((Get-Item $exe).Length)"
+      - name: Install Playwright client (no Chromium emulator)
+        run: npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund playwright@1.55.1
+      - name: Enable WebView2 CDP only on temporary Windows CI VM
+        shell: pwsh
+        run: |
+          $path="HKCU:\Software\Policies\Microsoft\Edge\WebView2\AdditionalBrowserArguments"
+          New-Item -Path $path -Force | Out-Null
+          New-ItemProperty -Path $path -Name "bando_hub.exe" -Value "--remote-debugging-port=19649 --remote-debugging-address=127.0.0.1" -PropertyType String -Force | Out-Null
+      - name: Launch REAL native Tauri EXE and capture menu and editor UI
+        env:
+          BANDO_STAGE9_EXE: ${{ github.workspace }}\audit-exe\unpacked\bando_hub.exe
+          BANDO_STAGE9_OUT: audit-real-native-menu
+          BANDO_STAGE9_BINARY_COMMIT: 3eca217fe2a045e25c6caf0cbedb0bdd234a9afb
+        run: node scripts/stage9-windows-native-audit.mjs
+      - name: Remove temporary policy
+        if: always()
+        shell: pwsh
+        run: |
+          Remove-ItemProperty -Path "HKCU:\Software\Policies\Microsoft\Edge\WebView2\AdditionalBrowserArguments" -Name "bando_hub.exe" -ErrorAction SilentlyContinue
+      - name: Preserve real UI screenshots and native diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: actual-Tauri-8menus-and-dialogs
+          path: audit-real-native-menu/
+          if-no-files-found: warn
+          retention-days: 7
+  real-reception-and-test-db:
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Download EXACT integrated Windows executable
+        uses: actions/download-artifact@v4
+        with:
+          name: TSBH-migration03-preview-NOT-FINAL
+          run-id: 43460648913
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: audit-exe
+      - name: Extract native Tauri executable
+        shell: pwsh
+        run: |
+          Expand-Archive -LiteralPath "audit-exe/BANDO-HUB-migration03-preview.zip" -DestinationPath "audit-exe/unpacked" -Force
+          if (!(Test-Path "audit-exe/unpacked/bando_hub.exe")) { throw "Real Tauri EXE missing" }
+      - name: Install Playwright CDP client (no browser emulator)
+        run: npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund playwright@1.55.1
+      - name: Enable WebView2 debugging only on temporary CI VM
+        shell: pwsh
+        run: |
+          $path="HKCU:\Software\Policies\Microsoft\Edge\WebView2\AdditionalBrowserArguments"
+          New-Item -Path $path -Force | Out-Null
+          New-ItemProperty -Path $path -Name "bando_hub.exe" -Value "--remote-debugging-port=19651 --remote-debugging-address=127.0.0.1" -PropertyType String -Force | Out-Null
+      - name: Run REAL native UI + TEST SQLite reception audit (no IPC mocks)
+        env:
+          BANDO_NATIVE_EXE: ${{ github.workspace }}\audit-exe\unpacked\bando_hub.exe
+          BANDO_NATIVE_OUT: audit-real-native-reception
+          BANDO_NATIVE_BIN_COMMIT: 3eca217fe2a045e25c6caf0cbedb0bdd234a9afb
+        run: node scripts/migration03-reception-native-ui.mjs
+      - name: Remove temporary policy
+        if: always()
+        shell: pwsh
+        run: |
+          Remove-ItemProperty -Path "HKCU:\Software\Policies\Microsoft\Edge\WebView2\AdditionalBrowserArguments" -Name "bando_hub.exe" -ErrorAction SilentlyContinue
+      - name: Preserve real reception screenshots and SQLite diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: actual-Tauri-reception-and-test-db
+          path: audit-real-native-reception/
+          if-no-files-found: warn
+          retention-days: 7
