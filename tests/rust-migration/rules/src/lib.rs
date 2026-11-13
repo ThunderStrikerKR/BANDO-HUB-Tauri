@@ -788,4 +788,104 @@ mod regression {
             json!({"assignment:p1":"music","group:music":"v1"}));
     }
 
+
+    #[test]
+    fn exported_factory_staff_confirmation_is_metadata_only() {
+        let mut before=workflow_state("POSTPAID");
+        before["workflow"]["queue"]=json!([{
+            "id":"excel-1","shipmentId":"shipment:o1:r1",
+            "origin":"FACTORY","status":"EXPORTED","fileOnly":true,
+            "snapshot":{"total":36300}
+        }]);
+        let mut after=before.clone();
+        after["workflow"]["queue"][0]["fileOnly"]=json!(false);
+        after["workflow"]["queue"][0]["factoryDeliveredAt"]=json!("2026-11-13T15:00:00+09:00");
+        after["workflow"]["events"].as_array_mut().unwrap().push(json!({
+            "id":"event-1","action":"공장 전달 직원 확인",
+            "at":"2026-11-13T15:00:00+09:00","actor":"직원",
+            "shipmentIds":["shipment:o1:r1"]
+        }));
+        assert_eq!(run("validate_workflow",json!({
+            "state":after,"before":before
+        }))["valid"],true);
+        let mut forged=after.clone();
+        forged["workflow"]["events"]=json!([]);
+        assert!(execute("validate_workflow",json!({
+            "state":forged,"before":before
+        })).is_err());
+    }
+
+    #[test]
+    fn printed_file_disposal_requires_matching_historical_export_snapshot() {
+        let mut before=workflow_state("POSTPAID");
+        before["workflow"]["queue"]=json!([{
+            "id":"excel-1","shipmentId":"shipment:o1:r1",
+            "origin":"FACTORY","status":"EXPORTED","fileOnly":true,
+            "snapshot":{"total":36300}
+        }]);
+        let mut after=before.clone();
+        after["workflow"]["queue"][0]["status"]=json!("CANCELLED");
+        after["workflow"]["events"].as_array_mut().unwrap().push(json!({
+            "id":"event-discard","action":"전달 전 출력본 폐기 / 재작성",
+            "at":"2026-11-13T15:00:00+09:00","actor":"직원",
+            "shipmentIds":["shipment:o1:r1"]
+        }));
+        after["exports"]=json!([{
+            "id":"export-1","snapshots":[before["workflow"]["queue"][0]]
+        }]);
+        assert_eq!(run("validate_workflow",json!({
+            "state":after,"before":before
+        }))["valid"],true);
+        after["exports"][0]["snapshots"][0]["snapshot"]["total"]=json!(1);
+        assert!(execute("validate_workflow",json!({
+            "state":after,"before":before
+        })).is_err());
+    }
+
+    #[test]
+    fn only_untransferred_pre_approval_confirmation_can_be_partially_cancelled() {
+        let mut before=two_shipments_in_one_group();
+        before["workflow"]["confirmations"]=json!([{
+            "id":"confirm-1","groupId":"group:o1","dealerId":"dealer-1",
+            "shipmentIds":["shipment:o1:r1","shipment:o1:r2"],
+            "amount":72600,"actor":"직원",
+            "confirmedAt":"2026-11-13T12:00:00+09:00",
+            "announcedAccount":{"id":"account-1","bank":"가상은행",
+                "number":"123-456","holder":"가상상호"},
+            "amounts":{"shipment:o1:r1":36300,"shipment:o1:r2":36300},
+            "allocations":[{"shipmentId":"shipment:o1:r1","amount":36300},
+                {"shipmentId":"shipment:o1:r2","amount":36300}]
+        }]);
+        let mut after=before.clone();
+        after["workflow"]["confirmations"][0]["shipmentIds"]=json!(["shipment:o1:r2"]);
+        after["workflow"]["confirmations"][0]["allocations"]=json!([
+            {"shipmentId":"shipment:o1:r2","amount":36300}
+        ]);
+        after["workflow"]["confirmations"][0]["amounts"]=json!({"shipment:o1:r2":36300});
+        after["workflow"]["confirmations"][0]["amount"]=json!(36300);
+        assert_eq!(run("validate_workflow",json!({
+            "state":after,"before":before
+        }))["valid"],true);
+        let mut forbidden=after.clone();
+        forbidden["workflow"]["shipments"][0]["step"]=json!(4);
+        assert!(execute("validate_workflow",json!({
+            "state":forbidden,"before":before
+        })).unwrap_err().contains("확인 기록"));
+    }
+
+    #[test]
+    fn actual_freight_audit_must_prove_the_original_value() {
+        let before=workflow_state("POSTPAID");
+        let recorded=run("apply_workflow_action",json!({
+            "state":before,"shipmentId":"shipment:o1:r1","origin":"FACTORY",
+            "action":"record_actual_freight","value":4200,
+            "eventId":"event-1","now":"2026-11-13T15:00:00+09:00"
+        }));
+        let mut forged=recorded["state"].clone();
+        forged["workflow"]["events"][0]["before"]=json!(999);
+        assert!(execute("validate_workflow",json!({
+            "state":forged,"before":before
+        })).unwrap_err().contains("수정 근거"));
+    }
+
 }
