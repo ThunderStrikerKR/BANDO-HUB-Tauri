@@ -489,4 +489,20 @@ mod regression {
         assert_eq!(result["state"]["orders"][0]["raw"],before["orders"][0]["raw"]);
     }
 
+    #[test]
+    fn factory_reply_dispatch_completion_requires_tracking_and_actual_freight() {
+        let mut state=workflow_state("POSTPAID");
+        let view=|state:&Value|run("evaluate_dispatch_state",json!({"state":state,"orderId":"o1"}));
+        assert_eq!(view(&state)["status"],"처리 중");
+        state["workflow"]["shipments"][0]["tracking"]=json!({"FACTORY":"123456789"});
+        assert_eq!(view(&state)["status"],"처리 중");
+        state["workflow"]["shipments"][0]["actualFreight"]=json!({"FACTORY":4200});
+        assert_eq!(view(&state)["status"],"처리 완료");
+        state["orders"][0]["recipients"][0]["items"][0]["origin"]=json!("STORE");
+        assert_eq!(view(&state)["status"],"처리 중");
+        state["workflow"]["shipments"][0]["tracking"]["STORE"]=json!("987654321");
+        state["workflow"]["shipments"][0]["actualFreight"]["STORE"]=json!(2500);
+        assert_eq!(view(&state)["status"],"처리 완료");
+    }
+
 }
