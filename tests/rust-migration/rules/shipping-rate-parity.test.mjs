@@ -3,6 +3,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { tsImport } from "tsx/esm/api";
+const { combinationVersions }=await tsImport("../../../src/shipping.ts",import.meta.url);
 const root=fileURLToPath(new URL("../../../",import.meta.url));
 const cargo=fileURLToPath(new URL("../integration/Cargo.toml",import.meta.url));
 const old={
@@ -282,5 +284,64 @@ for(let i=0;i<copyCases.length;i++){
     assert.deepEqual(copyActual[i].value,copyOracle(copyRequests[i].payload));
     assert.equal(copyState.productHistory.p1.length,1);
     assert.equal(copyState.groups[0].current.version,"old-version");
+  });
+}
+
+const baseCombo={
+  id:"old-combination",key:"FACTORY|p1@1",epoch:2,
+  versions:{"assignment:p1":"g1","group:g1":"old-version"},
+  charge:3000,actual:2500,at:"2026-11-01T00:00:00.000Z",
+  active:true,description:"확인된 합포장",
+  shipmentId:"shipment-1",verifiedAt:"2026-11-02T00:00:00.000Z",
+  sampleCount:3,observedCharge:2500,
+};
+const exceptionState={
+  products:[{id:"p1",shippingGroupId:"g1"},{id:"p2",shippingGroupId:"g2"}],
+  shipping:{...structuredClone(shipping),combinations:[baseCombo]},
+};
+const exceptionCases=[
+  ["new exception amount retains historical actual and prior inactive",4500],
+  ["zero verified exception is an allowed manual charge",0],
+  ["revised charge keeps current group and assignment versions",3200],
+];
+function exceptionOracle(payload){
+  const state=payload.state;
+  const next=structuredClone(payload.shipping);
+  const old=next.combinations.find(x=>x.id===payload.combinationId);
+  old.active=false;
+  next.combinations.push({
+    ...old,verifiedAt:undefined,shipmentId:undefined,
+    sampleCount:0,observedCharge:undefined,
+    id:payload.newId,charge:payload.charge,epoch:next.epoch,
+    versions:combinationVersions(old.key,state),
+    at:payload.now,active:true,
+  });
+  return JSON.parse(JSON.stringify({shipping:next}));
+}
+const exceptionRequests=exceptionCases.map(([,price])=>({
+  domain:"rules",operation:"apply_shipping_action",
+  payload:{
+    action:"revise_combination",state:exceptionState,
+    shipping:exceptionState.shipping,
+    combinationId:"old-combination",newId:"revised-combination",
+    charge:price,now,
+  }
+}));
+const exceptionRun=spawnSync("cargo",["run","--quiet","--manifest-path",cargo,
+  "--bin","reception_runner"],{
+  cwd:root,input:JSON.stringify(exceptionRequests),encoding:"utf8",
+  timeout:900000,maxBuffer:64*1024*1024
+});
+if(exceptionRun.error)throw exceptionRun.error;
+assert.equal(exceptionRun.status,0,exceptionRun.stderr);
+const exceptionActual=JSON.parse(exceptionRun.stdout);
+assert.equal(exceptionActual.length,exceptionCases.length);
+for(let i=0;i<exceptionCases.length;i++){
+  const [name]=exceptionCases[i];
+  test("Rust exception freight: "+name,()=>{
+    assert.equal(exceptionActual[i].ok,true,JSON.stringify(exceptionActual[i].error));
+    assert.deepEqual(exceptionActual[i].value,exceptionOracle(exceptionRequests[i].payload));
+    assert.equal(exceptionState.shipping.combinations[0].active,true);
+    assert.equal(exceptionState.shipping.combinations.length,1);
   });
 }
