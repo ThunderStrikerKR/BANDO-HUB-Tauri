@@ -254,9 +254,27 @@ fn append_event(state:&mut Value,payload:&Value,action:&str,ids:&[String],
     if find_by_id(&state["workflow"]["events"],id).is_some() {
         return Err("업무 이벤트 ID가 중복됩니다.".into());
     }
-    let event=json!({"id":id,"at":now,"actor":if actor.is_empty() {"직원(이름 미설정)"}else{actor},
-        "action":action,"shipmentIds":ids,"groupId":group_id,
-        "before":before,"after":after});
+    let mut event=json!({"id":id,"at":now,"actor":if actor.is_empty() {"직원(이름 미설정)"}else{actor},
+        "action":action,"shipmentIds":ids});
+    // Original TypeScript event() receives optional before/after/groupId
+    // arguments. An absent argument serializes as an OMITTED property, not
+    // explicit null. Preserve genuine null only for recordActualFreight's
+    // "before" evidence when no old freight exists.
+    if !["실제 출고 운임 입력","매장 발송 확인"].contains(&action) {
+        set(&mut event,"groupId",json!(group_id))?;
+    }
+    if !["처리완료 / 엑셀 관리 목록 이관","실제 입금 기록",
+        "엑셀 이관 복구","매장 발송 확인",
+        "전달 후 변경 요청 기록","묶음 입금 계좌 변경",
+        "실제 배송 완료 / 운임 검증"].contains(&action) {
+        set(&mut event,"before",before)?;
+    }
+    if !["엑셀 이관 복구","매장 발송 확인"].contains(&action) {
+        set(&mut event,"after",after)?;
+    }
+    if action=="이전 단계 취소" {
+        set(&mut event,"reason",json!("입금 기록과 이전 완료 이력은 보존"))?;
+    }
     state["workflow"]["events"].as_array_mut().ok_or("업무 이벤트 목록 누락")?.push(event);
     Ok(())
 }
@@ -363,7 +381,7 @@ pub(super) fn apply(payload:&Value)->Result<Value,String> {
                 let ship_id=str_field(&state["workflow"]["shipments"][*si],"id").to_string();
                 let (_index,oi,ri)=shipment_indices(&state,&ship_id)?;
                 if next==1 {
-                    let sender=field(&state["orders"][oi],"senderSnapshot").clone();
+                    let sender=super::reconciliation::sender_for(&state,&state["orders"][oi]);
                     set(&mut state["workflow"]["shipments"][*si],"sender",sender)?;
                 }
                 if next==2 {
