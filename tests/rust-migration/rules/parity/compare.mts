@@ -20,6 +20,8 @@ import {
 } from "../../../../src/shipping.ts";
 import { shipmentTotals, validateWorkflow, reconcileWorkflow, deleteOrder, workflowIssues, stageIssues, applyOrderRawEdit, migrateWorkflow } from "../../../../src/workflow.ts";
 import { orderIssues, approveMissingQuantity, pendingIssue } from "../../../../src/validation.ts";
+import { validateReceptionBoundary } from "../../../../src/orders/reception.ts";
+import { companyClient, companyParty } from "../../../../src/order-types.ts";
 
 const root=resolve(dirname(fileURLToPath(import.meta.url)),"../../../..");
 const now="2026-11-13T09:00:00+09:00";
@@ -1520,6 +1522,262 @@ validationCase("missing dealer but frozen client snapshot remains valid",unchang
   s.orders[0].clientSnapshot=copy(s.clients[0]);
   s.clients=[];
 },true);
+
+
+// Actual src/orders/reception.ts::validateReceptionBoundary baseline. Tests
+// must compare a newly saved reception in after-State to a genuine prior
+// State, not two clones that already contain the newly confirmed order.
+function newConfirmedReception(type:"AGENCY"|"DEALER"|"RETAIL"="AGENCY"){
+  const state:any=copy(baseState);
+  const existing:any=copy(order);
+  existing.id="order-new";
+  existing.receptionVersion=1;
+  existing.confirmedAt=now;
+  existing.clientSnapshot=copy(client);
+  existing.senderSnapshot=copy(client);
+  existing.receipt={original:existing.raw,at:now,
+    actor:"접수 담당자",clientId:existing.clientId,legacy:false};
+  existing.recipients[0].id="recipient-new";
+  existing.recipients[0].items[0].id="item-new";
+  existing.recipients[0].items[0].quantityConfirmed=true;
+  existing.confirmationSnapshot={
+    at:now,raw:existing.raw,client:copy(client),
+    recipients:copy(existing.recipients),
+    data:{id:existing.id,raw:existing.raw,recipients:copy(existing.recipients)}
+  };
+  existing.orderType=type;
+  if(type==="DEALER"){
+    existing.senderSnapshot=companyClient(state.settings as any);
+  }else if(type==="RETAIL"){
+    existing.clientId="";
+    existing.raw="";
+    existing.paid=true;
+    existing.applyVat=false;
+    existing.recipients[0].dispatchOrigin="FACTORY";
+    existing.recipients[0].vatDefault=false;
+    existing.recipients[0].items[0].unitPrice=null;
+    existing.recipients[0].items[0].quantityConfirmed=true;
+    existing.clientSnapshot=companyParty(state.settings as any);
+    existing.senderSnapshot=companyClient(state.settings as any);
+    existing.receipt.original="";existing.receipt.clientId="";
+    existing.confirmationSnapshot.raw="";
+    existing.confirmationSnapshot.client=copy(existing.clientSnapshot);
+    existing.confirmationSnapshot.data.raw="";
+    existing.confirmationSnapshot.recipients=copy(existing.recipients);
+    existing.confirmationSnapshot.data.recipients=copy(existing.recipients);
+  }
+  state.orders.push(existing);
+  const clonedSource:any=copy(workflow.sources[0]);
+  clonedSource.id="source:order-new";
+  clonedSource.orderId="order-new";
+  clonedSource.raw=existing.raw;
+  state.workflow.sources.push(clonedSource);
+  const clonedGroup:any=copy(workflow.groups[0]);
+  clonedGroup.id="group:order-new";
+  clonedGroup.rootGroupId="group:order-new";
+  clonedGroup.sourceId=clonedSource.id;
+  clonedGroup.dealerId=existing.clientId;
+  state.workflow.groups.push(clonedGroup);
+  const clonedShipment:any=copy(workflow.shipments[0]);
+  clonedShipment.id="shipment:order-new:recipient-new";
+  clonedShipment.sourceId=clonedSource.id;
+  clonedShipment.orderId="order-new";
+  clonedShipment.recipientId="recipient-new";
+  clonedShipment.groupId=clonedGroup.id;
+  clonedShipment.step=type==="RETAIL"?4:1;
+  clonedShipment.transferred=type==="RETAIL";
+  state.workflow.shipments.push(clonedShipment);
+  state.workflow.events.push({id:"confirm-order-new",at:now,
+    actor:"접수 담당자",action:"주문 확인 완료",
+    shipmentIds:[clonedShipment.id],groupId:clonedGroup.id,
+    after:{orderType:type}});
+  return state;
+}
+function receptionCase(name:string,change:(after:any,before:any)=>void,
+  expectedOk:boolean,mode:"AGENCY"|"DEALER"|"RETAIL"="AGENCY",
+  isNew=true){
+  const before:any=copy(baseState);
+  const after:any=isNew?newConfirmedReception(mode):copy(before);
+  change(after,before);
+  add("reception boundary: "+name,"validate_reception_boundary",{before,state:after},
+    ()=>{validateReceptionBoundary(before,after);return {valid:true};});
+  cases[cases.length-1].expectedOk=expectedOk;
+}
+function newOrder(s:any){return s.orders.find((o:any)=>o.id==="order-new");}
+function newShip(s:any){return s.workflow.shipments.find((x:any)=>x.orderId==="order-new");}
+function newGroup(s:any){return s.workflow.groups.find((x:any)=>x.id==="group:order-new");}
+receptionCase("valid new agency confirmation",()=>{},true);
+receptionCase("valid new dealer confirmation",()=>{},true,"DEALER");
+receptionCase("valid new retail confirmation",()=>{},true,"RETAIL");
+receptionCase("new retail without reception version",s=>{
+  delete newOrder(s).receptionVersion;
+},false,"RETAIL");
+receptionCase("new retail wrong reception version",s=>{
+  newOrder(s).receptionVersion=2;
+},false,"RETAIL");
+receptionCase("new v1 without confirmedAt",s=>{
+  delete newOrder(s).confirmedAt;
+},false);
+receptionCase("new v1 without confirmationSnapshot",s=>{
+  delete newOrder(s).confirmationSnapshot;
+},false);
+receptionCase("new order wrong type",s=>{
+  newOrder(s).orderType="OTHER";
+},false);
+receptionCase("legacy agency new order accepted",s=>{
+  newOrder(s).receptionVersion=0;
+  delete newOrder(s).confirmationSnapshot;
+},true);
+receptionCase("agency senderSnapshot missing",s=>{
+  delete newOrder(s).senderSnapshot;
+},false);
+receptionCase("agency senderSnapshot modified",s=>{
+  newOrder(s).senderSnapshot.phone="010-3333-7777";
+},false);
+receptionCase("DEALER senderSnapshot set to client",s=>{
+  newOrder(s).senderSnapshot=copy(client);
+},false,"DEALER");
+receptionCase("RETAIL senderSnapshot set to client",s=>{
+  newOrder(s).senderSnapshot=copy(client);
+},false,"RETAIL");
+receptionCase("RETAIL clientSnapshot wrong",s=>{
+  newOrder(s).clientSnapshot=copy(client);
+},false,"RETAIL");
+receptionCase("RETAIL has forbidden clientId",s=>{
+  newOrder(s).clientId="dealer-1";
+  newGroup(s).dealerId="dealer-1";
+},false,"RETAIL");
+receptionCase("RETAIL has nonempty raw original",s=>{
+  newOrder(s).raw="별도 주문";
+},false,"RETAIL");
+receptionCase("RETAIL with analyzed snapshot",s=>{
+  newOrder(s).analysisSnapshot={raw:"분석된 원문"};
+},false,"RETAIL");
+receptionCase("RETAIL with paid=false",s=>{
+  newOrder(s).paid=false;
+},false,"RETAIL");
+receptionCase("RETAIL with explicit item price",s=>{
+  const o=newOrder(s);
+  o.recipients[0].items[0].unitPrice=30000;
+  o.confirmationSnapshot.recipients=copy(o.recipients);
+  o.confirmationSnapshot.data.recipients=copy(o.recipients);
+},false,"RETAIL");
+receptionCase("RETAIL dispatchOrigin missing",s=>{
+  const o=newOrder(s);delete o.recipients[0].dispatchOrigin;
+},false,"RETAIL");
+receptionCase("RETAIL dispatchOrigin unknown",s=>{
+  newOrder(s).recipients[0].dispatchOrigin="UNKNOWN";
+},false,"RETAIL");
+receptionCase("RETAIL actualFreight negative",s=>{
+  newOrder(s).recipients[0].actualFreight=-1;
+},false,"RETAIL");
+receptionCase("RETAIL quantity confirmation missing",s=>{
+  newOrder(s).recipients[0].items[0].quantityConfirmed=false;
+},false,"RETAIL");
+receptionCase("RETAIL missing company sender address",s=>{
+  s.settings.senderAddress="";
+  newOrder(s).senderSnapshot=companyClient(s.settings as any);
+  newOrder(s).clientSnapshot=companyParty(s.settings as any);
+},false,"RETAIL");
+receptionCase("RETAIL sold-out item warning",s=>{
+  s.products[0].saleStatus="품절";
+},false,"RETAIL");
+receptionCase("product removed from registration",s=>{
+  newOrder(s).recipients[0].items[0].productId="missing-product";
+},false);
+receptionCase("product is inactive",s=>{
+  s.products[0].active=false;
+},false);
+receptionCase("product is deleted",s=>{
+  s.products[0].deletedAt=now;
+},false);
+receptionCase("product variant unknown",s=>{
+  newOrder(s).recipients[0].items[0].variantId="missing-variant";
+},false);
+receptionCase("confirmationSnapshot raw mismatched",s=>{
+  newOrder(s).confirmationSnapshot.raw="different raw";
+},false);
+receptionCase("confirmationSnapshot order ID mismatched",s=>{
+  newOrder(s).confirmationSnapshot.data.id="other-order";
+},false);
+receptionCase("confirmationSnapshot data raw mismatched",s=>{
+  newOrder(s).confirmationSnapshot.data.raw="different raw";
+},false);
+receptionCase("confirmationSnapshot recipients mismatched",s=>{
+  newOrder(s).confirmationSnapshot.recipients[0].name="다른 수취인";
+},false);
+receptionCase("confirmationSnapshot data recipients mismatched",s=>{
+  newOrder(s).confirmationSnapshot.data.recipients[0].name="다른 수취인";
+},false);
+receptionCase("confirmationSnapshot time mismatched",s=>{
+  newOrder(s).confirmationSnapshot.at="2020-01-01T00:00:00Z";
+},false);
+receptionCase("receipt original mismatched",s=>{
+  newOrder(s).receipt.original="다른 원문";
+},false);
+receptionCase("receipt time mismatched",s=>{
+  newOrder(s).receipt.at="2020-01-01T00:00:00Z";
+},false);
+receptionCase("snapshot client ID mismatched",s=>{
+  newOrder(s).confirmationSnapshot.client.id="not-same-client";
+},false);
+receptionCase("missing all active shipments",s=>{
+  s.workflow.shipments=s.workflow.shipments.filter((v:any)=>v.orderId!=="order-new");
+},false);
+receptionCase("all shipments are legacyArchived",s=>{
+  newShip(s).legacyArchived=true;
+},false);
+receptionCase("active shipment step zero",s=>{
+  newShip(s).step=0;
+},false);
+receptionCase("no confirmation event",s=>{
+  s.workflow.events=s.workflow.events.filter((e:any)=>e.id!=="confirm-order-new");
+},false);
+receptionCase("confirmation event unrelated shipment",s=>{
+  s.workflow.events.find((e:any)=>e.id==="confirm-order-new").shipmentIds=["shipment:other"];
+},false);
+receptionCase("recipient has no matching shipment",s=>{
+  const o=newOrder(s);
+  const second=copy(o.recipients[0]);
+  second.id="recipient-extra";second.name="추가 수취인";
+  second.items[0].id="item-extra";
+  o.recipients.push(second);
+  o.confirmationSnapshot.recipients=copy(o.recipients);
+  o.confirmationSnapshot.data.recipients=copy(o.recipients);
+},false);
+receptionCase("agency stage 1 is blocked by missing address",s=>{
+  const o=newOrder(s);o.recipients[0].address="";
+  o.confirmationSnapshot.recipients=copy(o.recipients);
+  o.confirmationSnapshot.data.recipients=copy(o.recipients);
+},false);
+receptionCase("agency stage 1 blocked by unassigned evidence",s=>{
+  const o=newOrder(s);o.recipients[0].unassignedEvidence=[{
+    kind:"product",text:"이해할 수 없는 품명"
+  }];
+  o.confirmationSnapshot.recipients=copy(o.recipients);
+  o.confirmationSnapshot.data.recipients=copy(o.recipients);
+},false);
+receptionCase("existing confirmed raw edited",s=>{
+  s.orders[0].confirmedAt=now;s.orders[0].raw="변경됨";
+},false,"AGENCY",false);
+receptionCase("existing confirmed timestamp edited",s=>{
+  s.orders[0].confirmedAt=now;
+},true,"AGENCY",false);
+receptionCase("existing confirmed snapshot edited",s=>{
+  s.orders[0].confirmationSnapshot={at:now};
+},true,"AGENCY",false);
+receptionCase("existing order type changed",s=>{
+  s.orders[0].orderType="DEALER";
+},false,"AGENCY",false);
+receptionCase("existing senderSnapshot changed",s=>{
+  s.orders[0].senderSnapshot=copy(client);
+},false,"AGENCY",false);
+receptionCase("existing mutable address can change",s=>{
+  s.orders[0].recipients[0].address="서울특별시 가상로 99";
+},true,"AGENCY",false);
+receptionCase("existing order raw changed before confirmation",s=>{
+  s.orders[0].raw="편집된 접수 초안";
+},true,"AGENCY",false);
 
 function normalized(v:unknown):string {
   if(Array.isArray(v))return "["+v.map(normalized).join(",")+"]";
