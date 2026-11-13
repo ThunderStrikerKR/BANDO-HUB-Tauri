@@ -1,3 +1,5 @@
+> **동등성 2026-11-13 최신 검증:** 실측 TS/Rust 차등 사례 109 + 11 + 65 = **185개 일치** (성공 커밋 `2db4a1ba36ddeb3df7049254950816d2dbc2323f`, [Actions 43356375386](https://github.com/ThunderStrikerKR/TSBH/actions/runs/43356375386)). 세션 2의 규칙 모듈은 이 브랜치에 비교 테스트용으로 **비활성 복사**함. 세션 1 인식 엔진은 다수 실패로 병합하지 않음. 전체 이전/실제 Windows 시연/핵심 TS 제거는 **미완료**. 세부 결과: [PARITY_AUDIT.md](PARITY_AUDIT.md). 이 최신 기록은 아래 과거 중간 상태보다 우선함.
+
 # Rust migration session state
 Updated: 2026-11-13 KST (session 3)
 
