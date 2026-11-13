@@ -505,4 +505,53 @@ mod regression {
         assert_eq!(view(&state)["status"],"처리 완료");
     }
 
+    #[test]
+    fn completed_delivery_records_actual_tariff_observation_and_retains_snapshot() {
+        let mut before=workflow_state("POSTPAID");
+        before["shipping"]=shipping_state()["shipping"].clone();
+        before["workflow"]["shipments"][0]["transferred"]=json!(true);
+        before["workflow"]["queue"]=json!([{
+            "id":"excel:shipment:o1:r1:FACTORY","shipmentId":"shipment:o1:r1",
+            "origin":"FACTORY","status":"EXPORTED","fileOnly":false,
+            "snapshot":{"total":36300,"shipping":3000,"vat":3300,
+                "subtotal":30000,"freightCode":"010"}
+        }]);
+        let result=run("apply_workflow_action",json!({
+            "state":before,"action":"complete_delivery",
+            "shipmentId":"shipment:o1:r1","actual":{"FACTORY":4200},
+            "combinationIds":["combination-1"],"deliveryIds":["delivery-1"],
+            "eventId":"event-1","now":"2026-11-13T13:00:00+09:00"
+        }));
+        assert_eq!(result["completed"],true);
+        assert_eq!(result["state"]["workflow"]["shipments"][0]["delivery"]["recordIds"][0],
+            "combination-1");
+        assert_eq!(result["state"]["shipping"]["combinations"][0]["charge"],4200);
+        assert_eq!(result["state"]["shipping"]["combinations"][0]["observedCharge"],3000);
+        assert_eq!(result["state"]["workflow"]["deliveries"][0]["actual"],4200);
+        assert_eq!(result["state"]["workflow"]["deliveries"][0]["charge"],3000);
+        assert_eq!(result["state"]["workflow"]["queue"][0]["snapshot"]["total"],36300);
+        assert_eq!(result["state"]["workflow"]["events"][0]["action"],"실제 배송 완료 / 운임 검증");
+        assert_eq!(run("validate_workflow",json!({"state":result["state"],"before":before}))["valid"],true);
+    }
+    #[test]
+    fn queued_or_file_only_excel_cannot_claim_delivery_completion() {
+        let mut state=workflow_state("POSTPAID");
+        state["shipping"]=shipping_state()["shipping"].clone();
+        state["workflow"]["shipments"][0]["transferred"]=json!(true);
+        state["workflow"]["queue"]=json!([{
+            "id":"queued","shipmentId":"shipment:o1:r1","origin":"FACTORY",
+            "status":"QUEUED","fileOnly":false
+        }]);
+        let make=|state:&Value|json!({
+            "state":state,"action":"complete_delivery","shipmentId":"shipment:o1:r1",
+            "actual":{"FACTORY":4200},"combinationIds":["combo-1"],
+            "deliveryIds":["delivery-1"],"eventId":"event-1",
+            "now":"2026-11-13T13:00:00+09:00"
+        });
+        assert!(execute("apply_workflow_action",make(&state)).is_err());
+        state["workflow"]["queue"][0]["status"]=json!("EXPORTED");
+        state["workflow"]["queue"][0]["fileOnly"]=json!(true);
+        assert!(execute("apply_workflow_action",make(&state)).is_err());
+    }
+
 }
