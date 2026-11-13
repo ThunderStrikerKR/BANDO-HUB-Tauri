@@ -31,6 +31,12 @@ pub fn execute(operation: &str, payload: Value) -> Result<Value, String> {
             str_field(&payload,"query"),
             str_field(&payload,"date"),
         ),
+        "list_order_history_view" => history::list_view(
+            req(&payload,"state")?,
+            str_field(&payload,"query"),
+            str_field(&payload,"date"),
+            field(&payload,"trackingOrder"),
+        ),
         "order_history_status" => Ok(json!({"status":history::status(
             req(&payload,"state")?,required_str(&payload,"orderId")?,
         )})),
