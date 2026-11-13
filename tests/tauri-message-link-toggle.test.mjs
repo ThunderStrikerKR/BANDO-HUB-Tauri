@@ -15,13 +15,13 @@ test("optional product link toggle appears next to auto message heading", () => 
 });
 test("payment preview and clipboard use the optional link flag, default off", () => {
   assert.match(view, /useState\(false\)/);
-  assert.match(view, /automaticMessage\(state, gid, includeLinks\)/);
-  assert.match(generator, /automaticMessage\(state: State, gid: string, includeLinks = false\)/);
-  assert.match(generator, /hubMessages\(order, state, gid, \{ payment: includeLinks, options: false \}\)/);
+  assert.match(view, /nativeAutomaticMessage\(latestState\.current, gid, includeLinks\)/);
+  assert.doesNotMatch(view, /\bautomaticMessage\(state, gid, includeLinks\)/);
+  assert.match(content("src/native-automatic-message.ts"), /"output", "render_automatic_message"/);
   assert.match(view, /window\.bando!\.copy\(greeting \? withGreeting\(text\) : text\)/);
 });
 test("request drafts exclude optional links when edited and avoid duplicates", () => {
-  assert.match(view, /!baseText\.includes\(item\.url\)/);
+  assert.match(view, /!baseText\.includes\(entry\.slice\(entry\.lastIndexOf\("\\n"\) \+ 1\)\)/);
   assert.match(view, /optionalSuffix && value\.endsWith\(optionalSuffix\)/);
   assert.match(view, /setIncludeLinks\(false\)/);
 });
