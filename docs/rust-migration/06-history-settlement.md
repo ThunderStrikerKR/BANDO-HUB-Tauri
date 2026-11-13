@@ -86,3 +86,12 @@
 - 다른 브랜치의 공동 작업과 충돌하지 않도록 공유 `.github/workflows/migration-output.yml`은 다시 원상복구.
 - 후속 수정 사항: 보류 Excel 출력의 입금표시 경고도 Rust 뷰 결과를 소비하도록 수정, 해당 출력 테스트에 Rust와 동일한 정형 데이터 전달.
 - **정적 코드 경로 검사 20개 중 실제 런타임 검사 19개 통과, 나머지 1개는 의도한 TypeScript `import type`로서 JS 실행에 포함되지 않음.** 최신 HEAD Rust 컴파일/원본 TS 비교와 Windows 최종 시험까지 검증 절차를 마친 후에만 PR #6을 Ready로 전환할 것.
+
+## 후속 검증 요약 — 2026-11-13
+
+- 예약된 UI/TypeScript 원본 제거 계획에 따라 전용 화면의 Rust IPC 호출, 수취인별 복사문구, 이력상품 참조, 입금 증빙 경고 및 일일 결산 결과 경로를 전수 확인.
+- 보류 중인 주문 이력 Excel 출력 또한 Rust 이력의 `display.paymentEvidenceMissing`을 소비하도록 수정했다. Rust 결과 없이 과거 TS 알고리즘으로 폴백하거나 경고를 지우는 대신 명시적인 오류를 발생시키고 회귀 테스트를 작성했다.
+- 원본 `domain.won`, `matching.internalModel`, `settlement-report.seoulDate`와 신규 표시 전용 함수들에 대해 실제 GitHub 소스에서 함수를 추출해 **22개 입력 / 22개 동일** 확인.
+- 재검증한 파일의 정적 실행 경로와 표현 검사는 전부 통과했으나, **이번 추가 패치 전체에 대한 Rust cargo 컴파일, Windows 실행, TS/Rust 차등 테스트의 신규 결과는 확보하지 못했다**.
+- 근거: GitHub Actions 브랜치 실행 [43439119940](https://github.com/ThunderStrikerKR/TSBH/actions/runs/43439119940) 등에서 job 0개 / 실패; `rerun_failed_workflow_run_jobs`는 HTTP 403 (`This workflow run cannot be retried`). 기본 브랜치 `main`은 현재 `.github/workflows/` 파일이 없으므로 PR만으로 새 검증 작업을 안정적으로 실행할 대체 워크플로를 확보할 수 없다. 차단 원인은 공개 API에서 확인 불가.
+- 결론: **구현 정리 완료 / 최신 커밋 자동 검증 미완료 / PR Draft 유지**. 다른 세션의 소스나 공용 CI 파일은 변경하지 않았음. 실제 병합/배포 전에는 HEAD 기준 `npm run build`, `npm test`, `node --test tests/rust-migration/rules/history-parity.test.mjs`와 Windows `cargo test --manifest-path src-tauri/Cargo.toml --lib` 통과가 필요함.
