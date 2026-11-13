@@ -259,6 +259,19 @@ fn payment_signature(view:&Value,payment_text:&str,account:Option<&Value>,
         format!(r#"{{"text":{text},"items":{item_text}}}"#)
     })
 }
+/** Keep the original copy-only greeting helper in Rust too: request drafts
+ * remain staff-editable, so this operation accepts the final edited text.
+ */
+pub(super) fn decorate_copy(payload:&Value)->Result<Value,String>{
+    let original=payload.get("text").and_then(Value::as_str)
+        .ok_or("복사할 메시지 본문이 없습니다.")?;
+    let include_greeting=is_true(payload,"includeGreeting");
+    let decorated=if include_greeting &&
+        !original.trim_start().starts_with("안녕하세요 반도스탠드입니다."){
+        format!("안녕하세요 반도스탠드입니다.\\n\\n{original}")
+    }else{original.to_string()};
+    Ok(json!({"text":decorated}))
+}
 pub(super) fn execute(payload:&Value)->Result<Value,String>{
     let state=payload.get("state").ok_or("메시지 생성 상태가 없습니다.")?;
     let gid=string(payload,"groupId");
