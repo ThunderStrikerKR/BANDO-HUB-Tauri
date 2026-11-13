@@ -62,7 +62,7 @@ fn resolve_historical<'a>(
         };
     }
     let mapping_key = format!("{}|{}", product_id, variant_id);
-    let mapped_id = state.get("productMappings")?.get(&mapping_key)?.as_str()?;
+    let mapped_id = state.get("productMappings")?.get(mapping_key.as_str())?.as_str()?;
     let mapped = find_by_id(products, mapped_id)?;
     let variants = children(mapped, "variants");
     if text(mapped, "sourceProductId") == product_id
@@ -122,7 +122,7 @@ fn validate_factory_product(state: &Value, item: &Value) -> Result<(), String> {
     if historical {
         let color = trimmed(&variants[0], "color");
         if !color.is_empty() && color != "단일" && color != "색상 미표기"
-            && stored_name.contains(&color) && !frozen_name.contains(&color)
+            && stored_name.contains(color.as_str()) && !frozen_name.contains(color.as_str())
         {
             return Err("과거 주문의 색상 구분이 독립 상품 기록과 일치하는지 확인하세요.".into());
         }
