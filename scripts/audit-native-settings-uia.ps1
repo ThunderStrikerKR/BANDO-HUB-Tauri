@@ -80,7 +80,23 @@ public static class BandoNativeSettings {
     if($null -ne $target){$ready=$true;break}
     Start-Sleep -Milliseconds 350
   }
-  if(-not $ready){throw "Tauri settings menu never appeared"}
+  if(-not $ready){
+    $found=Elements
+    $result.availableNodes=@($found | Where-Object {-not [string]::IsNullOrWhiteSpace($_.name)} |
+      Select-Object -First 90 name,control,offscreen,x,y,w,h)
+    $result.nodeCount=$found.Count
+    try {
+      $bounds=[System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+      $bitmap=[System.Drawing.Bitmap]::new($bounds.Width,$bounds.Height)
+      $graphics=[System.Drawing.Graphics]::FromImage($bitmap)
+      try{
+        $graphics.CopyFromScreen($bounds.Location,[System.Drawing.Point]::Empty,$bounds.Size)
+        $bitmap.Save((Join-Path $OutDir "settings-unavailable.png"),[System.Drawing.Imaging.ImageFormat]::Png)
+      }finally{$graphics.Dispose();$bitmap.Dispose()}
+      $result.diagnosticScreenshot="settings-unavailable.png"
+    }catch { $result.screenshotFailure=$_.Exception.Message }
+    throw "Tauri settings menu never appeared (nodes=$($found.Count))"
+  }
   $result.observations+=@{check="main HWND and settings button";passed=$true}
   ClickNative "설정"
   $editor=$null

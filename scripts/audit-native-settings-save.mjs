@@ -67,8 +67,15 @@ const probe=async(verifyOnly)=>{
       status:data.status,observations:data.observations});
     console.log("NATIVE_SETTINGS_RESULT",result.slice(-450),data.status);
   }finally{
+    report.checks.push({type:verifyOnly?"reopen process":"save process",
+      pid:child.pid,exitCode:child.exitCode,stderrTail:stderr.slice(-900)});
     if(child.exitCode===null)child.kill();
-    await pause(750);
+    await new Promise(resolve=>{
+      if(child.exitCode!==null)return resolve();
+      child.once("exit",resolve);
+      setTimeout(resolve,3500);
+    });
+    await pause(1000);
   }
 };
 try{

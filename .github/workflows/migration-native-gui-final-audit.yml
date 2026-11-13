@@ -98,6 +98,11 @@ jobs:
           BANDO_NATIVE_OUT: audit-real-native-reception
           BANDO_NATIVE_BIN_COMMIT: 3eca217fe2a045e25c6caf0cbedb0bdd234a9afb
         run: node scripts/migration03-reception-native-ui.mjs
+      - name: Ensure the previous reception app has exited before TEST settings persistence
+        shell: pwsh
+        run: |
+          Get-Process -Name "bando_hub" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+          Start-Sleep -Seconds 2
       - name: Enable bundled Python for read-only TEST SQLite inspection
         uses: actions/setup-python@v5
         with:
