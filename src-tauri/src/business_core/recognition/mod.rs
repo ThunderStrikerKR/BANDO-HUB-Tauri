@@ -229,6 +229,25 @@ fn address_info(value: &str) -> (String, String, Value) {
     }
     (kind.into(), status.into(), parts)
 }
+fn color_label(value: &str) -> &str {
+    match value.trim().to_lowercase().as_str() {
+        "black" | "블랙" | "검정" => "블랙",
+        "white" | "화이트" => "화이트",
+        "gray" | "grey" | "그레이" => "그레이",
+        "brown" | "브라운" => "브라운",
+        "chrome" | "크롬" => "크롬",
+        "gold" | "골드" => "골드",
+        "rose gold" | "로즈골드" => "로즈골드",
+        "cosmo black" | "코스모블랙" => "코스모블랙",
+        "silver" | "실버" => "실버",
+        "blue" | "블루" => "블루",
+        "red" | "레드" => "레드",
+        "clear" | "클리어" => "클리어",
+        "frost" | "프로스트" => "프로스트",
+        "색상 미표기" => "",
+        _ => value,
+    }
+}
 fn blank_recipient(id: &str, name: &str, anchor: Option<&Evidence>, raw: &str) -> Value {
     let mut value = json!({
         "id":id, "name":name, "address":"", "phone":"", "mobile":"", "note":"",
@@ -603,11 +622,16 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
                 recipients[row_index][other] = json!(v);
             }
         }
-        let src = source_json(raw,e,&rid,&rid);
+        let mut src = source_json(raw,e,&rid,&rid);
+        let source_kind = if (kind=="phone" || kind=="mobile")
+            && !previous.is_empty() && previous!=v {
+            if kind=="phone" {"mobile"} else {"phone"}
+        } else {kind};
+        src["field"]=json!(source_kind);
         recipients[row_index]["sources"].as_array_mut().expect("sources").push(src);
         recipients[row_index]["candidates"].as_array_mut().expect("candidates")
             .push(json!({"id":format!("{}:{}:{}",kind,utf16(raw,e.start),utf16(raw,e.end)),
-                "field":kind,"value":e.value,"label":e.value,
+                "field":source_kind,"value":e.value,"label":e.value,
                 "start":utf16(raw,e.start),"end":utf16(raw,e.end)}));
         events[index].recipient = Some(row_index);
     }
@@ -670,11 +694,24 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
             })} else {hit.decision["match"].clone()};
             let mut products=hit.decision["productCandidates"].clone();
             if let Some(candidates)=products.as_array_mut() {
-                let base=utf16(raw,hit.source_start);
+                // parseLegacy productCandidates are local to the item text,
+                // unlike global analysis evidence spans. Preserve the
+                // TypeScript contract instead of adding the raw offset.
                 for candidate in candidates {
-                    if let (Some(start),Some(end))=(candidate["start"].as_u64(),candidate["end"].as_u64()) {
-                        candidate["start"]=json!(base+start as usize);
-                        candidate["end"]=json!(base+end as usize);
+                    candidate["start"]=json!(0);
+                    candidate["end"]=json!(hit.raw.encode_utf16().count());
+                    if let Some(pid)=candidate.get("productId").and_then(Value::as_str) {
+                        if let Some(product)=model::products(state).iter()
+                            .find(|p|p["id"]==pid) {
+                            let suffix=if product["colorStatus"]=="NOT_REQUIRED" {
+                                ""
+                            } else {
+                                product["variants"].as_array().and_then(|xs|xs.first())
+                                    .and_then(|v|v["color"].as_str())
+                                    .map(color_label).unwrap_or("")
+                            };
+                            candidate["label"]=json!(format!("{} {}",product["name"].as_str().unwrap_or(""),suffix));
+                        }
                     }
                 }
             }
@@ -684,7 +721,8 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
                 "color":hit.decision["color"],"quantity":quantity_value,
                 "quantityConfirmed":unique,"unitPrice":null,
                 "origin":hit.decision.get("origin").and_then(Value::as_str).unwrap_or("FACTORY"),
-                "defaulted":false,"recognitionReason":reason,"issues":issues,
+                "defaulted":chosen.is_some() && model::written_color(&hit.raw).is_none(),
+                "recognitionReason":reason,"issues":issues,
                 "url":"","match":term,
                 "productCandidates":products,"sources":[],
             });
@@ -744,13 +782,27 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
             }
         }
     }
-    let candidates: Vec<Value> = events.iter().map(|e| {
+    // Original analyzeEvidence sorts candidate output by source location,
+    // not the sequence in which product/quantity regexes were executed.
+    for row in &mut recipients {
+        if let Some(src)=row["sources"].as_array_mut() {
+            src.sort_by_key(|s|(s["start"].as_u64().unwrap_or(u64::MAX),
+                s["end"].as_u64().unwrap_or(u64::MAX)));
+        }
+        if let Some(cs)=row["candidates"].as_array_mut() {
+            cs.sort_by_key(|c|(c["start"].as_u64().unwrap_or(u64::MAX),
+                c["end"].as_u64().unwrap_or(u64::MAX)));
+        }
+    }
+    let mut candidates: Vec<Value> = events.iter().map(|e| {
         let mut candidate=e_json(raw,e);
         if let Some(idx) = e.recipient {
             candidate["recipientId"]=recipients[idx]["id"].clone();
         }
         candidate
     }).collect();
+    candidates.sort_by_key(|c|(c["start"].as_u64().unwrap_or(u64::MAX),
+        c["end"].as_u64().unwrap_or(u64::MAX)));
     Ok(json!({"recipients":recipients,"candidates":candidates,"unassigned":unassigned}))
 }
 
