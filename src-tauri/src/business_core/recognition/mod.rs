@@ -99,6 +99,11 @@ fn ts_evidence_reason(raw: &str,e:&Evidence) -> String {
     let line=raw[start..end].trim();
     let base=match (e.kind,e.reason) {
         ("product",_)=>"상품 코드 / 별칭 / 옵션 인식 결과; 귀속은 별도 판정",
+        ("quantity","상품 행에 명시된 수량") if
+            regex::Regex::new(r"(?i)\b(?:BC[\s-]*105)\s+1\s*$")
+                .expect("bare unitted BC-105 source")
+                .is_match(line)
+            =>"같은 상품 행 또는 독립 수량 구간",
         ("quantity","독립 수량 원문; 상품 연결은 별도 판정")
           |("quantity","상품 행에 명시된 수량")
             =>"원문 전체 수량 후보 독립 추출",
@@ -110,6 +115,9 @@ fn ts_evidence_reason(raw: &str,e:&Evidence) -> String {
             =>"수취 기관 또는 직함을 포함한 이름",
         ("name","상품 수량 뒤의 독립 수취인명")
             =>"상품 수량 뒤의 독립 수취인명",
+        ("name","수취인 복수 표기 이름")=>"수취인 복수 표기 이름",
+        ("name","수취 기관 또는 직함을 포함한 이름")
+            =>"수취 기관 또는 직함을 포함한 이름",
         ("name","독립 수취인 또는 기관명") if
             regex::Regex::new(
                 r"^[가-힣A-Za-z0-9 ()]{2,30}(?:학교|교회|성당|병원|학원|월드|목사)$"
@@ -131,7 +139,9 @@ fn ts_evidence_reason(raw: &str,e:&Evidence) -> String {
         ("name",_)=>"같은 행의 대안 후보; 직원 확인 필요",
         ("phone","연락처 원문 구간")
           |("mobile","연락처 원문 구간")=>{
-            if regex::Regex::new(r"^[가-힣]{2,5}(?:님)?\s+0[\d\s().-]{3,}$")
+            if line.starts_with("TEL") || line.starts_with("Tel") {
+                "전화번호 구간 독립 추출"
+            } else if regex::Regex::new(r"^[가-힣]{2,5}(?:님)?\s+0[\d\s().-]{3,}$")
                 .expect("same line phone").is_match(line) {
                 "같은 행의 연락처 원문 보존; 유효성은 별도 검증"
             } else if regex::Regex::new(
@@ -815,6 +825,13 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
             each:Regex::new(r"(?i)(?:각각?|수취인마다|한\s*분당).*(?:\d+|한|두|세)\s*(?:개|대)|씩")
                 .expect("each-recipient quantity").is_match(trimmed),
         });
+        // TS OrderEvidence.value is the parsed product field, not the whole
+        // mixed recipient/phone row or all columns from a shipment table.
+        // Its evidence span still points only to the actual matched token.
+        if let Some(hit)=product_hits.last() {
+            let displayed=ts_product_display(hit,&events).0.to_owned();
+            events[product_evidence].value=displayed;
+        }
     }
     // A generic quantity line is evidence but cannot itself prove which SKU was ordered.
     for line in &lines {
@@ -865,11 +882,23 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
                 recipients[row_index][other] = json!(v);
             }
         }
-        let src = source_json(raw,e,&rid,&rid);
+        // When two mobile contacts are present, the second is retained in
+        // the alternate phone field. TS source(row,c,other) records the
+        // effective destination field, while the original evidence remains
+        // of kind "mobile".
+        let effective_field = if (kind=="phone" || kind=="mobile")
+            && !previous.is_empty() && previous != v {
+            let other=if kind=="phone" {"mobile"} else {"phone"};
+            if recipients[row_index][other].as_str()==Some(v.as_str()) {
+                other
+            } else {kind}
+        } else {kind};
+        let mut src=source_json(raw,e,&rid,&rid);
+        src["field"]=json!(effective_field);
         recipients[row_index]["sources"].as_array_mut().expect("sources").push(src);
         recipients[row_index]["candidates"].as_array_mut().expect("candidates")
             .push(json!({"id":format!("{}:{}:{}",kind,utf16(raw,e.start),utf16(raw,e.end)),
-                "field":kind,"value":e.value,"label":e.value,
+                "field":effective_field,"value":e.value,"label":e.value,
                 "start":utf16(raw,e.start),"end":utf16(raw,e.end)}));
         events[index].recipient = Some(row_index);
     }
@@ -1088,10 +1117,15 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
     for e in &events {
         if (e.kind=="product" || e.kind=="quantity") && e.recipient.is_none() {
             let idx=owner_index(&anchors,&events,e.start);
-            recipients[idx]["unassignedEvidence"].as_array_mut().map(|xs|xs.push(e_json(raw,e)));
-            if recipients[idx].get("unassignedEvidence").is_none() {
-                recipients[idx]["unassignedEvidence"]=json!([e_json(raw,e)]);
+            // Indexing a missing JSON key creates null. Check the array
+            // before indexing; otherwise the first unassigned evidence is
+            // silently dropped and its shipping warning disappears.
+            if !recipients[idx].get("unassignedEvidence")
+                .and_then(Value::as_array).is_some() {
+                recipients[idx]["unassignedEvidence"]=json!([]);
             }
+            recipients[idx]["unassignedEvidence"].as_array_mut()
+                .expect("unassigned evidence array").push(e_json(raw,e));
         }
     }
     let candidates: Vec<Value> = ordered.iter().map(|e| {
