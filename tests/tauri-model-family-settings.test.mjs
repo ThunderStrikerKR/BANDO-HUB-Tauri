@@ -15,7 +15,7 @@ test("No model code based auto-family groups or prefilled color groups",async()=
   assert.equal(suggestGroupColor(state,[black,silver]),undefined);
   const ui=read("src/ColorGuidanceManager.tsx");
   assert.match(ui,/그룹 생성/);
-  assert.match(ui,/모델군에 상품 추가/);
+  assert.match(ui,/<h3>상품 추가<\/h3>/);
   assert.match(ui,/대표모델/);
   assert.match(ui,/validateModelGroups/);
   assert.match(ui,/await window.bando.backup\(\)/);
