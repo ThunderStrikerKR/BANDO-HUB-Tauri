@@ -139,17 +139,24 @@ fn connect(input:&Value,source:&Value,approve:bool,context:&Value)->Result<Value
         let order=rows(&next,"orders").iter()
             .find(|o|s(o,"id")==s(&ship,"orderId"))
             .ok_or("실제 출고지와 배송 건을 확인하세요.")?;
-        let found=rows(order,"recipients").iter().any(|r|
-            s(r,"id")==s(&ship,"recipientId")
-                && rows(r,"items").iter().any(|i|s(i,"origin")=="FACTORY"));
-        if !found{return Err("실제 출고지와 배송 건을 확인하세요.".into())}
-        if prev_actual!=*wanted{
+        let original_recipient=rows(order,"recipients").iter()
+            .find(|r|s(r,"id")==s(&ship,"recipientId"))
+            .ok_or("실제 출고지와 배송 건을 확인하세요.")?;
+        if !rows(original_recipient,"items").iter().any(|i|s(i,"origin")=="FACTORY"){
+            return Err("실제 출고지와 배송 건을 확인하세요.".into())
+        }
+        // TS connectFactoryReply checks collisions against the archived queue
+        // recipient, BUT recordActualFreight reads the current order recipient.
+        // Its audit and no-op rule must keep that distinction.
+        let order_actual=actual(&ship,original_recipient);
+        let changed_freight=order_actual!=*wanted;
+        if changed_freight{
             let at=s(context,"freightAt");
             let freight_actor=actor(&next);
             add_event(&mut next,json!({
                 "id":audit_id(context,"freightEventIds",index),
                 "at":at,"actor":freight_actor,"action":"실제 출고 운임 입력",
-                "shipmentIds":[shipment_id],"before":prev_actual,
+                "shipmentIds":[shipment_id],"before":order_actual,
                 "after":{"origin":"FACTORY","amount":wanted}
             }))?;
         }
@@ -157,10 +164,12 @@ fn connect(input:&Value,source:&Value,approve:bool,context:&Value)->Result<Value
             .ok_or("공장 회신 배송 건이 없습니다.")?.iter_mut()
             .find(|v|s(v,"id")==shipment_id)
             .ok_or("회신할 배송 건이 없습니다.")?;
-        if !field(shipment,"actualFreight").is_object(){
-            shipment["actualFreight"]=json!({});
+        if changed_freight {
+            if !field(shipment,"actualFreight").is_object(){
+                shipment["actualFreight"]=json!({});
+            }
+            shipment["actualFreight"]["FACTORY"]=wanted.clone();
         }
-        shipment["actualFreight"]["FACTORY"]=wanted.clone();
         if !field(shipment,"tracking").is_object(){
             shipment["tracking"]=json!({});
         }
@@ -173,7 +182,7 @@ fn connect(input:&Value,source:&Value,approve:bool,context:&Value)->Result<Value
             "at":field(&reply,"at"),
             "actor":if s(&reply,"actor").is_empty(){"공장 회신 Excel"}else{s(&reply,"actor")},
             "action":reply_action,"shipmentIds":[shipment_id],
-            "before":{"tracking":if prev_tracking.is_empty(){Value::Null}else{json!(prev_tracking)},
+            "before":{"tracking":field(field(&ship,"tracking"),"FACTORY"),
                       "actual":prev_actual},
             "after":{"tracking":field(&current,"tracking"),"actual":wanted,"fileId":reply_id}
         }))?;
