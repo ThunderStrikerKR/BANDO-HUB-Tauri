@@ -235,7 +235,7 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
     ).expect("name label");
     let inline_person = Regex::new(r"(?:^|[\s|/])([가-힣]{2,5})(?:님)?\s+(?:0(?:50\d|1[016789]|2|[3-6]\d|70|80))")
         .expect("inline name");
-    let quantity_person = Regex::new(r"(?i)(?:\d+|한|두|세|네)\s*(?:개|대|ea|pcs)\s+([가-힣]{2,5})(?:님)?")
+    let quantity_person = Regex::new(r"(?i)(?:\d+|한|두|세|네)\s*(?:개|대|ea|pcs)(?:\s|ㅣ|\|)+([가-힣]{2,5})(?:님)?")
         .expect("quantity name");
     let note_label = Regex::new(r"^\s*(?:배송\s*)?(?:메모|메시지|메세지|요청사항)\s*[:：]?\s*(.*)$")
         .expect("note");
@@ -321,6 +321,17 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
         }
         let has_name = events.iter().any(|e| e.kind == "name" && e.line == line.number);
         if !has_name && address.is_none() {
+            if let Some(c) = Regex::new(r"^([가-힣]{2,5})\s+(?:목사|선생님)$")
+                .expect("recipient title").captures(text) {
+                if let Some(name) = c.get(1) {
+                    if is_person(name.as_str()) {
+                        if let Some(at) = line.text.find(name.as_str()) {
+                            add_match(&mut events,line,at,at+name.len(),"name",
+                                name.as_str().to_owned(),"직함 앞 독립 수취인 이름");
+                        }
+                    }
+                }
+            }
             let standalone = text.trim_end_matches('님');
             if is_person(standalone) || is_institution(text) {
                 if let Some(at) = line.text.find(text) {
@@ -376,8 +387,8 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
         // model spans are byte offsets inside this Rust module.
         let p_start = p_start.min(skip_until.len());
         let p_end = p_end.min(skip_until.len()).max(p_start);
-        let p_start = skip_until.floor_char_boundary(p_start);
-        let p_end = skip_until.floor_char_boundary(p_end);
+        let p_start = if skip_until.is_char_boundary(p_start) { p_start } else { 0 };
+        let p_end = if skip_until.is_char_boundary(p_end) { p_end } else { skip_until.len() };
         let product_evidence = add_match(&mut events,line,offset+p_start,offset+p_end,
             "product",trimmed.to_owned(),"상품명/모델명/별칭 인식 근거");
         product_hits.push(ProductHit {
