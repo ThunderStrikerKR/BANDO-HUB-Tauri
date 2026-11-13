@@ -287,12 +287,17 @@ fn address_info(value: &str) -> (String, String, Value) {
             let detail=rest[full.end()..].trim();
             if !detail.is_empty(){parts["detail"]=json!(detail);}
         }
-    } else if let Some(m)=Regex::new(r"[동리읍면]\s+(?:산\s*)?(\d+(?:-\d+)?)")
-        .expect("lot number").captures(rest) {
-        parts["building"]=json!(&m[1]);
-        if let Some(full)=m.get(0){
-            let detail=rest[full.end()..].trim();
-            if !detail.is_empty(){parts["detail"]=json!(detail);}
+    } else if let Some(town)=parts.get("town").and_then(Value::as_str) {
+        // src/parser.ts::addressParts uses the detected *entire* town
+        // as the lot prefix. A suffix such as "410동 804호" is not an
+        // administrative lot without the matching earlier 읍/면/동/리.
+        let pattern=format!(r"{}\s+(?:산\s*)?(\d+(?:-\d+)?)",regex::escape(town));
+        if let Some(m)=Regex::new(&pattern).expect("town-bound lot number").captures(rest){
+            parts["building"]=json!(&m[1]);
+            if let Some(full)=m.get(0){
+                let detail=rest[full.end()..].trim();
+                if !detail.is_empty(){parts["detail"]=json!(detail);}
+            }
         }
     }
     (kind.into(), status.into(), parts)
