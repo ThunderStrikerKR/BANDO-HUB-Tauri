@@ -32,6 +32,8 @@ jobs:
         run: npm install --no-audit --no-fund --ignore-scripts
       - name: Compare original TS against compiled catalog and client Rust
         run: node --test tests/rust-migration/catalog-clients/parity.test.mjs
+      - name: Compare complete client workbook row previews with original TS
+        run: node --test tests/rust-migration/catalog-clients/client-preview-parity.test.mjs
 
   frontend-regression:
     runs-on: ubuntu-latest
