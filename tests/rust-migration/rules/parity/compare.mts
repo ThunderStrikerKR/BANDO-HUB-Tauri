@@ -1906,6 +1906,139 @@ receptionCase("existing senderSnapshot object mutated without type change",(s,b)
   s.orders[0].senderSnapshot={...copy(client),phone:"010-5555-3333"};
 },false,"AGENCY",false);
 
+
+receptionCase("RETAIL simultaneous field failures preserve issue order",s=>{
+  const o=newOrder(s);
+  o.recipients[0].name="";
+  o.recipients[0].address="";
+  o.recipients[0].phone="";
+  o.recipients[0].mobile="";
+  o.recipients[0].dispatchOrigin="UNKNOWN";
+  o.recipients[0].items[0].quantityConfirmed=false;
+  o.recipients[0].items[0].variantId="unknown-variant";
+  s.settings.senderAddress="";
+  s.settings.senderPhone="";
+  s.products[0].saleStatus="품절";
+  o.senderSnapshot=companyClient(s.settings as any);
+  o.clientSnapshot=companyParty(s.settings as any);
+},false,"RETAIL");
+receptionCase("new AGENCY explicit sender with empty phone fails stage one",s=>{
+  const o=newOrder(s);
+  o.analysisRaw=[
+    "송하인: 별도 대리점",
+    "송하인주소: 서울특별시 종로구 대학로 7"
+  ].join("\n");
+  o.senderSnapshot=explicitSender(o.analysisRaw,copy(client));
+},false);
+receptionCase("new AGENCY explicit sender with no address fails stage one",s=>{
+  const o=newOrder(s);
+  o.analysisRaw=[
+    "송하인: 별도 대리점",
+    "연락처: 010-7777-8888"
+  ].join("\n");
+  o.senderSnapshot=explicitSender(o.analysisRaw,copy(client));
+},false);
+receptionCase("new AGENCY product candidate conflict blocks confirmation",s=>{
+  const o=newOrder(s);
+  o.recipients[0].candidates=[
+    {field:"name",value:"첫 수취인"},{field:"name",value:"둘째 수취인"}
+  ];
+  o.recipients[0].confirmedFields=[];
+  o.confirmationSnapshot.recipients=copy(o.recipients);
+  o.confirmationSnapshot.data.recipients=copy(o.recipients);
+},false);
+receptionCase("existing sender snapshot present can remain unchanged",(s,b)=>{
+  b.orders[0].senderSnapshot=copy(client);
+  s.orders[0].senderSnapshot=copy(client);
+},true,"AGENCY",false);
+receptionCase("existing order confirmed raw can retain identical content",(s,b)=>{
+  b.orders[0].confirmedAt=now;
+  b.orders[0].confirmationSnapshot={raw:"original",at:now};
+  s.orders[0].confirmedAt=now;
+  s.orders[0].confirmationSnapshot={raw:"original",at:now};
+},true,"AGENCY",false);
+receptionCase("new confirmation with two recipients each has active shipment",s=>{
+  const o=newOrder(s);
+  const row=copy(o.recipients[0]);
+  row.id="recipient-two";row.name="두번째 수취인";
+  row.items[0].id="item-two";
+  o.recipients.push(row);
+  o.confirmationSnapshot.recipients=copy(o.recipients);
+  o.confirmationSnapshot.data.recipients=copy(o.recipients);
+  const sh=copy(newShip(s));
+  sh.id="shipment:order-new:recipient-two";
+  sh.recipientId=row.id;
+  s.workflow.shipments.push(sh);
+  const e=s.workflow.events.find((v:any)=>v.id==="confirm-order-new");
+  e.shipmentIds.push(sh.id);
+},true);
+receptionCase("new confirmation second recipient belongs to another group",s=>{
+  const o=newOrder(s);
+  const row=copy(o.recipients[0]);
+  row.id="recipient-two";row.name="두번째 수취인";
+  row.items[0].id="item-two";
+  o.recipients.push(row);
+  o.confirmationSnapshot.recipients=copy(o.recipients);
+  o.confirmationSnapshot.data.recipients=copy(o.recipients);
+  const gp=copy(newGroup(s));
+  gp.id="group:order-new:second";
+  s.workflow.groups.push(gp);
+  const sh=copy(newShip(s));
+  sh.id="shipment:order-new:recipient-two";
+  sh.recipientId=row.id;
+  sh.groupId=gp.id;
+  s.workflow.shipments.push(sh);
+  const e=s.workflow.events.find((v:any)=>v.id==="confirm-order-new");
+  e.shipmentIds.push(sh.id);
+},true);
+receptionCase("new confirmation second group stage-1 failure blocks all",s=>{
+  const o=newOrder(s);
+  const row=copy(o.recipients[0]);
+  row.id="recipient-two";row.name="두번째 수취인";
+  row.items[0].id="item-two";
+  row.items[0].origin="UNKNOWN";
+  o.recipients.push(row);
+  o.confirmationSnapshot.recipients=copy(o.recipients);
+  o.confirmationSnapshot.data.recipients=copy(o.recipients);
+  const gp=copy(newGroup(s));
+  gp.id="group:order-new:second";
+  s.workflow.groups.push(gp);
+  const sh=copy(newShip(s));
+  sh.id="shipment:order-new:recipient-two";
+  sh.recipientId=row.id;
+  sh.groupId=gp.id;
+  s.workflow.shipments.push(sh);
+  const e=s.workflow.events.find((v:any)=>v.id==="confirm-order-new");
+  e.shipmentIds.push(sh.id);
+},false);
+receptionCase("new AGENCY v1 unconfirmed second recipient prevents full save",s=>{
+  const o=newOrder(s);
+  const row=copy(o.recipients[0]);
+  row.id="recipient-two";row.name="두번째 수취인";
+  o.recipients.push(row);
+  o.confirmationSnapshot.recipients=copy(o.recipients);
+  o.confirmationSnapshot.data.recipients=copy(o.recipients);
+},false);
+receptionCase("new AGENCY receipt confirmation actor omitted is still accepted",s=>{
+  const o=newOrder(s);
+  delete o.receipt.actor;
+},true);
+receptionCase("new AGENCY missing receipt object is rejected",s=>{
+  delete newOrder(s).receipt;
+},false);
+receptionCase("existing unconfirmed v1 draft may retain raw edits",s=>{
+  s.orders[0].receptionVersion=1;
+  s.orders[0].raw="접수 원문 변경";
+},true,"AGENCY",false);
+receptionCase("existing unconfirmed v1 with no snapshot stays draft",s=>{
+  s.orders[0].receptionVersion=1;
+  delete s.orders[0].confirmationSnapshot;
+},true,"AGENCY",false);
+receptionCase("new AGENCY v1 missing order records shipment event",s=>{
+  const e=s.workflow.events.find((v:any)=>v.id==="confirm-order-new");
+  e.action="접수";
+},false);
+
 function normalized(v:unknown):string {
   if(Array.isArray(v))return "["+v.map(normalized).join(",")+"]";
   if(v&&typeof v==="object") {
