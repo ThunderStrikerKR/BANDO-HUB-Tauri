@@ -22,6 +22,7 @@ import { shipmentTotals, validateWorkflow, reconcileWorkflow, deleteOrder, workf
 import { orderIssues, approveMissingQuantity, pendingIssue } from "../../../../src/validation.ts";
 import { validateReceptionBoundary } from "../../../../src/orders/reception.ts";
 import { companyClient, companyParty } from "../../../../src/order-types.ts";
+import { explicitSender } from "../../../../src/explicit-sender.ts";
 
 const root=resolve(dirname(fileURLToPath(import.meta.url)),"../../../..");
 const now="2026-11-13T09:00:00+09:00";
@@ -1783,6 +1784,127 @@ receptionCase("existing mutable address can change",s=>{
 receptionCase("existing order raw changed before confirmation",s=>{
   s.orders[0].raw="편집된 접수 초안";
 },true,"AGENCY",false);
+
+
+// Reception boundary hard corners: key presence, explicit sender parser,
+// historical product selection and stage-one order confirmation blockers.
+receptionCase("RETAIL omitted item unitPrice differs from null",s=>{
+  const o=newOrder(s);delete o.recipients[0].items[0].unitPrice;
+},false,"RETAIL");
+receptionCase("existing missing senderSnapshot cannot become explicit null",s=>{
+  s.orders[0].senderSnapshot=null;
+},false,"AGENCY",false);
+receptionCase("existing absent senderSnapshot unchanged stays valid",()=>{},true,"AGENCY",false);
+receptionCase("existing senderSnapshot null may be removed only if original null",s=>{
+  s.orders[0].senderSnapshot=null;
+},false,"AGENCY",false);
+receptionCase("new AGENCY explicit sender marker from analysisRaw",s=>{
+  const o=newOrder(s);
+  o.analysisRaw=[
+    "원문 임의 제목",
+    "송하인: 서울 총판",
+    "연락처: 010-7777-8888",
+    "송하인주소: 서울특별시 종로구 대학로 7"
+  ].join("\n");
+  o.senderSnapshot=explicitSender(o.analysisRaw,copy(client));
+},true);
+receptionCase("new AGENCY sender with fullwidth colon and spaces",s=>{
+  const o=newOrder(s);
+  o.analysisRaw=[
+    "견적서",
+    "  보내는 사람：별도 거래처",
+    "  전화번호 010 7777 8888",
+    "  보내는곳：서울특별시 종로구 대학로 7 3층"
+  ].join("\n");
+  o.senderSnapshot=explicitSender(o.analysisRaw,copy(client));
+},true);
+receptionCase("new AGENCY sender with phone parentheses and dot",s=>{
+  const o=newOrder(s);
+  o.analysisRaw=[
+    "송하인명: 가상상사",
+    "02 (312) 3456",
+    "주소: 서울시 중구 가상로 15"
+  ].join("\n");
+  o.senderSnapshot=explicitSender(o.analysisRaw,copy(client));
+},true);
+receptionCase("new AGENCY senderSnapshot must follow actual client, not clientSnapshot",s=>{
+  const o=newOrder(s);
+  o.clientSnapshot={...copy(client),name:"확정 당시 회사명",phone:"010-9999-9999"};
+},true);
+receptionCase("new AGENCY senderSnapshot cannot silently use frozen client",s=>{
+  const o=newOrder(s);
+  o.clientSnapshot={...copy(client),name:"확정 당시 회사명"};
+  o.senderSnapshot=copy(o.clientSnapshot);
+},false);
+receptionCase("new DEALER uses house sender fallback name",s=>{
+  s.settings.senderName="";
+  newOrder(s).senderSnapshot=companyClient(s.settings as any);
+},true,"DEALER");
+receptionCase("RETAIL company snapshot may use mobile contact",s=>{
+  s.settings.senderPhone="";
+  s.settings.senderMobile="010-7777-8888";
+  const o=newOrder(s);
+  o.clientSnapshot=companyParty(s.settings as any);
+  o.senderSnapshot=companyClient(s.settings as any);
+},true,"RETAIL");
+receptionCase("RETAIL with blank sender phone and mobile",s=>{
+  s.settings.senderPhone="";
+  s.settings.senderMobile="";
+  const o=newOrder(s);
+  o.senderSnapshot=companyClient(s.settings as any);
+  o.clientSnapshot=companyParty(s.settings as any);
+},false,"RETAIL");
+receptionCase("RETAIL item already superseded",s=>{
+  s.products[0].supersededBy="replacement-1";
+},false,"RETAIL");
+receptionCase("RETAIL invalid recipient address",s=>{
+  const o=newOrder(s);o.recipients[0].address="주소 미정";
+},false,"RETAIL");
+receptionCase("RETAIL missing recipient name",s=>{
+  newOrder(s).recipients[0].name="";
+},false,"RETAIL");
+receptionCase("RETAIL missing recipient contact",s=>{
+  const o=newOrder(s);
+  o.recipients[0].phone="";o.recipients[0].mobile="";
+},false,"RETAIL");
+receptionCase("RETAIL no ordered items",s=>{
+  newOrder(s).recipients[0].items=[];
+},false,"RETAIL");
+receptionCase("RETAIL buyer has product without confirmed quantity",s=>{
+  newOrder(s).recipients[0].items[0].quantityConfirmed=undefined;
+},false,"RETAIL");
+receptionCase("RETAIL recipient actual freight zero accepted",s=>{
+  newOrder(s).recipients[0].actualFreight=0;
+},false,"RETAIL");
+receptionCase("RETAIL item has no matching variant",s=>{
+  newOrder(s).recipients[0].items[0].variantId="not-a-variant";
+},false,"RETAIL");
+receptionCase("AGENCY item superseded but still registered",s=>{
+  s.products[0].supersededBy="replacement-1";
+},false);
+receptionCase("AGENCY no receivable items but no action blockers",s=>{
+  const o=newOrder(s);
+  o.recipients[0].items=[];
+  o.confirmationSnapshot.recipients=copy(o.recipients);
+  o.confirmationSnapshot.data.recipients=copy(o.recipients);
+},false);
+receptionCase("new V1 confirmed timestamp empty string",s=>{
+  newOrder(s).confirmedAt="";
+},false);
+receptionCase("new V1 confirmed timestamp numeric zero",s=>{
+  newOrder(s).confirmedAt=0;
+},false);
+receptionCase("new V1 confirmationSnapshot empty object",s=>{
+  newOrder(s).confirmationSnapshot={};
+},false);
+receptionCase("existing confirmed receipt snapshot remains frozen with identical content",s=>{
+  s.orders[0].confirmedAt=now;
+  s.orders[0].confirmationSnapshot={at:now};
+},true,"AGENCY",false);
+receptionCase("existing senderSnapshot object mutated without type change",(s,b)=>{
+  b.orders[0].senderSnapshot=copy(client);
+  s.orders[0].senderSnapshot={...copy(client),phone:"010-5555-3333"};
+},false,"AGENCY",false);
 
 function normalized(v:unknown):string {
   if(Array.isArray(v))return "["+v.map(normalized).join(",")+"]";
