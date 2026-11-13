@@ -888,4 +888,126 @@ mod regression {
         })).unwrap_err().contains("수정 근거"));
     }
 
+
+    fn reconciled_initial_state() -> Value {
+        let c=client("wholesale");
+        let mut o=order(1,json!(30000));
+        o["recipients"][0]["vatDefault"]=Value::Null;
+        // Source creation defaults this value for new shipments.
+        o["recipients"][0].as_object_mut().unwrap().remove("vatDefault");
+        json!({
+            "orders":[o],"clients":[c],"products":[product()],
+            "settings":{"operatorName":"가상 담당자","accounts":[{
+                "id":"account-1","bank":"가상은행","number":"123-456",
+                "holder":"가상상호"
+            }],"defaultAccountId":"account-1"},
+            "shipping":shipping_state()["shipping"]
+        })
+    }
+
+    #[test]
+    fn reconcile_creates_stable_source_group_and_shipment() {
+        let state=reconciled_initial_state();
+        let result=run("reconcile_workflow",json!({
+            "state":state,"now":"2026-11-13T16:00:00+09:00","eventIds":[]
+        }));
+        let w=&result["state"]["workflow"];
+        assert_eq!(result["emittedEvents"],0);
+        assert_eq!(w["sources"][0]["id"],"source:o1");
+        assert_eq!(w["sources"][0]["number"],1);
+        assert_eq!(w["groups"][0]["id"],"group:o1");
+        assert_eq!(w["groups"][0]["sourceId"],"source:o1");
+        assert_eq!(w["shipments"][0]["id"],"shipment:o1:r1");
+        assert_eq!(w["shipments"][0]["step"],0);
+        assert_eq!(w["shipments"][0]["transferred"],false);
+        assert_eq!(w["shipments"][0]["charges"]["FACTORY"],3000);
+        assert_eq!(w["shipments"][0]["freightVersion"],
+            r#"{"epoch":7,"groups":[{"assignment:p1":"music","group:music":"v1"}]}"#);
+        assert_eq!(w["shipments"][0]["recipientSnapshot"]["vatDefault"],true);
+        assert_eq!(result["state"]["orders"][0]["recipients"][0]["vatDefault"],true);
+        let second=run("reconcile_workflow",json!({
+            "state":result["state"],"now":"2026-11-13T16:10:00+09:00","eventIds":[]
+        }));
+        assert_eq!(second["emittedEvents"],0);
+        assert_eq!(second["state"]["workflow"]["sources"].as_array().unwrap().len(),1);
+        assert_eq!(second["state"]["workflow"]["groups"].as_array().unwrap().len(),1);
+        assert_eq!(second["state"]["workflow"]["shipments"].as_array().unwrap().len(),1);
+    }
+
+    #[test]
+    fn reconcile_changed_recipient_downgrades_stage_without_losing_stable_identity() {
+        let first=run("reconcile_workflow",json!({
+            "state":reconciled_initial_state(),
+            "now":"2026-11-13T16:00:00+09:00","eventIds":[]
+        }));
+        let mut state=first["state"].clone();
+        state["workflow"]["shipments"][0]["step"]=json!(3);
+        state["orders"][0]["recipients"][0]["name"]=json!("가상 정정 수취인");
+        let changed=run("reconcile_workflow",json!({
+            "state":state,"now":"2026-11-13T16:30:00+09:00",
+            "eventIds":["event-recheck"]
+        }));
+        let ship=&changed["state"]["workflow"]["shipments"][0];
+        assert_eq!(ship["id"],"shipment:o1:r1");
+        assert_eq!(ship["step"],0);
+        assert_eq!(ship["rechecks"][0]["reason"],
+            "수취인 / 상품 / 수량 / 가격 / 출고지 / 송하인 변경");
+        assert_eq!(ship["rechecks"][0]["fromStage"],3);
+        assert_eq!(ship["rechecks"][0]["toStage"],0);
+        assert_eq!(changed["state"]["workflow"]["groups"][0]["needsNotice"],true);
+        assert_eq!(changed["state"]["workflow"]["events"][0]["action"],"재검증 필요");
+        assert_eq!(changed["state"]["workflow"]["events"][0]["id"],"event-recheck");
+        assert_eq!(changed["state"]["orders"][0]["recipients"][0]["name"],"가상 정정 수취인");
+    }
+
+    #[test]
+    fn reconcile_tariff_revision_downgrades_only_unfrozen_auto_charge() {
+        let initial=run("reconcile_workflow",json!({
+            "state":reconciled_initial_state(),
+            "now":"2026-11-13T16:00:00+09:00","eventIds":[]
+        }));
+        let mut state=initial["state"].clone();
+        state["workflow"]["shipments"][0]["step"]=json!(3);
+        state["shipping"]["epoch"]=json!(8);
+        state["shipping"]["groups"][0]["current"]["version"]=json!("v2");
+        state["shipping"]["groups"][0]["current"]["fees"]["1"]=json!(4000);
+        let changed=run("reconcile_workflow",json!({
+            "state":state,"now":"2026-11-13T16:30:00+09:00",
+            "eventIds":["event-recheck"]
+        }));
+        let ship=&changed["state"]["workflow"]["shipments"][0];
+        assert_eq!(ship["charges"]["FACTORY"],4000);
+        assert_eq!(ship["step"],1);
+        assert_eq!(ship["rechecks"][0]["reason"],"적용 운임 기준 변경");
+        assert_eq!(changed["emittedEvents"],1);
+        let mut frozen=initial["state"].clone();
+        frozen["orders"][0]["confirmedAt"]=json!("2026-11-13T16:20:00+09:00");
+        frozen["orders"][0]["pricesLocked"]=json!(true);
+        frozen["orders"][0]["clientSnapshot"]=client("wholesale");
+        frozen["shipping"]["epoch"]=json!(8);
+        frozen["shipping"]["groups"][0]["current"]["version"]=json!("v2");
+        frozen["shipping"]["groups"][0]["current"]["fees"]["1"]=json!(4000);
+        let preserved=run("reconcile_workflow",json!({
+            "state":frozen,"now":"2026-11-13T16:30:00+09:00","eventIds":[]
+        }));
+        assert_eq!(preserved["state"]["workflow"]["shipments"][0]["charges"]["FACTORY"],3000);
+    }
+
+    #[test]
+    fn reconcile_avoids_deleting_shipment_with_payment_history() {
+        let initial=run("reconcile_workflow",json!({
+            "state":reconciled_initial_state(),
+            "now":"2026-11-13T16:00:00+09:00","eventIds":[]
+        }));
+        let mut state=initial["state"].clone();
+        state["orders"][0]["recipients"]=json!([]);
+        state["workflow"]["payments"]=json!([{
+            "id":"payment-1","allocations":[{"shipmentId":"shipment:o1:r1","amount":100}]
+        }]);
+        assert!(execute("reconcile_workflow",json!({
+            "state":state,"now":"2026-11-13T16:30:00+09:00",
+            "eventIds":[]
+        })).unwrap_err().contains("이관 / 입금 기록"));
+    }
+
 }
