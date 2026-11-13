@@ -7,7 +7,7 @@ import {tsImport} from "tsx/esm/api";
 const {resolvePrice,totals,repriceOrder}=await tsImport("../../../src/domain.ts",import.meta.url);
 const {shouldRefreshUncommittedOrderPricing}=await tsImport("../../../src/orders/passive-pricing.ts",import.meta.url);
 const {recommendShipping}=await tsImport("../../../src/shipping.ts",import.meta.url);
-const {shipmentTotals,stageIssues,groupStep,groupShipments,orderGrandTotal,shipmentVat}=
+const {shipmentTotals,stageIssues,groupStep,groupShipments,orderGrandTotal,shipmentVat,groupTotals,workflowIssues,shipmentFreightCode,paymentBalance,shipmentContext}=
   await tsImport("../../../src/workflow.ts",import.meta.url);
 const root=fileURLToPath(new URL("../../../",import.meta.url));
 const manifest=fileURLToPath(new URL("./Cargo.toml",import.meta.url));
@@ -276,6 +276,87 @@ checkOrderPreview("draft-only before dealer selection", (s) => {
   s.orders = [];
   s.workflow.shipments = [];
   s.workflow.groups = [];
+});
+
+// The entire live board projection must agree with the original TypeScript
+// oracle, not just the order footer. The Rust engine owns stage blockers,
+// item issues, per-origin shipping and payment allocations.
+function checkBoardPreview(name, mutate = () => {}) {
+  const state = workflowState();
+  mutate(state);
+  const expected = () => ({
+    groups: state.workflow.groups.flatMap((group) => {
+      const ships = groupShipments(state, group.id);
+      if (!ships.length) return [];
+      const step = groupStep(state, group.id);
+      const needsNotice = group.needsNotice === true;
+      const nextStep = needsNotice && step >= 2 ? 3 : step + 1;
+      const vats = ships.map((ship) => {
+        const {order,recipient} = shipmentContext(state,ship);
+        return shipmentVat(order,recipient);
+      });
+      return [{
+        groupId: group.id,
+        step,
+        nextStep,
+        needsNotice,
+        transferred: ships.some((ship) => ship.transferred === true),
+        shipmentCount: ships.length,
+        totals: groupTotals(state,group.id),
+        vatLabel: vats.every(Boolean) ? "부가세 포함" :
+          vats.some(Boolean) ? "부가세 포함/별도" : "부가세 별도",
+        shipments: ships.map((ship) => {
+          const {order,recipient} = shipmentContext(state,ship);
+          return {
+            shipmentId:ship.id,
+            paid:paymentBalance(state,ship).paid,
+            totals:shipmentTotals(state,ship),
+            freightCode:shipmentFreightCode(order,recipient),
+            vatIncluded:shipmentVat(order,recipient),
+          };
+        }),
+        issues: workflowIssues(state,group.id),
+        nextStageBlockers: nextStep <= 4 ? stageIssues(state,group.id,nextStep) : [],
+      }];
+    }),
+  });
+  add("board preview " + name, "preview_workflow", {state}, expected);
+}
+checkBoardPreview("normal confirmed postpaid");
+checkBoardPreview("prepaid stage 3", (s) => {
+  s.clients[0].payment = "PREPAID";
+  s.orders[0].clientSnapshot.payment = "PREPAID";
+});
+checkBoardPreview("notice again", (s) => { s.workflow.groups[0].needsNotice = true; });
+checkBoardPreview("collect COD and excluded VAT", (s) => {
+  s.orders[0].recipients[0].freightCode = "020";
+  s.orders[0].recipients[0].vatOverride = false;
+});
+checkBoardPreview("freight uncertain", (s) => { s.workflow.shipments[0].charges = {}; });
+checkBoardPreview("matched account payment", (s) => {
+  s.workflow.payments.push({
+    id:"pay-1",dealerId:"dealer-1",
+    account:s.settings.accounts[0],allocations:[{
+      shipmentId:"shipment:o1:r1",amount:10000,
+    }],
+  });
+});
+checkBoardPreview("unmatched account payment excluded", (s) => {
+  s.workflow.payments.push({
+    id:"pay-1",dealerId:"dealer-1",
+    account:{id:"another",bank:"가상은행",number:"987",holder:"다른사람"},
+    allocations:[{shipmentId:"shipment:o1:r1",amount:10000}],
+  });
+});
+checkBoardPreview("transferred frozen invoice", (s) => {
+  s.workflow.shipments[0].transferred = true;
+  s.workflow.queue.push({
+    id:"q1",shipmentId:"shipment:o1:r1",origin:"FACTORY",
+    status:"EXPORTED",snapshot:{subtotal:20000,shipping:4000,vat:2400,total:26400},
+  });
+});
+checkBoardPreview("archived shipment not shown", (s) => {
+  s.workflow.shipments[0].legacyArchived = true;
 });
 
 test("actual TS price, freight and refresh decisions match staged Rust rules",()=>{
