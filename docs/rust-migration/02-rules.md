@@ -3,8 +3,8 @@
 Date: 2026-11-13 KST
 Repository: ThunderStrikerKR/TSBH
 Branch: migration/02-rules (created at d5ea8ed20b8120b844437263c2eb2b8963559e8d)
-Last implementation/test-source commit before this document: 3f6aecbc46fcc03e00bc6a29caf49e33b7cd5204
-Last independent Cargo test-verified code commit: 3f6aecbc46fcc03e00bc6a29caf49e33b7cd5204 (28/28 PASS; GitHub Actions run 43353880822; not full TS parity or Windows validation)
+Last implementation/test-source commit before this document: 989397ac974c368564a2c769286c313708529bc4
+Last independent Cargo test-verified code commit: 989397ac974c368564a2c769286c313708529bc4 (30/30 PASS; GitHub Actions run 43354364403; not full TS parity or Windows validation)
 
 ## Scope and ownership
 
@@ -109,6 +109,8 @@ Operations and JSON contracts:
       mark_store_sent: queueId
       record_change_request: shipmentId, changeRequestId, text
       set_group_account: groupId, accountId? (AUTO if omitted)
+      complete_delivery: shipmentId, actual by origin, combinationIds,
+        deliveryIds; rejects QUEUED or fileOnly EXPORTED entries
 
 Example calculation (call execute("calculate_price", payload)):
 
@@ -157,7 +159,9 @@ Expected: {"subtotal":60000,"shipping":3000,"vat":6300,"total":69300}
    version string. InitialShipping in TypeScript creates random versions.
    Persisted shipping state must be supplied before production use.
 6. Missing workflow operations still include detachShipment, regroupShipment,
-   completeDelivery, and factory-reply row matching/application. The pure Rust
+   and factory-reply row matching/application. Rust complete_delivery now
+   records verified combinations and delivery evidence, but requires further
+   TS parity testing before integration. The pure Rust
    engine now provides record_payment, confirm_group_payment,
    set_group_account, restore_shipment, mark_store_sent,
    record_change_request and evaluate_dispatch_state, but TS parity for
@@ -200,7 +204,7 @@ Compile/test command:
   cargo test --manifest-path tests/rust-migration/rules/Cargo.toml
 
 It imports the real rules/mod.rs by relative path, not a duplicated mock.
-Twenty-eight synthetic Rust regression tests were authored for:
+Thirty synthetic Rust regression tests were authored for:
   tier pricing, SPECIAL and legacy overrides;
   VAT, COD and fee waiver;
   invalid price and overflow;
@@ -215,7 +219,7 @@ Twenty-eight synthetic Rust regression tests were authored for:
   actual freight event;
   immutable workflow history and duplicate IDs.
 
-LATEST RESULT: 28/28 Rust independent regression tests PASS in GitHub Actions run 43353880822 (verified source commit 3f6aecbc46fcc03e00bc6a29caf49e33b7cd5204). TS parity, native Tauri/SQLite integration and Windows EXE remain NOT_RUN/UNVERIFIED.
+LATEST RESULT: 30/30 Rust independent regression tests PASS in GitHub Actions run 43354364403 (verified source commit 989397ac974c368564a2c769286c313708529bc4). TS parity, native Tauri/SQLite integration and Windows EXE remain NOT_RUN/UNVERIFIED.
 TS baseline test source inspected, not executed:
   tests/tauri-confirmed-order-master-freeze.test.mjs
   tests/reception-passive-pricing.test.mjs
@@ -283,10 +287,15 @@ with source of truth for receipt and workflow histories kept intact.
 
 ## Final remote verification and cross-session boundary notes (2026-11-13)
 
-- Session 2 final independent Rust test fixture checkpoint: commit `3f6aecbc46fcc03e00bc6a29caf49e33b7cd5204`.
-- GitHub Actions Rust (Ubuntu Stable) run: https://github.com/ThunderStrikerKR/TSBH/actions/runs/43353880822
-- **PASS: 28 tests / 0 failed**. This verifies syntax, compilation, and the authored fixture expectations, **not exhaustive TypeScript parity**.
+- Session 2 final independent Rust test fixture checkpoint: commit `989397ac974c368564a2c769286c313708529bc4`.
+- GitHub Actions Rust (Ubuntu Stable) run: https://github.com/ThunderStrikerKR/TSBH/actions/runs/43354364403
+- **PASS: 30 tests / 0 failed**. This verifies syntax, compilation, and the authored fixture expectations, **not exhaustive TypeScript parity**.
 - Later tests added: actual payment record, prepaid confirmation with audit allocation, group account change with preserved confirmation and recheck events, store queue transition, queued Excel handoff restore, separate actual freight event, post-delivery change request, origin-completion assessment, STORE/FACTORY mixed bundle shipping, product-specific freight, and safe overflow rejection.
-- **BASELINE_FAIL: no baseline executed; REGRESSION: not established; BLOCKED: unreconciled workflow, full approval issue parity, confirm-revocation edge cases, completeDelivery, account/freight special cases, TS snapshot exceptions; NOT_RUN: TypeScript output parity and Windows Tauri/SQLite integration**.
+- **BASELINE_FAIL: no baseline executed; REGRESSION: not established; BLOCKED: unreconciled workflow, full approval issue parity, confirm-revocation edge cases, account/freight special cases, completeDelivery parity and TS snapshot exceptions; NOT_RUN: TypeScript output parity and Windows Tauri/SQLite integration**.
 - This branch additionally contains `.github/workflows/rust-migration-ci.yml` from separate concurrent writer commit `51776244a413f8adbf9d70118de3f4205f4130b6`. Session 2 neither authored nor edited this out-of-scope path, and cannot safely erase concurrent changes under the ownership contract. Session 3 must inspect this unexpected out-of-scope branch addition before merging.
 - Session 3 should **not enable Rust approval-gating as the sole authority** until stage issues and workflow history parity are completed and the native Rust reception validator has remained in the SQLite transaction pipeline.
+
+## Delivery finalization checkpoint
+
+- Ported TS workflow.ts completeDelivery as pure action `complete_delivery`, using explicit `now`, `eventId`, `combinationIds` and `deliveryIds` rather than global UUID or clock. It validates transferred state, rejects queued/unconfirmed factory output, requires per-origin actual freight, freezes shipment delivery evidence and records verified tariff combinations with observed charges. It never overwrites existing queue billing snapshots.
+- CI regression tests cover one successful finalized FACTORY delivery plus QUEUED and fileOnly rejection. These tests passed in run 43354364403; production parity (sample-counts, historical assignment/version and SQLite transactions) remains BLOCKED until session 3 verification.
