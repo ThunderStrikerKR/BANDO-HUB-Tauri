@@ -15,7 +15,7 @@ export function businessCoreCall<T>(
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { Api, State, CatalogReport, OcrCapture, OfficialLink } from "./types";
 import productImages from "./tauri-product-images.json";
-import { parseOfficialProductPage } from "./official-product-import";
+
 
 
 const notReady = (feature: string): never => {
@@ -91,7 +91,10 @@ const api: Api = {
   previewImport: async (url) => {
     const html = await invoke<string>("fetch_official_product_html", { target: url });
     const state = await invoke<State>("state_load");
-    return parseOfficialProductPage(url, html, state);
+    return businessCoreCall("catalog_clients", "preview_official_product_html", {
+      state, url, html, now: new Date().toISOString(),
+      productId: crypto.randomUUID(), variantId: crypto.randomUUID(),
+    });
   },
   // Suggests links from the bundled historical catalog; individual previews
   // still fetch their official product detail pages live.
