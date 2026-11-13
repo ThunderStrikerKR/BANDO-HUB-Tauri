@@ -698,7 +698,10 @@ fn reanalyze(payload: &Value) -> Result<Value, String> {
                     if let Some(object)=item.as_object_mut(){object.remove("quantityApproval");}
                 }
                 if let Some(sources)=item["sources"].as_array_mut() {
-                    for source in sources {source["targetId"]=new_id.clone();}
+                    for source in sources {
+                        source["targetId"]=new_id.clone();
+                        source["recipientId"]=old_row["id"].clone();
+                    }
                 }
             }
         }
