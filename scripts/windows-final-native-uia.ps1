@@ -205,9 +205,19 @@ finally:
   }
   function FillEdit([string]$label,[string]$value){
     $all=Elements
+    # A prior click on the footer Save button can scroll the settings form
+    # down. The operator field is still a native UIA Edit, but IsOffscreen=true.
+    # SetFocus first so WebView2 scrolls it into the viewport.
     $matches=@($all | Where-Object {
-      $_.name -eq $label -and $_.control -match "Edit" -and !$_.offscreen -and $_.w -gt 0
+      $_.name -eq $label -and $_.control -match "Edit" -and $_.w -gt 0
     })
+    if($matches.Count -gt 0 -and $matches[0].offscreen) {
+      try { $matches[0].el.SetFocus(); Start-Sleep -Milliseconds 420 } catch {}
+      $all=Elements
+      $matches=@($all|Where-Object {
+        $_.name -eq $label -and $_.control -match "Edit" -and !$_.offscreen -and $_.w -gt 0
+      })
+    }
     if($matches.Count -eq 0){
       # The accessibility provider sometimes gives the HTML input no Name.
       # Pair the real visible Edit rectangle to its nearby UIA label.
