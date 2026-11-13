@@ -456,4 +456,37 @@ mod regression {
         assert_eq!(quote["bundles"][0]["versions"]["product:p1"],"product-override-1");
     }
 
+    #[test]
+    fn account_change_downgrades_released_notice_and_rechecks_payment() {
+        let mut before=workflow_state("PREPAID");
+        before["settings"]["accounts"].as_array_mut().unwrap().push(json!({
+            "id":"account-2","bank":"가상은행","number":"999-888","holder":"가상상호"
+        }));
+        before["workflow"]["confirmations"]=json!([{
+            "id":"confirm-1","groupId":"group:o1","dealerId":"dealer-1",
+            "shipmentIds":["shipment:o1:r1"],"amount":36300,
+            "confirmedAt":"2026-11-13T09:00:00+09:00","actor":"직원",
+            "announcedAccount":{"id":"account-1","bank":"가상은행",
+                "number":"123-456","holder":"가상상호"},
+            "allocations":[{"shipmentId":"shipment:o1:r1","amount":36300}]
+        }]);
+        let result=run("apply_workflow_action",json!({
+            "state":before,"action":"set_group_account","groupId":"group:o1",
+            "accountId":"account-2","eventId":"event-1",
+            "now":"2026-11-13T12:00:00+09:00"
+        }));
+        assert_eq!(result["accountMode"],"MANUAL");
+        assert_eq!(result["accountId"],"account-2");
+        assert_eq!(result["state"]["orders"][0]["groupAccounts"]["group:o1"]["id"],"account-2");
+        assert_eq!(result["state"]["workflow"]["shipments"][0]["step"],2);
+        assert_eq!(result["state"]["workflow"]["groups"][0]["needsNotice"],true);
+        assert_eq!(result["state"]["workflow"]["events"].as_array().unwrap().len(),3);
+        assert_eq!(result["state"]["workflow"]["events"][0]["action"],"입금 승인 재확인 필요");
+        assert_eq!(result["state"]["workflow"]["events"][1]["action"],"재검증 필요");
+        assert_eq!(result["state"]["workflow"]["events"][2]["action"],"묶음 입금 계좌 변경");
+        assert_eq!(result["state"]["workflow"]["confirmations"][0],
+            before["workflow"]["confirmations"][0]);
+        assert_eq!(result["state"]["orders"][0]["raw"],before["orders"][0]["raw"]);
+    }
+
 }
