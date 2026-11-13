@@ -198,7 +198,7 @@ pub(super) fn project_order(payload: &Value) -> Result<Value, String> {
                 safe(field(item, "unitPrice"))
                     .zip(field(item, "quantity").as_i64())
                     .and_then(|(price, quantity)| price.checked_mul(quantity))
-                    .filter(|value| value.abs() <= super::MAX_SAFE)
+                    .filter(|value| (-super::MAX_SAFE..=super::MAX_SAFE).contains(value))
             };
             json!({
                 "recipientId": field(recipient, "id"),
