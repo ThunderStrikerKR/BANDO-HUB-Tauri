@@ -294,6 +294,42 @@ pub(super) fn shipping_action(payload: &Value) -> Result<Value, String> {
             set(&mut shipping["groups"][index],"current",next)?;
             Ok(json!({"shipping":shipping}))
         }
+        "copy_group_rule" => {
+            // ProductFreightPanel: manually copy a confirmed group tariff
+            // into selected standalone product tariff slots. Preserve the
+            // per-product history, without changing group membership.
+            let mut shipping=req(payload,"shipping")?.clone();
+            let group_id=required_str(payload,"groupId")?;
+            let selected=rows(req(payload,"productIds")?);
+            let group=rows(field(&shipping,"groups")).iter()
+                .find(|g|str_field(g,"id")==group_id)
+                .ok_or("복사할 운임 그룹을 찾지 못했습니다.")?;
+            let template=field(group,"current").clone();
+            let now=required_str(payload,"now")?;
+            if !field(&shipping,"productRules").is_object() {
+                set(&mut shipping,"productRules",json!({}))?;
+            }
+            if !field(&shipping,"productHistory").is_object() {
+                set(&mut shipping,"productHistory",json!({}))?;
+            }
+            for id in selected {
+                let pid=id.as_str().ok_or("선택한 상품 ID를 확인하세요.")?;
+                let old=field(&shipping["productRules"],pid).clone();
+                if !old.is_null() {
+                    if !field(&shipping["productHistory"],pid).is_array() {
+                        set(&mut shipping["productHistory"],pid,json!([]))?;
+                    }
+                    shipping["productHistory"][pid].as_array_mut()
+                        .ok_or("상품 운임 이력 형식 오류")?.push(old);
+                }
+                let version=required_str(field(payload,"versionIds"),pid)?;
+                let mut copy=template.clone();
+                set(&mut copy,"version",json!(version))?;
+                set(&mut copy,"at",json!(now))?;
+                set(&mut shipping["productRules"],pid,copy)?;
+            }
+            Ok(json!({"shipping":shipping}))
+        }
         "assign_products" => {
             // ShippingManager::savePending: batch assignment changes apply to
             // current products only; clearing an assignment issues a fresh
