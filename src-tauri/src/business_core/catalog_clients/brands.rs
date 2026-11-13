@@ -34,17 +34,17 @@ pub(super) fn validate(before:&Value,next:&Value)->Result<(),String>{
         let own=terms(brand);
         for (index,other) in brands.iter().enumerate(){
             if index==position{continue}
-            if field(other,"id")==id {
-                // The TS oracle checks collision terms before duplicate IDs.
+            if field(other,"id")!=id {
                 let other_terms=terms(other);
-                if !own.iter().any(|name|other_terms.contains(name)){
-                    return Err("브랜드 식별자가 중복되었습니다.".into())
+                if own.iter().any(|name|other_terms.contains(name)){
+                    return Err("브랜드 공식명, 한글명 또는 검색 별칭이 다른 브랜드와 중복됩니다.".into())
                 }
             }
-            let other_terms=terms(other);
-            if own.iter().any(|name|other_terms.contains(name)){
-                return Err("브랜드 공식명, 한글명 또는 검색 별칭이 다른 브랜드와 중복됩니다.".into())
-            }
+        }
+        // The original TS duplicate-ID check runs *after* alias collisions.
+        if brands.iter().enumerate().any(|(index,other)|
+            index!=position && field(other,"id")==id){
+            return Err("브랜드 식별자가 중복되었습니다.".into())
         }
     }
     Ok(())
