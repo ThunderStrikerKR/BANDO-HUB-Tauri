@@ -130,8 +130,8 @@ for(const [category,brand,query,missing] of [
     !p.deletedAt && !p.supersededBy &&
     p.catalog!=="DEMO" && !p.variants.some(v=>v.source==="DEMO") &&
     classified.has(p.id) &&
-    (p.name+" "+(p.subtitle??"")).toLowerCase().replace(/\\s/g,"")
-      .includes(query.toLowerCase().replace(/\\s/g,"")) &&
+    (p.name+" "+(p.subtitle??"")).toLowerCase().replace(/\s/g,"")
+      .includes(query.toLowerCase().replace(/\s/g,"")) &&
     (!missing || p.variants.some(v=>!v.wholesale||!v.semi||!v.retail))
   ).map(p=>p.id);
   add("management products "+category+"/"+query+"/"+missing,"management_products",
