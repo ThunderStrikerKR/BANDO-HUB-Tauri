@@ -69,7 +69,7 @@ pub(super) fn validate_templates(settings: &Value) -> Result<(), String> {
         let (_, required) = template_default(key)
             .ok_or_else(|| format!("지원하지 않는 자동 메시지 유형입니다: {}", key))?;
         let body = value.as_str().ok_or("자동 메시지는 1자 이상, 2000자 이하로 입력하세요.")?;
-        if body.trim().is_empty() || body.chars().count() > 2000 {
+        if body.trim().is_empty() || body.encode_utf16().count() > 2000 {
             return Err("자동 메시지는 1자 이상, 2000자 이하로 입력하세요.".into());
         }
         for token in re.captures_iter(body) {
@@ -166,6 +166,7 @@ fn payment(payload: &Value, settings: &Value) -> Result<Value, String> {
     let mut vat_flags = Vec::new();
     let mut provisional = Vec::new();
     let mut official_links = Vec::new();
+    let mut quantity_messages = Vec::new();
     for recipient in recipients {
         let name = s(recipient, "name").trim();
         if !name.is_empty() { parts.push(format!("{}님", name)); }
@@ -192,7 +193,7 @@ fn payment(payload: &Value, settings: &Value) -> Result<Value, String> {
                 && item.get("quantity").and_then(Value::as_i64) == Some(1)
                 && item.get("quantityConfirmed").and_then(Value::as_bool) == Some(false);
             if quantity_one {
-                parts.push(render(settings, "quantityOne", &json!({
+                quantity_messages.push(render(settings, "quantityOne", &json!({
                     "수취인":if name.is_empty() { "수취인" } else { name },
                     "상품명":customer_model(original)
                 }))?);
@@ -222,6 +223,7 @@ fn payment(payload: &Value, settings: &Value) -> Result<Value, String> {
         if vat {
             parts.push(render(settings, "paymentVat", &json!({"부가세":money(&recipient["vat"])}))?);
         }
+        parts.extend(quantity_messages.drain(..));
         parts.push(String::new());
     }
     let mixed = vat_flags.contains(&true) && vat_flags.contains(&false);
