@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { confirmDiscardDraft } from "./shared/editor-flow";
 import { Modal } from "./ui";
 import { itemFromProduct } from "./domain";
 import { businessCoreCall } from "./tauri-bridge";
 import { productModelNames } from "./product-name-match";
-import { searchProducts } from "./product-search";
+import { useNativeProductIds } from "./native-catalog-queries";
 import type { Client, Item, Product, State } from "./types";
 
 function money(value: number | null): string {
@@ -53,14 +53,12 @@ export function OrderItemEditor({
   const changed = draft.productId !== item.productId || draft.variantId !== item.variantId;
   const closeDraft = () => void confirmDiscardDraft("상품 상세 수정", changed, onClose);
 
-  const results = useMemo(
-    () => searchProducts(state, query, client.id)
-      .filter((candidate) =>
-        candidate.catalog !== "DEMO" &&
-        !candidate.variants.some((variant) => variant.source === "DEMO"))
-      .slice(0, 100),
-    [state, query, client.id],
+  const {products: matchedProducts, error: searchError} = useNativeProductIds(
+    state, "search_products", {
+      query, clientId: client.id, excludeDemo: true,
+    }, [query, client.id],
   );
+  const results = matchedProducts.slice(0, 100);
 
   const clientQuoteSignature = JSON.stringify(client);
   useEffect(() => {
