@@ -108,7 +108,8 @@ test("model-group UI, employee resolver, Rust persistence and messages use produ
   assert.match(ui, /g\[activeId\]\.representativeProductId=id/);
   assert.match(ui, /대표 지정/);
   assert.match(ui, /className="family-representative-tag"/);
-  assert.match(ui, /validateModelGroups/);
+  assert.match(ui, /"catalog_clients","validate_model_groups"/);
+  assert.doesNotMatch(ui, /validateModelGroups\(draft\)/);
   assert.doesNotMatch(ui, /id="representative-color"/);
   assert.match(resolver, /"suggest_group_representative"/);
   assert.doesNotMatch(resolver, /suggestGroupRepresentative\(state,/);
