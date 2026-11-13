@@ -262,6 +262,29 @@ fn compare_real_recipient_fields_addresses_contacts_and_all_evidence() {
     print_recipient_report("TS_RUST_RECIPIENT", &report);
     assert_eq!(report["referenceFailuresRust"].as_array().map(Vec::len),Some(0),
         "Rust source spans must not reference stale delivery or item IDs");
+    // These remaining TS defects were reviewed on their ORIGINAL fixture
+    // text, not simply ignored by matching case IDs. All 66 original-value
+    // differences are pinned. Any new field OR changed TS/Rust value fails
+    // this gate; fewer differences are allowed when upstream TS is fixed.
+    let reviewed:Value=serde_json::from_str(include_str!(
+        "../ts-rust-recipient-reviewed-exceptions-20261113.json"
+    )).expect("read reviewed upstream exception snapshot");
+    let expected=reviewed["differences"].as_array().expect("reviewed exceptions");
+    let found=report["differences"].as_array().expect("actual field differences");
+    assert!(!report["truncated"].as_bool().unwrap_or(true),
+        "recipient field audit must be complete, not truncated");
+    assert_eq!(found.len() as u64,
+        report["mismatchCount"].as_u64().unwrap_or(u64::MAX),
+        "every mismatch must be materialized for review");
+    assert!(found.len()<=expected.len(),
+        "TS/Rust recipient mismatch count must not grow beyond reviewed baseline");
+    for difference in found {
+        assert!(expected.contains(difference),
+            "new or changed recipient value outside reviewed TS source defects: {difference}");
+    }
+    assert!(report["casesWithDifferences"].as_u64().unwrap_or(u64::MAX)<=5,
+        "recipient differences outside the five reviewed source-bug inputs");
+    println!("TS_RUST_RECIPIENT_PARITY_STATUS ONLY_REVIEWED_TS_SOURCE_EXCEPTIONS");
 }
 
 #[test]
@@ -371,4 +394,107 @@ fn compare_real_reanalysis_and_employee_confirmations() {
     print_recipient_report("TS_RUST_REANALYSIS",&report);
     assert_eq!(report["referenceFailuresRust"].as_array().map(Vec::len),Some(0),
         "reanalysis must leave all Rust recipient and Item source links valid");
+    // Upstream TypeScript's changed-quantity reanalysis leaves two stale
+    // recipientId source refs. Rust fixes this deliberately, so the five
+    // resulting JSON diffs are known but no NEW diff is accepted.
+    let previous:Value=serde_json::from_str(include_str!(
+        "../ts-rust-reanalysis-differential-20261113.json"
+    )).expect("previous real TS/Rust reanalysis audit");
+    let allowed=previous["differences"].as_array().expect("reviewed TS bug");
+    let actual=report["differences"].as_array().expect("actual TS/Rust reanalysis diff");
+    assert_eq!(actual.len() as u64,report["mismatchCount"].as_u64().unwrap_or(u64::MAX));
+    for difference in actual {
+        assert!(allowed.contains(difference),
+            "new TS/Rust reanalysis mismatch outside the reviewed stale-recipientId defect: {difference}");
+    }
+    println!("TS_RUST_REANALYSIS_PARITY_STATUS ONLY_REVIEWED_TS_SOURCE_EXCEPTION");
+}
+
+
+#[test]
+fn protect_true_recipients_and_address_details_against_legacy_ts_false_positives() {
+    let (state,_)=corrected_state();
+    let client=recipient_client();
+    let cases=recipient_cases();
+    for id in ["original-19","original-20","recipient-name-contact",
+        "recipient-inline","recipient-address-detail"] {
+        let case=cases.iter().find(|c|c["id"]==id).expect("fixture");
+        let raw=case["raw"].as_str().expect("literal original order");
+        let rust=recognition::execute("analyze_order",json!({
+            "raw":raw,"state":state,"client":client
+        })).expect("production Rust");
+        let recipients=rust["recipients"].as_array().expect("deliveries");
+        assert_eq!(recipients.len(),1,
+            "{id}: no phantom deliveries from order dates or model options");
+        let actual=&recipients[0];
+        match id {
+            "original-19"=>{
+                assert_eq!(actual["name"],"여가상");
+                assert_ne!(actual["name"],"연주용의자");
+                assert_eq!(actual["items"][0]["quantity"],1);
+            }
+            "original-20"=>{
+                assert_eq!(actual["name"],"이가상");
+                assert_eq!(actual["phone"],"053-123-4567");
+                assert_eq!(actual["mobile"],"010-1234-5678");
+                assert!(actual["address"].as_str().unwrap_or("").contains("경북 경산시"));
+                assert_eq!(actual["items"][0]["quantity"],1);
+            }
+            "recipient-name-contact"=>{
+                assert_eq!(actual["name"],"김가상");
+                assert_ne!(actual["name"],"민판");
+                assert_eq!(actual["mobile"],"010-1234-5678");
+            }
+            "recipient-inline"=>{
+                assert_eq!(actual["name"],"이가상",
+                    "explicit recipient after product quantity must not disappear");
+                assert_eq!(actual["mobile"],"010-1234-5678");
+            }
+            "recipient-address-detail"=>{
+                assert_eq!(actual["name"],"박가상");
+                assert!(actual["address"].as_str().unwrap_or("")
+                    .contains("101동 1102호"),
+                    "indented apartment number belongs in shipping address");
+                assert!(!rust["candidates"].as_array().unwrap().iter()
+                    .any(|c|c["kind"]=="product" && c["text"]=="101"),
+                    "apartment building must not become an unknown product SKU");
+            }
+            _=>unreachable!()
+        }
+        assert!(recipients.iter().all(|r|
+            r["id"].as_str().map_or(false,|s|!s.is_empty())));
+    }
+}
+
+#[test]
+fn preserve_secondary_contact_and_show_unassigned_quantity_evidence() {
+    let (state,_)=corrected_state();
+    let client=recipient_client();
+    let cases=recipient_cases();
+    for id in ["original-01","original-03","recipient-common"] {
+        let raw=cases.iter().find(|c|c["id"]==id).unwrap()["raw"]
+            .as_str().unwrap().to_owned();
+        let response=recognition::execute("analyze_order",json!({
+            "raw":raw,"state":state,"client":client
+        })).expect("real Rust");
+        let row=&response["recipients"][0];
+        match id {
+            "original-01"=>{
+                let sources=row["sources"].as_array().unwrap();
+                assert!(sources.iter().any(|s|
+                    s["field"]=="mobile" && s["text"]=="010-1234-5678"));
+                assert!(sources.iter().any(|s|
+                    s["field"]=="phone" && s["text"]=="010-1111-2222"));
+                assert_eq!(row["mobile"],"010-1234-5678");
+                assert_eq!(row["phone"],"010-1111-2222");
+            }
+            "original-03"|"recipient-common"=>{
+                let evidence=row["unassignedEvidence"].as_array()
+                    .expect("quantity still visible without a recipient SKU assignment");
+                assert!(evidence.iter().any(|e|e["kind"]=="quantity"),
+                    "{id}: unassigned quantity evidence must not silently disappear");
+            }
+            _=>unreachable!()
+        }
+    }
 }
