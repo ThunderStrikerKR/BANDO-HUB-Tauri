@@ -225,7 +225,7 @@ fn stage_issues(state:&Value,group_id:&str,next:i64) -> Result<Vec<String>,Strin
             if fee_total(ship,row,order).is_none() {
                 issues.push(format!("{}: 배송 운임을 확인하세요",str_field(row,"name")));
             }
-            if field(shipment_totals(state,str_field(ship,"id"))?,"total").is_null() {
+            if field(&shipment_totals(state,str_field(ship,"id"))?,"total").is_null() {
                 issues.push(format!("{}: 청구액 미확정",str_field(row,"name")));
             }
         }
