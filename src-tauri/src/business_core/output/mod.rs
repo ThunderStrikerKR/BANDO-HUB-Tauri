@@ -28,6 +28,7 @@ pub fn execute(operation: &str, payload: Value) -> Result<Value, String> {
         "render_messages" => messages::execute(&payload),
         "render_automatic_request" => automatic_request::execute(&payload),
         "render_automatic_message" => automatic_full::execute(&payload),
+        "decorate_automatic_copy" => automatic_full::decorate_copy(&payload),
         "payment_copy_status" => automatic_full::execute(&payload),
         "prepare_settlement" => settlement::prepare(
             payload.get("state").unwrap_or(&Value::Null),
