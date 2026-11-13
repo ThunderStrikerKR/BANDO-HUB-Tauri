@@ -20,6 +20,7 @@ import {
 } from "../../../../src/shipping.ts";
 import { shipmentTotals, validateWorkflow, reconcileWorkflow, deleteOrder, workflowIssues, stageIssues, applyOrderRawEdit, migrateWorkflow, advanceGroup, undoGroup, setShipmentFreight, processGroup, confirmGroupPayment, recordPayment, restoreShipment, markStoreSent, recordChangeRequest, setGroupAccount, detachShipment, regroupShipment, completeDelivery } from "../../../../src/workflow.ts";
 import { recordActualFreight } from "../../../../src/actual-freight.ts";
+import { deleteGroup, restoreGroup } from "../../../../src/group-trash.ts";
 import { orderIssues, approveMissingQuantity, pendingIssue } from "../../../../src/validation.ts";
 import { validateReceptionBoundary } from "../../../../src/orders/reception.ts";
 import { companyClient, companyParty } from "../../../../src/order-types.ts";
@@ -2346,6 +2347,44 @@ wfActionCase("reject delivery before factory handoff","complete_delivery",
       origin:"FACTORY",status:"QUEUED",snapshot:{}}];},
   ids=>({...actionProps(ids),actual:{FACTORY:3500}}),
   s=>completeDelivery(s,WFS,{FACTORY:3500},WFA),false);
+
+
+// Entire original group-trash State, including deletedAt and append-only events.
+function groupTrashCase(name:string,action:"delete_group"|"restore_group",
+  edit:(state:any)=>void,expectOk:boolean,groupId="group:o1") {
+  const state:any=copy(baseState);
+  edit(state);
+  const id="group-trash-"+name.replace(/[^a-zA-Z0-9]/g,"-");
+  add("group trash: "+name,"apply_group_action",{
+    action,state,groupId,now:actionNow,eventId:id
+  },()=>({state:deterministicIds([id],()=>
+    action==="delete_group"?deleteGroup(state,groupId):restoreGroup(state,groupId))}));
+  cases[cases.length-1].expectedOk=expectOk;
+}
+groupTrashCase("soft-delete untransferred group","delete_group",()=>{},true);
+groupTrashCase("delete missing group fails","delete_group",()=>{},false,"no-such-group");
+groupTrashCase("delete already soft-deleted is unchanged","delete_group",
+  s=>{s.workflow.groups[0].deletedAt=actionNow;},true);
+groupTrashCase("delete after step four fails","delete_group",
+  s=>{s.workflow.shipments[0].step=4;},false);
+groupTrashCase("delete transferred fails","delete_group",
+  s=>{s.workflow.shipments[0].transferred=true;},false);
+groupTrashCase("delete delivered fails","delete_group",
+  s=>{s.workflow.shipments[0].delivery={at:actionNow};},false);
+groupTrashCase("delete group with linked payment fails","delete_group",
+  s=>{s.workflow.payments.push({id:"paid",dealerId:"dealer-1",
+    amount:500,allocations:[{shipmentId:"shipment:o1:r1",amount:500}]});},false);
+groupTrashCase("delete empty group leaves zero shipment IDs","delete_group",
+  s=>{s.workflow.shipments=[];},true);
+groupTrashCase("restore missing group fails","restore_group",()=>{},false,"no-such-group");
+groupTrashCase("restore active group no-op","restore_group",()=>{},true);
+groupTrashCase("restore soft deleted group preserves notices","restore_group",
+  s=>{s.workflow.groups[0].deletedAt=actionNow;
+    s.workflow.groups[0].notices=[{id:"notice-old",amount:7000}];},true);
+groupTrashCase("restore group with all existing shipment IDs","restore_group",
+  s=>{s.workflow.groups[0].deletedAt="2026-01-01T00:00:00.000Z";
+    s.workflow.shipments.push({...copy(s.workflow.shipments[0]),
+      id:"shipment:o1:r2",recipientId:"r2"});},true);
 
 function normalized(v:unknown):string {
   if(Array.isArray(v))return "["+v.map(normalized).join(",")+"]";
