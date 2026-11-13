@@ -30,6 +30,8 @@ pub(super) fn validate(state: &Value, before: Option<&Value>) -> Result<(),Strin
     for s in rows(field(w,"shipments")) {
         if flag(s,"legacyArchived") && shipment_for(state,s).is_err() {continue;}
         let (order,_recipient) = shipment_for(state,s)?;
+        let group = find_by_id(field(w,"groups"),str_field(s,"groupId"));
+        let step = field(s,"step").as_i64();
         if str_field(order,"orderType") == "RETAIL" {
             let has_payment = rows(field(w,"payments")).iter().any(|p|
                 rows(field(p,"allocations")).iter().any(|a| str_field(a,"shipmentId")==str_field(s,"id")));
@@ -41,7 +43,6 @@ pub(super) fn validate(state: &Value, before: Option<&Value>) -> Result<(),Strin
                 return Err("소매 주문에는 입금 / 계좌 안내 단계를 만들 수 없습니다.".into());
             }
         }
-        let group = find_by_id(field(w,"groups"),str_field(s,"groupId"));
         let source = find_by_id(field(w,"sources"),str_field(s,"sourceId"));
         let valid_link = match (group,source) {
             (Some(g),Some(src)) => str_field(src,"orderId") == str_field(order,"id")
@@ -50,7 +51,6 @@ pub(super) fn validate(state: &Value, before: Option<&Value>) -> Result<(),Strin
             _ => false
         };
         if !valid_link {return Err("발주서 / 묶음 / 배송 건 연결 오류".into());}
-        let step = field(s,"step").as_i64();
         if step.is_none_or(|n| !(0..=4).contains(&n)) {
             return Err("잘못된 진행 단계".into());
         }
