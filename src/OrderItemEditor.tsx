@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { confirmDiscardDraft } from "./shared/editor-flow";
 import { Modal } from "./ui";
-import { itemFromProduct, resolvePrice } from "./domain";
+import { itemFromProduct } from "./domain";
+import { businessCoreCall } from "./tauri-bridge";
 import { productModelNames } from "./product-name-match";
 import { searchProducts } from "./product-search";
 import type { Client, Item, Product, State } from "./types";
@@ -40,6 +41,11 @@ export function OrderItemEditor({
     );
     return (recognized?.[0] ?? item.name.split(" / ")[0]).trim();
   });
+  const [catalogPrices, setCatalogPrices] = useState<Record<string, number | null>>({});
+  const [priceError, setPriceError] = useState("");
+  const [pricePending, setPricePending] = useState(false);
+  const priceRequest = useRef(0);
+  const selectedPriceRequest = useRef(0);
   const [imageCache, setImageCache] = useState<Record<string, string | null>>({});
   const [invalidImage, setInvalidImage] = useState<string | null>(null);
 
@@ -55,6 +61,40 @@ export function OrderItemEditor({
       .slice(0, 100),
     [state, query, client.id],
   );
+
+  const clientQuoteSignature = JSON.stringify(client);
+  useEffect(() => {
+    const request = ++priceRequest.current;
+    const eligible = results.filter((candidate) =>
+      candidate.variants.length === 1 && !candidate.requiresOption);
+    setCatalogPrices({});
+    setPriceError("");
+    if (!eligible.length) return;
+    void businessCoreCall<{ prices: Array<number | null> }>(
+      "rules", "resolve_unit_prices", {
+        quotes: eligible.map((candidate) => ({
+          product: candidate, variantId: candidate.variants[0].id,
+        })),
+        client,
+      },
+    ).then(({ prices }) => {
+      if (request !== priceRequest.current) return;
+      if (prices.length !== eligible.length)
+        throw Error("상품 가격 조회 결과 수가 일치하지 않습니다.");
+      setCatalogPrices(Object.fromEntries(
+        eligible.map((candidate, index) => [candidate.id, prices[index]]),
+      ));
+    }).catch((error) => {
+      if (request !== priceRequest.current) return;
+      setPriceError("Rust 가격 조회 실패: " +
+        (error instanceof Error ? error.message : String(error)));
+    });
+    return () => {
+      if (request === priceRequest.current) priceRequest.current++;
+    };
+  }, [results, clientQuoteSignature]);
+
+  useEffect(() => () => { selectedPriceRequest.current++; }, []);
 
   useEffect(() => {
     const current = product;
@@ -82,7 +122,7 @@ export function OrderItemEditor({
   const usableImage = image && image !== invalidImage ? image : null;
 
   const choose = (candidate: Product) => {
-    if (locked) return;
+    if (locked || pricePending) return;
     if (candidate.variants.length !== 1 || candidate.requiresOption) {
       setSelectionError(candidate.requiresOption
         ? "상품 구성이 미확정입니다. 등록된 독립 상품을 선택하세요."
@@ -92,23 +132,36 @@ export function OrderItemEditor({
     setSelectionError("");
     if (candidate.id === item.productId &&
         candidate.variants[0].id === item.variantId) {
+      selectedPriceRequest.current++;
       setDraft(structuredClone(item));
       return;
     }
-    const next = itemFromProduct(candidate, client,
-      candidate.variants[0].color, item.quantity, candidate.variants[0].id);
-    setDraft({
-      ...next,
-      id: item.id,
-      raw: item.raw,
-      sources: item.sources,
-      quantity: item.quantity,
-      quantityConfirmed: item.quantityConfirmed,
+    const request = ++selectedPriceRequest.current;
+    setPricePending(true);
+    void businessCoreCall<{ unitPrice: number | null }>(
+      "rules", "resolve_unit_price", {
+        product: candidate, variantId: candidate.variants[0].id, client,
+      },
+    ).then(({ unitPrice }) => {
+      if (request !== selectedPriceRequest.current) return;
+      const next = itemFromProduct(candidate, client,
+        candidate.variants[0].color, item.quantity,
+        candidate.variants[0].id, unitPrice);
+      setDraft({
+        ...next, id: item.id, raw: item.raw, sources: item.sources,
+        quantity: item.quantity, quantityConfirmed: item.quantityConfirmed,
+      });
+    }).catch((error) => {
+      if (request === selectedPriceRequest.current)
+        setSelectionError("Rust 가격 조회 실패: " +
+          (error instanceof Error ? error.message : String(error)));
+    }).finally(() => {
+      if (request === selectedPriceRequest.current) setPricePending(false);
     });
   };
 
   const apply = () => {
-    if (locked || !changed || !draft.productId || !draft.variantId ||
+    if (pricePending || locked || !changed || !draft.productId || !draft.variantId ||
         !Number.isSafeInteger(item.quantity) || (item.quantity ?? 0) < 1) return;
     const next = { ...draft, manuallyConfirmed: true };
     delete next.quantityApproval;
@@ -178,6 +231,7 @@ export function OrderItemEditor({
               onChange={(event) => setQuery(event.target.value)}
             />
             {selectionError && <p className="order-item-edit-error" role="alert">{selectionError}</p>}
+            {priceError && <p className="order-item-edit-error" role="alert">{priceError}</p>}
             <div className="order-item-edit-results" aria-label="등록 상품 검색 결과">
               {results.map((candidate) => (
                 <button
@@ -194,9 +248,10 @@ export function OrderItemEditor({
                     <small>{candidate.category}</small>
                   </span>
                   <span className="order-item-edit-candidate-price">
-                    {money(candidate.variants.length === 1
-                      ? resolvePrice(candidate, candidate.variants[0].id, client)
-                      : null)}
+                    {candidate.variants.length === 1 &&
+                      Object.hasOwn(catalogPrices, candidate.id)
+                      ? money(catalogPrices[candidate.id])
+                      : "가격 확인 중"}
                   </span>
                 </button>
               ))}
@@ -219,7 +274,7 @@ export function OrderItemEditor({
           <button
             type="button"
             className="primary"
-            disabled={locked || !changed || !draft.productId || !draft.variantId ||
+            disabled={pricePending || locked || !changed || !draft.productId || !draft.variantId ||
               !Number.isSafeInteger(item.quantity) || (item.quantity ?? 0) < 1}
             onClick={apply}
           >

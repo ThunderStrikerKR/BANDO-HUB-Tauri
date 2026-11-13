@@ -30,6 +30,17 @@ pub fn execute(operation: &str, payload: Value) -> Result<Value, String> {
             required_str(&payload, "variantId")?,
             req(&payload, "client")?,
         ).map(|price| json!({"unitPrice": price})),
+        "resolve_unit_prices" => {
+            let client=req(&payload,"client")?;
+            let prices=rows(req(&payload,"quotes")?).iter().map(|quote|{
+                pricing::resolve_unit_price(
+                    req(quote,"product")?,
+                    required_str(quote,"variantId")?,
+                    client,
+                )
+            }).collect::<Result<Vec<_>,_>>()?;
+            Ok(json!({"prices":prices}))
+        },
         "reprice_order" => pricing::reprice_order(&payload),
         "should_refresh_pricing" => Ok(json!({"refresh": pricing::should_refresh(&payload)?})),
         "apply_shipping_action" => shipping::shipping_action(&payload),

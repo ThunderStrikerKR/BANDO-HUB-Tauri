@@ -157,6 +157,8 @@ export function itemFromProduct(
   color?: string,
   quantity: number | null = 1,
   selectedVariantId?: string,
+  // Optional authoritative native quote: bypass TS pricing in migrated UI.
+  priceOverride?: number | null,
 ): Item {
   const explicit = selectedVariantId
     ? p.variants.find((variant) => variant.id === selectedVariantId)
@@ -189,7 +191,9 @@ export function itemFromProduct(
       ? "[가상] " + productName : productName,
     color: c,
     quantity,
-    unitPrice: v ? resolvePrice(p, v.id, client) : null,
+    unitPrice: v
+      ? priceOverride === undefined ? resolvePrice(p, v.id, client) : priceOverride
+      : null,
     origin: p.origin,
     defaulted: !color,
     issues: v

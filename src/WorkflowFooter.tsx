@@ -1,4 +1,3 @@
-import { recommendShipping } from "./shipping";
 import type { Origin, Price, State } from "./types";
 import { shipmentContext, shipmentFreightCode, shipmentVat } from "./workflow";
 import type { WorkflowShipment } from "./workflow-types";
@@ -17,17 +16,17 @@ export function WorkflowFreightRows({
   activeKey,
 }: FreightProps) {
   const { order, recipient, client } = shipmentContext(state, shipment),
-    rec = recommendShipping({ ...order, recipients: [recipient] }, state),
+    origins = [...new Set(recipient.items.map((item) => item.origin))],
     disabled = shipment.transferred,
     collect = shipmentFreightCode(order, recipient) === "020";
   return (
     <>
-      {rec.bundles.map((b, index) => {
-        const value = collect || client.shippingFeeExcluded ? 0 : shipment.charges[b.origin];
+      {origins.map((origin, index) => {
+        const value = collect || client.shippingFeeExcluded ? 0 : shipment.charges[origin];
         return (
           <tr
-            key={b.origin}
-            data-freight-origin={b.origin}
+            key={origin}
+            data-freight-origin={origin}
             data-link-key={recipient.id + ":freight"}
             className={
               "freight-item-row freight-input-area" +
@@ -37,16 +36,16 @@ export function WorkflowFreightRows({
             <td colSpan={3}>
               <div className="freight-line">
                 <b className="freight-name">
-                  {rec.bundles.length === 1
+                  {origins.length === 1
                     ? "운임"
-                    : b.origin === "FACTORY"
+                    : origin === "FACTORY"
                       ? "공장 운임"
                       : "매장 운임"}
                 </b>
                 <div className="freight-amount-code">
                   <div className="freight-money">
                   <input
-                    aria-label={`${recipient.name} ${b.origin === "FACTORY" ? "공장" : "매장"} 적용 운임`}
+                    aria-label={`${recipient.name} ${origin === "FACTORY" ? "공장" : "매장"} 적용 운임`}
                     inputMode="numeric"
                     disabled={disabled || collect || client.shippingFeeExcluded}
                     value={
@@ -61,7 +60,7 @@ export function WorkflowFreightRows({
                       const digitsBefore = input.value
                         .slice(0, input.selectionStart ?? input.value.length)
                         .replace(/\D/g, "").length;
-                      onFreight(b.origin, raw === "" ? null : Number(raw));
+                      onFreight(origin, raw === "" ? null : Number(raw));
                       requestAnimationFrame(() => {
                         if (!input.isConnected || document.activeElement !== input) return;
                         let at = 0,
@@ -79,7 +78,7 @@ export function WorkflowFreightRows({
                   <span className="freight-payment-code">
                     <span aria-hidden="true">(</span>
                     <select
-                      aria-label={index ? "운임구분 " + b.origin : "운임구분"}
+                      aria-label={index ? "운임구분 " + origin : "운임구분"}
                       value={shipmentFreightCode(order, recipient)}
                       disabled={disabled}
                       onChange={(e) => onCode(e.target.value as "010" | "020")}
@@ -92,8 +91,8 @@ export function WorkflowFreightRows({
                 </div>
                 <button
                   className="freight-inquiry"
-                  aria-hidden={b.origin !== "FACTORY"}
-                  style={{ visibility: b.origin === "FACTORY" ? "visible" : "hidden" }}
+                  aria-hidden={origin !== "FACTORY"}
+                  style={{ visibility: origin === "FACTORY" ? "visible" : "hidden" }}
                   disabled
                   title="공장 문의 연동 준비 중"
                 >
