@@ -2,7 +2,8 @@ import { useState } from "react";
 import { AutomaticMessageTemplateManager } from "./AutomaticMessageTemplateManager";
 import { ProvisionalProductNoticeManager } from "./ProvisionalProductNoticeManager";
 import { confirmAction } from "./dialogs";
-import { clientCandidates, uid } from "./domain";
+import { uid } from "./domain";
+import { useNativeClients } from "./native-catalog-queries";
 import { businessCoreCall } from "./tauri-bridge";
 import { TierBadge } from "./ManagementUI";
 import { ClientWorkbookTools } from "./ClientWorkbookTools";
@@ -82,8 +83,9 @@ export function ClientManager({
     setMessageDirty(false);
     setMessageSection(next);
   };
+  const nativeClients = useNativeClients(state.clients, search);
   const rows = search
-    ? clientCandidates(search, state.clients)
+    ? nativeClients.results
     : state.clients.filter((c) => !c.deletedAt);
   const save = async (): Promise<boolean> => {
     if (!edit) return true;
