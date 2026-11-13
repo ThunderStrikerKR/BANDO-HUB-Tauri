@@ -3,11 +3,12 @@ on:
   push:
     branches:
       - migration/03-integration
+      - migration/06-history-settlement
   workflow_dispatch:
 permissions:
   contents: read
 concurrency:
-  group: rust-output-migration03
+  group: rust-output-migration03-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   output-rust:
@@ -120,3 +121,29 @@ jobs:
         run: npm install --no-audit --no-fund --ignore-scripts
       - name: Real native Rust recognition to React draft parity and preservation
         run: node --test tests/rust-migration/recognition/react-reception.test.mjs
+
+  history-ts-rust-parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install TS original oracle
+        run: npm install --no-audit --no-fund --ignore-scripts
+      - name: Compare original TS history, tracking, historical products and settlement to compiled Rust
+        run: node --test tests/rust-migration/rules/history-parity.test.mjs
+
+  history-native-windows:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+      - name: Verify actual native Windows history rules
+        run: cargo test --manifest-path src-tauri/Cargo.toml --lib business_core::rules::history::tests:: -- --test-threads=1
