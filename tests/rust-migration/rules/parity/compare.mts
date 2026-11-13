@@ -657,7 +657,9 @@ function rawCase(name:string,raw:string,mutate:(s:any)=>void=()=>{},
   cases[cases.length-1].expectedOk= ![
     "empty raw rejected","blank raw rejected",
     "previously deleted order blocked","Excel exported recipient blocked",
-    "already delivered recipient blocked","payer identity cannot silently change"
+    "already delivered recipient blocked","payer identity cannot silently change",
+    "already handed off store Excel blocked",
+    "two paid recipients must preserve original recipient links"
   ].includes(name);
 }
 rawCase("unchanged source is a no-op",order.raw);
@@ -691,6 +693,64 @@ rawCase("payer identity cannot silently change",
 rawCase("previously confirmed step requires rechecks",
   "가상 수취인\n서울시 가상로 1\n010-1234-5678\n가상 상품 1개",s=>{
     s.workflow.shipments[0].step=3;
+  });
+
+
+rawCase("cancelled Excel does not block original raw correction",
+  "가상 수취인\n서울시 가상로 1\n010-1234-5678\n가상 상품 3개",s=>{
+    s.workflow.queue.push({id:"cancelled-1",shipmentId:"shipment:o1:r1",
+      origin:"FACTORY",status:"CANCELLED",snapshot:{}});
+  });
+rawCase("already handed off store Excel blocked",
+  "가상 수취인\n서울시 가상로 1\n010-1234-5678\n가상 상품 3개",s=>{
+    s.workflow.queue.push({id:"store-sent-1",shipmentId:"shipment:o1:r1",
+      origin:"STORE",status:"STORE_SENT",snapshot:{}});
+  });
+rawCase("same name protects already paid recipient after contact correction",
+  "가상 수취인\n서울시 가상로 1\n010-2222-3333\n가상 상품 3개",s=>{
+    s.workflow.payments.push({id:"payment-1",dealerId:"dealer-1",
+      amount:1000,allocations:[{shipmentId:"shipment:o1:r1",amount:1000}]});
+  });
+rawCase("same mobile preserves identity when recipient name is corrected",
+  "이름: 수정된 수취인\n주소: 서울시 가상로 1\n휴대폰: 010-1234-5678\n가상 상품 2개",s=>{
+    s.orders[0].recipients[0].mobile="010-1234-5678";
+    s.orders[0].recipients[0].phone="";
+    s.workflow.payments.push({id:"payment-2",dealerId:"dealer-1",
+      amount:1000,allocations:[{shipmentId:"shipment:o1:r1",amount:1000}]});
+  });
+rawCase("manual item confirmation carries matching historical fields",
+  "가상 수취인\n서울시 가상로 1\n010-1234-5678\n가상 상품 2개",s=>{
+    s.orders[0].recipients[0].items[0].manuallyConfirmed=true;
+    s.orders[0].recipients[0].items[0].quantityApproval={
+      at:now,actor:"가상 담당자",quantity:2
+    };
+    s.orders[0].recipients[0].vatOverride=false;
+    s.orders[0].messageEdits={payment:"기존 문구"};
+    s.workflow.groups[0].messageEdits={payment:"이전 안내"};
+  });
+rawCase("edit previously confirmed order keeps master-snapshot policy",
+  "가상 수취인\n서울시 가상로 1\n010-1234-5678\n가상 상품 2개",s=>{
+    s.orders[0].confirmedAt=now;
+    s.orders[0].pricesLocked=true;
+    s.orders[0].clientSnapshot=copy(s.clients[0]);
+  });
+rawCase("strict identity retains matching phone",
+  "받는분: 가상 수취인\n주소: 서울시 가상로 1\n연락처: 010-1234-5678\n가상 상품 2개",
+  s=>{
+    s.orders[0].recipients[0].mobile="010-1234-5678";
+    s.orders[0].recipients[0].phone="";
+  },true);
+rawCase("two paid recipients must preserve original recipient links",
+  "가상 수취인\n서울시 가상로 1\n010-1234-5678\n가상 상품 2개",s=>{
+    const r=copy(s.orders[0].recipients[0]);
+    r.id="r2";r.name="다른 수취인";r.phone="010-8888-7777";
+    r.items[0].id="item2";
+    s.orders[0].recipients.push(r);
+    const ship=copy(s.workflow.shipments[0]);
+    ship.id="shipment:o1:r2";ship.recipientId="r2";
+    s.workflow.shipments.push(ship);
+    s.workflow.payments.push({id:"payment-r2",dealerId:"dealer-1",
+      amount:1000,allocations:[{shipmentId:"shipment:o1:r2",amount:1000}]});
   });
 
 function normalized(v:unknown):string {
