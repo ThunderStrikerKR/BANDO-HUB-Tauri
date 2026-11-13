@@ -10,6 +10,8 @@ mod registration;
 mod registration_preview;
 #[path = "catalog_clients/product_sync_preview.rs"]
 mod product_sync_preview;
+#[path = "catalog_clients/official_import.rs"]
+mod official_import;
 use unicode_normalization::UnicodeNormalization;
 use url::Url;
 
@@ -271,6 +273,7 @@ pub fn execute(operation: &str, payload: Value) -> Result<Value, String> {
     let state = payload.get("state").ok_or("현재 상태가 없습니다.")?;
     match operation {
         "preview_client_rows" => client_preview::preview(&payload),
+        "apply_official_product_import" => official_import::apply(&payload),
         "prepare_registration_commit" => registration::commit(&payload),
         "preview_registration_rows" => registration_preview::preview(&payload),
         "preview_product_sync_rows" => product_sync_preview::preview(&payload),
