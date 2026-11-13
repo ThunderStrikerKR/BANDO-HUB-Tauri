@@ -302,4 +302,79 @@ mod regression {
         assert!(execute("validate_workflow",json!({"state":after,"before":before})).is_err());
     }
 
+    #[test]
+    fn prepaid_confirmation_creates_allocation_then_approves() {
+        let mut s=workflow_state("PREPAID");
+        s["workflow"]["groups"][0]["notices"]=json!([{
+            "id":"notice-1","account":{"id":"account-1","bank":"가상은행",
+                "number":"123-456","holder":"가상상호"},
+            "amounts":{"shipment:o1:r1":36300},"total":36300
+        }]);
+        let out=run("apply_workflow_action",json!({
+            "state":s,"action":"confirm_group_payment","groupId":"group:o1",
+            "confirmationId":"confirm-1","eventId":"event-1",
+            "now":"2026-11-13T11:00:00+09:00"
+        }));
+        assert_eq!(out["step"],4);
+        assert_eq!(out["state"]["workflow"]["confirmations"][0]["amount"],36300);
+        assert_eq!(out["state"]["workflow"]["confirmations"][0]["allocations"][0]["amount"],36300);
+        assert_eq!(out["state"]["workflow"]["events"][0]["action"],"입금 확인 완료");
+        assert_eq!(out["state"]["orders"][0]["raw"],s["orders"][0]["raw"]);
+    }
+    #[test]
+    fn recorded_payment_is_audited_and_cannot_overallocate() {
+        let s=workflow_state("PREPAID");
+        let input=json!({
+            "state":s,"action":"record_payment","groupId":"group:o1",
+            "paymentId":"pay-1","allocationIds":["allocation-1"],
+            "allocations":[{"shipmentId":"shipment:o1:r1","amount":36300}],
+            "paidAmount":36300,"paidAt":"2026-11-13T10:00:00+09:00",
+            "eventId":"event-1","now":"2026-11-13T10:01:00+09:00"
+        });
+        let result=run("apply_workflow_action",input.clone());
+        assert_eq!(result["state"]["workflow"]["payments"][0]["amount"],36300);
+        assert_eq!(result["state"]["workflow"]["payments"][0]["allocations"][0]["id"],"allocation-1");
+        assert_eq!(result["state"]["workflow"]["events"][0]["action"],"실제 입금 기록");
+        assert_eq!(run("validate_workflow",json!({"state":result["state"],"before":s}))["valid"],true);
+        let mut invalid=input;
+        invalid["allocations"][0]["amount"]=json!(36301);
+        assert!(execute("apply_workflow_action",invalid).is_err());
+    }
+    #[test]
+    fn pre_excel_queue_can_be_restored_without_erasing_audit() {
+        let state=workflow_state("POSTPAID");
+        let approved=run("apply_workflow_action",json!({
+            "state":state,"action":"advance_group","groupId":"group:o1",
+            "eventId":"event-1","now":"2026-11-13T11:00:00+09:00"
+        }));
+        let queued=run("apply_workflow_action",json!({
+            "state":approved["state"],"action":"process_group","groupId":"group:o1",
+            "eventId":"event-2","now":"2026-11-13T11:10:00+09:00"
+        }));
+        let restored=run("apply_workflow_action",json!({
+            "state":queued["state"],"action":"restore_shipment","shipmentId":"shipment:o1:r1",
+            "eventId":"event-3","now":"2026-11-13T11:15:00+09:00"
+        }));
+        assert_eq!(restored["state"]["workflow"]["shipments"][0]["transferred"],false);
+        assert_eq!(restored["state"]["workflow"]["queue"][0]["status"],"CANCELLED");
+        assert_eq!(restored["state"]["workflow"]["events"].as_array().unwrap().len(),3);
+    }
+    #[test]
+    fn store_dispatch_can_advance_queued_status_without_excel_export() {
+        let mut s=workflow_state("POSTPAID");
+        s["workflow"]["queue"]=json!([{
+            "id":"store-queue","shipmentId":"shipment:o1:r1",
+            "origin":"STORE","status":"QUEUED",
+            "at":"2026-11-13T09:00:00+09:00"
+        }]);
+        let result=run("apply_workflow_action",json!({
+            "state":s,"action":"mark_store_sent","queueId":"store-queue",
+            "eventId":"event-1","now":"2026-11-13T11:00:00+09:00"
+        }));
+        assert_eq!(result["status"],"STORE_SENT");
+        assert_eq!(result["state"]["workflow"]["queue"][0]["status"],"STORE_SENT");
+        assert_eq!(result["state"]["workflow"]["queue"][0]["fileOnly"],false);
+        assert_eq!(result["state"]["workflow"]["events"][0]["action"],"매장 발송 확인");
+    }
+
 }
