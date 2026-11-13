@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { confirmAction, promptText } from "./dialogs";
 import { money, won } from "./domain";
+import { businessCoreCall } from "./tauri-bridge";
 import { internalModel } from "./matching";
 import { colorLabel, registeredProducts, sortProducts } from "./product-models";
 import { ProductFreightPanel } from "./ProductFreightPanel";
@@ -117,31 +118,24 @@ export function ShippingManager({
   const editingDirty = !!editing && !!initialEditing && !sameFreightEditor(editing.rule, initialEditing);
   const saveEditedRule = async (): Promise<boolean> => {
     if (!editing || !editingDirty) return true;
-              const next = structuredClone(shipping),
-                g = next.groups.find((g) => g.id === editing.id)!;
-              g.history.push(g.current);
-              if (Object.entries(editing.rule.fees).some(([count, amount]) =>
-                typeof amount === "number" && editing.rule.maxBundle !== null &&
-                Number(count) > editing.rule.maxBundle)) {
-                onNotice("최대 묶음 수량을 초과하는 운임 구간을 확인하세요.", "error");
-                return false;
-              }
-              g.current = {
-                ...editing.rule,
-                maxConfirmed: editing.rule.maxBundle !== null,
-                version: crypto.randomUUID(),
-                at: new Date().toISOString(),
-              };
-              delete g.current.validFrom;
-              delete g.current.validUntil;
-              delete g.current.basis;
-              delete g.current.packable;
-              const ok = await save(
-                { ...state, shipping: next },
-                "운임표를 저장했습니다. 변경 전 기준은 이력으로 보존됩니다.",
-              );
-              if (ok) { setEditing(undefined); setInitialEditing(undefined); }
-              return ok;
+    try {
+      const { shipping: updated } = await businessCoreCall<{ shipping: ShippingState }>(
+        "rules", "apply_shipping_action", {
+          action: "save_group_rule",
+          shipping, groupId: editing.id, rule: editing.rule,
+          versionId: crypto.randomUUID(), now: new Date().toISOString(),
+        },
+      );
+      const ok = await save(
+        { ...state, shipping: updated },
+        "운임표를 저장했습니다. 변경 전 기준은 이력으로 보존됩니다.",
+      );
+      if (ok) { setEditing(undefined); setInitialEditing(undefined); }
+      return ok;
+    } catch (error) {
+      onNotice(error instanceof Error ? error.message : String(error), "error");
+      return false;
+    }
   };
   usePageLeaveGuard({
     label: "운임 관리",
