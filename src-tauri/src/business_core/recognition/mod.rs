@@ -335,8 +335,13 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
             let value=without_phones.trim();
             if !value.is_empty() {
                 let end=start+without_phones.trim_end().len();
+                // In the original TS parser, a parenthesized postal code at
+                // the beginning of a labelled address is stripped from the
+                // address value. Keep the untouched source span for evidence.
+                let normalized=Regex::new(r"^\(\d{5}\)\s*").expect("postcode")
+                    .replace(value,"").to_string();
                 add_match(&mut events,line,start,end,"address",
-                    value.to_owned(),"배송주소 원문 구간");
+                    normalized,"배송주소 원문 구간");
             }
         }
 
@@ -619,12 +624,11 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
             if chosen.is_none() {
                 issues.push("제품명이 확인되지 않습니다.".into());
             }
-            if !unique {
-                issues.push(if hit.quantities.is_empty() {
-                    "수량 미기재 / 거래처 확인 필요".to_owned()
-                } else {
-                    "한 줄에 여러 상품과 수량 확인 필요".to_owned()
-                });
+            // TS order-evidence::attach removes provisional "수량 1개"
+            // notices when no quantity evidence is attached; the unresolved
+            // quantity remains null and quantityConfirmed=false.
+            if hit.quantities.len()>1 {
+                issues.push("한 줄에 여러 상품과 수량 확인 필요".into());
             }
             let term = if hit.common {json!({
                 "kind":"COMMON_INHERIT",
