@@ -320,7 +320,9 @@ test("report screens keep live read-only views while Excel export buttons are de
   const native=read("src-tauri/src/lib.rs");
   const bridge=read("src/tauri-bridge.ts");
   assert.match(app,/<DailySettlement state=\{state\}/);
-  assert.match(daily,/dailySettlement\(state, date, orderHistory\(state, "", date\)\)/);
+  assert.match(daily,/businessCoreCall<DailySettlementReport>\("output", "prepare_settlement"/);
+  assert.match(daily,/const historyRows = orderHistory\(state, "", date\)/);
+  assert.match(daily,/requestId\.current === id/);
   // Keep actual daily settlement and order-history queries, filters and warnings.
   assert.match(daily, /report\.orderRows\.map/);
   assert.match(daily, /report\.paymentRows\.map/);
