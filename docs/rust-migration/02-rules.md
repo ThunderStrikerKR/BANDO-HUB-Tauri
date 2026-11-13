@@ -3,8 +3,8 @@
 Date: 2026-11-13 KST
 Repository: ThunderStrikerKR/TSBH
 Branch: migration/02-rules (created at d5ea8ed20b8120b844437263c2eb2b8963559e8d)
-Last implementation/test-source commit before this document: 989397ac974c368564a2c769286c313708529bc4
-Last independent Cargo test-verified code commit: 989397ac974c368564a2c769286c313708529bc4 (30/30 PASS; GitHub Actions run 43354364403; not full TS parity or Windows validation)
+Last implementation/test-source commit before this document: 0a168943b78390f5c97e0a7f335860add0d35db1
+Last independent Cargo test-verified code commit: 0a168943b78390f5c97e0a7f335860add0d35db1 (31/31 PASS; GitHub Actions run 43354719292; not full TS parity or Windows validation)
 
 ## Scope and ownership
 
@@ -204,7 +204,7 @@ Compile/test command:
   cargo test --manifest-path tests/rust-migration/rules/Cargo.toml
 
 It imports the real rules/mod.rs by relative path, not a duplicated mock.
-Thirty synthetic Rust regression tests were authored for:
+Thirty-one synthetic Rust regression tests were authored for:
   tier pricing, SPECIAL and legacy overrides;
   VAT, COD and fee waiver;
   invalid price and overflow;
@@ -219,7 +219,7 @@ Thirty synthetic Rust regression tests were authored for:
   actual freight event;
   immutable workflow history and duplicate IDs.
 
-LATEST RESULT: 30/30 Rust independent regression tests PASS in GitHub Actions run 43354364403 (verified source commit 989397ac974c368564a2c769286c313708529bc4). TS parity, native Tauri/SQLite integration and Windows EXE remain NOT_RUN/UNVERIFIED.
+LATEST RESULT: 31/31 Rust independent regression tests PASS in GitHub Actions run 43354719292 (verified source commit 0a168943b78390f5c97e0a7f335860add0d35db1). TS parity, native Tauri/SQLite integration and Windows EXE remain NOT_RUN/UNVERIFIED.
 TS baseline test source inspected, not executed:
   tests/tauri-confirmed-order-master-freeze.test.mjs
   tests/reception-passive-pricing.test.mjs
@@ -287,9 +287,9 @@ with source of truth for receipt and workflow histories kept intact.
 
 ## Final remote verification and cross-session boundary notes (2026-11-13)
 
-- Session 2 final independent Rust test fixture checkpoint: commit `989397ac974c368564a2c769286c313708529bc4`.
-- GitHub Actions Rust (Ubuntu Stable) run: https://github.com/ThunderStrikerKR/TSBH/actions/runs/43354364403
-- **PASS: 30 tests / 0 failed**. This verifies syntax, compilation, and the authored fixture expectations, **not exhaustive TypeScript parity**.
+- Session 2 final independent Rust test fixture checkpoint: commit `0a168943b78390f5c97e0a7f335860add0d35db1`.
+- GitHub Actions Rust (Ubuntu Stable) run: https://github.com/ThunderStrikerKR/TSBH/actions/runs/43354719292
+- **PASS: 31 tests / 0 failed**. This verifies syntax, compilation, and the authored fixture expectations, **not exhaustive TypeScript parity**.
 - Later tests added: actual payment record, prepaid confirmation with audit allocation, group account change with preserved confirmation and recheck events, store queue transition, queued Excel handoff restore, separate actual freight event, post-delivery change request, origin-completion assessment, STORE/FACTORY mixed bundle shipping, product-specific freight, and safe overflow rejection.
 - **BASELINE_FAIL: no baseline executed; REGRESSION: not established; BLOCKED: unreconciled workflow, full approval issue parity, confirm-revocation edge cases, account/freight special cases, completeDelivery parity and TS snapshot exceptions; NOT_RUN: TypeScript output parity and Windows Tauri/SQLite integration**.
 - This branch additionally contains `.github/workflows/rust-migration-ci.yml` from separate concurrent writer commit `51776244a413f8adbf9d70118de3f4205f4130b6`. Session 2 neither authored nor edited this out-of-scope path, and cannot safely erase concurrent changes under the ownership contract. Session 3 must inspect this unexpected out-of-scope branch addition before merging.
@@ -299,3 +299,9 @@ with source of truth for receipt and workflow histories kept intact.
 
 - Ported TS workflow.ts completeDelivery as pure action `complete_delivery`, using explicit `now`, `eventId`, `combinationIds` and `deliveryIds` rather than global UUID or clock. It validates transferred state, rejects queued/unconfirmed factory output, requires per-origin actual freight, freezes shipment delivery evidence and records verified tariff combinations with observed charges. It never overwrites existing queue billing snapshots.
 - CI regression tests cover one successful finalized FACTORY delivery plus QUEUED and fileOnly rejection. These tests passed in run 43354364403; production parity (sample-counts, historical assignment/version and SQLite transactions) remains BLOCKED until session 3 verification.
+
+## Freight change and payment-approval audit correction
+
+- `set_shipment_freight` now performs the same audit sequence on a previously advanced shipment as the TypeScript `downgrade` path: keep any prior confirmation record, append `입금 승인 재확인 필요` event when applicable, append `재검증 필요`, lower shipment step to 1, mark account notice as required when previously past step 2, and finally append `배송 건 운임 수정`.
+- Generated internal audit event IDs derive deterministically from the caller's required `eventId` and shipment/confirmation IDs, preserving uniqueness without an implicit clock or global UUID.
+- Source/test checkpoint `0a168943b78390f5c97e0a7f335860add0d35db1`: 31/31 PASS GitHub Actions Ubuntu; this is still not complete TypeScript parity.
