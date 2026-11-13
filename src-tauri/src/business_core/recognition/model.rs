@@ -72,13 +72,16 @@ fn top(p: &Value, verified: &HashSet<String>) -> Option<&'static str> {
     } else { None }
 }
 fn no_holes(text: &str) -> bool {
-    Regex::new(r"민\s*판|무\s*타공|비\s*타공|구멍\s*(?:없음|없는|안\s*뚫린)")
-        .expect("static regex").is_match(text)
+    static NO_HOLES:OnceLock<Regex>=OnceLock::new();
+    NO_HOLES.get_or_init(||Regex::new(
+        r"민\s*판|무\s*타공|비\s*타공|구멍\s*(?:없음|없는|안\s*뚫린)"
+    ).expect("static regex")).is_match(text)
 }
 fn with_holes(text: &str) -> bool {
-    !no_holes(text) &&
-        Regex::new(r"(?:^|[\s/,(])타\s*공|구멍\s*(?:있는|있음|뚫린)")
-            .expect("static regex").is_match(text)
+    static WITH_HOLES:OnceLock<Regex>=OnceLock::new();
+    !no_holes(text) && WITH_HOLES.get_or_init(||Regex::new(
+        r"(?:^|[\s/,(])타\s*공|구멍\s*(?:있는|있음|뚫린)"
+    ).expect("static regex")).is_match(text)
 }
 fn is_boundary(text: &str, begin: usize, end: usize) -> bool {
     let disallow = |ch: char| ch.is_ascii_alphanumeric() || ch == '-';
@@ -276,8 +279,10 @@ fn filter_business_candidates<'a>(
 
 fn qualifiers(text: &str) -> HashSet<String> {
     let input: String = text.to_lowercase().chars().filter(|c| !c.is_whitespace()).collect();
-    let re = Regex::new(r"(?:가방|바퀴)(?:미포함|포함|미장착|장착)|[ab]타입|민판|무타공상판|무타공|비타공상판|타공상판|\d+(?:\.\d+)?cm")
-        .expect("static regex");
+    static QUALIFIERS:OnceLock<Regex>=OnceLock::new();
+    let re=QUALIFIERS.get_or_init(||Regex::new(
+        r"(?:가방|바퀴)(?:미포함|포함|미장착|장착)|[ab]타입|민판|무타공상판|무타공|비타공상판|타공상판|\d+(?:\.\d+)?cm"
+    ).expect("static regex"));
     re.find_iter(&input).map(|m| {
         let t = m.as_str();
         if t == "민판" || t.starts_with("무타공") { "비타공상판".to_owned() }
