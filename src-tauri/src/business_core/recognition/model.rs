@@ -391,7 +391,9 @@ pub(crate) fn decide(text: &str, state: &Value, client_id: &str) -> Decision {
         names.entry(str_field(p,"id").to_owned()).or_insert_with(|| json!({
             "id": format!("candidate:{}",str_field(p,"id")),
             "field": "product", "value": str_field(p,"id"), "label": str_field(p,"name"),
-            "start": 0, "end": 0, "productId": str_field(p,"id"),
+            "start": text[..e.span.0].encode_utf16().count(),
+            "end": text[..e.span.1].encode_utf16().count(),
+            "productId": str_field(p,"id"),
             "variantId": variants(p).first().map(|v| str_field(v,"id"))
         }));
     }
