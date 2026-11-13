@@ -19,7 +19,11 @@ test("Tauri can save a store Excel independently of factory and only after previ
  assert.match(ui,/businessCoreCall<StoreExportPreview>\("output", "prepare_store_export", \{ state: current, ids: chosen \}\)/);
  assert.match(ui,/createStoreWorkbook\(preview\)/);
  assert.match(ui,/businessCoreCall<StoreExportPreview>\("output", "prepare_store_export", \{ state: latest, ids: preview.ids \}\)/);
- assert.match(ui,/recordStoreExportPrepared\(latest, preview, savedPath, fresh\)/);
+ assert.match(ui,/await nativeFinalizeExport\(latest, "STORE", preview, savedPath\)/);
+ const native=read("src/native-export.ts"), history=read("src-tauri/src/business_core/output/export_history.rs");
+ assert.match(native,/"output", "finalize_export"/);
+ assert.match(history,/entry\["status"\]=json!\("EXPORTED"\)/);
+ assert.match(history,/entry\["fileOnly"\]=json!\(true\)/);
  assert.match(ui,/saveStoreWorkbook\(bytes\)/);
  assert.match(ui,/선택 " \+ chosen.length \+ "건 매장 Excel 작성"/);
  assert.doesNotMatch(ui,/매장 Excel 출력 미이식/);
