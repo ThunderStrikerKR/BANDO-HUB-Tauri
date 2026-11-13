@@ -182,6 +182,9 @@ export function useOrderDesk({
   // client and catalog revision. A completed previous request must never
   // replace newer typing, a newly selected order or employee corrections.
   const recognitionRequest = useRef(0);
+  // RETAIL's companyParty() can allocate a new equal object each render.
+  // A semantic signature prevents repeated native calls on those renders.
+  const clientSignature = JSON.stringify(liveClient ?? null);
   const latestReceptionInput = useRef({
     orderId: draft.id,
     clientId: draft.clientId,
@@ -190,7 +193,7 @@ export function useOrderDesk({
     manual: !!draft.manualClassification,
     products: state.products,
     aliases: state.aliases,
-    client: liveClient,
+    clientSignature,
   });
   latestReceptionInput.current = {
     orderId: draft.id,
@@ -200,7 +203,7 @@ export function useOrderDesk({
     manual: !!draft.manualClassification,
     products: state.products,
     aliases: state.aliases,
-    client: liveClient,
+    clientSignature,
   };
   useEffect(() => {
     const request = ++recognitionRequest.current;
@@ -235,7 +238,7 @@ export function useOrderDesk({
           latest.saved || latest.manual ||
           latest.products !== state.products ||
           latest.aliases !== state.aliases ||
-          latest.client !== liveClient
+          latest.clientSignature !== clientSignature
         ) return;
         assertRustReceptionAnalysis(result, source);
         onChange((previous) => {
@@ -248,7 +251,7 @@ export function useOrderDesk({
             active.saved || active.manual ||
             active.products !== state.products ||
             active.aliases !== state.aliases ||
-            active.client !== liveClient ||
+            active.clientSignature !== clientSignature ||
             previous.id !== orderId ||
             previous.clientId !== clientId ||
             !receptionAnalysisAllowed(previous, source, pricingClient.id)
@@ -280,7 +283,7 @@ export function useOrderDesk({
   }, [
     source, draft.id, draft.clientId, draft.analysisRaw, draft.analysisClientId,
     draft.manualClassification, draft.confirmedAt, draft.pricesLocked,
-    viewMode, saved, pricingClient.id, liveClient,
+    viewMode, saved, pricingClient.id, clientSignature,
     state.products, state.aliases,
   ]);
   const run = async (fn: () => Promise<unknown> | unknown) => {
