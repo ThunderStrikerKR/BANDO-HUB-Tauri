@@ -234,8 +234,17 @@ finally:
       Select-Object -First 55 name,control,offscreen,x,y,w,h)
     Store
     if($matches.Count -gt 0){
-      $matches[0].el.SetFocus()
-      $method="UIAutomation Edit focus"
+      # The accessibility element may be replaced after scroll/layout;
+      # click its freshly measured rectangle to send genuine native input.
+      $rect=$matches[0]
+      $cx=[int]($rect.x+[Math]::Min(100,$rect.w/2))
+      $cy=[int]($rect.y+$rect.h/2)
+      [BandoAuditNative]::SetForegroundWindow($proc.MainWindowHandle)|Out-Null
+      [BandoAuditNative]::SetCursorPos($cx,$cy)|Out-Null
+      [BandoAuditNative]::mouse_event(0x0002,0,0,0,[UIntPtr]::Zero)
+      Start-Sleep -Milliseconds 75
+      [BandoAuditNative]::mouse_event(0x0004,0,0,0,[UIntPtr]::Zero)
+      $method="native mouse click on measured UIAutomation Edit rectangle"
     }else{
       # Last fallback uses the *measured* native label rectangle, not a
       # hard-coded pixel location or a synthetic DOM interaction.
