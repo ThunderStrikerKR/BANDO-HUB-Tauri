@@ -218,15 +218,19 @@ pub(super) fn preview(payload:&Value)->Result<Value,String>{
         if let Some(v)=result{row.insert("client".into(),v);}
         rows.push(Value::Object(row));
     }
-    let proposed=rows.iter().filter(|row|["ADD","UPDATE"].contains(&strv(row,"status")))
-        .cloned().collect::<Vec<_>>();
-    for row in rows.iter_mut(){
+    // The original TS oracle excludes the same *object* from peers, not
+    // every record carrying the same worksheet row number. Keep the original
+    // array index so separate proposed entries are never silently ignored.
+    let proposed=rows.iter().enumerate()
+        .filter(|(_,row)|["ADD","UPDATE"].contains(&strv(row,"status")))
+        .map(|(index,row)|(index,row.clone())).collect::<Vec<_>>();
+    for (row_index,row) in rows.iter_mut().enumerate(){
         if !["ADD","UPDATE"].contains(&strv(row,"status")){continue}
         let Some(client)=row.get("client").cloned() else{continue};
         let previous=existing.iter().find(|c|strv(c,"id")==strv(&client,"id"));
         if !identity_changed(previous,&client){continue}
-        let peers=proposed.iter().filter(|candidate|candidate.get("row")!=row.get("row"))
-            .filter_map(|item|item.get("client").cloned()).collect::<Vec<_>>();
+        let peers=proposed.iter().filter(|(index,_)|*index!=row_index)
+            .filter_map(|(_,item)|item.get("client").cloned()).collect::<Vec<_>>();
         let conflicts=collision(&client,peers);
         if !conflicts.is_empty(){
             row["status"]=json!("HOLD");
