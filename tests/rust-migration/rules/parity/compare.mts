@@ -1034,6 +1034,187 @@ migrationCase("archived REVIEW shipment preserves original audit",s=>{
   });
 });
 
+
+// validateWorkflow is a distinct TS function from validateReceptionBoundary:
+// test both its current-state guards and exact before->after preservation,
+// including error priority when multiple checks would fail.
+function validationCase(name:string,setup:(s:any)=>void,change:(s:any)=>void,
+  expectedOk:boolean,withBefore=true){
+  const before:any=copy(baseState);
+  setup(before);
+  const state:any=copy(before);
+  change(state);
+  add("validate workflow: "+name,"validate_workflow",
+    withBefore?{state,before}:{state},
+    ()=>{validateWorkflow(state as any,withBefore?before as any:undefined);return {valid:true};});
+  cases[cases.length-1].expectedOk=expectedOk;
+}
+const unchanged=()=>{};
+validationCase("unchanged state before supplied",unchanged,unchanged,true);
+validationCase("no workflow is valid",unchanged,s=>{delete s.workflow;},true);
+for(const name of ["sources","groups","shipments","payments","queue",
+  "events","deliveries","changeRequests"]){
+  validationCase("duplicate "+name+" ID",s=>{
+    const sample:any={
+      sources:s.workflow.sources[0],groups:s.workflow.groups[0],
+      shipments:s.workflow.shipments[0],
+      payments:{id:"payment1",dealerId:"dealer-1",amount:0,allocations:[]},
+      queue:{id:"queue1",shipmentId:"shipment:o1:r1",origin:"FACTORY",status:"QUEUED"},
+      events:{id:"event1",action:"TEST",shipmentIds:[]},
+      deliveries:{id:"delivery1",shipmentId:"shipment:o1:r1",origin:"FACTORY"},
+      changeRequests:{id:"change1",shipmentId:"shipment:o1:r1"}
+    }[name];
+    s.workflow[name].push(copy(sample));
+  },s=>{s.workflow[name].push(copy(s.workflow[name][0]));},false,false);
+}
+validationCase("invalid shipment missing recipient",unchanged,s=>{
+  s.workflow.shipments[0].recipientId="missing-r";
+},false);
+validationCase("archived missing recipient is skipped",unchanged,s=>{
+  s.workflow.shipments[0].legacyArchived=true;
+  s.workflow.shipments[0].recipientId="missing-r";
+},true);
+validationCase("retail missing transfer",unchanged,s=>{
+  s.orders[0].orderType="RETAIL";s.workflow.groups[0].dealerId="dealer-1";
+  s.workflow.shipments[0].transferred=false;
+},false);
+validationCase("retail linked to payment",unchanged,s=>{
+  s.orders[0].orderType="RETAIL";
+  s.workflow.shipments[0].transferred=true;s.workflow.shipments[0].step=4;
+  s.workflow.payments=[{id:"p-1",dealerId:"dealer-1",amount:2,
+    allocations:[{shipmentId:"shipment:o1:r1",amount:2}]}];
+},false);
+validationCase("retail linked to confirmed notice",unchanged,s=>{
+  s.orders[0].orderType="RETAIL";
+  s.workflow.shipments[0].transferred=true;s.workflow.shipments[0].step=4;
+  s.workflow.groups[0].notices=[{id:"notice-1",at:now}];
+},false);
+validationCase("retail valid stage four",unchanged,s=>{
+  s.orders[0].orderType="RETAIL";
+  s.workflow.shipments[0].transferred=true;s.workflow.shipments[0].step=4;
+},true);
+for(const key of ["sourceId","orderId","recipientId"]){
+  validationCase("modified shipment link "+key,unchanged,s=>{
+    s.workflow.shipments[0][key]="broken-id";
+  },false);
+}
+validationCase("invalid group source relation",unchanged,s=>{
+  s.workflow.groups[0].sourceId="broken-source";
+},false);
+validationCase("invalid client assignment",unchanged,s=>{
+  s.workflow.groups[0].dealerId="other-dealer";
+},false);
+for(const step of [-1,5,1.5,null]){
+  validationCase("invalid step "+step,unchanged,s=>{
+    s.workflow.shipments[0].step=step;
+  },false);
+}
+for(const [which,val] of [["charges",-1],["charges",1.5],["actualFreight",-1],
+  ["actualFreight",1.25]] as const){
+  validationCase("invalid "+which+" "+val,unchanged,s=>{
+    s.workflow.shipments[0][which]={FACTORY:val};
+  },false);
+}
+validationCase("charges null permitted",unchanged,s=>{
+  s.workflow.shipments[0].charges.FACTORY=null;
+},true);
+validationCase("actual freight zero valid",unchanged,s=>{
+  s.workflow.shipments[0].actualFreight={FACTORY:0};
+},false);
+validationCase("payment allocation exceeds amount",unchanged,s=>{
+  s.workflow.payments.push({id:"p-invalid",dealerId:"dealer-1",amount:1,
+    allocations:[{shipmentId:"shipment:o1:r1",amount:2}]});
+},false);
+validationCase("payment allocation wrong dealer",unchanged,s=>{
+  s.workflow.payments.push({id:"p-invalid",dealerId:"other-dealer",amount:10,
+    allocations:[{shipmentId:"shipment:o1:r1",amount:3}]});
+},false);
+validationCase("payment allocation unknown shipment",unchanged,s=>{
+  s.workflow.payments.push({id:"p-invalid",dealerId:"dealer-1",amount:10,
+    allocations:[{shipmentId:"shipment:unknown",amount:3}]});
+},false);
+validationCase("missing Excel shipment",unchanged,s=>{
+  s.workflow.queue.push({id:"q-invalid",shipmentId:"unknown-shipment",
+    origin:"FACTORY",status:"QUEUED"});
+},false);
+validationCase("duplicate delivery per origin",unchanged,s=>{
+  s.workflow.deliveries.push({id:"d-1",shipmentId:"shipment:o1:r1",origin:"FACTORY"});
+  s.workflow.deliveries.push({id:"d-2",shipmentId:"shipment:o1:r1",origin:"FACTORY"});
+},false);
+validationCase("confirmation duplicate id",unchanged,s=>{
+  const c={id:"confirm-1",groupId:"group:o1",dealerId:"dealer-1",
+    amount:1,shipmentIds:["shipment:o1:r1"],
+    allocations:[{shipmentId:"shipment:o1:r1",amount:1}]};
+  s.workflow.confirmations.push(copy(c),copy(c));
+},false);
+validationCase("confirmation unknown group",unchanged,s=>{
+  s.workflow.confirmations.push({id:"confirm-1",groupId:"missing-group",
+    amount:1,shipmentIds:["shipment:o1:r1"],allocations:[]});
+},false);
+validationCase("confirmation missing allocation shipment",unchanged,s=>{
+  s.workflow.confirmations.push({id:"confirm-1",groupId:"group:o1",
+    amount:1,shipmentIds:["shipment:o1:r1"],
+    allocations:[{shipmentId:"missing",amount:1}]});
+},false);
+validationCase("old payment cannot be deleted",s=>{
+  s.workflow.payments.push({id:"p-1",dealerId:"dealer-1",amount:10,
+    allocations:[{shipmentId:"shipment:o1:r1",amount:10}]});
+},s=>{s.workflow.payments=[];},false);
+validationCase("old payment cannot be modified",s=>{
+  s.workflow.payments.push({id:"p-1",dealerId:"dealer-1",amount:10,
+    allocations:[{shipmentId:"shipment:o1:r1",amount:10}]});
+},s=>{s.workflow.payments[0].amount=12;},false);
+validationCase("old events cannot be removed",s=>{
+  s.workflow.events.push({id:"e-1",at:now,actor:"old",action:"OLD",shipmentIds:[]});
+},s=>{s.workflow.events=[];},false);
+validationCase("old delivery cannot be removed",s=>{
+  s.workflow.deliveries.push({id:"delivery-old",shipmentId:"shipment:o1:r1",
+    origin:"FACTORY",charge:4000,actual:3400});
+},s=>{s.workflow.deliveries=[];},false);
+validationCase("old source raw cannot be modified",unchanged,s=>{
+  s.workflow.sources[0].raw="changed source";
+},false);
+validationCase("old request cannot be modified",s=>{
+  s.workflow.changeRequests=[{id:"cr-1",shipmentId:"shipment:o1:r1",
+    text:"original",at:now,actor:"old"}];
+},s=>{s.workflow.changeRequests[0].text="changed";},false);
+validationCase("shipment ID cannot be deleted",unchanged,s=>{
+  s.workflow.shipments=[];
+},false);
+validationCase("old shipment recipient link cannot change",unchanged,s=>{
+  s.workflow.shipments[0].recipientId="another-r";
+},false);
+validationCase("old delivery snapshot cannot be edited",s=>{
+  s.workflow.shipments[0].delivery={at:now,actor:"old",actual:{FACTORY:3000}};
+},s=>{s.workflow.shipments[0].delivery.actual.FACTORY=4500;},false);
+validationCase("old account notice cannot change",s=>{
+  s.workflow.groups[0].notices=[{id:"notice-1",at:now,
+    account:copy(s.settings.accounts[0]),amount:44000}];
+},s=>{s.workflow.groups[0].notices[0].amount=123;},false);
+validationCase("old group message may change without notice loss",s=>{
+  s.workflow.groups[0].notices=[{id:"notice-1",at:now}];
+},s=>{s.workflow.groups[0].messageEdits={payment:"updated"};},true);
+validationCase("queued snapshot cannot change",s=>{
+  s.workflow.queue=[{id:"q1",shipmentId:"shipment:o1:r1",origin:"FACTORY",
+    status:"QUEUED",snapshot:{total:3000}}];
+},s=>{s.workflow.queue[0].snapshot.total=9000;},false);
+validationCase("cancelled snapshot may change",s=>{
+  s.workflow.queue=[{id:"q1",shipmentId:"shipment:o1:r1",origin:"FACTORY",
+    status:"CANCELLED",snapshot:{total:3000}}];
+},s=>{s.workflow.queue[0].snapshot.total=9000;},true);
+validationCase("queue immutable shipment ownership",s=>{
+  s.workflow.queue=[{id:"q1",shipmentId:"shipment:o1:r1",origin:"FACTORY",
+    status:"QUEUED",snapshot:{total:3000}}];
+},s=>{s.workflow.queue[0].shipmentId="changed";},false);
+validationCase("mismatch reception policy should not affect validateWorkflow",unchanged,s=>{
+  s.orders[0].orderType="INVALID";
+  s.orders[0].confirmedAt=now;
+},true);
+validationCase("old confirmed receipt raw is outside validateWorkflow",unchanged,s=>{
+  s.orders[0].confirmedAt=now;
+  s.orders[0].raw="new confirmed raw";
+},true);
+
 function normalized(v:unknown):string {
   if(Array.isArray(v))return "["+v.map(normalized).join(",")+"]";
   if(v&&typeof v==="object") {
