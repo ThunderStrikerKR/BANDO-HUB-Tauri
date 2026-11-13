@@ -56,3 +56,31 @@ test("direct-entry retail confirm goes through the native reducer and preserves 
   assert.match(rustRules, /"apply_retail_action" => retail_operations::apply\(&payload\)/);
   assert.match(nativeRetail, /"confirm_retail"=>/);
 });
+
+test("customer-approved product resolution uses native Rust, not TS fallback", () => {
+  const resolver = source("src/IssueResolver.tsx");
+  const desk = source("src/OrderDesk.tsx");
+  const nativeProduct = source("src-tauri/src/business_core/rules/product_confirmation.rs");
+  assert.match(resolver, /const result = await nativeResolveProduct\(/);
+  assert.doesNotMatch(resolver, /resolveProduct\(\s*state,/);
+  assert.match(desk, /const result = await nativeConfirmProposedProduct\(state, draft, r\.id, i\.id\)/);
+  assert.doesNotMatch(desk, /confirmProposedProduct\(state,/);
+  assert.match(adapter, /"rules", "apply_product_action"/);
+  assert.match(rustRules, /"apply_product_action" => product_confirmation::apply\(&payload\)/);
+  assert.match(nativeProduct, /"resolve_product"=>resolve\(payload\)/);
+  assert.match(nativeProduct, /"confirm_proposed_product"=>confirm\(payload\)/);
+});
+
+test("working raw correction previews using Rust recognition and the Rust audit reducer", () => {
+  const modal = source("src/WorkingRawDialog.tsx");
+  const nativeRaw = source("src-tauri/src/business_core/rules/raw_corrections.rs");
+  assert.match(modal, /setPreview\(await nativeCorrectWorkingRaw\(state, order, text, reason\)\)/);
+  assert.doesNotMatch(modal, /correctWorkingRaw\(state, order, text, reason\)/);
+  assert.match(adapter, /"recognition", "analyze_order"/);
+  assert.match(adapter, /assertRustReceptionAnalysis\(analyzed, text\)/);
+  assert.match(adapter, /"rules", "apply_raw_correction"/);
+  assert.match(adapter, /parsedRecipients: analyzed\.recipients/);
+  assert.match(nativeRaw, /"correct_working_raw"=>/);
+  assert.match(modal, /setPreview\(undefined\);\s*try \{/);
+  assert.match(modal, /disabled=\{!preview \|\| busy\}/);
+});
