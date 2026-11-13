@@ -131,7 +131,17 @@ pub(super) fn project(payload: &Value) -> Result<Value, String> {
         let blockers = if next_step <= 4 {
             workflow_issues::stage_issues(state, group_id, next_step)?
         } else { Vec::new() };
-        let issues = workflow_issues::workflow_issues(state, group_id)?;
+        let mut issues = workflow_issues::workflow_issues(state, group_id)?;
+        // The original TS ValidationIssue omits an unknown updatedAt
+        // (JSON.stringify(undefined)), while Rust serde_json null would
+        // expose a real field. Preserve the original preview payload shape.
+        for issue in &mut issues {
+            if field(issue, "updatedAt").is_null() {
+                if let Some(map) = issue.as_object_mut() {
+                    map.remove("updatedAt");
+                }
+            }
+        }
         projected.push(json!({
             "groupId": group_id,
             "step": step,
