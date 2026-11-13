@@ -299,7 +299,9 @@ fn official_links(report:&Value)->Value{
         if !seen.insert(format!("{host}|{number}")){continue}
         links.push(json!({"name":name,"url":link}));
     }
-    links.sort_by(|a,b|natural_cmp(field(a,"name"),field(b,"name")));
+    // URL and duplicate decisions are native. The UI applies the same
+    // Korean locale ordering as the original TS display, without changing
+    // which official products are included.
     json!(links)
 }
 pub(super) fn execute(operation:&str,payload:&Value)->Result<Value,String>{
