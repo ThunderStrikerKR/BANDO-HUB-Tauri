@@ -159,3 +159,75 @@ for(let i=0;i<individualCases.length;i++){
     assert.equal(payload.shipping.groups[1].current.version,"other-version");
   });
 }
+
+const currentRule={
+  version:"p-older",at:"2026-11-01T00:00:00.000Z",
+  fees:{"1":3500},maxBundle:1,maxConfirmed:true,
+  perItem:null,notes:"직원 기록",
+};
+const assignmentState={
+  shipping:{...structuredClone(shipping),
+    productRules:{"p1":currentRule},productHistory:{}},
+  products:[
+    {id:"p1",name:"상품 1",shippingGroupId:"g1"},
+    {id:"p2",name:"상품 2",shippingGroupId:"g1"},
+    {id:"p3",name:"유지 상품",shippingGroupId:"g2"},
+  ],
+};
+const assignmentCases=[
+  ["assign existing product to another group",{"p1":"g2"}],
+  ["unassign saves prior individual rate in history",{"p1":""}],
+  ["unassign product without old individual rule",{"p2":""}],
+  ["batch assignment and unassignment are atomic",{"p1":"","p2":"g2"}],
+];
+function assignmentOracle(payload){
+  const next=structuredClone(payload.state);
+  const changed=Object.entries(payload.assignments);
+  for(const [pid,value] of changed)if(!value){
+    next.shipping.productRules??={};
+    next.shipping.productHistory??={};
+    const old=next.shipping.productRules[pid];
+    if(old)next.shipping.productHistory[pid]=[
+      ...(next.shipping.productHistory[pid]??[]),old
+    ];
+    next.shipping.productRules[pid]={
+      version:payload.versionIds[pid],at:payload.now,
+      fees:{"1":null,"2":null,"3":null,"4":null,"5":null,"6":null},
+      maxBundle:null,maxConfirmed:false,perItem:null,
+      notes:"상품의 최대 묶음 수량과 운임을 확인해 입력하세요.",
+    };
+  }
+  next.products=next.products.map(p=>{
+    if(payload.assignments[p.id]===undefined)return p;
+    const copy={...p,shippingGroupId:payload.assignments[p.id]||undefined};
+    if(copy.shippingGroupId===undefined)delete copy.shippingGroupId;
+    return copy;
+  });
+  return {state:next};
+}
+const assignmentRequests=assignmentCases.map(([,assignments])=>({
+  domain:"rules",operation:"apply_shipping_action",
+  payload:{
+    action:"assign_products",state:assignmentState,assignments,
+    versionIds:{"p1":"id-p1","p2":"id-p2"},now,
+  },
+}));
+const batch=spawnSync("cargo",["run","--quiet","--manifest-path",cargo,
+  "--bin","reception_runner"],{
+  cwd:root,input:JSON.stringify(assignmentRequests),encoding:"utf8",
+  timeout:900000,maxBuffer:64*1024*1024
+});
+if(batch.error)throw batch.error;
+assert.equal(batch.status,0,batch.stderr);
+const batchOutputs=JSON.parse(batch.stdout);
+assert.equal(batchOutputs.length,assignmentCases.length);
+for(let i=0;i<assignmentCases.length;i++){
+  const [name]=assignmentCases[i];
+  test("Rust group assignment: "+name,()=>{
+    const expected=assignmentOracle(assignmentRequests[i].payload);
+    assert.equal(batchOutputs[i].ok,true,JSON.stringify(batchOutputs[i].error));
+    assert.deepEqual(batchOutputs[i].value,expected);
+    assert.equal(assignmentState.products[0].shippingGroupId,"g1");
+    assert.equal(assignmentState.shipping.productHistory["p1"],undefined);
+  });
+}
