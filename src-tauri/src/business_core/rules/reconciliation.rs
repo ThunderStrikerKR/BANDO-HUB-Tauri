@@ -169,7 +169,7 @@ pub(super) fn reconcile(payload:&Value)->Result<Value,String> {
     }
     let order_count=rows(field(&state,"orders")).len();
     for oi in 0..order_count {
-        let order=state["orders"][oi].clone();
+        let mut order=state["orders"][oi].clone();
         let order_id=str_field(&order,"id").to_string();
         let dealer_id=str_field(&order,"clientId").to_string();
         if has_value(field(&order,"deletedAt")) ||
@@ -177,6 +177,14 @@ pub(super) fn reconcile(payload:&Value)->Result<Value,String> {
             (find_by_id(field(&state,"clients"),&dealer_id).is_none() &&
                 !has_value(field(&order,"clientSnapshot"))) {
             continue;
+        }
+        // TS reconcileWorkflow invokes synchronizeIssueDecisions on each
+        // active order. Preserve the shape even for zero current issues.
+        // Detailed issue evidence and resolution synchronization still require
+        // separate parity coverage before this can replace the TS engine.
+        if !field(&order,"issueResolutions").is_object() {
+            set(&mut order,"issueResolutions",json!({}))?;
+            state["orders"][oi]=order.clone();
         }
         let source_id=format!("source:{order_id}");
         let root_id=format!("group:{order_id}");
