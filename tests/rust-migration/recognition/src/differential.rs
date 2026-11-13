@@ -124,6 +124,9 @@ fn execute_original_typescript_and_rust_with_all_product_fields() {
         "casesWithDifferences":report["casesWithDifferences"],
         "mismatchCount":report["mismatchCount"]
     }));
+    for trace in report["diagnostics"].as_array().into_iter().flatten(){
+        println!("TS_RUST_PRODUCT_TRACE {}",trace);
+    }
     for entry in report["byField"].as_array().into_iter().flatten(){
         println!("TS_RUST_PRODUCT_DIFF_FIELD {}",entry);
     }
