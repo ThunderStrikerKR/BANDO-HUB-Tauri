@@ -5,7 +5,7 @@ const read = path => readFileSync(new URL("../" + path, import.meta.url),"utf8")
 
 test("factory Excel opens the saved folder only after a committed export", () => {
   const queue = read("src/WorkflowQueue.tsx");
-  const start = queue.indexOf("const preview = previewFactoryExport(current, chosen)");
+  const start = queue.indexOf('const preview = await businessCoreCall<FactoryExportPreview>("output", "prepare_factory_export", { state: current, ids: chosen })');
   const end = queue.indexOf('scope === "STORE" ? "선택 "', start);
   assert.ok(start >= 0 && end > start);
   const factoryHandler = queue.slice(start,end);
