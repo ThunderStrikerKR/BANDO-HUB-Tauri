@@ -136,7 +136,7 @@ fn valid_address(row:&Value,legacy:bool)->bool {
     if str_field(row,"addressStatus")=="INCOMPLETE" || (address.contains('#') || address.contains('@')) {return false;}
     // Conservative non-regex equivalent for common road / lot / PO box forms.
     let markers=["대로","로","길","동 ","리 ","읍 ","면 ","사서함"];
-    markers.iter().any(|m|address.match_indices(m).any(|(i,_)| {
+    markers.iter().any(|m|address.match_indices(*m).any(|(i,_)| {
         address[i+m.len()..].trim_start().chars().next().is_some_and(|c|c.is_ascii_digit())
     }))
 }
@@ -373,8 +373,11 @@ pub(super) fn apply(payload:&Value)->Result<Value,String> {
                 let order=&mut state["orders"][oi];
                 set(order,"confirmedAt",json!(now))?;
                 set(order,"createdAt",json!(now))?;
-                set(order,"receipt",json!({"original":field(order,"raw"),
-                    "at":now,"actor":actor,"clientId":field(order,"clientId"),"legacy":false}))?;
+                let receipt_original=field(order,"raw").clone();
+                let receipt_client_id=field(order,"clientId").clone();
+                let receipt=json!({"original":receipt_original,
+                    "at":now,"actor":actor,"clientId":receipt_client_id,"legacy":false});
+                set(order,"receipt",receipt)?;
                 set(order,"clientSnapshot",client.clone())?;
                 set(order,"senderSnapshot",sender)?;
                 set(order,"pricesLocked",json!(true))?;
@@ -517,17 +520,18 @@ pub(super) fn apply(payload:&Value)->Result<Value,String> {
             for si in ships {
                 let ship_id=str_field(&state["workflow"]["shipments"][si],"id").to_string();
                 let (_index,oi,ri)=shipment_indices(&state,&ship_id)?;
-                let order=&state["orders"][oi];
-                let row=&order["recipients"][ri];
-                let client=party(&state,order).ok_or("거래처 정보를 확인하세요.")?;
+                let order=state["orders"][oi].clone();
+                let row=order["recipients"][ri].clone();
+                let client=party(&state,&order)
+                    .ok_or("거래처 정보를 확인하세요.")?.clone();
                 let sender=state["workflow"]["shipments"][si].get("sender")
-                    .filter(|v|!v.is_null()).unwrap_or(client).clone();
+                    .filter(|v|!v.is_null()).unwrap_or(&client).clone();
                 let totals=shipment_totals(&state,&ship_id)?;
                 for key in ["total","subtotal","shipping","vat"] {
                     if safe(field(&totals,key)).is_none() {return Err("청구액 미확정".into());}
                 }
-                let freight_code=shipment_freight_code(order,row).to_string();
-                for origin in row_origins(row) {
+                let freight_code=shipment_freight_code(&order,&row).to_string();
+                for origin in row_origins(&row) {
                     let entry_id=format!("excel:{ship_id}:{origin}");
                     let existing_index=index_by_id(field(&state["workflow"],"queue"),&entry_id);
                     if existing_index.is_some_and(|i|str_field(
@@ -535,7 +539,7 @@ pub(super) fn apply(payload:&Value)->Result<Value,String> {
                         return Err("이미 등록된 배송 건입니다.".into());
                     }
                     let mut selected=row.clone();
-                    set(&mut selected,"items",json!(rows(field(row,"items")).iter()
+                    set(&mut selected,"items",json!(rows(field(&row,"items")).iter()
                         .filter(|item|str_field(item,"origin")==origin)
                         .cloned().collect::<Vec<_>>()))?;
                     let entry=json!({
