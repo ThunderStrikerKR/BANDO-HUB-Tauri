@@ -55,7 +55,8 @@ pub(crate) fn for_product(text: &str, allow_table: bool, allow_trailing: bool) -
     if !explicit.is_empty() { return explicit; }
     if allow_table {
         let pattern = Regex::new(r"\|\s*([1-9]\d*)\s*(?:\||$)").expect("table quantity");
-        if let Some(c) = pattern.captures_iter(text).next() {
+        let first = pattern.captures_iter(text).next();
+        if let Some(c) = first {
             if let (Some(whole), Some(value)) = (c.get(0), c.get(1)) {
                 if let Ok(number) = value.as_str().parse::<i64>() {
                     return vec![Quantity { value: number, start: whole.start() + 1, end: whole.end() - usize::from(whole.as_str().ends_with('|')) }];
