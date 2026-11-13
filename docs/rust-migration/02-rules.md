@@ -1,5 +1,61 @@
 # TSBH Rust migration — session 2/3: Price, freight and workflow rules
 
+## Session 2 continuation: order decisions, guarded deletion and shipping upgrade — 2026-11-13
+
+**Most recent actual source verification**
+- Branch: `migration/02-rules`
+- Implementation/test-source commit: `8b913a9e647a79e3be72241077933177a8060e15`
+- GitHub Actions: https://github.com/ThunderStrikerKR/TSBH/actions/runs/43364642796
+- **TypeScript original vs Rust: 46/46 named differential fixtures PASS, 0 mismatches**
+- **Independent Rust regression: 47/47 PASS, 0 failed**
+- **Windows Tauri integration: SKIPPED by branch CI policy**
+- This is named-case parity ONLY; **session 2 is INCOMPLETE**.
+  No Tauri/SQLite business-rule caller has been switched.
+
+New or expanded session-2 owned implementation:
+1. `src-tauri/src/business_core/rules/issues.rs` adds `order_issues`
+   matching the original `validation.ts::orderIssues` result shape:
+   issue title, stage, severity, recipient/item, customer questions,
+   source-span, actor, evidence and staff decision. Reconciliation
+   now reuses the projected issues for historical decision sync.
+2. `apply_issue_action` implements `approve_missing_quantity`
+   and `pending_issue`, including source-specific rejection conditions
+   and staff/customer decision evidence.
+3. `src-tauri/src/business_core/rules/order_mutations.rs` adds
+   `delete_order`, with original ordinary-delete restrictions,
+   queued-export cancellation, soft deletion, recheck events and group
+   notice changes. The pure function receives deterministic
+   `now`, `eventId` and ordered `eventIds`.
+4. `apply_shipping_action` adds `upgrade`:
+   six legacy groups are appended only when absent; historical tariffs
+   and groups remain intact. The caller injects versions and time.
+5. The parity corpus has grown from 27 to **46 original-TS comparisons**:
+   complete issue records, missing address/name/quantity/color, legacy
+   alias and staff decisions, rejection paths, order deletion including
+   two audit events, tariff upgrade and idempotence.
+6. Known differences fixed using actual TS results:
+   serialized match discriminator appears first in the evidence string;
+   JavaScript `Date.toISOString()` uses UTC Z representation.
+
+**Outstanding work in this session, by priority**
+- Finish all `workflowIssues` and `stageIssues` branches, `saleIssues`,
+  the entire `validateWorkflow`/`validateReceptionBoundary` guard set,
+  and exact address/contact/receipt/evidence checks.
+- Implement `applyOrderRawEdit` (using recognition output supplied by
+  session 1, without rewriting its parser) and `migrateWorkflow`.
+- Compare partial payment-confirmation cancellation, account changes,
+  post-delivery/queued-export exceptions, audit/recheck fan-out.
+- Verify explicit-sender extraction from order raw text and
+  exact historical billing/account signature serialization.
+- Session 3 alone owns Tauri command/React/SQLite integration and Windows
+  app execution. Retain native `reception.rs` as authoritative.
+
+**Critical limitation**: 46 matching fixtures are not exhaustive
+TypeScript equivalence; no production Rust approval gate can replace the
+existing TS behavior until untested paths and native integration pass.
+
+---
+
 ## TypeScript-vs-Rust differential comparison — executed 2026-11-13 KST
 
 **Verified**: actual original TypeScript business functions and the compiled
@@ -10,8 +66,8 @@ Actions Ubuntu runner. The Rust integration test
 `node --import tsx` and the Rust `json_rules` binary, and compares success,
 errors, numeric values, JSON fields, and snapshots recursively.
 
-**Latest verified comparison: 27 / 27 PARITY PASS, 0 mismatches.**
-**Independent Rust regression: 47 / 47 PASS.**
+**Previous checkpoint: 27 / 27 PARITY PASS, 0 mismatches (superseded by 46 / 46 above).**
+**Independent Rust regression at that previous checkpoint: 47 / 47 PASS.**
 GitHub Actions run:
 https://github.com/ThunderStrikerKR/TSBH/actions/runs/43360550428
 Source commit tested: `88db940d02660882842443890e0873ffabaa2a05`.
