@@ -289,6 +289,7 @@ add("order issues common alias auto applied","order_issues",{order:issueAlias},
   ()=>({issues:orderIssues(issueAlias)}));
 
 
+const actionNow=new Date(now).toISOString();
 function frozenDate<T>(callback:()=>T):T {
   const original=globalThis.Date;
   const RealDate=original;
@@ -307,21 +308,21 @@ approvalOrder.recipients[0].items[0].quantity=null;
 approvalOrder.recipients[0].items[0].quantityConfirmed=false;
 add("approve missing quantity explicit actor","apply_issue_action",{
   action:"approve_missing_quantity",order:approvalOrder,
-  recipientId:"r1",itemId:"item1",actor:"검증직원",now
+  recipientId:"r1",itemId:"item1",actor:"검증직원",now:actionNow
 },()=>({order:frozenDate(()=>approveMissingQuantity(approvalOrder,"r1","item1","검증직원"))}));
 const ambiguousApproval:any=copy(approvalOrder);
 ambiguousApproval.recipients[0].items[0].issues=["여러 모델 가능"];
 add("reject ambiguous quantity approval","apply_issue_action",{
   action:"approve_missing_quantity",order:ambiguousApproval,
-  recipientId:"r1",itemId:"item1",actor:"검증직원",now
+  recipientId:"r1",itemId:"item1",actor:"검증직원",now:actionNow
 },()=>({order:approveMissingQuantity(ambiguousApproval,"r1","item1","검증직원")}));
 add("customer question issue decision","apply_issue_action",{
   action:"pending_issue",order:issueMissingName,
-  issueId:"issue:o1:r1:recipient:NAME",actor:"검증직원",now
+  issueId:"issue:o1:r1:recipient:NAME",actor:"검증직원",now:actionNow
 },()=>({order:frozenDate(()=>pendingIssue(
   issueMissingName,"issue:o1:r1:recipient:NAME","검증직원"))}));
 add("nonexistent issue is not recorded","apply_issue_action",{
-  action:"pending_issue",order,issueId:"absent",actor:"검증직원",now
+  action:"pending_issue",order,issueId:"absent",actor:"검증직원",now:actionNow
 },()=>({order:pendingIssue(order as any,"absent","검증직원")}));
 
 
