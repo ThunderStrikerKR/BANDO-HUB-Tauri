@@ -2737,6 +2737,7 @@ add("receipt: fallback when no history","apply_raw_correction",{
 },()=>({receipt:receiptOf(order as any)}));
 function eligibleRawState(){
   const state:any=copy(baseState);
+  state.aliases=[];
   state.products[0].defaultColor="Black";
   state.products[0].createdAt=now;
   state.orders[0].recipients[0].name="";
