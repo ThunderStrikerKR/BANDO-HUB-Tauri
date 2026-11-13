@@ -12,7 +12,7 @@ import { nativeReconcileWorkflow } from "./orders/native-rules";
 import { useNativeWorkflowReconcile } from "./orders/useNativeWorkflowReconcile";
 import { retainUnsavedOrderEdits } from "./order-edit-snapshots";
 import type { Order } from "./types";
-import { groupShipments, reconcileWorkflow } from "./workflow";
+import { groupShipments } from "./workflow";
 import { activeShipments, validSelection } from "./workspace-selection";
 type Props = ComponentProps<typeof OrderDesk> & {
   externalKakao: boolean;
@@ -276,9 +276,19 @@ export function HubWorkspace(props: Props) {
       setEdits((old) => ({ ...old, [next.id]: next }));
     }
   };
-  const messageOrder = receptionOrder,
-    messageState = messageOrder.clientId ? reconcileWorkflow(base, messageOrder) : base,
-    messageGroup =
+  const messageOrder = receptionOrder;
+  const messageOverlay = useMemo(
+    () => messageOrder.id !== draft.id && (messageOrder.clientId || messageOrder.orderType === "RETAIL")
+      ? [messageOrder] : [],
+    [messageOrder, draft.id],
+  );
+  const nativeMessage = useNativeWorkflowReconcile(base, messageOverlay);
+  // Reuse the already reconciled draft preview instead of dispatching a
+  // second identical Rust IPC for the currently edited reception.
+  const messageState = messageOrder.id === draft.id ? preview : nativeMessage.state;
+  const messageReady = messageOrder.id === draft.id
+    ? previewReady : nativeBase.ready && nativeMessage.ready;
+  const messageGroup =
       selected?.orderId === messageOrder.id &&
       selected?.groupId &&
       groupShipments(messageState, selected.groupId).length > 0
@@ -426,7 +436,7 @@ export function HubWorkspace(props: Props) {
             <MessageWorkspace
               state={messageState}
               order={messageOrder}
-              gid={nativeBase.ready ? messageGroup : undefined}
+              gid={messageReady ? messageGroup : undefined}
               onOrder={(o) => {
                 changeReception(o);
               }}
