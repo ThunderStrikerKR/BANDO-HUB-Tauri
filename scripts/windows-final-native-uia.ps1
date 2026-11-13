@@ -304,33 +304,53 @@ finally:
   ClickUI "상품 관리"
   ClickUI "설정"
   ClickUI "기본 설정"
-  $operator=@(Elements | Where-Object {$_.name -eq "작업자 이름" -and $_.control -match "Edit"}) | Select-Object -First 1
-  if($null -eq $operator){throw "Saved operator field missing after page re-entry"}
-  # WebView2's Windows accessibility provider sometimes exposes an Edit
-  # element without the ValuePattern. The real control is still keyboard
-  # accessible. Never fail acceptance merely because that API is unsupported.
+  # Scroll the actual right-hand WebView2 form to its top. Save leaves the
+  # document near the footer; the hosted UIA provider cannot focus an
+  # offscreen editable node and does not implement ValuePattern consistently.
+  [BandoAuditNative]::SetForegroundWindow($proc.MainWindowHandle)|Out-Null
+  $rect=$root.Current.BoundingRectangle
+  $sx=[int]($rect.X+[Math]::Max(400, $rect.Width*0.77))
+  $sy=[int]($rect.Y+[Math]::Min(350, $rect.Height*0.53))
+  [BandoAuditNative]::SetCursorPos($sx,$sy)|Out-Null
+  for($scroll=0;$scroll -lt 14;$scroll++){
+    [BandoAuditNative]::mouse_event(0x0800,0,0,120,[UIntPtr]::Zero)
+  }
+  Start-Sleep -Milliseconds 520
+  Capture "reopened" "설정-재진입-실제화면"
+  $operator=@(Elements | Where-Object {
+    $_.name -eq "작업자 이름" -and $_.control -match "Edit" -and
+    !$_.offscreen -and $_.w -gt 75 -and $_.h -gt 10
+  }) | Select-Object -First 1
+  if($null -eq $operator){throw "Saved operator field not visibly accessible after settings screen re-entry"}
+  # First try the semantic API, then native mouse/keyboard reading of the
+  # same measured HTML input, never a JS/React or database substitution.
   $shown=$null
   $accessMethod="UIA ValuePattern"
   try {
     $pattern=$operator.el.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern)
     $shown=$pattern.Current.Value
   } catch {
-    $accessMethod="Native keyboard Ctrl+A / Ctrl+C from focused WebView2 Edit"
+    $accessMethod="Native mouse click and keyboard Ctrl+A / Ctrl+C"
     [BandoAuditNative]::SetForegroundWindow($proc.MainWindowHandle)|Out-Null
-    $operator.el.SetFocus()
-    Start-Sleep -Milliseconds 250
+    $x=[int]($operator.x+[Math]::Min(110,$operator.w/2))
+    $y=[int]($operator.y+$operator.h/2)
+    [BandoAuditNative]::SetCursorPos($x,$y)|Out-Null
+    [BandoAuditNative]::mouse_event(0x0002,0,0,0,[UIntPtr]::Zero)
+    Start-Sleep -Milliseconds 90
+    [BandoAuditNative]::mouse_event(0x0004,0,0,0,[UIntPtr]::Zero)
+    Start-Sleep -Milliseconds 200
     [System.Windows.Forms.Clipboard]::Clear()
     [System.Windows.Forms.SendKeys]::SendWait("^a")
-    Start-Sleep -Milliseconds 120
+    Start-Sleep -Milliseconds 140
     [System.Windows.Forms.SendKeys]::SendWait("^c")
-    Start-Sleep -Milliseconds 250
+    Start-Sleep -Milliseconds 270
     $shown=[System.Windows.Forms.Clipboard]::GetText()
   }
   if($shown -ne "CI-Windows-UIA-검수"){
     throw "Saved settings value not restored in real UI after page re-entry (method=$accessMethod, shown=$shown)"
   }
   $report.sqliteChecks+=@{check="settings_ui_reopen";status="PASS";value=$shown;method=$accessMethod}
-  Capture "reopened" "설정-재진입-값유지"
+  Capture "verified" "설정-재진입-값유지"
   ClickUI "거래처 관리"
   ClickUI "거래처 목록"
   ClickUI "＋ 거래처 등록"
