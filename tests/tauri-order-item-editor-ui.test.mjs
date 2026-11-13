@@ -35,7 +35,7 @@ test("the approved fixed size, layout tokens and collapsed inline search are ret
 });
 
 test("only four approved product fields and existing action buttons remain", () => {
-  for (const text of ["상품명","카테고리","가격","상품 변경","검색 접기","삭제","취소","적용"]) {
+  for (const text of ["상품명","카테고리","가격","상품 변경","검색 접기","삭제","닫기","적용"]) {
     assert.ok(editor.includes(text),text);
   }
   assert.match(editor, /className="order-item-edit-photo"/);

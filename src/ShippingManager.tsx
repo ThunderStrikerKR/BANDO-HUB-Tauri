@@ -116,7 +116,7 @@ export function ShippingManager({
   };
   const editingDirty = !!editing && !!initialEditing && !sameFreightEditor(editing.rule, initialEditing);
   const saveEditedRule = async (): Promise<boolean> => {
-    if (!editing) return true;
+    if (!editing || !editingDirty) return true;
               const next = structuredClone(shipping),
                 g = next.groups.find((g) => g.id === editing.id)!;
               g.history.push(g.current);

@@ -285,7 +285,7 @@ try {
   await ocrProgress.waitFor({ state: "detached" });
   let ocrReview = page.getByRole("dialog", { name: "OCR 문자 인식 검토" });
   await ocrReview.waitFor();
-  await ocrReview.getByRole("button", { name: "취소" }).click();
+  await ocrReview.getByRole("button", { name: "닫기" }).click();
   await ocrReview.waitFor({ state: "detached" });
   await captureButton.click();
   ocrReview = page.getByRole("dialog", { name: "OCR 문자 인식 검토" });
@@ -1224,20 +1224,20 @@ try {
   const clientAddress = clientModal.getByRole("textbox",{name:"거래처 주소"});
   const originalAddress = await clientAddress.inputValue();
   await clientAddress.fill("경기도 검증시 저장확인로 88");
-  await clientModal.getByRole("button",{name:"취소",exact:true}).click();
+  await clientModal.getByRole("button",{name:"닫기",exact:true}).click();
   await checkPrompt("client");
   assert.equal(await clientModal.evaluate((dialog) => dialog.open), true,
     "The edited client must stay open underneath the unsaved-changes dialog");
   await leave.getByRole("button",{name:"취소",exact:true}).click();
   assert.equal(await clientAddress.inputValue(),"경기도 검증시 저장확인로 88");
-  await clientModal.getByRole("button",{name:"취소",exact:true}).click();
+  await clientModal.getByRole("button",{name:"닫기",exact:true}).click();
   await leave.getByRole("button",{name:"저장 안 함"}).click();
   await clientModal.waitFor({state:"detached"});
   assert.equal((await mockState()).state.clients.find(c=>c.id==="ci-store-dealer").address,originalAddress);
   await navPage.locator(".client-table tbody tr").filter({hasText:"검증악기"}).first().click();
   await navPage.evaluate(() => { window.__injectPostSaveReadFailure = true; });
   await clientAddress.fill("경기도 검증시 저장확인로 89");
-  await clientModal.getByRole("button",{name:"취소",exact:true}).click();
+  await clientModal.getByRole("button",{name:"닫기",exact:true}).click();
   await leave.getByRole("button",{name:"저장",exact:true}).click();
   await clientModal.waitFor({state:"detached"});
   assert.equal((await mockState()).state.clients.find(c=>c.id==="ci-store-dealer").address,"경기도 검증시 저장확인로 89");
@@ -1249,7 +1249,7 @@ try {
   await navPage.evaluate(() => { window.__nextLoadMustFail = false; });
   await navPage.locator(".client-table tbody tr").filter({hasText:"검증악기"}).first().click();
   assert.equal(await clientAddress.inputValue(),"경기도 검증시 저장확인로 89");
-  await clientModal.getByRole("button",{name:"취소",exact:true}).click();
+  await clientModal.getByRole("button",{name:"닫기",exact:true}).click();
   await clientModal.waitFor({state:"detached"});
   console.log("PASS: committed client state displays without a post-save SQLite read");
 
@@ -1320,17 +1320,17 @@ try {
   const firstProductId=await navPage.evaluate(() => window.__navSaved().state.products[0].id);
   const beforeProduct=await mockState();
   await description.fill("상품설명 미저장 취소 검사");
-  await productModal.getByRole("button",{name:"취소",exact:true}).click();
+  await productModal.getByRole("button",{name:"닫기",exact:true}).click();
   await checkPrompt("product");
   await leave.getByRole("button",{name:"취소",exact:true}).click();
   assert.equal(await description.inputValue(),"상품설명 미저장 취소 검사");
-  await productModal.getByRole("button",{name:"취소",exact:true}).click();
+  await productModal.getByRole("button",{name:"닫기",exact:true}).click();
   await leave.getByRole("button",{name:"저장 안 함"}).click();
   await productModal.waitFor({state:"detached"});
   assert.equal((await mockState()).saves.length,beforeProduct.saves.length);
   await productRows.first().getByRole("button",{name:"상세 관리"}).click();
   await description.fill("상품설명 저장 완료 검사");
-  await productModal.getByRole("button",{name:"취소",exact:true}).click();
+  await productModal.getByRole("button",{name:"닫기",exact:true}).click();
   await leave.getByRole("button",{name:"저장",exact:true}).click();
   await productModal.waitFor({state:"detached"});
   const productAfter=await mockState();
