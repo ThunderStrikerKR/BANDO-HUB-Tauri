@@ -17,6 +17,8 @@ import {
   combinationVersions,
   combinationCurrent,
   upgradeShipping,
+  deleteShippingGroup,
+  changeShippingBasis,
 } from "../../../../src/shipping.ts";
 import { shipmentTotals, validateWorkflow, reconcileWorkflow, deleteOrder, workflowIssues, stageIssues, applyOrderRawEdit, migrateWorkflow, advanceGroup, undoGroup, setShipmentFreight, processGroup, confirmGroupPayment, recordPayment, restoreShipment, markStoreSent, recordChangeRequest, setGroupAccount, detachShipment, regroupShipment, completeDelivery, groupContext, groupStep } from "../../../../src/workflow.ts";
 import { recordActualFreight } from "../../../../src/actual-freight.ts";
@@ -3023,6 +3025,54 @@ dispatchCase("both origins must have tracking and actual",s=>{
   s.workflow.shipments[0].tracking={FACTORY:"888888888888",STORE:"777777777777"};
   s.workflow.shipments[0].actualFreight={FACTORY:3000,STORE:2500};
 });
+
+
+function shippingDeleteCase(name:string,change:(s:any)=>void,detach:boolean,expectedOk:boolean){
+  const state:any=copy(baseState);
+  change(state);
+  add("shipping deletion: "+name,"apply_shipping_action",{
+    action:"delete_group",state,groupId:"music",detach,now:actionNow
+  },()=>({state:frozenDate(()=>deleteShippingGroup(state,"music",detach))}));
+  cases[cases.length-1].expectedOk=expectedOk;
+}
+shippingDeleteCase("reject linked product without detach",s=>{
+  s.products[0].shippingGroupId="music";
+},false,false);
+shippingDeleteCase("detach linked product and deactivate combination",s=>{
+  s.products[0].shippingGroupId="music";
+  s.shipping.combinations.push({
+    id:"known-combo",active:true,versions:{"group:music":"v1"},
+    key:"FACTORY|p1@v1:2",epoch:7,at:now,charge:3000,actual:2900
+  });
+},true,true);
+shippingDeleteCase("delete group with no registered product",s=>{
+  delete s.products[0].shippingGroupId;
+},false,true);
+shippingDeleteCase("delete already deleted group blocked",s=>{
+  s.shipping.groups[0].deletedAt=now;
+},true,false);
+function basisCase(name:string,change:(s:any)=>void,groupId?:string){
+  const shipping:any=copy(shipping);
+  change(shipping);
+  const ruleIds=Object.keys(shipping.productRules??{});
+  const ids=Array.from({length:ruleIds.length+shipping.groups.length+2},
+    (_,i)=>"shipping-basis-"+i);
+  const productVersions=Object.fromEntries(ruleIds.map((id,i)=>[id,ids[i]]));
+  const groupVersions=Object.fromEntries(shipping.groups.map((g:any,i)=>
+    [g.id,ids[ruleIds.length+i]]));
+  add("shipping basis: "+name,"apply_shipping_action",{
+    action:"change_basis",shipping,groupId,now:actionNow,
+    productVersions,groupVersions
+  },()=>({shipping:deterministicIds(ids,()=>changeShippingBasis(shipping,groupId))}));
+  cases[cases.length-1].expectedOk=true;
+}
+basisCase("reset current group only",()=>{},"music");
+basisCase("global epoch reset with current groups",()=>{});
+basisCase("product-specific tariff archived before reset",s=>{
+  s.productRules={p1:copy(s.groups[0].current)};
+  s.productRules.p1.version="product-rule-v1";
+});
+basisCase("nonexistent target leaves shipping unchanged",()=>{},"not-a-group");
 
 function normalized(v:unknown):string {
   if(Array.isArray(v))return "["+v.map(normalized).join(",")+"]";
