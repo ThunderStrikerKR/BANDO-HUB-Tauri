@@ -1,0 +1,148 @@
+//! Read-only Rust projection of the live workflow board.
+//! Never creates events, allocates IDs, changes persisted state, or saves SQLite.
+//! Derives the visible per-shipment and per-group totals from the same Rust
+//! rules that validate subsequent staff-approved workflow transitions.
+use serde_json::{json, Value};
+use super::{checked_sum, field, find_by_id, flag, has_value, req, rows, safe, str_field};
+use super::{workflow, workflow_issues};
+
+fn sum_field(totals: &[Value], key: &str) -> Value {
+    if totals.is_empty() { return Value::Null; }
+    totals.iter()
+        .map(|row| safe(field(row, key)))
+        .collect::<Option<Vec<_>>>()
+        .and_then(checked_sum)
+        .map_or(Value::Null, |value| json!(value))
+}
+
+fn vat_applies(order: &Value, recipient: &Value) -> bool {
+    field(recipient, "vatOverride").as_bool()
+        .or_else(|| field(recipient, "vatDefault").as_bool())
+        .unwrap_or_else(|| flag(order, "applyVat"))
+}
+
+/// Returns a pure projection of all active workflow groups, with no state
+/// mutation. All amounts and action blockers are calculated in compiled Rust.
+/// React remains responsible only for presenting this result.
+pub(super) fn project(payload: &Value) -> Result<Value, String> {
+    let state = req(payload, "state")?;
+    let orders = field(state, "orders");
+    let workflow_state = field(state, "workflow");
+    let all_shipments = rows(field(workflow_state, "shipments"));
+    let mut projected = Vec::new();
+
+    for group in rows(field(workflow_state, "groups")) {
+        if has_value(field(group, "deletedAt")) { continue; }
+        let group_id = str_field(group, "id");
+        let ships = all_shipments.iter()
+            .filter(|ship| str_field(ship, "groupId") == group_id)
+            .filter(|ship| !flag(ship, "legacyArchived"))
+            .filter(|ship| !find_by_id(orders, str_field(ship, "orderId"))
+                .is_some_and(|order| has_value(field(order, "deletedAt"))))
+            .collect::<Vec<_>>();
+        if ships.is_empty() { continue; }
+
+        let mut totals = Vec::with_capacity(ships.len());
+        let mut shipment_projections = Vec::with_capacity(ships.len());
+        let mut all_vat = true;
+        let mut any_vat = false;
+        for ship in &ships {
+            let order = find_by_id(orders, str_field(ship, "orderId"))
+                .ok_or("배송 건의 발주서 / 수취인 / 거래처 연결을 확인하세요.")?;
+            let recipient = find_by_id(field(order, "recipients"), str_field(ship, "recipientId"))
+                .ok_or("배송 건의 발주서 / 수취인 / 거래처 연결을 확인하세요.")?;
+            let vat = vat_applies(order, recipient);
+            all_vat &= vat;
+            any_vat |= vat;
+            let amount = workflow::shipment_totals(state, str_field(ship, "id"))?;
+            shipment_projections.push(json!({
+                "shipmentId": field(ship, "id"),
+                "totals": amount,
+                "freightCode": workflow::shipment_freight_code(order, recipient),
+                "vatIncluded": vat
+            }));
+            totals.push(amount);
+        }
+        let step = ships.iter()
+            .filter_map(|ship| field(ship, "step").as_i64())
+            .min().unwrap_or(0);
+        let needs_notice = flag(group, "needsNotice");
+        let next_step = if needs_notice && step >= 2 { 3 } else { step + 1 };
+        let blockers = if next_step <= 4 {
+            workflow_issues::stage_issues(state, group_id, next_step)?
+        } else { Vec::new() };
+        let issues = workflow_issues::workflow_issues(state, group_id)?;
+        projected.push(json!({
+            "groupId": group_id,
+            "step": step,
+            "nextStep": next_step,
+            "needsNotice": needs_notice,
+            "transferred": ships.iter().any(|s| flag(s, "transferred")),
+            "shipmentCount": ships.len(),
+            "totals": {
+                "subtotal": sum_field(&totals, "subtotal"),
+                "shipping": sum_field(&totals, "shipping"),
+                "vat": sum_field(&totals, "vat"),
+                "total": sum_field(&totals, "total")
+            },
+            "vatLabel": if all_vat { "부가세 포함" }
+                else if any_vat { "부가세 포함/별도" }
+                else { "부가세 별도" },
+            "shipments": shipment_projections,
+            "issues": issues,
+            "nextStageBlockers": blockers
+        }));
+    }
+    Ok(json!({ "groups": projected }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::project;
+    use serde_json::json;
+
+    #[test]
+    fn no_workflow_groups_returns_empty_projection_without_creating_events() {
+        let state = json!({
+            "orders": [], "workflow": {
+                "groups": [], "shipments": [], "events": []
+            }
+        });
+        let initial = state.clone();
+        let projected = project(&json!({"state": state})).expect("empty preview");
+        assert_eq!(projected, json!({"groups": []}));
+        assert_eq!(initial["workflow"]["events"], json!([]));
+    }
+
+    #[test]
+    fn deleted_and_empty_groups_do_not_show_or_create_rows() {
+        let state = json!({
+            "orders": [], "workflow": {
+                "groups": [
+                    {"id": "deleted", "deletedAt": "2026-11-13T00:00:00Z"},
+                    {"id": "no-shipments"}
+                ],
+                "shipments": [], "events": []
+            }
+        });
+        assert_eq!(
+            project(&json!({"state": state})).expect("hidden groups"),
+            json!({"groups": []})
+        );
+    }
+
+    #[test]
+    fn malformed_active_shipments_are_not_silently_reported_as_zero() {
+        let state = json!({
+            "orders": [],
+            "workflow": {
+                "groups": [{"id": "group:one"}],
+                "shipments": [{
+                    "id": "shipment:one", "groupId": "group:one",
+                    "orderId": "missing-order", "recipientId": "recipient:one"
+                }]
+            }
+        });
+        assert!(project(&json!({"state": state})).is_err());
+    }
+}
