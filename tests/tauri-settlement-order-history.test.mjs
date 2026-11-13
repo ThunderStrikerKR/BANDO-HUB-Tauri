@@ -314,6 +314,15 @@ test("actual xlsx roundtrip retains separate dated order billing and account rec
   assert.equal(receipts.getCell("G2").value,10000);
 });
 
+test("deferred history XLSX cannot silently replace a missing Rust payment verdict", async () => {
+  const state=base();
+  const legacyRows=orderHistory(state,"",DAY);
+  await assert.rejects(
+    exportOrderHistoryWorkbook(state,legacyRows),
+    /Rust 조회 결과를 확인하세요/,
+  );
+});
+
 test("real XLSX history export uses current filtered rows and never changes state", async () => {
   const state=base();
   const before=JSON.stringify(state);
