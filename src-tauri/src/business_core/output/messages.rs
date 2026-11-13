@@ -167,7 +167,7 @@ pub(super) fn url_is_official(url: &str) -> bool {
 pub(super) fn default_color_notice(settings: &Value, item: &Value) -> Result<Option<String>, String> {
     let color = color_label(s(&item["appliedDefaultColor"], "color")).trim();
     if color.is_empty() { return Ok(None); }
-    Ok(Some(render(settings, "colorDefault", &json!({"색상":color, "상품명":customer_model(s(item,"name"))}))?))
+    Ok(Some(render(settings, "colorDefault", &json!({"색상":color, "상품명":s(item,"name")}))?))
 }
 pub(super) fn representative_notice(settings: &Value, item: &Value) -> Result<Option<String>, String> {
     let selection = &item["appliedRepresentativeModel"];
@@ -175,6 +175,7 @@ pub(super) fn representative_notice(settings: &Value, item: &Value) -> Result<Op
         return Ok(None);
     }
     let name = s(selection, "productName").trim();
+    let name=if name.is_empty(){s(item,"name").trim()}else{name};
     if name.is_empty() { return Ok(None); }
     Ok(Some(render(settings, "modelRepresentative", &json!({"상품명":name}))?))
 }
@@ -182,7 +183,7 @@ fn once(items: impl IntoIterator<Item=String>) -> Vec<String> {
     let mut seen = HashSet::new();
     items.into_iter().filter(|item| seen.insert(item.to_owned())).collect()
 }
-fn payment(payload: &Value, settings: &Value) -> Result<Value, String> {
+pub(super) fn payment(payload: &Value, settings: &Value) -> Result<Value, String> {
     let recipients = payload.get("recipients").and_then(Value::as_array)
         .ok_or("입금 안내용 배송 건 정보가 없습니다.")?;
     if recipients.is_empty() { return Err("입금 안내용 배송 건 정보가 없습니다.".into()); }
