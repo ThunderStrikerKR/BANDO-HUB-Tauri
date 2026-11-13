@@ -2265,11 +2265,13 @@ wfActionCase("undo prepaid confirmed approval revokes confirmation","undo_group"
   s=>undoGroup(s,WFG,WFA),true);
 wfActionCase("freight edit from previously notified stage","set_shipment_freight",
   s=>preparedWorkflowStage(s,3),
-  ids=>({...actionProps(ids),origin:"FACTORY",value:4500}),
+  ids=>({...actionProps(ids),origin:"FACTORY",value:4500,
+    eventId:ids[1],auditEventIds:[ids[0]]}),
   s=>setShipmentFreight(s,WFS,"FACTORY",4500,WFA),true);
 wfActionCase("change account after completed notice","set_group_account",
   s=>preparedWorkflowStage(s,3),
-  ids=>({...actionProps(ids),accountId:"account-1"}),
+  ids=>({...actionProps(ids),accountId:"account-1",
+    eventId:ids[1],auditEventIds:[ids[0]]}),
   s=>setGroupAccount(s,WFG,"account-1",WFA),true);
 wfActionCase("zero-change actual freight is no-op","record_actual_freight",
   s=>{s.workflow.shipments[0].actualFreight={FACTORY:3500};},
