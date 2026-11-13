@@ -85,7 +85,7 @@ pub(super) fn finalize(payload:&Value)->Result<Value,String>{
     }));
     let actor=next.get("settings").and_then(|s|s.get("operatorName"))
         .and_then(Value::as_str).unwrap_or("").trim();
-    let actor=if actor.is_empty(){"직원"}else{actor};
+    let actor=if actor.is_empty(){"직원".to_string()}else{actor.to_string()};
     next["workflow"]["events"].as_array_mut().ok_or("업무 감사 이력 누락")?.push(json!({
         "id":event_id,"at":at,"actor":actor,
         "action":if origin=="FACTORY"{"공장 발송 Excel 작성"}else{"매장 발송 Excel 작성"},
