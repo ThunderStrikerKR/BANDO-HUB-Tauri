@@ -124,7 +124,9 @@ test("No staff-facing SKU split or multi-option creation path remains", () => {
   const alias = read("src/AliasManager.tsx");
   assert.doesNotMatch(admin, /SkuSplitPanel|판매 옵션 추가|manualOptionEditor/);
   assert.doesNotMatch(alias, /관리 별칭 옵션|기본 등록 옵션/);
-  assert.match(admin, /p\.variants\.length !== 1/);
+  const editor = read("src-tauri/src/business_core/catalog_clients/editor.rs");
+  assert.match(editor, /items\(&p,"variants"\)\.len\(\)!=1/);
+  assert.match(admin, /"upsert_product_from_editor"/);
 });
 
 test("Independent product editor does not show legacy multi-option UI", () => {
@@ -137,7 +139,9 @@ test("Independent product editor does not show legacy multi-option UI", () => {
   assert.match(admin, /value=\{edit\.variants\[0\]\.url\}/);
   assert.match(admin, /edit\.variants\.length === 1 && \(/);
   assert.match(admin, /disabled=\{edit\.variants\.length !== 1\}/);
-  assert.match(admin, /if \(p\.variants\.length !== 1\) throw Error/);
+  const editor = read("src-tauri/src/business_core/catalog_clients/editor.rs");
+  assert.match(editor, /상품은 한 가지 판매 구성으로만 등록할 수 있습니다/);
+  assert.match(editor, /items\(&p,"variants"\)\.len\(\)!=1/);
   assert.match(admin, /<Field label="상품명" help=\{\{/);
   assert.match(admin, /매장 직원과 공장 직원이 같은 상품을 정확히 구별/);
   assert.match(admin, /<Field label="상품설명" help=\{\{/);
