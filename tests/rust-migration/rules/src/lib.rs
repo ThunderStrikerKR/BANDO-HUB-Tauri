@@ -578,4 +578,106 @@ mod regression {
         assert_eq!(run("validate_workflow",json!({"state":updated["state"],"before":state}))["valid"],true);
     }
 
+
+    fn two_shipments_in_one_group() -> Value {
+        let mut state=workflow_state("POSTPAID");
+        let mut second_recipient=state["orders"][0]["recipients"][0].clone();
+        second_recipient["id"]=json!("r2");
+        second_recipient["name"]=json!("가상 수취인 2");
+        second_recipient["items"][0]["id"]=json!("item2");
+        state["orders"][0]["recipients"].as_array_mut().unwrap().push(second_recipient);
+        let mut second_shipment=state["workflow"]["shipments"][0].clone();
+        second_shipment["id"]=json!("shipment:o1:r2");
+        second_shipment["recipientId"]=json!("r2");
+        state["workflow"]["shipments"].as_array_mut().unwrap().push(second_shipment);
+        state
+    }
+
+    #[test]
+    fn detaching_shipment_preserves_step_account_and_notices() {
+        let mut state=two_shipments_in_one_group();
+        state["workflow"]["groups"][0]["notices"]=json!([{
+            "id":"notice-1","at":"2026-11-13T09:00:00+09:00",
+            "actor":"직원","shipmentIds":["shipment:o1:r1","shipment:o1:r2"],
+            "amounts":{"shipment:o1:r1":36300,"shipment:o1:r2":36300},
+            "total":72600,"account":{"id":"account-1","bank":"가상은행",
+                "number":"123-456","holder":"가상상호"},"message":"가상 안내"
+        }]);
+        let before=state.clone();
+        let moved=run("apply_workflow_action",json!({
+            "state":state,"action":"detach_shipment","shipmentId":"shipment:o1:r1",
+            "newGroupId":"split-1","eventId":"event-split",
+            "now":"2026-11-13T14:00:00+09:00"
+        }));
+        let w=&moved["state"]["workflow"];
+        assert_eq!(w["groups"].as_array().unwrap().len(),2);
+        assert_eq!(w["shipments"][0]["groupId"],"split-1");
+        assert_eq!(w["shipments"][0]["step"],before["workflow"]["shipments"][0]["step"]);
+        assert_eq!(w["shipments"][1]["groupId"],"group:o1");
+        assert_eq!(w["groups"][1]["rootGroupId"],before["workflow"]["groups"][0]["rootGroupId"]);
+        assert_eq!(w["groups"][1]["accountMode"],"MANUAL");
+        assert_eq!(w["groups"][1]["accountId"],"account-1");
+        assert_eq!(w["groups"][1]["notices"],json!([]));
+        assert_eq!(w["groups"][0]["notices"],before["workflow"]["groups"][0]["notices"]);
+        assert_eq!(w["groups"][0]["needsNotice"],true);
+        assert_eq!(w["groups"][1]["needsNotice"],true);
+        assert_eq!(w["events"][0]["action"],"묶음 해제");
+        assert_eq!(w["events"][0]["before"],"group:o1");
+        assert_eq!(w["events"][0]["after"],"split-1");
+    }
+
+    #[test]
+    fn regroup_requires_ack_for_existing_notice_and_preserves_payment_evidence() {
+        let mut state=two_shipments_in_one_group();
+        let moved=run("apply_workflow_action",json!({
+            "state":state,"action":"detach_shipment","shipmentId":"shipment:o1:r1",
+            "newGroupId":"split-1","eventId":"event-1",
+            "now":"2026-11-13T14:00:00+09:00"
+        }));
+        state=moved["state"].clone();
+        let request=|ack:bool|json!({
+            "state":state,"action":"regroup_shipment","shipmentId":"shipment:o1:r1",
+            "targetGroupId":"group:o1","ack":ack,"eventId":"event-2",
+            "now":"2026-11-13T14:05:00+09:00"
+        });
+        assert!(execute("apply_workflow_action",request(false)).unwrap_err()
+            .contains("승인하세요"));
+        let joined=run("apply_workflow_action",request(true));
+        let w=&joined["state"]["workflow"];
+        assert_eq!(w["shipments"][0]["groupId"],"group:o1");
+        assert_eq!(w["shipments"][0]["step"],3);
+        assert_eq!(w["groups"][0]["needsNotice"],true);
+        assert_eq!(w["groups"][1]["needsNotice"],true);
+        assert_eq!(w["events"][1]["action"],"다시 묶기");
+        assert_eq!(w["events"][1]["before"],"split-1");
+        assert_eq!(w["events"][1]["after"],"group:o1");
+        assert_eq!(w["events"][1]["reason"],"배송 ID / 단계 / 입금 배분 유지");
+        assert_eq!(w["payments"],json!([]));
+    }
+
+    #[test]
+    fn regroup_rejects_transferred_or_mismatched_stage_without_partial_mutation() {
+        let moved=run("apply_workflow_action",json!({
+            "state":two_shipments_in_one_group(),"action":"detach_shipment",
+            "shipmentId":"shipment:o1:r1","newGroupId":"split-1",
+            "eventId":"event-1","now":"2026-11-13T14:00:00+09:00"
+        }));
+        let state=moved["state"].clone();
+        let make=|s:Value|json!({
+            "state":s,"action":"regroup_shipment","shipmentId":"shipment:o1:r1",
+            "targetGroupId":"group:o1","ack":true,"eventId":"event-2",
+            "now":"2026-11-13T14:05:00+09:00"
+        });
+        let mut wrong_step=state.clone();
+        wrong_step["workflow"]["shipments"][1]["step"]=json!(2);
+        assert!(execute("apply_workflow_action",make(wrong_step)).unwrap_err().contains("진행 단계"));
+        let mut transferred=state.clone();
+        transferred["workflow"]["shipments"][1]["transferred"]=json!(true);
+        assert!(execute("apply_workflow_action",make(transferred)).unwrap_err().contains("진행 단계"));
+        let mut different_dealer=state;
+        different_dealer["workflow"]["groups"][1]["dealerId"]=json!("other-dealer");
+        assert!(execute("apply_workflow_action",make(different_dealer)).unwrap_err()
+            .contains("같은 최초 발주서"));
+    }
+
 }
