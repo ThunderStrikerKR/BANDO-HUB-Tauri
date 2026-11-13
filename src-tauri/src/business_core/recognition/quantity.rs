@@ -36,7 +36,7 @@ pub(crate) fn extract(text: &str) -> Vec<Quantity> {
         // not support look-ahead, so validate the following bytes explicitly.
         let following = &text[whole.end()..];
         if capture.get(2).is_some()
-            && Regex::new(r"(?i)^\\s*(?:cm|mm)\\b").expect("dimension guard")
+            && Regex::new(r"(?i)^\s*(?:cm|mm)\b").expect("dimension guard")
                 .is_match(following) {
             continue;
         }
