@@ -56,7 +56,10 @@ public static class BandoAuditNative {
       $el=$nodes.Item($i)
       try {
         $name=$el.Current.Name
-        if ([string]::IsNullOrWhiteSpace($name)) { continue }
+        $ctrl=$el.Current.ControlType.ProgrammaticName
+        # WebView2 can expose editable HTML <input> with an empty UIA Name.
+        # Retain unnamed native Edit controls for label-relative selection.
+        if ([string]::IsNullOrWhiteSpace($name) -and $ctrl -notmatch "Edit|ComboBox") { continue }
         $r=$el.Current.BoundingRectangle
         $result+= [PSCustomObject]@{
           el=$el
@@ -201,19 +204,48 @@ finally:
     return $value | ConvertFrom-Json
   }
   function FillEdit([string]$label,[string]$value){
-    $matches=@(Elements | Where-Object {
+    $all=Elements
+    $matches=@($all | Where-Object {
       $_.name -eq $label -and $_.control -match "Edit" -and !$_.offscreen -and $_.w -gt 0
     })
-    if($matches.Count -ne 1){throw "Expected one visible editable Windows control '$label', found $($matches.Count)"}
-    $element=$matches[0]
-    $element.el.SetFocus()
+    if($matches.Count -eq 0){
+      # The accessibility provider sometimes gives the HTML input no Name.
+      # Pair the real visible Edit rectangle to its nearby UIA label.
+      $lab=@($all|Where-Object {$_.name -eq $label -and !$_.offscreen})|Select-Object -First 1
+      if($null -ne $lab){
+        $matches=@($all|Where-Object {
+          $_.control -match "Edit" -and !$_.offscreen -and $_.w -gt 75 -and
+          $_.y -ge ($lab.y-5) -and $_.y -le ($lab.y+100) -and
+          [Math]::Abs($_.x-$lab.x) -lt 180
+        }|Sort-Object @{Expression={[Math]::Abs($_.y-$lab.y)+[Math]::Abs($_.x-$lab.x)}})
+      }
+    }
+    $report.editsObserved=@($all|Where-Object {$_.control -match "Edit"}|
+      Select-Object -First 55 name,control,offscreen,x,y,w,h)
+    Store
+    if($matches.Count -gt 0){
+      $matches[0].el.SetFocus()
+      $method="UIAutomation Edit focus"
+    }else{
+      # Last fallback uses the *measured* native label rectangle, not a
+      # hard-coded pixel location or a synthetic DOM interaction.
+      $lab=@($all|Where-Object {$_.name -eq $label -and !$_.offscreen})|Select-Object -First 1
+      if($null -eq $lab){throw "Native editable field or its label not found: $label"}
+      $cx=[int]($lab.x+[Math]::Min(100,[Math]::Max(40,$lab.w/2)))
+      $cy=[int]($lab.y+$lab.h+22)
+      [BandoAuditNative]::SetForegroundWindow($proc.MainWindowHandle)|Out-Null
+      [BandoAuditNative]::SetCursorPos($cx,$cy)|Out-Null
+      [BandoAuditNative]::mouse_event(0x0002,0,0,0,[UIntPtr]::Zero)
+      Start-Sleep -Milliseconds 75
+      [BandoAuditNative]::mouse_event(0x0004,0,0,0,[UIntPtr]::Zero)
+      $method="Measured native label-relative mouse"
+    }
     [System.Windows.Forms.Clipboard]::SetText($value)
     Start-Sleep -Milliseconds 110
     [System.Windows.Forms.SendKeys]::SendWait("^a")
     [System.Windows.Forms.SendKeys]::SendWait("^v")
-    Start-Sleep -Milliseconds 550
-    $nodes=@(Elements | Where-Object { $_.name -eq $label -and $_.control -match "Edit" })
-    $report.inputActions+=@{field=$label;kind="UIAutomation focus and native keyboard/clipboard paste"}
+    Start-Sleep -Milliseconds 600
+    $report.inputActions+=@{field=$label;method=$method}
     Store
   }
   $report.inputActions=@()
