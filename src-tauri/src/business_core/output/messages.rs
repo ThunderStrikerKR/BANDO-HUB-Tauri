@@ -115,7 +115,7 @@ pub(super) fn validate_templates(settings: &Value) -> Result<(), String> {
     }
     Ok(())
 }
-fn render(settings: &Value, key: &str, values: &Value) -> Result<String, String> {
+pub(super) fn render(settings: &Value, key: &str, values: &Value) -> Result<String, String> {
     let (default, _) = template_default(key)
         .ok_or_else(|| format!("지원하지 않는 자동 메시지 유형입니다: {}", key))?;
     let body = settings.get("automaticMessageTemplates")
@@ -158,18 +158,18 @@ fn customer_model(name: &str) -> String {
     }
     raw.to_owned()
 }
-fn url_is_official(url: &str) -> bool {
+pub(super) fn url_is_official(url: &str) -> bool {
     let Ok(parsed) = url::Url::parse(url) else { return false };
     parsed.scheme() == "https"
         && matches!(parsed.host_str(), Some("bandostand.com" | "www.bandostand.com" | "bandomall.co.kr" | "www.bandomall.co.kr"))
         && parsed.path().starts_with("/product/")
 }
-fn default_color_notice(settings: &Value, item: &Value) -> Result<Option<String>, String> {
+pub(super) fn default_color_notice(settings: &Value, item: &Value) -> Result<Option<String>, String> {
     let color = color_label(s(&item["appliedDefaultColor"], "color")).trim();
     if color.is_empty() { return Ok(None); }
     Ok(Some(render(settings, "colorDefault", &json!({"색상":color, "상품명":customer_model(s(item,"name"))}))?))
 }
-fn representative_notice(settings: &Value, item: &Value) -> Result<Option<String>, String> {
+pub(super) fn representative_notice(settings: &Value, item: &Value) -> Result<Option<String>, String> {
     let selection = &item["appliedRepresentativeModel"];
     if s(selection, "productId").is_empty() || s(selection, "productId") != s(item, "productId") {
         return Ok(None);
