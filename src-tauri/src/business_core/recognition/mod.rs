@@ -565,7 +565,33 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
         if let Some(begin)=address {
             if !ts_semantics::model_before_address(&line.text[..begin],state) {continue;}
         }
-        let product_part = address.map_or(line.text, |begin| &line.text[..begin]);
+        // A mixed row may put a recipient name and phone after an actual
+        // item and quantity. The TS logical-line parser stops the item's
+        // source text at that recipient, rather than swallowing the name.
+        let mut product_part = address.map_or(line.text, |begin| &line.text[..begin]);
+        let inline_recipient = events.iter().filter(|e|
+            e.kind=="name" && e.line==line.number
+                && e.start>=line.start && e.start<line.start+product_part.len()
+        ).map(|e|e.start-line.start).min();
+        let mut shortened_for_recipient=false;
+        if let Some(name_start)=inline_recipient {
+            if quantity::extract(&product_part[..name_start]).len()>0 {
+                product_part=&product_part[..name_start];
+                shortened_for_recipient=true;
+            }
+        }
+        product_part=product_part.trim_end_matches(|ch: char|
+            ch.is_whitespace() || ch=='ㅣ' || ch=='|');
+        // parseLegacy drops the leading Bando store prefix for an inline
+        // numeric SKU + recipient line, while preserving it in stand-alone
+        // product lines such as "반도 705 보면대 1EA".
+        if shortened_for_recipient && product_part.starts_with("반도 ") {
+            let after=product_part["반도 ".len()..].trim_start();
+            if after.chars().take(3).all(|c|c.is_ascii_digit())
+                && after.chars().take(3).count()==3 {
+                product_part=after;
+            }
+        }
         let trimmed = product_part.trim();
         if trimmed.is_empty() || is_money_or_header(trimmed)
             || (trimmed.contains('|') && trimmed.split('|').any(|column|
@@ -684,7 +710,13 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
         let rid = recipients[row_index]["id"].as_str().unwrap_or("").to_owned();
         let e = &events[index];
         let kind = e.kind;
-        let v = e.value.clone();
+        // Parenthesized postal codes are a distinct field in parseLegacy:
+        // (11806) 경기도... stores the address without "(11806)", while
+        // the evidence span still points into the untouched original text.
+        let v = if kind=="address" {
+            let postal=Regex::new(r"^\s*\(\d{5}\)\s*").expect("postal code");
+            postal.replace(&e.value,"").into_owned()
+        } else {e.value.clone()};
         let previous = recipients[row_index][kind].as_str().unwrap_or("").to_owned();
         if previous.is_empty() {
             recipients[row_index][kind] = json!(v);
@@ -750,6 +782,15 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
                 .filter(|s| !s.is_empty());
             let name = hit.decision.get("name").and_then(Value::as_str)
                 .filter(|s|!s.is_empty()).unwrap_or(&hit.raw);
+            // When no catalog SKU is selected and the whole line served as
+            // the provisional name, TypeScript removes only the terminal
+            // order quantity. Keep the original raw text and quantity source.
+            let display_name = if chosen.is_none() && name==hit.raw {
+                let trailing=Regex::new(
+                    r"(?i)\s*(?:\d+|한|두|세|삼)\s*(?:개|대|ea|pcs)\s*$"
+                ).expect("temporary quantity label");
+                trailing.replace(name,"").trim().to_owned()
+            } else {name.to_owned()};
             let reason = hit.decision.get("recognitionReason").cloned().unwrap_or(Value::Null);
             let mut issues: Vec<String> = Vec::new();
             if chosen.is_none() {
@@ -779,7 +820,7 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
             }
             let mut item = json!({
                 "id":id,"productId":chosen,"variantId":hit.decision["variantId"],
-                "raw":hit.raw,"name":name,
+                "raw":hit.raw,"name":display_name,
                 "color":hit.decision["color"],"quantity":quantity_value,
                 "quantityConfirmed":unique,"unitPrice":null,
                 "origin":hit.decision.get("origin").and_then(Value::as_str).unwrap_or("FACTORY"),
