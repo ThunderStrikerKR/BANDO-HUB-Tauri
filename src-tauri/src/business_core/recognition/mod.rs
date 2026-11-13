@@ -201,7 +201,14 @@ fn phone_regex() -> Regex {
 fn address_begin(line: &str) -> Option<usize> {
     let prefix = Regex::new(r"^\s*(?:주소|배송지(?:\s*주소)?|배송주소|받는곳|수취인주소)\s*[:：]?\s*")
         .expect("address prefix");
-    if let Some(m) = prefix.find(line) { return Some(m.end()); }
+    if let Some(m)=prefix.find(line) {
+        // parseLegacy.ts detects the province after an optional five-digit
+        // postal marker. An address label must not turn (11806) into the
+        // beginning of the actual shipping address/source span.
+        let marker=Regex::new(r"^\\(\\d{5}\\)\\s*").expect("postal marker");
+        let skipped=marker.find(&line[m.end()..]).map_or(0,|v|v.end());
+        return Some(m.end()+skipped);
+    }
     let address = Regex::new(concat!(
         r"(?:서울(?:특별시)?|부산(?:광역시)?|대구(?:광역시)?|인천(?:광역시)?|광주(?:광역시)?|",
         r"대전(?:광역시)?|울산(?:광역시)?|세종(?:특별자치시)?|경기(?:도)?|강원(?:특별자치도|도)?|",
@@ -255,7 +262,9 @@ fn address_info(value: &str) -> (String, String, Value) {
         "COMPLETE"
     } else { "INCOMPLETE" };
     let province = Regex::new(r"^(?:서울특별시|서울|부산광역시|부산|대구광역시|대구|인천광역시|인천|광주광역시|광주|대전광역시|대전|울산광역시|울산|세종특별자치시|세종|경기도|경기|강원특별자치도|강원도|강원|충청북도|충청남도|전북특별자치도|전라북도|전라남도|경상북도|경상남도|제주특별자치도|제주도|제주|충북|충남|전북|전남|경북|경남)")
-        .expect("province").find(value).map(|m| m.as_str().to_owned());
+        .expect("province").find(value)
+        .filter(|m|value[m.end()..].chars().next().map_or(true,char::is_whitespace))
+        .map(|m|m.as_str().to_owned());
     let mut parts = json!({});
     let rest = province.as_ref().and_then(|p|value.strip_prefix(p))
         .map(str::trim).unwrap_or(value);
