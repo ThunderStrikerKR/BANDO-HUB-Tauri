@@ -1,5 +1,120 @@
 # TSBH Rust migration — session 2/3: Price, freight and workflow rules
 
+## Session 2 continuation: validateWorkflow full-branch audit — 2026-11-13
+
+**Current verified checkpoint**
+- Branch: `migration/02-rules`
+- Last source/test SHA: `75105ec30ac0be9bfe997f8f97c5a5025cd361d8`
+- Passing workflow run: https://github.com/ThunderStrikerKR/TSBH/actions/runs/43374763979
+- **Direct original-TypeScript / compiled-Rust comparison: 383/383 named fixtures PASS**
+- **Independent Rust regression tests: 47/47 PASS**
+- Integrated Windows/Tauri/SQLite test on this branch: **SKIPPED**.
+- The previous checkpoint was 285/285. This pass added **98** direct
+  differential examples including a current/previous-state integrity matrix.
+- This is test-corpus equivalence, **not a proof of all possible states**.
+
+### Source audit and actual corrections
+
+The source of truth remains `src/workflow.ts::validateWorkflow`
+from commit `d5ea8ed20b8120b844437263c2eb2b8963559e8d`.
+The Rust implementation is `src-tauri/src/business_core/rules/validation.rs::validate`.
+
+1. **Separated validation responsibilities**: original
+   `validateWorkflow(state,before)` does not invoke
+   `validateReceptionBoundary(before,state)`. Rust previously called
+   the reception validator implicitly at the end of `validate`.
+   The extra call has been **removed**. The separate Rust
+   `validate_reception_boundary` operation remains registered and
+   continues to be a required independent integration check.
+2. **Matched the guard order**: within a shipment check, the source
+   checks RETAIL payment/stage restrictions before source/group
+   link integrity; actualFreight numeric validity before charge validity.
+   In history checks, existing confirmation cancellation precedes
+   shipment reference/actual freight/delivery preservation, followed
+   by group notice, immutable source/payment/event/delivery/change
+   records, then Excel queue snapshot and handoff exceptions.
+3. **Correct JS payment aggregation behavior**: source validates the
+   payment total first, then executes the `sum(allocations)` aggregate,
+   then checks individual allocations. Decimal, negative, overrun
+   and non-safe aggregate totals can produce the distinct original
+   `금액 합계를 확인하세요.` rather than an invented allocation error.
+   Negative individual amounts with an otherwise valid aggregate
+   proceed to the source's `입금 배분 연결 오류` guard.
+4. **Preserved absent-versus-explicit-null actual freight**: source
+   compares `JSON.stringify(undefined)` with `JSON.stringify(null)`.
+   Rust previously collapsed absent and null into the same JSON value
+   and silently permitted some unrecorded changes to historical
+   actual freight. It now includes property **presence** in the
+   comparison before allowing a change; a new `실제 출고 운임 입력`
+   event with the correct previous amount, new origin and value
+   is required for changed entries.
+5. **Correct shipmentContext dealer validation**: source requires a
+   recipient and the effective `orderParty`. A missing dealer without
+   a saved clientSnapshot is invalid for agency/dealer orders; a
+   RETAIL order may synthesize the company party, and saved
+   clientSnapshot must be honored if the master client is absent.
+   Rust now follows the same cases. For archived shipments, only
+   *missing original recipient linkage* qualifies for the source's
+   skip path; an archived shipment with an existing recipient but
+   missing dealer must not be silently skipped.
+
+### Original TypeScript comparison matrix
+
+`tests/rust-migration/rules/parity/compare.mts` runs the actual
+`validateWorkflow(state,before)` and the compiled Rust
+`execute("validate_workflow",{state,before})` on the SAME synthetic
+JSON structure, comparing exact success and error messages.
+
+Fixtures cover:
+- No workflow, valid state and duplicate IDs across sources, groups,
+  shipments, payments, queue, events, deliveries and requests
+- Orphan/archived recipients, RETAIL restrictions, source/group/dealer
+  linkage, step range and negative/decimal freight values
+- Missing/incorrect recipient party vs RETAIL company fallback and
+  saved clientSnapshot
+- Payment totals, multiple allocations, invalid dealer/shipment
+  linkage, safe-integer limits and incorrect aggregate sums
+- Duplicate deliveries, confirmations with invalid amounts, unknown
+  group/shipments and duplicate confirmation identifiers
+- Partial/full confirmation cancellation at valid and forbidden
+  shipment stages, unchanged confirmations and illegal edits
+- Stable source/recipient/shipment IDs and preserved payments,
+  account notices, audit events, deliveries and change requests
+- Actual freight audit proof with new event, origin/amount/before
+  matching, legacy recipient fallback, explicitly null/absent
+  origin distinction, and reused old-event refusal
+- Queue entry immutable shipment/origin/snapshot, CANCELLED
+  exceptions, EXPORTED/STORE_SENT frozen records, staff
+  `공장 전달 직원 확인` metadata-only change and documented
+  `전달 전 출력본 폐기 / 재작성` disposal with a matching export snapshot
+- Double-fault priority cases showing the original error precedence
+  for retail, approval cancellation and freight.
+
+The tests also assert whether the real TypeScript source **must pass
+or fail** for each scenario; two implementations merely returning the
+same unintended error do not count as success.
+
+### Important boundaries
+
+- `validateWorkflow` and `validateReceptionBoundary` are separate
+  original TypeScript functions with separate Rust operations. The
+  completion of this task **does not verify every reception-boundary
+  branch**. Call both at their correct app boundary as required by
+  the existing original workflow; do not silently combine their
+  semantics in the pure `validateWorkflow` operation.
+- 383 matching cases are not exhaustive input-space proof. Unusual
+  malformed JSON, unsupported runtime types or differing serialized
+  object property order may still require further verification.
+- **No live business records were migrated or modified**. No
+  app-level Tauri commands, SQLite persistence, UI, or Windows
+  runtime were edited in this session. Those integrations remain
+  with session 3.
+- Remaining session-2 owned work: comprehensive
+  `validateReceptionBoundary` direct parity and any uncovered
+  payment-confirmation/cancellation variant not in this matrix.
+
+---
+
 ## Session 2 continuation: migrateWorkflow Rust migration — 2026-11-13
 
 **Latest verified source checkpoint**
