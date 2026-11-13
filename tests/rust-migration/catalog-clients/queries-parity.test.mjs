@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {spawnSync} from "node:child_process";
+import {readFileSync} from "node:fs";
 import {fileURLToPath} from "node:url";
 import {tsImport} from "tsx/esm/api";
 
@@ -178,6 +179,11 @@ for(const links of [
   add("official links set "+trials.length,"official_links",{report},
     ()=>officialLinksFromSnapshot(report));
 }
+const bundledCatalog=JSON.parse(readFileSync(
+  new URL("../../../src-tauri/resources/catalog.json",import.meta.url),"utf8"));
+add("official links full bundled source snapshot","official_links",
+  {report:bundledCatalog},()=>officialLinksFromSnapshot(bundledCatalog));
+
 function editorOracle(s,p,updatedAt){
   const proposed=structuredClone(p);
   proposed.name=proposed.name.trim();
