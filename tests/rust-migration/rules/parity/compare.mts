@@ -82,6 +82,7 @@ const copy=<T>(obj:T):T=>structuredClone(obj);
 const cases: Array<{
   name:string; operation:string; payload:Record<string,unknown>;
   baseline:()=>unknown;
+  expectedOk?:boolean;
 }>=[];
 function add(name:string,operation:string,payload:Record<string,unknown>,baseline:()=>unknown) {
   cases.push({name,operation,payload,baseline});
@@ -653,6 +654,11 @@ function rawCase(name:string,raw:string,mutate:(s:any)=>void=()=>{},
   add("raw edit: "+name,"apply_order_raw_edit",payload,
     ()=>({state:deterministicIds(generated,()=>applyOrderRawEdit(
       state,"o1",raw,"검증직원",strictIdentity))}));
+  cases[cases.length-1].expectedOk= ![
+    "empty raw rejected","blank raw rejected",
+    "previously deleted order blocked","Excel exported recipient blocked",
+    "already delivered recipient blocked","payer identity cannot silently change"
+  ].includes(name);
 }
 rawCase("unchanged source is a no-op",order.raw);
 rawCase("empty raw rejected","");
@@ -742,6 +748,11 @@ let passed=0;
 for(let i=0;i<cases.length;i++){
   const c=cases[i];
   const ts=outcome(c.baseline);
+  if(c.expectedOk!==undefined && ts.ok!==c.expectedOk){
+    console.error("BASELINE RESULT UNEXPECTED",c.name,
+      "expected success",c.expectedOk,"actual",ts);
+    process.exitCode=1;
+  }
   let rust:unknown;
   try{rust=JSON.parse(output[i]);}
   catch {console.error("Invalid Rust JSON",c.name,output[i]);process.exit(2);}
