@@ -18,7 +18,7 @@ import {
   combinationCurrent,
   upgradeShipping,
 } from "../../../../src/shipping.ts";
-import { shipmentTotals, validateWorkflow, reconcileWorkflow, deleteOrder, workflowIssues, stageIssues, applyOrderRawEdit } from "../../../../src/workflow.ts";
+import { shipmentTotals, validateWorkflow, reconcileWorkflow, deleteOrder, workflowIssues, stageIssues, applyOrderRawEdit, migrateWorkflow } from "../../../../src/workflow.ts";
 import { orderIssues, approveMissingQuantity, pendingIssue } from "../../../../src/validation.ts";
 
 const root=resolve(dirname(fileURLToPath(import.meta.url)),"../../../..");
@@ -753,6 +753,119 @@ rawCase("two paid recipients must preserve original recipient links",
     s.workflow.payments.push({id:"payment-r2",dealerId:"dealer-1",
       amount:1000,allocations:[{shipmentId:"shipment:o1:r2",amount:1000}]});
   });
+
+
+
+// Historical workflow conversion. The TypeScript baseline executes the REAL
+// migrateWorkflow, including reconciliation, and must produce a successful
+// State. Rust consumes the same initial State and the same UUID/time stream.
+function migrationCase(name:string,mutate:(state:any)=>void=()=>{}){
+  const legacy:any=copy(baseState);
+  legacy.aliases=[];
+  mutate(legacy);
+  const ids=Array.from({length:160},(_,i)=>"legacy-uuid-"+(i+1));
+  add("legacy migration: "+name,"migrate_workflow",{
+    state:legacy,now:actionNow,eventIds:ids
+  },()=>({state:deterministicIds(ids,()=>migrateWorkflow(legacy))}));
+  cases[cases.length-1].expectedOk=true;
+}
+migrationCase("REVIEW with no prior workflow",s=>{
+  delete s.workflow;
+  s.queue=[];
+  s.orders[0].status="REVIEW";
+});
+migrationCase("notified historical order",s=>{
+  delete s.workflow;
+  s.orders[0].notified=true;
+  s.orders[0].status="STATEMENT";
+});
+migrationCase("paid legacy order preserves historical approval",s=>{
+  delete s.workflow;
+  s.orders[0].paid=true;
+  s.orders[0].status="PAID";
+});
+migrationCase("postpaid already approved",s=>{
+  delete s.workflow;
+  s.orders[0].postpaidApproved=true;
+  s.orders[0].status="STATEMENT";
+});
+migrationCase("old queued order creates frozen Excel queue",s=>{
+  delete s.workflow;
+  s.orders[0].status="QUEUED";
+  s.queue=["o1"];
+});
+migrationCase("old exported order becomes historical archive",s=>{
+  delete s.workflow;
+  s.orders[0].status="EXPORTED";
+});
+migrationCase("notified despite queued legacy flag",s=>{
+  delete s.workflow;
+  s.orders[0].notified=true;
+  s.orders[0].status="STATEMENT";
+  s.queue=["o1"];
+});
+migrationCase("two historical recipients with independent quantities",s=>{
+  delete s.workflow;
+  s.orders[0].status="QUEUED";
+  s.orders[0].paid=true;
+  s.queue=["o1"];
+  const second=copy(s.orders[0].recipients[0]);
+  second.id="r2";second.name="두번째 수취인";
+  second.items[0].id="item2";second.items[0].quantity=1;
+  s.orders[0].recipients.push(second);
+});
+migrationCase("preserve existing payment allocations and event IDs",s=>{
+  s.orders[0].paid=true;
+  s.orders[0].status="PAID";
+  s.workflow.payments.push({
+    id:"old-payment",dealerId:"dealer-1",
+    account:copy(s.settings.accounts[0]),amount:15000,
+    allocations:[{shipmentId:"shipment:o1:r1",amount:15000}]
+  });
+  s.workflow.events.push({
+    id:"old-event",at:now,actor:"이전 직원",
+    action:"실제 입금",shipmentIds:["shipment:o1:r1"],
+    groupId:"group:o1"
+  });
+});
+migrationCase("preserve existing confirmed account and delivery history",s=>{
+  s.orders[0].status="EXPORTED";
+  s.workflow.confirmations.push({
+    id:"old-confirm",groupId:"group:o1",dealerId:"dealer-1",
+    shipmentIds:["shipment:o1:r1"],amount:70000,
+    confirmedAt:now,actor:"이전 직원",
+    announcedAccount:copy(s.settings.accounts[0]),
+    amounts:{"shipment:o1:r1":70000},
+    allocations:[{shipmentId:"shipment:o1:r1",amount:70000}]
+  });
+  s.workflow.events.push({
+    id:"old-event-2",at:now,actor:"이전 직원",
+    action:"입금 확인",shipmentIds:["shipment:o1:r1"],groupId:"group:o1"
+  });
+});
+migrationCase("old shipment queue and historical audit not overwritten",s=>{
+  s.orders[0].status="QUEUED";
+  s.queue=["o1"];
+  s.workflow.payments.push({
+    id:"old-payment-2",dealerId:"dealer-1",
+    account:copy(s.settings.accounts[0]),amount:1000,
+    allocations:[{shipmentId:"shipment:o1:r1",amount:1000}]
+  });
+  s.workflow.queue.push({
+    id:"old-queue",shipmentId:"shipment:o1:r1",origin:"FACTORY",
+    at:now,status:"CANCELLED",legacy:true,
+    snapshot:{sender:copy(s.clients[0]),subtotal:40000,
+      vat:4000,shipping:3000,total:47000}
+  });
+});
+migrationCase("multi-origin invoice snapshot remains item-filtered",s=>{
+  delete s.workflow;
+  s.orders[0].status="QUEUED";
+  s.queue=["o1"];
+  const next=copy(s.orders[0].recipients[0].items[0]);
+  next.id="store-item";next.origin="STORE";
+  s.orders[0].recipients[0].items.push(next);
+});
 
 function normalized(v:unknown):string {
   if(Array.isArray(v))return "["+v.map(normalized).join(",")+"]";
