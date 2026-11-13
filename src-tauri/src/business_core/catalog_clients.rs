@@ -2,6 +2,7 @@
 //! XLSX byte parsing and React editor drafts remain UI concerns. A validated
 //! state transition is returned to the existing revision-checked SQLite saver.
 use serde_json::{json, Value};
+mod client_preview;
 use unicode_normalization::UnicodeNormalization;
 use url::Url;
 
@@ -262,6 +263,7 @@ fn archive_product(state: &Value, id: &str, at: &str) -> Result<Value, String> {
 pub fn execute(operation: &str, payload: Value) -> Result<Value, String> {
     let state = payload.get("state").ok_or("현재 상태가 없습니다.")?;
     match operation {
+        "preview_client_rows" => client_preview::preview(&payload),
         "archive_client" => archive_client(
             state, field(&payload, "clientId"), field(&payload, "at")),
         "archive_product" => archive_product(
