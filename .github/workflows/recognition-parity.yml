@@ -10,6 +10,17 @@ concurrency:
   group: recognition-parity-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  rust-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: tests/rust-migration/recognition -> target
+      - name: Run original Rust 20-order regression unchanged
+        run: cargo test --manifest-path tests/rust-migration/recognition/Cargo.toml
   compare-20:
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -19,9 +30,10 @@ jobs:
         with:
           node-version: '22'
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: tests/rust-migration/recognition -> target
       - name: Install project dependencies
         run: npm ci --ignore-scripts --no-audit --no-fund
-      - name: Run original Rust 20-order regression unchanged
-        run: cargo test --manifest-path tests/rust-migration/recognition/Cargo.toml
       - name: Compare original TypeScript against real Rust on all 20 orders
         run: node --test tests/rust-migration/recognition/parity-20.test.mjs
