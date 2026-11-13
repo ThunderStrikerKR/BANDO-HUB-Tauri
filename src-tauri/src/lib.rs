@@ -307,9 +307,15 @@ fn initialize_database(path: &Path) -> Result<Connection, String> {
 // Pure Rust domain computation only: returning a new workflow state does
 // NOT write SQLite. Existing checked state_save/transaction boundaries must
 // commit approved results against a fresh persisted revision.
+// Recognition scans the catalog and can be CPU intensive. Run it outside the
+// Tauri UI thread so continuous reception typing remains responsive.
 #[tauri::command]
-fn business_core_call(domain: String, operation: String, payload: Value) -> Result<Value, String> {
-    business_core::execute(&domain, &operation, payload)
+async fn business_core_call(domain: String, operation: String, payload: Value) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        business_core::execute(&domain, &operation, payload)
+    })
+    .await
+    .map_err(|_| "Rust 업무 엔진 실행이 중단되었습니다.".to_owned())?
 }
 
 #[tauri::command]
