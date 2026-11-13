@@ -389,6 +389,7 @@ test("Rust rename retains current rate and historical records",()=>{
   });
   assert.deepEqual(crudResults[2].value.shipping.groups[1],shipping.groups[1]);
 });
+{
 // Replays the original ShippingManager exception-revision algorithm and uses
 // the ACTUAL TypeScript combinationVersions() function as its oracle.
 // Rust must retire the selected version, retain all unrelated history, and
@@ -498,4 +499,4 @@ for(let i=0;i<exceptionCases.length;i++){
     assert.equal(exceptionShipping.combinations[1].active,false);
   });
 }
-
+}
