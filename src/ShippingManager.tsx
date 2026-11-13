@@ -15,7 +15,6 @@ import {
   combinationCurrent,
   combinationVersions,
   editableShippingRule,
-  emptyProductRule,
   initialShipping,
 } from "./shipping";
 import type { ShippingRule, ShippingState, State } from "./types";
@@ -126,31 +125,26 @@ export function ShippingManager({
   );
   const savePending = async (): Promise<boolean> => {
     if (!changes.length) return true;
-                  const updatedShipping = structuredClone(shipping);
-                  for (const [id, value] of changes)
-                    if (!value) {
-                      updatedShipping.productRules ??= {};
-                      updatedShipping.productHistory ??= {};
-                      const old = updatedShipping.productRules[id];
-                      if (old)
-                        updatedShipping.productHistory[id] = [
-                          ...(updatedShipping.productHistory[id] ?? []),
-                          old,
-                        ];
-                      updatedShipping.productRules[id] = emptyProductRule();
-                    }
-                  const next = {
-                    ...state,
-                    shipping: updatedShipping,
-                    products: state.products.map((p) =>
-                      pending[p.id] !== undefined
-                        ? { ...p, shippingGroupId: pending[p.id] || undefined }
-                        : p,
-                    ),
-                  };
-                  const ok = await save(next, "배송 그룹 지정을 저장했습니다.");
-                  if (ok) { setPending({}); setSelected([]); }
-                  return ok;
+    try {
+      const assignments = Object.fromEntries(changes);
+      const versionIds = Object.fromEntries(
+        changes.filter(([, value]) => !value)
+          .map(([id]) => [id, crypto.randomUUID()]),
+      );
+      const result = await businessCoreCall<{ state: State }>(
+        "rules", "apply_shipping_action", {
+          action: "assign_products",
+          state: { ...state, shipping },
+          assignments, versionIds, now: new Date().toISOString(),
+        },
+      );
+      const ok = await save(result.state, "배송 그룹 지정을 저장했습니다.");
+      if (ok) { setPending({}); setSelected([]); }
+      return ok;
+    } catch (error) {
+      onNotice(error instanceof Error ? error.message : String(error), "error");
+      return false;
+    }
   };
   const editingDirty = !!editing && !!initialEditing && !sameFreightEditor(editing.rule, initialEditing);
   const saveEditedRule = async (): Promise<boolean> => {
