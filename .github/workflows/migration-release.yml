@@ -1,0 +1,83 @@
+name: Rust migration Windows portable release candidate
+on:
+  push:
+    branches:
+      - migration/03-integration
+    paths:
+      - src-tauri/**
+      - src/**
+      - scripts/**
+      - package.json
+      - vite.config.ts
+      - .github/workflows/migration-release.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows-portable:
+    runs-on: windows-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          cache-targets: true
+      - name: Install existing frontend dependencies
+        run: npm install --no-audit --no-fund
+      - name: Build actual Windows Release EXE
+        run: npm run build:windows
+      - name: Verify Windows executable and checksum
+        shell: pwsh
+        run: |
+          $exe = "src-tauri/target/release/bando_hub_tauri.exe"
+          if (!(Test-Path $exe)) { throw "Windows release executable not produced" }
+          $hash = (Get-FileHash -Algorithm SHA256 $exe).Hash
+          Write-Host "EXE SHA256: $hash"
+          Write-Host "EXE bytes: $((Get-Item $exe).Length)"
+      - name: Cache portable PaddleOCR runtime and models
+        id: ocr-cache
+        uses: actions/cache@v4
+        with:
+          path: ocr-build-cache
+          key: bando-ocr-win-x64-v1-${{ hashFiles('scripts/package-ocr-runtime.ps1', 'scripts/prepare-ocr-bundle.py', 'scripts/verify-packaged-ocr.ps1', 'scripts/verify-portable-ocr.py', 'src-tauri/resources/ocr/recognize.py') }}
+      - name: Package embedded Python and Korean PaddleOCR models
+        if: steps.ocr-cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: ./scripts/package-ocr-runtime.ps1 -TargetDir "ocr-build-cache"
+      - name: Check offline OCR dependencies
+        shell: pwsh
+        run: |
+          if (!(Test-Path "ocr-build-cache/runtime/python.exe")) { throw "Embedded Python missing" }
+          if (!(Test-Path "ocr-build-cache/models/PP-OCRv5_mobile_det/inference.json")) { throw "OCR detection model missing" }
+          if (!(Test-Path "ocr-build-cache/models/korean_PP-OCRv5_mobile_rec/inference.json")) { throw "OCR Korean recognition model missing" }
+      - name: Package Portable ZIP with fixed executable name
+        shell: pwsh
+        run: |
+          $root = "src-tauri/target/release"
+          $portable = Join-Path $root "BANDO-HUB-portable"
+          New-Item -ItemType Directory -Path $portable -Force | Out-Null
+          Copy-Item (Join-Path $root "bando_hub_tauri.exe") (Join-Path $portable "bando_hub.exe")
+          Copy-Item "ocr-build-cache" (Join-Path $portable "ocr") -Recurse
+          if (!(Test-Path (Join-Path $portable "bando_hub.exe"))) { throw "Expected EXE name missing" }
+          if (!(Test-Path (Join-Path $portable "ocr/runtime/python.exe"))) { throw "OCR runtime missing" }
+          Compress-Archive -Path (Join-Path $portable "*") -DestinationPath (Join-Path $root "BANDO-HUB-migration03-preview.zip") -Force
+          Get-FileHash -Algorithm SHA256 (Join-Path $root "BANDO-HUB-migration03-preview.zip")
+      - name: Verify packaged OCR after extracting under Korean path
+        shell: pwsh
+        run: |
+          $root = "src-tauri/target/release"
+          $unpacked = Join-Path $env:RUNNER_TEMP "반도허브-한글경로-검증"
+          Expand-Archive -LiteralPath (Join-Path $root "BANDO-HUB-migration03-preview.zip") -DestinationPath $unpacked
+          ./scripts/verify-packaged-ocr.ps1 -OcrRoot (Join-Path $unpacked "ocr")
+      - name: Upload unapproved migration candidate for integration testing
+        uses: actions/upload-artifact@v4
+        with:
+          name: TSBH-migration03-preview-NOT-FINAL
+          path: src-tauri/target/release/BANDO-HUB-migration03-preview.zip
+          if-no-files-found: error
+          retention-days: 7
