@@ -7,7 +7,7 @@
 - 독점 브랜치: migration/01-recognition
 - 공통 기준: d5ea8ed20b8120b844437263c2eb2b8963559e8d
 - 선행 모델 선택 구현: 3f8e062e1e049b5297b0fd78a285dad7a679d6f5
-- 마지막 소스 수정 커밋: cbcbe87a0056ee4fef05a9f8f55f5a55c64a6c53
+- 마지막 소스 수정 커밋: 24e53a5acfc48301af14e5bf4a2fc201f5b20955
 - 마지막 **Rust 컴파일 검증 완료 커밋: 없음.**
 - 작업 경로는 사용자 지정 허용 경로로 제한. 기존 TS 및 공통 Rust/설정 파일은 미수정.
 
@@ -20,7 +20,7 @@
    - 한국어 및 숫자 수량, 개/대/세트/EA/PCS, × 및 별도 표 수량 열, 모델 뒤 단독 수량.
    - 하이픈 모델의 -1과 옵션 괄호 뒤 명시된 -1개 구분.
 3. src-tauri/src/business_core/recognition/mod.rs
-   - execute 진입점, 배송건/수취인/연락처/주소 추출, 상품 근거, 배송건 연결, 보수적 재분석.
+   - execute 진입점, 배송건/수취인/연락처/주소와 행정구역 구성요소 추출, 상품 근거, 배송건 연결, 보수적 재분석.
    - UI에 넘기는 분석 원문 span은 UTF-16 코드 유닛 기준.
    - 기존 확정 필드 및 명확하게 식별된 상품 직원 확정값 보존.
 4. tests/rust-migration/recognition/Cargo.toml 및 src/lib.rs
