@@ -7,9 +7,10 @@ import { FactoryReplyImport } from "./FactoryReplyImport";
 import { ActualFreightField } from "./ActualFreightField";
 import { actualFreightOf, recordActualFreight } from "./actual-freight";
 import { requestPageLeave, usePageLeaveGuard } from "./shared/page-leave";
-import { createFactoryWorkbook, previewFactoryExport, recordFactoryExport } from "./factory-export";
-import { createStoreWorkbook, previewStoreExport, recordStoreExport } from "./store-export";
+import { createFactoryWorkbook, recordFactoryExportPrepared, type FactoryExportPreview } from "./factory-export";
+import { createStoreWorkbook, recordStoreExportPrepared, type StoreExportPreview } from "./store-export";
 import { confirmAction } from "./dialogs";
+import { businessCoreCall } from "./tauri-bridge";
 import { useState } from "react";
 import { markFactoryDelivered, reopenUnsentExport } from "./corrections";
 import { won } from "./domain";
@@ -411,7 +412,7 @@ export function WorkflowQueue({
               void run(async () => {
                 if (scope === "STORE") {
                   const current = await window.bando!.load();
-                  const preview = previewStoreExport(current, chosen);
+                  const preview = await businessCoreCall<StoreExportPreview>("output", "prepare_store_export", { state: current, ids: chosen });
                   if (!(await confirmAction(
                     "매장 발송 " + preview.rows.length + "건의 Excel을 작성할까요? 실제 포장과 택배 발송은 별도로 확인합니다."
                   ))) return;
@@ -424,7 +425,8 @@ export function WorkflowQueue({
                   if (!savedPath) return;
                   try {
                     const latest = await window.bando!.load();
-                    const result = recordStoreExport(latest, preview, savedPath);
+                    const fresh = await businessCoreCall<StoreExportPreview>("output", "prepare_store_export", { state: latest, ids: preview.ids });
+                     const result = recordStoreExportPrepared(latest, preview, savedPath, fresh);
                     await onSave(result.next);
                     setSelected([]);
                     onNotice("매장 발송 " + preview.rows.length +
@@ -436,7 +438,7 @@ export function WorkflowQueue({
                   return;
                 }
                 const current = await window.bando!.load();
-                const preview = previewFactoryExport(current, chosen);
+                const preview = await businessCoreCall<FactoryExportPreview>("output", "prepare_factory_export", { state: current, ids: chosen });
                 if (!(await confirmAction(
                   "공장 발송 " + preview.rows.length + "건의 로젠택배 Excel을 작성할까요? 저장 후 실제 공장 전달은 별도로 확인합니다."
                 ))) return;
@@ -448,7 +450,8 @@ export function WorkflowQueue({
                 let savedExportId: string;
                 try {
                   const latest = await window.bando!.load();
-                  const result = recordFactoryExport(latest, preview, savedPath);
+                  const fresh = await businessCoreCall<FactoryExportPreview>("output", "prepare_factory_export", { state: latest, ids: preview.ids });
+                   const result = recordFactoryExportPrepared(latest, preview, savedPath, fresh);
                   await onSave(result.next);
                   savedExportId = result.exportId;
                   setSelected([]);
