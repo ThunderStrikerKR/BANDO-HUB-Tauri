@@ -68,7 +68,7 @@ fn category_ids(state:&Value,major:&str,minor:&str)->HashSet<String>{
     let cats=cats_with_roots(state);
     let selected=cats.iter().filter(|c|if !minor.is_empty(){
         field(c,"id")==minor
-    }else{field(c,"id")==major||parent_id(c)==major}).collect::<Vec<_>>();
+    }else{field(c,"id")==major||(!major.is_empty()&&parent_id(c)==major)}).collect::<Vec<_>>();
     let mut ids=descendants(&cats,if minor.is_empty(){major}else{minor});
     for c in &selected{ids.insert(field(c,"id").to_owned());}
     for c in selected{
