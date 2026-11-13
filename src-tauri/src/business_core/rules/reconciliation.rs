@@ -42,7 +42,7 @@ fn party<'a>(state:&'a Value,order:&'a Value)->Option<&'a Value> {
     find_by_id(field(state,"clients"),str_field(order,"clientId"))
         .or_else(||order.get("clientSnapshot"))
 }
-fn sender_for(state:&Value,order:&Value)->Value {
+pub(super) fn sender_for(state:&Value,order:&Value)->Value {
     if has_value(field(order,"senderSnapshot")) {
         return field(order,"senderSnapshot").clone();
     }
@@ -117,7 +117,7 @@ fn downgrade(state:&mut Value,audit:&mut Audit<'_>,index:usize,to:i64,reason:&st
     audit.emit(state,"재검증 필요",&[ship_id],&group_id,
         Some(json!(before)),Some(json!(to)),Some(reason),"시스템")
 }
-fn billing(state:&Value,index:usize)->Result<String,String> {
+pub(super) fn billing(state:&Value,index:usize)->Result<String,String> {
     let ship=&state["workflow"]["shipments"][index];
     let group_id=str_field(ship,"groupId");
     let group=find_by_id(field(&state["workflow"],"groups"),group_id)
