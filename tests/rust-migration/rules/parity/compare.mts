@@ -18,7 +18,7 @@ import {
   combinationCurrent,
 } from "../../../../src/shipping.ts";
 import { shipmentTotals, validateWorkflow, reconcileWorkflow } from "../../../../src/workflow.ts";
-import { orderIssues } from "../../../../src/validation.ts";
+import { orderIssues, approveMissingQuantity, pendingIssue } from "../../../../src/validation.ts";
 
 const root=resolve(dirname(fileURLToPath(import.meta.url)),"../../../..");
 const now="2026-11-13T09:00:00+09:00";
@@ -287,6 +287,42 @@ const issueAlias:any=copy(order);
 issueAlias.recipients[0].items[0].match={kind:"COMMON_ALIAS",aliasId:"alias-1"};
 add("order issues common alias auto applied","order_issues",{order:issueAlias},
   ()=>({issues:orderIssues(issueAlias)}));
+
+
+function frozenDate<T>(callback:()=>T):T {
+  const original=globalThis.Date;
+  const RealDate=original;
+  class FixedDate extends RealDate {
+    constructor(...args:any[]) {
+      super(args.length?args[0]:now);
+    }
+    static now(){return new RealDate(now).getTime();}
+  }
+  (globalThis as any).Date=FixedDate;
+  try{return callback();}
+  finally{(globalThis as any).Date=original;}
+}
+const approvalOrder:any=copy(order);
+approvalOrder.recipients[0].items[0].quantity=null;
+approvalOrder.recipients[0].items[0].quantityConfirmed=false;
+add("approve missing quantity explicit actor","apply_issue_action",{
+  action:"approve_missing_quantity",order:approvalOrder,
+  recipientId:"r1",itemId:"item1",actor:"검증직원",now
+},()=>({order:frozenDate(()=>approveMissingQuantity(approvalOrder,"r1","item1","검증직원"))}));
+const ambiguousApproval:any=copy(approvalOrder);
+ambiguousApproval.recipients[0].items[0].issues=["여러 모델 가능"];
+add("reject ambiguous quantity approval","apply_issue_action",{
+  action:"approve_missing_quantity",order:ambiguousApproval,
+  recipientId:"r1",itemId:"item1",actor:"검증직원",now
+},()=>({order:approveMissingQuantity(ambiguousApproval,"r1","item1","검증직원")}));
+add("customer question issue decision","apply_issue_action",{
+  action:"pending_issue",order:issueMissingName,
+  issueId:"issue:o1:r1:recipient:NAME",actor:"검증직원",now
+},()=>({order:frozenDate(()=>pendingIssue(
+  issueMissingName,"issue:o1:r1:recipient:NAME","검증직원"))}));
+add("nonexistent issue is not recorded","apply_issue_action",{
+  action:"pending_issue",order,issueId:"absent",actor:"검증직원",now
+},()=>({order:pendingIssue(order as any,"absent","검증직원")}));
 
 function normalized(v:unknown):string {
   if(Array.isArray(v))return "["+v.map(normalized).join(",")+"]";
