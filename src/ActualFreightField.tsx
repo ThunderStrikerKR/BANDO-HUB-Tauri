@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { actualFreightOf, recordActualFreight } from "./actual-freight";
+import { actualFreightOf } from "./actual-freight";
+import { nativeRecordActualFreight } from "./orders/native-rules";
 import { usePageLeaveGuard } from "./shared/page-leave";
 import { Field, MoneyInput } from "./ui";
 import type { Origin, Price, State } from "./types";
@@ -42,7 +43,7 @@ export function ActualFreightField({
     if (value === saved) return true;
     setBusy(true);
     try {
-      await onSave(recordActualFreight(state, shipmentId, origin, value));
+      await onSave(await nativeRecordActualFreight(state, shipmentId, origin, value));
       onDraftSaved?.();
       setError("");
       return true;

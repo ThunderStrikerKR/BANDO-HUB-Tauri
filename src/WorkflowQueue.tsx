@@ -5,7 +5,8 @@ import { ManagementTable } from "./ui/ManagementTable";
 import { ManagementSearch } from "./ui/ManagementSearch";
 import { FactoryReplyImport } from "./FactoryReplyImport";
 import { ActualFreightField } from "./ActualFreightField";
-import { actualFreightOf, recordActualFreight } from "./actual-freight";
+import { actualFreightOf } from "./actual-freight";
+import { nativeRecordActualFreight } from "./orders/native-rules";
 import { requestPageLeave, usePageLeaveGuard } from "./shared/page-leave";
 import { createFactoryWorkbook, recordFactoryExportPrepared, type FactoryExportPreview } from "./factory-export";
 import { createStoreWorkbook, recordStoreExportPrepared, type StoreExportPreview } from "./store-export";
@@ -51,7 +52,7 @@ export function WorkflowQueue({
     try {
       let latest = await window.bando!.load();
       for (const { shipmentId, origin, value } of pendingFreight)
-        latest = recordActualFreight(latest, shipmentId, origin, value);
+        latest = await nativeRecordActualFreight(latest, shipmentId, origin, value);
       await onSave(latest);
       setFreightDrafts({});
       return true;

@@ -3,7 +3,7 @@
  * These functions never write SQLite or silently modify the supplied order.
  */
 import { businessCoreCall } from "../tauri-bridge";
-import type { Client, Order, State } from "../types";
+import type { Client, Order, Origin, Price, State } from "../types";
 
 export async function nativeRepriceEditedOrder(
   order: Order,
@@ -58,4 +58,22 @@ export async function nativeReconcileWorkflow(
     "rules", "validate_workflow", { state: next, before: state },
   );
   return next;
+}
+
+/** Persist a staff-approved actual freight amount using Rust's audited
+ * shipment operation. The caller still commits exactly once via SQLite.
+ */
+export async function nativeRecordActualFreight(
+  state: State, shipmentId: string, origin: Origin, value: Price,
+): Promise<State> {
+  const { state: updated } = await businessCoreCall<{ state: State }>(
+    "rules", "apply_workflow_action", {
+      action: "record_actual_freight",
+      state, shipmentId, origin, value,
+      now: new Date().toISOString(),
+      eventId: crypto.randomUUID(),
+      actor: state.settings.operatorName || "직원",
+    },
+  );
+  return updated;
 }
