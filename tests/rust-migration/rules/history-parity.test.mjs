@@ -5,6 +5,7 @@ import {spawnSync} from "node:child_process";
 import {fileURLToPath} from "node:url";
 import {tsImport} from "tsx/esm/api";
 const {orderHistory,orderHistoryStatus}=await tsImport("../../../src/app/order-history.ts",import.meta.url);
+const {dailySettlement}=await tsImport("../../../src/app/settlement-report.ts",import.meta.url);
 const manifest=fileURLToPath(new URL("./Cargo.toml",import.meta.url));
 const root=fileURLToPath(new URL("../../../",import.meta.url));
 const clone=x=>structuredClone(x);
@@ -135,4 +136,41 @@ test("original TS order history and compiled Rust match every whole JSON result"
   }
   if(diff.length)console.error(JSON.stringify({count:cases.length,diff:diff.slice(0,8)},null,2));
   assert.equal(diff.length,0,String(diff.length)+" of "+cases.length+" TS/Rust history cases differ");
+});
+
+
+test("same Rust history projections feed Rust settlement with full TS parity",()=>{
+  const candidates=cases.filter(c=>c.operation==="list_order_history");
+  const date="2026-11-13";
+  const requests=[],expectations=[];
+  for(const caseData of candidates) {
+    try {
+      const state=caseData.payload.state;
+      const rows=orderHistory(state,"",date);
+      requests.push({operation:"prepare_settlement",payload:{
+        state,date,historyRows:rows,
+      }});
+      expectations.push({name:caseData.name,expected:capture(()=>
+        dailySettlement(state,date,rows))});
+    }catch{
+      // Broken linkage is already checked by the history parity cases.
+    }
+  }
+  const outputManifest=fileURLToPath(new URL("../output/Cargo.toml",import.meta.url));
+  const process=spawnSync("cargo",["run","--quiet","--manifest-path",outputManifest,
+    "--bin","parity_runner"],{cwd:root,encoding:"utf8",
+    input:JSON.stringify(requests),timeout:900000,maxBuffer:32*1024*1024});
+  if(process.error)throw process.error;
+  assert.equal(process.status,0,process.stderr);
+  const actual=JSON.parse(process.stdout);
+  assert.equal(actual.length,requests.length);
+  const errors=[];
+  for(let i=0;i<actual.length;i++){
+    try{assert.deepEqual(actual[i],expectations[i].expected)}
+    catch{errors.push({name:expectations[i].name,ts:expectations[i].expected,rust:actual[i]})}
+  }
+  if(errors.length)console.error(JSON.stringify({cases:requests.length,
+    errors:errors.slice(0,8)},null,2));
+  assert.equal(errors.length,0,String(errors.length)+" of "+requests.length+
+    " TS/Rust end-to-end settlement scenarios differ");
 });
