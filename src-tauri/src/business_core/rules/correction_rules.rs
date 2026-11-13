@@ -117,13 +117,14 @@ pub(super) fn apply(payload:&Value)->Result<Value,String>{
             if existing{return Ok(json!({"state":state}));}
             let request_id=id(payload,0)?.to_string();
             let now=required_str(payload,"now")?;
+            let record=json!({
+                "id":request_id,"shipmentId":sid,
+                "orderId":str_field(order,"id"),
+                "at":now,"actor":actor(&state),"text":"배송 정보 정정 요청",
+                "beforeRecipient":old,"afterRecipient":after
+            });
             state["workflow"]["changeRequests"].as_array_mut()
-                .ok_or("정정 요청 목록 누락")?.push(json!({
-                    "id":request_id,"shipmentId":sid,
-                    "orderId":str_field(order,"id"),
-                    "at":now,"actor":actor(&state),"text":"배송 정보 정정 요청",
-                    "beforeRecipient":old,"afterRecipient":after
-                }));
+                .ok_or("정정 요청 목록 누락")?.push(record);
             log_status(&mut state,payload,1,&request_id,sid,"REGISTERED")?;
         }
         "copied_correction"=>{
