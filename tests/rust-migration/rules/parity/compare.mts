@@ -466,6 +466,95 @@ wfCase("multiple recipients same group",s=>{
   s.workflow.shipments.push(secondShip);
 },[1,2,4]);
 
+
+wfCase("explicit sender raw text",s=>{
+  s.orders[0].analysisRaw=[
+    "발주 번호 001",
+    "송하인: 별도 대리점",
+    "연락처: 010-2345-6789",
+    "송하인주소: 서울시 중구 가상길 15"
+  ].join("\n");
+});
+wfCase("explicit sender without address or phone",s=>{
+  s.orders[0].raw="보내는 분: 가상 발송업체";
+});
+wfCase("manual account selected and invalid",s=>{
+  s.orders[0].accountMode="MANUAL";
+  s.orders[0].accountId="not-an-account";
+});
+wfCase("brand-only BANDOMALL account selection",s=>{
+  s.clients[0].preferredAccountId="";
+  s.settings.brandAccounts={BANDOMALL:"mall-account",BANDOSTAND:"account-1"};
+  s.settings.accounts.push({id:"mall-account",bank:"가상은행2",
+    number:"234-567",holder:"쇼핑몰"});
+  s.products[0].catalog="BANDOMALL";
+});
+wfCase("prepaid partially paid after notice",s=>{
+  s.clients[0].payment="PREPAID";
+  s.workflow.shipments[0].step=3;
+  s.workflow.payments.push({id:"paid-1",dealerId:"dealer-1",
+    account:copy(s.settings.accounts[0]),amount:20000,
+    allocations:[{shipmentId:"shipment:o1:r1",amount:20000}]});
+});
+wfCase("prepaid confirmation intact",s=>{
+  s.clients[0].payment="PREPAID";
+  s.workflow.shipments[0].step=3;
+  s.workflow.confirmations.push({id:"confirmation-1",groupId:"group:o1",
+    dealerId:"dealer-1",shipmentIds:["shipment:o1:r1"],
+    amount:70400,announcedAccount:copy(s.settings.accounts[0]),
+    amounts:{"shipment:o1:r1":70400},
+    allocations:[{shipmentId:"shipment:o1:r1",amount:70400}]});
+});
+wfCase("prepaid confirmation recheck required",s=>{
+  s.clients[0].payment="PREPAID";
+  s.workflow.shipments[0].step=3;
+  s.workflow.confirmations.push({id:"confirmation-1",groupId:"group:o1",
+    dealerId:"dealer-1",shipmentIds:["shipment:o1:r1"],
+    amount:70400,announcedAccount:copy(s.settings.accounts[0]),
+    amounts:{"shipment:o1:r1":70400},
+    allocations:[{shipmentId:"shipment:o1:r1",amount:70400}]});
+  s.workflow.events.push({id:"event-recheck",action:"입금 승인 재확인 필요",
+    before:"confirmation-1",shipmentIds:["shipment:o1:r1"]});
+});
+wfCase("approved staff issue has pending customer confirmation",s=>{
+  s.orders[0].recipients[0].name="";
+  s.orders[0].issueResolutions={
+    "issue:o1:r1:recipient:NAME":{
+      resolution:"PENDING_CUSTOMER",resolutionSource:"직원",
+      evidence:JSON.stringify(""),updatedAt:now
+    }
+  };
+});
+wfCase("confirmed order in separated shipment groups",s=>{
+  s.orders[0].confirmedAt=now;
+  const second=copy(s.orders[0].recipients[0]);
+  second.id="r2";second.name="";
+  second.items[0].id="item2";second.items[0].productId="missing-p";
+  s.orders[0].recipients.push(second);
+  // Only r1 belongs to the currently checked group.
+});
+wfCase("historical parent variant mismatch",s=>{
+  s.products[0].sourceProductId="legacy-parent";
+  s.productMappings={"legacy-parent|wrong-v":"p1"};
+  s.orders[0].recipients[0].items[0].productId="legacy-parent";
+  s.orders[0].recipients[0].items[0].variantId="wrong-v";
+});
+wfCase("product marked as sale preparation",s=>{
+  s.products[0].saleStatus="판매준비중";
+});
+wfCase("product active false",s=>{
+  s.products[0].active=false;
+});
+wfCase("multiple freight origins with missing charge",s=>{
+  const store=copy(s.orders[0].recipients[0].items[0]);
+  store.id="store-item";store.origin="STORE";
+  s.orders[0].recipients[0].items.push(store);
+  s.workflow.shipments[0].charges.STORE=null;
+});
+wfCase("unknown quantity but freight already entered",s=>{
+  s.orders[0].recipients[0].items[0].quantity=null;
+  s.workflow.shipments[0].charges={FACTORY:4000};
+});
 function normalized(v:unknown):string {
   if(Array.isArray(v))return "["+v.map(normalized).join(",")+"]";
   if(v&&typeof v==="object") {
