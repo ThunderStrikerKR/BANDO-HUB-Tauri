@@ -94,7 +94,9 @@ pub(super) fn recommend(order: &Value, state: &Value) -> Result<Value, String> {
                 let variant = field(item,"variantId").as_str().unwrap_or("?");
                 let key = format!("{product}@{variant}");
                 let quantity = field(item,"quantity").as_i64().unwrap_or(0);
-                *grouped.entry(key).or_default() += quantity;
+                let current = grouped.entry(key).or_default();
+                *current = current.checked_add(quantity)
+                    .ok_or_else(|| "수량 합계를 확인하세요.".to_string())?;
             }
             let key = format!("{}|{}",origin,grouped.iter()
                 .map(|(name, quantity)| format!("{name}:{quantity}"))
@@ -156,7 +158,8 @@ pub(super) fn recommend(order: &Value, state: &Value) -> Result<Value, String> {
                     let mut reason = String::new();
                     for (_key, group_items, rule, group_name) in &by_group {
                         let q = group_items.iter().filter_map(|i| field(i,"quantity").as_i64())
-                            .sum::<i64>();
+                            .try_fold(0_i64, |sum, n| sum.checked_add(n))
+                            .unwrap_or(i64::MAX);
                         if group_items.iter().any(|i| field(i,"quantity").as_i64()
                             .is_none_or(|n| n == 0)) {
                             reason = "수량 확인 필요".into(); break;
