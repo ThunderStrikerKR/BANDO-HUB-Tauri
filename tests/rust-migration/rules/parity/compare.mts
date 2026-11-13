@@ -23,7 +23,7 @@ import { recordActualFreight } from "../../../../src/actual-freight.ts";
 import { deleteGroup, restoreGroup } from "../../../../src/group-trash.ts";
 import { correctionStatus, requestCorrection, copiedCorrection, confirmCorrection, markFactoryDelivered, markCollected, reopenUnsentExport } from "../../../../src/corrections.ts";
 import { orderIssues, approveMissingQuantity, pendingIssue } from "../../../../src/validation.ts";
-import { validateReceptionBoundary } from "../../../../src/orders/reception.ts";
+import { validateReceptionBoundary, newReception, replaceReception, persistedReceptionState } from "../../../../src/orders/reception.ts";
 import { companyClient, companyParty } from "../../../../src/order-types.ts";
 import { explicitSender } from "../../../../src/explicit-sender.ts";
 
@@ -2546,6 +2546,85 @@ correctionCase("reopen when store excel already exported blocked","reopen_unsent
 correctionCase("reopen after delivery blocked","reopen_unsent_export",
   s=>{factoryExport(s);s.workflow.shipments[0].delivery={at:now};},
   ()=>({}),s=>reopenUnsentExport(s,"shipment:o1:r1"),false);
+
+
+// Source reception preview handling must never silently persist a newly
+// created unconfirmed order as a side effect of editing settings/catalog.
+function receptionOperation(name:string,action:string,input:Record<string,unknown>,
+  baseline:()=>unknown,success=true) {
+  add("reception operation: "+name,"apply_reception_action",{action,...input},baseline);
+  cases[cases.length-1].expectedOk=success;
+}
+receptionOperation("new AGENCY draft","new_reception",{
+  id:"draft-r-1",now:actionNow,clientId:"dealer-1",orderType:"AGENCY"
+},()=>({order:deterministicIds(["draft-r-1"],()=>
+  newReception("dealer-1","AGENCY"))}));
+receptionOperation("new RETAIL draft","new_reception",{
+  id:"draft-r-2",now:actionNow,clientId:"",orderType:"RETAIL"
+},()=>({order:deterministicIds(["draft-r-2"],()=>newReception("","RETAIL"))}));
+receptionOperation("replace unconfirmed draft retains identity","replace_reception",{
+  order:{...copy(order),receptionVersion:1},raw:"새 발주 원문",now:actionNow
+},()=>({order:deterministicIds(["replacement-internal"],()=>replaceReception(
+  {...copy(order),receptionVersion:1} as any,"새 발주 원문"))}));
+receptionOperation("replace blank text drops dealer link","replace_reception",{
+  order:{...copy(order),receptionVersion:1,clientSnapshot:copy(client)},raw:"   ",now:actionNow
+},()=>({order:deterministicIds(["replacement-internal"],()=>replaceReception(
+  {...copy(order),receptionVersion:1,clientSnapshot:copy(client)} as any,"   "))}));
+receptionOperation("replace confirmed raw blocked","replace_reception",{
+  order:{...copy(order),confirmedAt:now},raw:"교체할 수 없음",now:actionNow
+},()=>({order:replaceReception({...copy(order),confirmedAt:now} as any,
+  "교체할 수 없음")}),false);
+receptionOperation("replace very long raw blocked","replace_reception",{
+  order:copy(order),raw:"가".repeat(100001),now:actionNow
+},()=>({order:replaceReception(copy(order) as any,"가".repeat(100001))}),false);
+function draftFixture(mode:"normal"|"payment"|"excel"|"confirmation"|"old"|"confirmed"|"two"){
+  const before:any=copy(baseState);
+  const proposed:any=copy(before);
+  if(mode==="old"){
+    before.orders.push({...copy(order),id:"draft-1",receptionVersion:1});
+  }
+  const draft:any={...copy(order),id:"draft-1",receptionVersion:1,
+    clientId:"dealer-1",status:"RECEIVED"};
+  if(mode==="confirmed")draft.confirmedAt=actionNow;
+  proposed.orders.push(draft);
+  proposed.queue.push("draft-1");
+  const src:any=copy(workflow.sources[0]);
+  src.id="source:draft-1";src.orderId="draft-1";
+  proposed.workflow.sources.push(src);
+  const group:any=copy(workflow.groups[0]);
+  group.id="group:draft-1";group.sourceId=src.id;
+  proposed.workflow.groups.push(group);
+  const ship:any=copy(workflow.shipments[0]);
+  ship.id="shipment:draft-1:r1";ship.orderId="draft-1";
+  ship.sourceId=src.id;ship.groupId=group.id;
+  proposed.workflow.shipments.push(ship);
+  proposed.workflow.events.push({id:"draft-event",action:"주문 확인 완료",
+    groupId:group.id,shipmentIds:[ship.id]});
+  if(mode==="two"){
+    const another={...copy(draft),id:"draft-2"};
+    proposed.orders.push(another);proposed.queue.push("draft-2");
+  }
+  if(mode==="excel")
+    proposed.workflow.queue.push({id:"queued-draft",shipmentId:ship.id,
+      origin:"FACTORY",status:"QUEUED",snapshot:{}});
+  if(mode==="payment")
+    proposed.workflow.payments.push({id:"paid-draft",amount:1000,
+      allocations:[{shipmentId:ship.id,amount:1000}]});
+  if(mode==="confirmation")
+    proposed.workflow.confirmations.push({id:"confirm-draft",
+      shipmentIds:[ship.id],allocations:[]});
+  return {before,state:proposed};
+}
+for(const mode of ["normal","payment","excel","confirmation","old","confirmed","two"] as const){
+  const input=draftFixture(mode);
+  receptionOperation("filter preview "+mode,"persisted_reception_state",input,
+    ()=>({state:persistedReceptionState(input.before as any,input.state as any)}),
+    !["payment","excel","confirmation"].includes(mode));
+}
+const noDraft=copy(baseState);
+receptionOperation("no draft is unchanged","persisted_reception_state",{
+  before:noDraft,state:copy(noDraft)
+},()=>({state:persistedReceptionState(noDraft as any,copy(noDraft) as any)}));
 
 function normalized(v:unknown):string {
   if(Array.isArray(v))return "["+v.map(normalized).join(",")+"]";
