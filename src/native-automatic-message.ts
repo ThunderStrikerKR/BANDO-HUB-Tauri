@@ -36,3 +36,13 @@ export async function nativePaymentWasCopied(
   );
   return result.copied;
 }
+
+/** Apply the user's optional greeting to the final (possibly edited) text. */
+export async function nativeDecorateCopyText(
+  text: string, includeGreeting: boolean,
+): Promise<string> {
+  const result = await businessCoreCall<{ text: string }>(
+    "output", "decorate_automatic_copy", { text, includeGreeting },
+  );
+  return result.text;
+}
