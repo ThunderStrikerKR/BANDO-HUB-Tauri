@@ -217,9 +217,26 @@ export function useAppModel() {
     // membership. A result for an older draft/revision must not be committed.
     const sourceState = state;
     const sourceDraft = draft;
+    let preparedDraft = sourceDraft;
+    // A user may press Save before the pending native tariff calculation
+    // finishes. Never persist an interim empty freight/version marker.
+    if (sourceDraft.shippingMode === "AUTO" &&
+        sourceDraft.shippingVersion === "" && sourceDraft.shippingFee === null) {
+      const freight = await businessCoreCall<{ total: number | null; version: string }>(
+        "rules", "calculate_shipping", { order: sourceDraft, state: sourceState },
+      );
+      if (latestSaveInputs.current.state !== sourceState ||
+          latestSaveInputs.current.draft !== sourceDraft)
+        throw Error("운임 계산 중 주문이 변경되었습니다. 확인 후 다시 저장하세요.");
+      preparedDraft = {
+        ...sourceDraft,
+        shippingFee: c.shippingFeeExcluded ? 0 : freight.total,
+        shippingVersion: freight.version,
+      };
+    }
     const result = await businessCoreCall<{ state: State; order: Order }>(
       "rules", "save_order", {
-        state: sourceState, order: sourceDraft, client: c,
+        state: sourceState, order: preparedDraft, client: c,
         mode, now: new Date().toISOString(),
       },
     );
@@ -227,7 +244,9 @@ export function useAppModel() {
     if (current.state !== sourceState || current.draft !== sourceDraft)
       throw Error("주문 정보가 변경되었습니다. 최신 내용을 확인한 뒤 다시 저장하세요.");
     await commit(result.state);
-    setDraft(result.order);
+    // A newer draft may have opened while the native SQLite transaction
+    // completed. A successful save must not replace that newer draft.
+    setDraft((currentDraft) => currentDraft === sourceDraft ? result.order : currentDraft);
     setNotice(mode === "queue" ? "공장 목록에 추가했습니다." : "주문을 저장했습니다.");
   };
   // A new reception cannot be saved until the employee confirms the order.
