@@ -147,6 +147,21 @@ function normalized(v:unknown):string {
   }
   return JSON.stringify(v);
 }
+function differentialPaths(a:unknown,b:unknown,path="$",limit=50):string[] {
+  if(normalized(a)===normalized(b))return [];
+  if(a===null||b===null||typeof a!=="object"||typeof b!=="object"||
+      Array.isArray(a)!==Array.isArray(b))return [path];
+  const aa=a as Record<string,unknown>,bb=b as Record<string,unknown>;
+  const keys=new Set([...Object.keys(aa),...Object.keys(bb)]);
+  const changed:string[]=[];
+  for(const key of keys){
+    if(changed.length>=limit)break;
+    const child=Array.isArray(a)?path+"["+key+"]":path+"."+key;
+    if(!(key in aa)||!(key in bb))changed.push(child+" (missing)");
+    else changed.push(...differentialPaths(aa[key],bb[key],child,limit-changed.length));
+  }
+  return changed;
+}
 function outcome(run:()=>unknown) {
   try {return {ok:true,value:run()};}
   catch(error) {return {ok:false,error:error instanceof Error?error.message:String(error)};}
@@ -181,6 +196,7 @@ for(let i=0;i<cases.length;i++){
     console.log("PARITY PASS",c.name);passed++;
   } else {
     console.error("PARITY FAIL",c.name);
+    console.error("  DIFFERENT PATHS",differentialPaths(ts,rust).join(", "));
     console.error("  TS  ",normalized(ts).slice(0,2000));
     console.error("  Rust",normalized(rust).slice(0,2000));
   }
