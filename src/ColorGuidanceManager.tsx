@@ -4,7 +4,7 @@ import { refreshAfterCommittedSave } from "./shared/committed-state";
 import { sameValue } from "./shared/draft";
 import { confirmAction } from "./dialogs";
 import { uid } from "./domain";
-import { validateModelGroups } from "./model-groups";
+import { businessCoreCall } from "./tauri-bridge";
 import { colorLabel, registeredProducts } from "./product-models";
 import type { State } from "./types";
 import { Field } from "./ui";
@@ -61,12 +61,12 @@ export function ColorGuidanceManager({state,onRefresh,query="",onQueryChange}: {
     if(busy||!unsaved)return !unsaved && !busy;
     setBusy(true);setStatus("");
     try{
-      validateModelGroups(draft);
+      await businessCoreCall("catalog_clients","validate_model_groups",{state:draft});
       if(!window.bando?.patchSettings)throw Error("설정 저장 기능을 사용할 수 없습니다.");
       const latest=await window.bando.load();
       const next=structuredClone(latest);
       next.settings.colorGuidanceGroups=structuredClone(draft.settings.colorGuidanceGroups??{});
-      validateModelGroups(next);
+      await businessCoreCall("catalog_clients","validate_model_groups",{state:next});
       await window.bando.backup();
       const updated=await window.bando.patchSettings(
         {colorGuidanceGroups:draft.settings.colorGuidanceGroups??{}},
