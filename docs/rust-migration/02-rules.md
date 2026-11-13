@@ -1,5 +1,103 @@
 # TSBH Rust migration — session 2/3: Price, freight and workflow rules
 
+## Session 2 continuation: applyOrderRawEdit Rust migration — 2026-11-13
+
+**Latest verified checkpoint**
+- Branch: `migration/02-rules`
+- Source and test commit: `2e26dc1d538b3acb2a8410b2b11bcb98491bebbc`
+- CI: https://github.com/ThunderStrikerKR/TSBH/actions/runs/43371378641
+- **Original TypeScript vs compiled Rust: 259 / 259 parity fixtures PASS, 0 mismatches**
+- **Independent Rust regression: 47 / 47 PASS**
+- **Windows/Tauri/SQLite: SKIPPED/NOT VERIFIED**
+- 19 additional direct comparison fixtures cover raw order edits; the prior
+  checkpoint was 240 / 240. For the raw-edit fixtures, expected successful
+  TypeScript outcomes and expected rejection outcomes were separately
+  asserted. Equal errors without the intended result do not count as PASS.
+- All writes remained in the session-2 ownership paths.
+
+### Implemented pure Rust boundary
+
+`execute("apply_order_raw_edit", payload)` is implemented in
+`src-tauri/src/business_core/rules/order_mutations.rs`, registered in
+`src-tauri/src/business_core/rules/mod.rs`.
+
+Payload contract:
+
+    {
+      "state": State,
+      "orderId": "o1",
+      "raw": "edited original source",
+      "parsedRecipients": [/* output from the existing session-1 parser */],
+      "strictIdentity": false,
+      "actor": "staff member",
+      "now": "2026-11-13T05:00:00.000Z",
+      "eventIds": ["event UUID 1", "event UUID 2", "..."]
+    }
+
+The function returns `{"state": State}`; errors return the original Korean
+TypeScript business-rule message. It is a **pure in-memory JSON mutation**;
+the caller must persist atomically and retain native reception validation.
+
+The original `applyOrderRawEdit` internally calls `parseOrder`; this port
+does **not** implement another parser. It accepts the exact
+`parseOrder(raw, selectedClient, state)` output from the session-1
+recognition owner. This is an **integration precondition**, not an
+authorization to synthesize or trust arbitrary `parsedRecipients`. Session 3
+must pass authenticated output from the original equivalent parser, verify
+the raw/context used to generate it, and avoid applying an unrelated
+parsed recipient list.
+
+Exact business-rule paths covered:
+- Reject nonexistent/deleted orders, blank raw edits, and attempts to
+  re-analyze EXPORTED/STORE_SENT or delivered shipments. Identical raw
+  returns an unmodified clone without requiring parser input or time.
+- Reassign recipient identity by first matching phone/mobile, then name,
+  finally (unless strictIdentity) original index; do not assign one prior
+  recipient to more than one new recipient.
+- Preserve receipt recipient VAT settings and old item ID on matching
+  original raw/product+variant; apply `mergeParsedItem` rules for staff
+  manual-confirmation evidence and changed quantity source spans; update
+  source-span target IDs for the preserved identities.
+- Reject paid-recipient reidentification when both name and mobile change;
+  retain previous payment records and all existing shipment IDs.
+- Cancel QUEUED exports, clear transferred flags, append downgrade/recheck
+  events, invalidate existing payment confirmations with `입금 승인 재확인 필요`,
+  reset order status/price lock and copy-message edit fields, append the
+  old original text to `rawHistory`, append `원문 편집` event.
+- Call the already-existing Rust `reconciliation::reconcile` after the
+  raw-edit mutation, preserving ordering of all generated audit IDs.
+- The input supplies UTC ISO clock and an ordered pool of event IDs;
+  there is no internal clock, random UUID or SQLite write.
+
+### Direct parity fixture coverage
+
+`tests/rust-migration/rules/parity/compare.mts` uses the **real TypeScript
+parseOrder** output as the Rust `parsedRecipients` input and replays the
+same UUID stream and time in the **real TypeScript applyOrderRawEdit**
+function. Compares entire JSON return values, including event order, ID
+links, source spans, billing information and rechecks.
+
+New fixtures: no-op raw, blank raw, deleted order, EXPORTED/STORE_SENT
+refusal, already delivered order, normal edit, strict matching,
+queued/cancelled Excel entries, paid recipient identity, retained
+mobile/name, staff-confirmed items and VAT overrides, confirmed orders,
+two previous recipient links with payment, and step-3 downgrade.
+
+**Scope qualification:** 259 / 259 is selected-input parity, not formal
+exhaustive equivalence. The Rust code depends on an external accurate
+recognition result; final atomic Tauri/SQLite integration and Windows
+execution remain session 3 tasks. Potential untested cases include
+arbitrary parser outputs, cross-group shipment histories, complex source
+evidence serialization and all native reception-boundary exceptions.
+
+**Session-2 work still outstanding beyond this task:**
+`migrateWorkflow`, remaining `validateWorkflow` and
+`validateReceptionBoundary` branches and full historical-payment
+cancellation/revalidation parity. Do not represent the overall migration as
+complete.
+
+---
+
 ## Session 2 continuation: workflowIssues and stageIssues differential parity — 2026-11-13
 
 **Implementation and verified source checkpoint**
@@ -71,7 +169,7 @@ JSON input as the compiled Rust `json_rules` binary. Fixtures include:
 
 **240/240 PASS is a corpus-specific result, not proof of all possible
 inputs or all TypeScript functions.** Remaining blockers outside this task
-include `applyOrderRawEdit`, `migrateWorkflow`, some complete
+include `migrateWorkflow`, some complete
 `validateWorkflow` and `validateReceptionBoundary` conditions, arbitrary
 sender raw-line parsing, unusual JSON key ordering in evidence, and all
 Tauri/SQLite/Windows integration. Session 3 must retain authoritative
