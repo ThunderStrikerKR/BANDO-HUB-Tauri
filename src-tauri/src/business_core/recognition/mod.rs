@@ -205,7 +205,7 @@ fn address_begin(line: &str) -> Option<usize> {
         // parseLegacy.ts detects the province after an optional five-digit
         // postal marker. An address label must not turn (11806) into the
         // beginning of the actual shipping address/source span.
-        let marker=Regex::new(r"^\\(\\d{5}\\)\\s*").expect("postal marker");
+        let marker=Regex::new(r"^\(\d{5}\)\s*").expect("postal marker");
         let skipped=marker.find(&line[m.end()..]).map_or(0,|v|v.end());
         return Some(m.end()+skipped);
     }
