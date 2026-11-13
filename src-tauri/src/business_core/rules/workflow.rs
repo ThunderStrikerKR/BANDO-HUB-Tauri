@@ -54,7 +54,7 @@ fn group_step(state: &Value, group_id: &str) -> Result<i64,String> {
     Ok(ids.iter().filter_map(|i|field(&state["workflow"]["shipments"][*i],"step").as_i64())
         .min().unwrap_or(0))
 }
-fn party<'a>(state: &'a Value, order: &'a Value) -> Option<&'a Value> {
+pub(super) fn party<'a>(state: &'a Value, order: &'a Value) -> Option<&'a Value> {
     if (has_value(field(order,"confirmedAt")) || flag(order,"pricesLocked") ||
         str_field(order,"orderType")=="RETAIL") &&
         has_value(field(order,"clientSnapshot")) {
@@ -71,7 +71,7 @@ fn row_origins(row: &Value) -> Vec<&str> {
     }
     origins
 }
-fn shipment_freight_code<'a>(order: &'a Value, row: &'a Value) -> &'a str {
+pub(super) fn shipment_freight_code<'a>(order: &'a Value, row: &'a Value) -> &'a str {
     if has_value(field(row,"freightCode")) {str_field(row,"freightCode")}
     else {str_field(order,"freightCode")}
 }
@@ -80,7 +80,7 @@ fn shipment_vat(order: &Value, row: &Value) -> bool {
     if let Some(v)=field(row,"vatDefault").as_bool() {return v;}
     flag(order,"applyVat")
 }
-fn fee_total(ship: &Value, row: &Value, order: &Value) -> Option<i64> {
+pub(super) fn fee_total(ship: &Value, row: &Value, order: &Value) -> Option<i64> {
     if shipment_freight_code(order,row)=="020" {return Some(0);}
     let os=row_origins(row);
     if os.is_empty() {return None;}
@@ -199,84 +199,10 @@ fn basic_issues(order:&Value,recipient:&Value,client:&Value) -> Vec<String> {
     }
     issues
 }
-fn stage_issues(state:&Value,group_id:&str,next:i64) -> Result<Vec<String>,String> {
-    let (gi,ids)=group_indices(state,group_id)?;
-    let group=&state["workflow"]["groups"][gi];
-    let mut issues=Vec::new();
-    let mut prepay=false;
-    for si in ids {
-        let ship=&state["workflow"]["shipments"][si];
-        let (_s,oi,ri)=shipment_indices(state,str_field(ship,"id"))?;
-        let order=&state["orders"][oi];
-        let row=&order["recipients"][ri];
-        let client=party(state,order).ok_or_else(||"거래처 정보를 확인하세요.".to_string())?;
-        prepay |= str_field(client,"payment")=="PREPAID";
-        if next>=1 {
-            if str_field(order,"clientId").is_empty() && str_field(order,"orderType")!="RETAIL" {
-                issues.push("거래처를 선택하면 단가가 적용됩니다".into());
-            }
-            issues.extend(basic_issues(order,row,client));
-            let sender=field(order,"senderSnapshot");
-            if !has_value(sender) && str_field(order,"orderType")=="AGENCY" {
-                // An explicit sender extracted from the source must be provided
-                // to the stage-1 action, or already present on the order.
-                // This cannot be guessed from a dealer's name.
-            } else if has_value(sender) {
-                if str_field(sender,"name").trim().is_empty() {issues.push("송하인 거래처명을 확인하세요".into());}
-                if str_field(sender,"address").trim().is_empty() {issues.push("송하인 거래처 주소를 확인하세요".into());}
-                if str_field(sender,"phone").trim().is_empty() &&
-                    str_field(sender,"mobile").trim().is_empty() {
-                    issues.push("송하인 거래처 연락처를 확인하세요".into());
-                }
-            }
-            for item in rows(field(row,"items")) {
-                if let Some(p)=find_by_id(field(state,"products"),str_field(item,"productId")) {
-                    if has_value(field(p,"deletedAt")) || has_value(field(p,"supersededBy")) ||
-                        field(p,"active").as_bool()==Some(false) {
-                        issues.push("판매 상태 확인 필요".into());
-                    }
-                }
-            }
-        }
-        if next>=2 && str_field(order,"orderType")!="RETAIL" {
-            if fee_total(ship,row,order).is_none() {
-                issues.push(format!("{}: 배송 운임을 확인하세요",str_field(row,"name")));
-            }
-            if field(&shipment_totals(state,str_field(ship,"id"))?,"total").is_null() {
-                issues.push(format!("{}: 청구액 미확정",str_field(row,"name")));
-            }
-        }
-        if next>=3 && str_field(order,"orderType")!="RETAIL" {
-            if field(ship,"step").as_i64().unwrap_or(0)<2 &&
-                shipment_freight_code(order,row)!="020" {
-                issues.push(format!("{}: 운임 적용 필요",str_field(row,"name")));
-            }
-            let account=account_for(state,group,order,client);
-            if account.is_none_or(|a|["bank","number","holder"].iter().any(|k|
-                str_field(a,k).trim().is_empty())) {
-                issues.push("입금 계좌를 등록 / 선택하세요".into());
-            }
-            if flag(group,"needsNotice") {issues.push("변경된 금액 / 계좌 재안내 필요".into());}
-        }
-        if next>=4 && str_field(order,"orderType")!="RETAIL" {
-            if field(ship,"step").as_i64().unwrap_or(0)<3 {
-                issues.push(format!("{}: 계좌 안내 완료 필요",str_field(row,"name")));
-            }
-            if str_field(client,"payment")=="PREPAID" && !flag(ship,"legacyApproval") {
-                let due=payment_due(state,ship,order,client)?;
-                if due.is_none_or(|v|v>0) {
-                    issues.push(format!("{}: 입금 부족 {}원",str_field(row,"name"),
-                        due.map(|v|v.to_string()).unwrap_or_else(||"확인 필요".into())));
-                }
-            }
-        }
-    }
-    let _=prepay;
-    issues.sort();
-    issues.dedup();
-    Ok(issues)
+fn stage_issues(state:&Value,group_id:&str,next:i64)->Result<Vec<String>,String>{
+    super::workflow_issues::stage_issues(state,group_id,next)
 }
-fn payment_due(state:&Value,ship:&Value,order:&Value,client:&Value)->Result<Option<i64>,String>{
+pub(super) fn payment_due(state:&Value,ship:&Value,order:&Value,client:&Value)->Result<Option<i64>,String>{
     let t=shipment_totals(state,str_field(ship,"id"))?;
     let total=safe(field(&t,"total"));
     let group_id=str_field(ship,"groupId");
