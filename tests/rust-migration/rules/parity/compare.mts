@@ -18,6 +18,7 @@ import {
   combinationCurrent,
 } from "../../../../src/shipping.ts";
 import { shipmentTotals, validateWorkflow, reconcileWorkflow } from "../../../../src/workflow.ts";
+import { orderIssues } from "../../../../src/validation.ts";
 
 const root=resolve(dirname(fileURLToPath(import.meta.url)),"../../../..");
 const now="2026-11-13T09:00:00+09:00";
@@ -241,6 +242,51 @@ staleDecision.orders[0].issueResolutions={
 add("reconciliation resolves obsolete issue decision","reconcile_workflow",{
   state:staleDecision,now,eventIds:[]
 },()=>({state:reconcileWorkflow(staleDecision),emittedEvents:0}));
+
+
+// TypeScript's orderIssues is the UI/approval source, not merely an issue-map
+// snapshot. Compare complete title, stage, resolution, evidence and source span.
+const issueOrder:any=copy(order);
+add("order issues clean input","order_issues",{order:issueOrder},
+  ()=>({issues:orderIssues(issueOrder)}));
+const issueMissingName:any=copy(order);
+issueMissingName.recipients[0].name="";
+add("order issues missing name","order_issues",{order:issueMissingName},
+  ()=>({issues:orderIssues(issueMissingName)}));
+const issueMissingAddress:any=copy(order);
+issueMissingAddress.receptionVersion=1;
+issueMissingAddress.recipients[0].address="가상주소";
+issueMissingAddress.recipients[0].addressStatus="INCOMPLETE";
+add("order issues incomplete address","order_issues",{order:issueMissingAddress},
+  ()=>({issues:orderIssues(issueMissingAddress)}));
+const issueMissingQuantity:any=copy(order);
+issueMissingQuantity.recipients[0].items[0].quantityConfirmed=false;
+issueMissingQuantity.recipients[0].items[0].quantity=null;
+add("order issues missing quantity","order_issues",{order:issueMissingQuantity},
+  ()=>({issues:orderIssues(issueMissingQuantity)}));
+const issueOption:any=copy(order);
+issueOption.recipients[0].items[0].issues=["색상 확인 필요"];
+issueOption.recipients[0].items[0].name="BD 709";
+add("order issues color option confirmation","order_issues",{order:issueOption},
+  ()=>({issues:orderIssues(issueOption)}));
+const issueContact:any=copy(order);
+issueContact.recipients[0].phone="010-123";
+issueContact.recipients[0].mobile="";
+add("order issues phone format detail","order_issues",{order:issueContact},
+  ()=>({issues:orderIssues(issueContact)}));
+const issueCustomerDecision:any=copy(issueMissingName);
+issueCustomerDecision.issueResolutions={
+  "issue:o1:r1:recipient:NAME":{
+    resolution:"PENDING_CUSTOMER",resolutionSource:"직원 확인 요청",
+    evidence:JSON.stringify(""),updatedAt:now
+  }
+};
+add("order issues pending customer decision","order_issues",{order:issueCustomerDecision},
+  ()=>({issues:orderIssues(issueCustomerDecision)}));
+const issueAlias:any=copy(order);
+issueAlias.recipients[0].items[0].match={kind:"COMMON_ALIAS",aliasId:"alias-1"};
+add("order issues common alias auto applied","order_issues",{order:issueAlias},
+  ()=>({issues:orderIssues(issueAlias)}));
 
 function normalized(v:unknown):string {
   if(Array.isArray(v))return "["+v.map(normalized).join(",")+"]";
