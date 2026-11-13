@@ -172,11 +172,18 @@ pub(super) fn validate(state: &Value, before: Option<&Value>) -> Result<(),Strin
                     let old_file_only=flag(old,"fileOnly");
                     let old_delivered=has_value(field(old,"factoryDeliveredAt"));
                     let current_delivered=has_value(field(current,"factoryDeliveredAt"));
+                    let mut metadata_view=current.clone();
+                    if let Some(object)=metadata_view.as_object_mut() {
+                        for key in ["fileOnly","factoryDeliveredAt"] {
+                            if let Some(value)=old.get(key) {
+                                object.insert(key.to_string(),value.clone());
+                            } else {
+                                object.remove(key);
+                            }
+                        }
+                    }
                     let metadata_only=old_file_only && !flag(current,"fileOnly") &&
-                        current_delivered &&
-                        ["id","shipmentId","origin","at","actor","status","snapshot",
-                         "exportId","exportedAt","legacy"].iter().all(|k|
-                            field(old,k)==field(current,k)) &&
+                        current_delivered && metadata_view==*old &&
                         rows(field(w,"events")).iter().any(|e|
                             str_field(e,"action")=="공장 전달 직원 확인" &&
                             rows(field(e,"shipmentIds")).iter()
