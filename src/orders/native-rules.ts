@@ -37,7 +37,7 @@ export async function nativeRepriceEditedOrder(
 
 export async function nativeReconcileWorkflow(
   state: State,
-  draft: Order,
+  draft?: Order,
 ): Promise<State> {
   // Rust reconciliation is deterministic and never reads the system clock
   // or generates IDs itself. Reserve enough candidate IDs for all potential
@@ -51,7 +51,8 @@ export async function nativeReconcileWorkflow(
   const eventIds = Array.from({ length: count }, () => crypto.randomUUID());
   const { state: next } = await businessCoreCall<{ state: State; emittedEvents: number }>(
     "rules", "reconcile_workflow", {
-      state, draft, now: new Date().toISOString(), eventIds,
+      state, ...(draft ? { draft } : {}),
+      now: new Date().toISOString(), eventIds,
     },
   );
   await businessCoreCall<{ valid: boolean }>(
@@ -76,4 +77,41 @@ export async function nativeRecordActualFreight(
     },
   );
   return updated;
+}
+
+/** Stateful workflow transitions use Rust's audited domain reducer. The
+ * caller's onSave still owns the single revision-checked SQLite transaction.
+ */
+export async function nativeApplyWorkflowAction(
+  state: State,
+  action:
+    | "restore_shipment" | "mark_store_sent" | "detach_shipment"
+    | "regroup_shipment" | "undo_group" | "advance_group"
+    | "confirm_group_payment" | "process_group"
+    | "set_group_account" | "set_shipment_freight",
+  args: Record<string, unknown>,
+): Promise<State> {
+  const prepared = action === "mark_store_sent"
+    ? state : await nativeReconcileWorkflow(state);
+  const now = new Date().toISOString();
+  const actor = state.settings.operatorName?.trim() || "직원(이름 미설정)";
+  // Audit IDs are preallocated on the caller side. Only IDs of actually
+  // emitted records are used; never leave a partially changed SQLite state.
+  const auditEventIds = Array.from({ length: 2048 }, () => crypto.randomUUID());
+  const payload = {
+    state: prepared, action, now, actor,
+    eventId: crypto.randomUUID(),
+    auditEventIds,
+    newGroupId: crypto.randomUUID(),
+    confirmationId: crypto.randomUUID(),
+    noticeId: crypto.randomUUID(),
+    ...args,
+  };
+  const result = await businessCoreCall<{ state: State }>(
+    "rules", "apply_workflow_action", payload,
+  );
+  await businessCoreCall<{ valid: boolean }>(
+    "rules", "validate_workflow", { state: result.state, before: state },
+  );
+  return result.state;
 }

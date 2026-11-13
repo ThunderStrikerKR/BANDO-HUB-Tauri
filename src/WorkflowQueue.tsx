@@ -19,7 +19,8 @@ import { internalModel } from "./matching";
 import type { NoticeSink } from "./shared/notices";
 import { useAsyncTask } from "./shared/useAsyncTask";
 import type { Origin, Price, State } from "./types";
-import { markStoreSent, restoreShipment, shipmentContext } from "./workflow";
+import { shipmentContext } from "./workflow";
+import { nativeApplyWorkflowAction } from "./orders/native-rules";
 export function WorkflowQueue({
   state,
   onSave,
@@ -217,7 +218,7 @@ export function WorkflowQueue({
                                     if (!(await confirmAction(
                                       "이 매장 발송 파일의 상품을 실제 발송했나요? 파일 작성만으로 발송 완료 처리하지 않습니다."
                                     ))) return;
-                                    await onSave(markStoreSent(state, q!.id));
+                                    await onSave(await nativeApplyWorkflowAction(state, "mark_store_sent", { queueId: q!.id }));
                                   })}
                                 >
                                   매장 발송 확인
@@ -343,14 +344,14 @@ export function WorkflowQueue({
                         />
                         <button
                           disabled={busy || ctx.order.orderType === "RETAIL"}
-                          onClick={() => void run(() => onSave(restoreShipment(state, ship.id)))}
+                          onClick={() => void run(async () => onSave(await nativeApplyWorkflowAction(state, "restore_shipment", { shipmentId: ship.id })))}
                         >
                           이관 복구
                         </button>
                         {q.origin === "STORE" && (
                           <button
                             disabled={busy}
-                            onClick={() => void run(() => onSave(markStoreSent(state, q.id)))}
+                            onClick={() => void run(async () => onSave(await nativeApplyWorkflowAction(state, "mark_store_sent", { queueId: q.id })))}
                           >
                             매장 발송 확인
                           </button>
