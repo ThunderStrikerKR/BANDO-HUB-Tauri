@@ -178,9 +178,16 @@ pub(super) fn validate(state: &Value, before: Option<&Value>) -> Result<(),Strin
                     }
                 }
                 for origin in ["STORE","FACTORY"] {
-                    let old_freight = field(field(old,"actualFreight"),origin);
-                    let current_freight = field(field(current,"actualFreight"),origin);
-                    if old_freight == current_freight {continue;}
+                    let old_actual=field(old,"actualFreight");
+                    let current_actual=field(current,"actualFreight");
+                    let old_freight = field(old_actual,origin);
+                    let current_freight = field(current_actual,origin);
+                    // TypeScript uses JSON.stringify(undefined) vs
+                    // JSON.stringify(null): an omitted origin differs from
+                    // one explicitly present with null. Treat presence as
+                    // part of the immutable audit value.
+                    if old_actual.get(origin).is_some()==current_actual.get(origin).is_some() &&
+                        old_freight == current_freight {continue;}
                     let old_recipient=shipment_for(old_state,old)?.1;
                     let original_freight=if field(old,"actualFreight").get(origin).is_some() {
                         old_freight
