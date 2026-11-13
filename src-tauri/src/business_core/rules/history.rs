@@ -126,6 +126,13 @@ pub(super) fn list(state:&Value,query:&str,date:&str)->Result<Value,String>{
         let mut parts=Vec::new();
         let mut recipients=Vec::new();
         if !ships.is_empty(){
+            // Original shipmentContext reports one stable linkage error before
+            // pricing when a shipment has no real client or recipient.
+            if client.is_none() || ships.iter().any(|ship|
+                !rows(field(order,"recipients")).iter().any(|r|
+                    str_field(r,"id")==str_field(ship,"recipientId"))) {
+                return Err("배송 건의 발주서 / 수취인 / 거래처 연결을 확인하세요.".into());
+            }
             for ship in &ships{
                 let shipment_id=str_field(ship,"id");
                 parts.push(workflow::shipment_totals(state,shipment_id)?);
@@ -148,7 +155,7 @@ pub(super) fn list(state:&Value,query:&str,date:&str)->Result<Value,String>{
             "vat":component(&parts,"vat"),
             "total":component(&parts,"total")
         });
-        let row=json!({
+        let mut row=json!({
             "order":order,"client":client,"recipients":recipients,
             "total":if ships.is_empty(){
                 field(&billing,"total").clone()
@@ -158,6 +165,10 @@ pub(super) fn list(state:&Value,query:&str,date:&str)->Result<Value,String>{
             "deleted":only_deleted_groups(state,id),
             "status":status(state,id)
         });
+        if client.is_none() {
+            // JSON.stringify(TS history) omits an undefined client key.
+            row.as_object_mut().unwrap().remove("client");
+        }
         result.push(row);
     }
     Ok(json!(result))
