@@ -539,7 +539,14 @@ fn settings_patch(db: State<'_, Database>, changes: Value, expected: Value) -> R
             else { settings.insert(field.clone(), updated.clone()); }
         }
     }
-    if changes.contains_key("colorGuidanceGroups") { validate_color_guidance(&state)?; }
+    if changes.contains_key("colorGuidanceGroups") {
+        // Canonical model-group policy is the same native business engine
+        // used by the editor. Do not reject new SKU-based groups using the
+        // legacy color/price-group validation rules.
+        business_core::catalog_clients::execute(
+            "validate_model_groups", json!({"state":&state})
+        )?;
+    }
     if changes.contains_key("automaticMessageTemplates") { validate_message_templates(&state)?; }
     if changes.contains_key("provisionalProductNotices") { validate_provisional_product_notices(&state)?; }
     if ["accounts", "defaultAccountId", "brandAccounts"].iter().any(|k| changes.contains_key(*k)) {
