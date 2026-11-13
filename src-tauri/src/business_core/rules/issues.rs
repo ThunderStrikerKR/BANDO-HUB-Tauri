@@ -53,17 +53,6 @@ fn valid_address(value:&str)->bool {
     }
     false
 }
-fn normalized_model(name:&str)->String {
-    let mut s=name.trim_start_matches("[가상]").to_string();
-    if name.starts_with("[가상]") {s=s.trim_start().to_string();}
-    if s.len()>=2 && s[..2].eq_ignore_ascii_case("BD") {
-        let suffix=&s[2..];
-        if suffix.chars().next().is_some_and(|c|c.is_whitespace() || c.is_ascii_digit()) {
-            s=suffix.trim_start().to_string();
-        }
-    }
-    s
-}
 pub(super) fn synchronize(order:&mut Value)->Result<(),String>{
     let mut issues=Vec::new();
     let order_view=order.clone();
@@ -166,7 +155,6 @@ pub(super) fn synchronize(order:&mut Value)->Result<(),String>{
                 add(&mut issues,o,Some(row),Some(item),"APPLIED",
                     field(item,"match"),Some("AUTO_APPLIED"),None);
             }
-            let _=normalized_model(str_field(item,"name"));
         }
     }
     let existing=field(o,"issueResolutions");
