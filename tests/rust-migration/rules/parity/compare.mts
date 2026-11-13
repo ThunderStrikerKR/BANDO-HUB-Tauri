@@ -2236,6 +2236,7 @@ wfActionCase("advance valid stage two to account notice","advance_group",
   (ids,s)=>{
     const expected=deterministicIds(ids,()=>advanceGroup(s,WFG,WFA));
     return {...actionProps(ids),noticeId:ids[0],eventId:ids[1],
+      reconcileEventIds:[],
       paymentMessage:expected.workflow.groups[0].notices.at(-1)?.message,
       billingSignature:expected.workflow.shipments[0].billingSignature};
   },
