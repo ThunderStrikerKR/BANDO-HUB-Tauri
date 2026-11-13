@@ -76,7 +76,7 @@ export function MessageWorkspace({
   const disabled = busy || !automatic || !text.trim() ||
     (!request && !!automatic.paymentIssues.length);
   const copy = async (greeting: boolean) => {
-    if (disabled || !gid) return;
+    if (disabled || !gid || !automatic) return;
     setBusy(true);
     try {
       await window.bando!.copy(greeting ? withGreeting(text) : text);
