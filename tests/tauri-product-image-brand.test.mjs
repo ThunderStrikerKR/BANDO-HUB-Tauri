@@ -57,7 +57,7 @@ test("Image and brand fixes keep existing SQLite schema and product references",
   assert.match(manager, /imageOverride: "MANUAL"/);
   assert.match(manager, /imageOverride: "HIDDEN"/);
   const native = read("src-tauri/src/business_core/catalog_clients.rs");
-  assert.match(manager, /"catalog_clients", "upsert_product"/);
+  assert.match(manager, /"catalog_clients", "upsert_product_from_editor"/);
   assert.match(native, /fn validate_product\(/);
   assert.match(native, /fn product_url_ok\(/);
   assert.match(native, /normalized_color\(field\(v, "color"\)\)/);
