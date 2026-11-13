@@ -5,7 +5,7 @@ use std::collections::HashSet;
 use super::{field,find_by_id,flag,has_value,rows,set,str_field};
 use super::workflow as w;
 
-fn historical_product<'a>(state:&'a Value,pid:&str,vid:&str)->Option<&'a Value>{
+pub(super) fn historical_product<'a>(state:&'a Value,pid:&str,vid:&str)->Option<&'a Value>{
     if pid.is_empty()||vid.is_empty(){return None;}
     let products=field(state,"products");
     if let Some(p)=find_by_id(products,pid){
@@ -19,7 +19,7 @@ fn historical_product<'a>(state:&'a Value,pid:&str,vid:&str)->Option<&'a Value>{
     (str_field(p,"sourceProductId")==pid &&
         variants.len()==1 && str_field(&variants[0],"id")==vid).then_some(p)
 }
-fn sale_problem(p:Option<&Value>)->&str{
+pub(super) fn sale_problem(p:Option<&Value>)->&str{
     let Some(p)=p else{return "상품 연결 확인 필요";};
     if has_value(field(p,"deletedAt"))||has_value(field(p,"supersededBy")) ||
         field(p,"active").as_bool()==Some(false){return "판매중지";}
