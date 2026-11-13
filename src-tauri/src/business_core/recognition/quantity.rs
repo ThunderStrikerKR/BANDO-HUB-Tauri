@@ -31,6 +31,18 @@ pub(crate) fn extract(text: &str) -> Vec<Quantity> {
     for capture in pattern.captures_iter(text) {
         let whole = capture.get(0).expect("full match");
         let number = capture.get(2).or_else(|| capture.get(1)).expect("quantity number");
+        // parser.ts::quantities excludes model dimensions such as x10cm,
+        // x10 mm and false unit prefixes such as 1EAS. Rust regex does
+        // not support look-ahead, so validate the following bytes explicitly.
+        let following = &text[whole.end()..];
+        if capture.get(2).is_some()
+            && Regex::new(r"(?i)^\\s*(?:cm|mm)\\b").expect("dimension guard")
+                .is_match(following) {
+            continue;
+        }
+        if following.chars().next().map_or(false,|c|c.is_ascii_alphabetic()) {
+            continue;
+        }
         // A model identifier must not be interpreted as a quantity.
         if whole.start() > 0 && text[..whole.start()].ends_with('-') {
             let prefix = &text[..whole.start() - 1];
@@ -86,6 +98,15 @@ mod tests {
         assert_eq!(extract("Desk TS-2 * 1EA")[0].value, 1);
         assert_eq!(extract("709(블랙)-1개")[0].value, 1);
         assert!(extract("709-1개").is_empty());
+    }
+    #[test]
+    fn original_type_script_quantity_boundaries() {
+        assert!(extract("x10cm").is_empty());
+        assert!(extract("x10mm").is_empty());
+        assert!(extract("x10 cm").is_empty());
+        assert!(extract("1EAS").is_empty());
+        assert_eq!(extract("2EA")[0].value,2);
+        assert_eq!(extract("x2")[0].value,2);
     }
     #[test]
     fn no_fabricated_quantity() {
