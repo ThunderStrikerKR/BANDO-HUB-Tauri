@@ -10,10 +10,12 @@ export async function nativeChangeCategory(
   name: string,
   parentId: string | null,
   transfer = false,
+  guardCatalogMove = false,
+  guardError = "",
 ): Promise<State> {
   const result = await businessCoreCall<{ state: State }>(
     "catalog_clients", "change_category", {
-      state, categoryId, name, parentId, transfer,
+      state, categoryId, name, parentId, transfer, guardCatalogMove, guardError,
     },
   );
   return result.state;
