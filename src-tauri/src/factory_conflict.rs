@@ -4,13 +4,16 @@ use crate::{Database, err, get_snapshot, lock_db, reply_digest, write_snapshot};
 use rusqlite::Connection;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
+use unicode_normalization::UnicodeNormalization;
 use std::{collections::HashSet, fs, path::{Path, PathBuf}, time::{SystemTime, UNIX_EPOCH}};
 use tauri::State;
 
 const MAX_JS_INT: u64 = 9_007_199_254_740_991;
 
 fn normalized(value: &str) -> String {
-    value.chars()
+    // The review, automatic-import guard and explicit employee correction
+    // must all match recipients with the same Unicode compatibility rules.
+    value.nfkc()
         .filter(|c| !c.is_whitespace() && !matches!(c, '(' | ')' | '[' | ']' | ',' | '.' | '-'))
         .flat_map(|c| c.to_lowercase()).collect()
 }
