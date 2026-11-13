@@ -222,6 +222,11 @@ pub(super) fn payment_due(state:&Value,ship:&Value,order:&Value,client:&Value)->
     let acknowledged=rows(field(field(state,"workflow"),"confirmations")).iter()
         .filter(|p|str_field(p,"dealerId")==str_field(order,"clientId") &&
             account.is_some_and(|a|key(field(p,"announcedAccount"))==key(a)))
+        .filter(|p| !rows(field(field(state,"workflow"),"events")).iter().any(|event|
+            str_field(event,"action")=="입금 승인 재확인 필요" &&
+            field(event,"before")==field(p,"id") &&
+            rows(field(event,"shipmentIds")).iter().any(|sid|
+                sid.as_str()==Some(str_field(ship,"id")))))
         .flat_map(|p|rows(field(p,"allocations")).iter())
         .filter(|a|str_field(a,"shipmentId")==str_field(ship,"id"))
         .filter_map(|a|safe(field(a,"amount")))
