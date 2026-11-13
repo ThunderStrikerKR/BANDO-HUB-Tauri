@@ -151,11 +151,13 @@ function outcome(run:()=>unknown) {
   try {return {ok:true,value:run()};}
   catch(error) {return {ok:false,error:error instanceof Error?error.message:String(error)};}
 }
-const runner=spawnSync("cargo",[
+const rustBinary=process.env.TSBH_RULES_BIN;
+const runner=spawnSync(rustBinary||"cargo",rustBinary?[]:[
   "run","--quiet","--manifest-path",
   "tests/rust-migration/rules/Cargo.toml","--bin","json_rules"
 ],{
   cwd:root,encoding:"utf8",timeout:180_000,maxBuffer:8*1024*1024,
+  // CI's cargo test already built the rules binary; avoid a nested cargo lock.
   input:cases.map(c=>JSON.stringify({operation:c.operation,payload:c.payload})).join("\n")+"\n"
 });
 if(runner.error||runner.status!==0){
