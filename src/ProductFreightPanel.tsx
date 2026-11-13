@@ -4,6 +4,7 @@ import { EmptyState } from "./ui/PageHeading";
 import { ManagementTable } from "./ui/ManagementTable";
 import { ShippingFeeRanges } from "./ShippingFeeRanges";
 import { useState } from "react";
+import { businessCoreCall } from "./tauri-bridge";
 import { confirmAction } from "./dialogs";
 import { registeredProducts, sortProducts } from "./product-models";
 import type { NoticeSink } from "./shared/notices";
@@ -60,42 +61,31 @@ export function ProductFreightPanel({
     ).ok;
   const writeRule = async (): Promise<boolean> => {
     if (!editing || !editingDirty) return true;
-    const next = clone(state),
-      shipping = next.shipping!;
     if (Object.entries(editing.rule.fees).some(([count, amount]) =>
       typeof amount === "number" && editing.rule.maxBundle !== null &&
       Number(count) > editing.rule.maxBundle)) {
       onNotice("최대 묶음 수량을 초과하는 운임 구간을 삭제하거나 수량을 다시 설정하세요.", "error");
       return false;
     }
-    const value = {
-      ...editing.rule,
-      maxConfirmed: editing.rule.maxBundle !== null,
-      version: crypto.randomUUID(),
-      at: new Date().toISOString(),
-    };
-    delete value.validFrom;
-    delete value.validUntil;
-    delete value.basis;
-    delete value.packable;
-    if (editing.groupId) {
-      const group = shipping.groups.find((g) => g.id === editing.groupId)!;
-      group.history.push(group.current);
-      group.current = value;
-    } else {
-      shipping.productRules ??= {};
-      shipping.productHistory ??= {};
-      const previous = shipping.productRules[editing.productId];
-      if (previous)
-        shipping.productHistory[editing.productId] = [
-          ...(shipping.productHistory[editing.productId] ?? []),
-          previous,
-        ];
-      shipping.productRules[editing.productId] = value;
+    try {
+      const { shipping } = await businessCoreCall<{ shipping: NonNullable<State["shipping"]> }>(
+        "rules", "apply_shipping_action", {
+          action: editing.groupId ? "save_group_rule" : "save_product_rule",
+          shipping: state.shipping, groupId: editing.groupId,
+          productId: editing.productId, rule: editing.rule,
+          versionId: crypto.randomUUID(), now: new Date().toISOString(),
+        },
+      );
+      const ok = await save(
+        { ...state, shipping },
+        "최대 묶음 수량과 운임을 저장했습니다. 이전 기준은 이력으로 보존합니다.",
+      );
+      if (ok) { setEditing(undefined); setInitialRule(undefined); }
+      return ok;
+    } catch (error) {
+      onNotice(error instanceof Error ? error.message : String(error), "error");
+      return false;
     }
-    const ok = await save(next, "최대 묶음 수량과 운임을 저장했습니다. 이전 기준은 이력으로 보존합니다.");
-    if (ok) { setEditing(undefined);setInitialRule(undefined); }
-    return ok;
   };
   const editingDirty = !!editing && !!initialRule && !sameFreightEditor(editing.rule, initialRule);
   usePageLeaveGuard({
