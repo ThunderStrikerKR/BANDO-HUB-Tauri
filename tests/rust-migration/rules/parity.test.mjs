@@ -318,6 +318,13 @@ function checkBoardPreview(name, mutate = () => {}) {
             paid:paymentBalance(state,ship).paid,
             totals:shipmentTotals(state,ship),
             freightCode:shipmentFreightCode(order,recipient),
+            displayCharges:Object.fromEntries([...new Set(recipient.items.map((item) => item.origin))]
+              .filter((origin) => origin === "FACTORY" || origin === "STORE")
+              .map((origin) => [origin, shipmentFreightCode(order,recipient) === "020" ||
+                shipmentContext(state,ship).client.shippingFeeExcluded ? 0 :
+                ship.charges[origin] ?? null])),
+            freightEditingBlocked:shipmentFreightCode(order,recipient) === "020" ||
+              shipmentContext(state,ship).client.shippingFeeExcluded === true,
             vatIncluded:shipmentVat(order,recipient),
           };
         }),
@@ -346,6 +353,10 @@ checkBoardPreview("matched account payment", (s) => {
       shipmentId:"shipment:o1:r1",amount:10000,
     }],
   });
+});
+checkBoardPreview("dealer excludes customer freight", (s) => {
+  s.clients[0].shippingFeeExcluded = true;
+  s.orders[0].clientSnapshot.shippingFeeExcluded = true;
 });
 checkBoardPreview("unmatched account payment excluded", (s) => {
   s.workflow.payments.push({
