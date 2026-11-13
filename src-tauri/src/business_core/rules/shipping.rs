@@ -230,6 +230,36 @@ pub(super) fn shipping_action(payload: &Value) -> Result<Value, String> {
     use super::{req, required_str, set};
     let action=required_str(payload,"action")?;
     match action {
+        "upgrade" => {
+            // src/shipping.ts::upgradeShipping: preserve every existing record
+            // and append only missing historical base classifications.
+            let mut shipping=req(payload,"shipping")?.clone();
+            let now=required_str(payload,"now")?;
+            for (prefix,label,names) in [
+                ("music","일반 보면대",["경량형","표준형","중량형"]),
+                ("microphone","일반 마이크스탠드",["소형 포장","중형 포장","대형 포장"])
+            ] {
+                for (i,name) in names.iter().enumerate() {
+                    let id=format!("{prefix}-type-{}",i+1);
+                    let exists=rows(field(&shipping,"groups")).iter()
+                        .any(|g|str_field(g,"id")==id);
+                    if exists {continue;}
+                    let version=field(field(payload,"groupVersions"),&id)
+                        .as_str().filter(|value|!value.is_empty())
+                        .ok_or_else(||format!("기존 운임 그룹 버전 ID 누락: {id}"))?;
+                    let group=json!({"id":id,"name":format!("{label} / {name}"),
+                        "current":{
+                            "version":version,"at":now,
+                            "fees":{"1":null,"2":null,"3":null,"4":null,"5":null,"6":null},
+                            "maxBundle":null,"maxConfirmed":false,"perItem":null,
+                            "notes":"직원이 분류와 운임을 확인해 입력하세요."
+                        },"history":[]});
+                    shipping["groups"].as_array_mut().ok_or("운임 그룹 목록 누락")?
+                        .push(group);
+                }
+            }
+            Ok(json!({"shipping":shipping}))
+        }
         "save_combination" => {
             let mut shipping=req(payload,"shipping")?.clone();
             let bundle=req(payload,"bundle")?;
