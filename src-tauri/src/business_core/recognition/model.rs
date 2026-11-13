@@ -127,8 +127,9 @@ pub(crate) fn find_term(text: &str, term: &str, is_model: bool) -> Option<(usize
     let term=term.trim();
     if term.is_empty() { return None; }
     let re = matching_regex(term,is_model)?;
-    re.find_iter(text).find(|m| is_boundary(text, m.start(), m.end()))
-        .map(|m| (m.start(), m.end()))
+    let found = re.find_iter(text).find(|m| is_boundary(text, m.start(), m.end()))
+        .map(|m| (m.start(), m.end()));
+    found
 }
 pub(crate) fn model_names(p: &Value) -> Vec<String> {
     let name = lead(p);
