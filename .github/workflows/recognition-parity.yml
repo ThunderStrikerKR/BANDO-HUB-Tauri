@@ -1,0 +1,27 @@
+name: Rust recognition TypeScript parity - 20 orders
+on:
+  push:
+    branches:
+      - migration/01-ts-parity
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: recognition-parity-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  compare-20:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install project dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Run original Rust 20-order regression unchanged
+        run: cargo test --manifest-path tests/rust-migration/recognition/Cargo.toml
+      - name: Compare original TypeScript against real Rust on all 20 orders
+        run: node --test tests/rust-migration/recognition/parity-20.test.mjs
