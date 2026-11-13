@@ -193,7 +193,7 @@ mod regressions {
                 let end=candidate["end"].as_u64().unwrap() as usize;
                 assert!(start<=end && end<=original.len(),"order {id}: invalid candidate bounds");
                 let original_text=String::from_utf16(&original[start..end]).unwrap();
-                assert_eq!(original_text,candidate["text"],"order {id}: candidate source was shifted");
+                assert_eq!(original_text,candidate["text"].as_str().unwrap(),"order {id}: candidate source was shifted");
                 checked+=1;
             }
             for row in output["recipients"].as_array().unwrap() {
@@ -203,7 +203,7 @@ mod regressions {
                         let end=source["end"].as_u64().unwrap() as usize;
                         assert!(start<=end && end<=original.len(),"order {id}: bad item span");
                         assert_eq!(String::from_utf16(&original[start..end]).unwrap(),
-                            source["text"],"order {id}: source must equal original bytes in UTF-16");
+                            source["text"].as_str().unwrap(),"order {id}: source must equal original bytes in UTF-16");
                     }
                 }
             }
