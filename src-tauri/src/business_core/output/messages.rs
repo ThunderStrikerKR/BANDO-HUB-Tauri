@@ -43,6 +43,32 @@ fn template_default(key: &str) -> Option<(&'static str, &'static [&'static str])
         _ => None,
     }
 }
+// Customer-facing validation errors use the original TypeScript template labels.
+fn template_label(key: &str) -> &str {
+    match key {
+        "recipientName" => "수취인 이름 누락",
+        "addressMissing" => "배송지 주소 누락",
+        "addressDetail" => "상세주소 부족",
+        "contactMissing" => "수취인 연락처 누락",
+        "quantityMissing" => "주문 수량 확인",
+        "modelMissing" => "상품 모델 확인",
+        "modelConfirm" => "추천 상품 확인",
+        "requestRecipient" => "확인 항목 묶음",
+        "requestClosing" => "확인 요청 마무리",
+        "colorDefault" => "대표색상 통보",
+        "modelRepresentative" => "대표모델 선택 통보",
+        "quantityOne" => "수량 1개 잠정 안내",
+        "paymentGreeting" => "입금 안내 인사말",
+        "paymentItem" => "상품별 금액 표시",
+        "paymentFreight" => "운임 안내",
+        "paymentVat" => "부가세 안내",
+        "paymentTotal" => "총 청구액 안내",
+        "paymentAccount" => "입금 계좌 안내",
+        "optionsIntro" => "주문 내용 확인 시작",
+        "optionsClosing" => "주문 확인 마무리",
+        _ => key,
+    }
+}
 fn allowed_variables(key: &str) -> &'static [&'static str] {
     match key {
         "addressMissing" | "addressDetail" | "contactMissing" => &["수취인"],
@@ -74,16 +100,16 @@ pub(super) fn validate_templates(settings: &Value) -> Result<(), String> {
         }
         for token in re.captures_iter(body) {
             if !allowed_variables(key).contains(&token.get(1).unwrap().as_str()) {
-                return Err(format!("{}: 지원하지 않는 변수 {{{}}}입니다.", key, &token[1]));
+                return Err(format!("{}: 지원하지 않는 변수 {{{}}}입니다.", template_label(key), &token[1]));
             }
         }
         let without = re.replace_all(body, "");
         if without.contains('{') || without.contains('}') {
-            return Err(format!("{}: 변수 괄호를 확인하세요.", key));
+            return Err(format!("{}: 변수 괄호를 확인하세요.", template_label(key)));
         }
         for required_variable in required {
             if !body.contains(&format!("{{{}}}", required_variable)) {
-                return Err(format!("{}: {{{}}} 변수를 삭제할 수 없습니다.", key, required_variable));
+                return Err(format!("{}: {{{}}} 변수를 삭제할 수 없습니다.", template_label(key), required_variable));
             }
         }
     }
