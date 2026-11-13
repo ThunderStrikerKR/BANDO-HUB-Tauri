@@ -51,11 +51,39 @@ function compare(ts,rs,path,caseId){
   }
 }
 const items=output=>(output?.recipients||[]).flatMap(r=>r.items||[]);
+// A legacy TS result sometimes contains an additional unresolved item
+// before a confirmed SKU (notably samples 19/20). Align by registered
+// productId and raw evidence first, then report the surplus item separately.
+// Otherwise comparing array index 0 to index 0 invents false field mismatches.
+function compareAlignedItems(tsItems,rustItems,caseId){
+  compare(tsItems.length,rustItems.length,"items.length",caseId);
+  const used=new Set();
+  for(let i=0;i<rustItems.length;i++){
+    const item=rustItems[i];
+    let candidate=-1;
+    if(item?.productId){
+      candidate=tsItems.findIndex((x,j)=>!used.has(j)&&
+        x?.productId===item.productId);
+    }
+    if(candidate<0) candidate=tsItems.findIndex((x,j)=>
+      !used.has(j)&&x?.raw===item?.raw);
+    if(candidate<0) candidate=tsItems.findIndex((x,j)=>!used.has(j)&&
+      x?.productId===item?.productId);
+    if(candidate<0){
+      compare(undefined,item,"items.unmatchedRust["+i+"]",caseId);
+    }else{
+      used.add(candidate);
+      compare(tsItems[candidate],item,"items["+i+"]",caseId);
+    }
+  }
+  for(let j=0;j<tsItems.length;j++) if(!used.has(j))
+    compare(tsItems[j],undefined,"items.unmatchedTs["+j+"]",caseId);
+}
 for(const entry of cases){
   const fromTs=parseEvidence(entry.raw,payload.client,payload.state);
   const tsItems=items(fromTs),rustItems=items(entry.rust);
   const before=differences.length;
-  compare(tsItems,rustItems,"items",entry.id);
+  compareAlignedItems(tsItems,rustItems,entry.id);
   // The TypeScript original lacks a match_products entrypoint. Check fields
   // shared with its actual parseEvidence-derived Item, separately.
   if(entry.match && tsItems.length===1){
