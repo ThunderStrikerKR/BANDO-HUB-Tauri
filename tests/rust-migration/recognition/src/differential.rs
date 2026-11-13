@@ -136,12 +136,49 @@ fn execute_original_typescript_and_rust_with_all_product_fields() {
     for entry in report["differences"].as_array().into_iter().flatten().take(1500){
         println!("TS_RUST_PRODUCT_DIFF_DETAIL {}",entry);
     }
-    // This is an *audit*, not a false assertion of complete parity.
-    // Keep all differences visible to CI; explicit parity gate can be
-    // enabled after source-proven differences have been corrected.
-    if report["mismatchCount"].as_u64().unwrap_or(0)>0 {
-        println!("TS_RUST_PRODUCT_PARITY_STATUS DIFFERENCES_REMAIN");
-    } else {
-        println!("TS_RUST_PRODUCT_PARITY_STATUS MATCHED_FOR_TESTED_CASES");
-    }
+    // Three source-proven upstream TypeScript defects remain:
+    // - Red/레드 alias is absent from domain.ts::normalizeColor;
+    // - a date is misclassified as an UNKNOWN item in samples 19/20;
+    // - the table parser leaves an explicit quantity unconfirmed.
+    // Allow fewer known defects if upstream code improves. Reject any new
+    // category, field, or case of mismatch.
+    let exceptions:Vec<(&str,&[&str])>=vec![
+        ("corrected-01",&[
+            "items[0].catalog","items[0].color",
+            "items[0].issues.length","items[0].issues[0]",
+            "items[0].match.kind","items[0].name",
+            "items[0].productId","items[0].recognitionReason",
+            "items[0].url","items[0].variantId"
+        ]),
+        ("original-19",&[
+            "items.length","items[0].quantity","items[0].quantityConfirmed",
+            "items[0].sources.length","items[0].sources[1]",
+            "items.unmatchedTs[0]"
+        ]),
+        ("original-20",&[
+            "items.length","items[0].quantity","items[0].quantityConfirmed",
+            "items[0].sources.length","items[0].sources[1]",
+            "items.unmatchedTs[0]"
+        ])
+    ];
+    let differences=report["differences"].as_array().expect("all actual field differences");
+    assert!(!report["truncated"].as_bool().unwrap_or(true),
+        "differential report truncated: unsafe to enforce an exception gate");
+    assert_eq!(differences.len() as u64,
+        report["mismatchCount"].as_u64().expect("complete diff count"),
+        "do not approve exceptions when not all differences were printed");
+    let unexpected:Vec<&Value>=differences.iter().filter(|d|{
+        let case=d["caseId"].as_str().unwrap_or("");
+        let path=d["path"].as_str().unwrap_or("");
+        !exceptions.iter().any(|(id,paths)|*id==case && paths.contains(&path))
+    }).collect();
+    assert!(unexpected.is_empty(),
+        "new TS/Rust recognition differences outside reviewed legacy defects: {}",
+        json!(unexpected));
+    assert!(differences.len()<=22,
+        "reviewed source defects must not grow or duplicate: {}",differences.len());
+    assert!(report["casesWithDifferences"].as_u64().unwrap_or(100)<=3,
+        "unexpected parity mismatch across additional input cases");
+    println!("TS_RUST_PRODUCT_PARITY_STATUS ONLY_THREE_REVIEWED_SOURCE_EXCEPTIONS");
+    println!("TS_RUST_PRODUCT_EXPECTED_EXCEPTION_COUNT {}",differences.len());
 }
