@@ -30,6 +30,17 @@ pub(super) fn validate(state: &Value, before: Option<&Value>) -> Result<(),Strin
     for s in rows(field(w,"shipments")) {
         if flag(s,"legacyArchived") && shipment_for(state,s).is_err() {continue;}
         let (order,_recipient) = shipment_for(state,s)?;
+        if str_field(order,"orderType") == "RETAIL" {
+            let has_payment = rows(field(w,"payments")).iter().any(|p|
+                rows(field(p,"allocations")).iter().any(|a| str_field(a,"shipmentId")==str_field(s,"id")));
+            let has_confirmation = rows(field(w,"confirmations")).iter().any(|c|
+                rows(field(c,"shipmentIds")).iter().any(|v|v.as_str()==Some(str_field(s,"id"))));
+            if !flag(s,"transferred") || step != Some(4)
+                || group.is_some_and(|g|!rows(field(g,"notices")).is_empty())
+                || has_payment || has_confirmation {
+                return Err("소매 주문에는 입금 / 계좌 안내 단계를 만들 수 없습니다.".into());
+            }
+        }
         let group = find_by_id(field(w,"groups"),str_field(s,"groupId"));
         let source = find_by_id(field(w,"sources"),str_field(s,"sourceId"));
         let valid_link = match (group,source) {
@@ -43,22 +54,11 @@ pub(super) fn validate(state: &Value, before: Option<&Value>) -> Result<(),Strin
         if step.is_none_or(|n| !(0..=4).contains(&n)) {
             return Err("잘못된 진행 단계".into());
         }
-        if str_field(order,"orderType") == "RETAIL" {
-            let has_payment = rows(field(w,"payments")).iter().any(|p|
-                rows(field(p,"allocations")).iter().any(|a| str_field(a,"shipmentId")==str_field(s,"id")));
-            let has_confirmation = rows(field(w,"confirmations")).iter().any(|c|
-                rows(field(c,"shipmentIds")).iter().any(|v|v.as_str()==Some(str_field(s,"id"))));
-            if !flag(s,"transferred") || step != Some(4)
-                || group.is_some_and(|g|!rows(field(g,"notices")).is_empty())
-                || has_payment || has_confirmation {
-                return Err("소매 주문에는 입금 / 계좌 안내 단계를 만들 수 없습니다.".into());
-            }
+        for v in field(s,"actualFreight").as_object().into_iter().flat_map(|m|m.values()) {
+            if !v.is_null() && safe(v).is_none() {return Err("실제 출고 운임 금액 오류".into());}
         }
         for v in field(s,"charges").as_object().into_iter().flat_map(|m|m.values()) {
             if !v.is_null() && safe(v).is_none() {return Err("운임 금액 오류".into());}
-        }
-        for v in field(s,"actualFreight").as_object().into_iter().flat_map(|m|m.values()) {
-            if !v.is_null() && safe(v).is_none() {return Err("실제 출고 운임 금액 오류".into());}
         }
     }
     for p in rows(field(w,"payments")) {
@@ -250,7 +250,6 @@ pub(super) fn validate(state: &Value, before: Option<&Value>) -> Result<(),Strin
                 }
             }
         }
-        validate_reception(old_state,state)?;
     }
     Ok(())
 }
