@@ -512,9 +512,14 @@ pub(super) fn apply(payload:&Value)->Result<Value,String> {
                 set(&mut state["workflow"]["shipments"][si],"step",json!(1))?;
                 if old_step>=3 {set(&mut state["workflow"]["groups"][gi],"needsNotice",json!(true))?;}
                 set(&mut state["workflow"]["shipments"][si],"legacyApproval",json!(false))?;
-                if !rows(field(&state["workflow"],"confirmations")).is_empty() {
-                    return Err("입금 재확인 이벤트 입력이 필요합니다.".into());
-                }
+                let active_confirms=rows(field(&state["workflow"],"confirmations")).iter()
+                    .filter(|c|rows(field(c,"shipmentIds")).iter()
+                        .any(|id|id.as_str()==Some(ship_id)))
+                    .filter(|c|!rows(field(&state["workflow"],"events")).iter().any(|e|
+                        str_field(e,"action")=="입금 승인 재확인 필요" &&
+                        field(e,"before")==field(c,"id") &&
+                        rows(field(e,"shipmentIds")).iter().any(|id|id.as_str()==Some(ship_id))))
+                    .map(|c|str_field(c,"id").to_string()).collect::<Vec<_>>();
                 if !state["workflow"]["shipments"][si]["rechecks"].is_array() {
                     set(&mut state["workflow"]["shipments"][si],"rechecks",json!([]))?;
                 }
@@ -523,6 +528,17 @@ pub(super) fn apply(payload:&Value)->Result<Value,String> {
                     "at":required_str(payload,"now")?,"reason":"직원이 운임 변경",
                     "fromStage":old_step,"toStage":1
                 }));
+                let seed=required_str(payload,"eventId")?;
+                for confirmation_id in active_confirms {
+                    append_extra_event(&mut state,payload,
+                        &format!("{seed}:reconfirm:{ship_id}:{confirmation_id}"),
+                        "입금 승인 재확인 필요",&[ship_id.to_string()],&group_id,
+                        json!(confirmation_id),Value::Null,"시스템","직원이 운임 변경")?;
+                }
+                append_extra_event(&mut state,payload,
+                    &format!("{seed}:recheck:{ship_id}"),"재검증 필요",
+                    &[ship_id.to_string()],&group_id,json!(old_step),json!(1),
+                    "시스템","직원이 운임 변경")?;
             }
             append_event(&mut state,payload,"배송 건 운임 수정",&[ship_id.to_string()],
                 json!({"origin":origin,"value":previous}),
