@@ -101,6 +101,17 @@ scenario("explicit null shipment actual overrides historical",s=>{
   s.workflow.queue[0].snapshot.recipient.actualFreight=3500;
   s.workflow.shipments[0].actualFreight.FACTORY=null;
 });
+scenario("current order amount matches while frozen snapshot unknown",s=>{
+  s.orders[0].recipients[0].actualFreight=4000;
+  s.workflow.queue[0].snapshot.recipient.actualFreight=null;
+});
+scenario("current order amount differs while frozen snapshot matches",s=>{
+  s.orders[0].recipients[0].actualFreight=3500;
+  s.workflow.queue[0].snapshot.recipient.actualFreight=4000;
+});
+scenario("explicit blank old tracking preserved in audit",s=>{
+  s.workflow.shipments[0].tracking.FACTORY="";
+});
 scenario("other shipment has tracking",s=>{
   s.workflow.shipments.push({id:"s2",orderId:"o2",recipientId:"r2",
     tracking:{FACTORY:"001234567890"},actualFreight:{}});
