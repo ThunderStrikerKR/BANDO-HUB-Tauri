@@ -41,7 +41,9 @@ fn score_stand(p: &Value) -> bool {
 }
 fn score_model(p: &Value) -> Option<(String, bool, String)> {
     if !score_stand(p) { return None; }
-    let re = Regex::new(r"(?i)^(?:BD[\s-]*)?(\d{3})(-1)?\s*(BR|G|W)?$").ok()?;
+    static SCORE_MODEL:OnceLock<Regex>=OnceLock::new();
+    let re=SCORE_MODEL.get_or_init(||Regex::new(r"(?i)^(?:BD[\s-]*)?(\d{3})(-1)?\s*(BR|G|W)?$")
+        .expect("registered music stand code"));
     let cap = re.captures(lead(p))?;
     Some((cap[1].to_owned(), cap.get(2).is_some(),
         cap.get(3).map(|m| m.as_str().to_uppercase()).unwrap_or_default()))
@@ -85,7 +87,9 @@ fn is_boundary(text: &str, begin: usize, end: usize) -> bool {
 }
 fn spell(term: &str, is_model: bool) -> String {
     let bare = if is_model {
-        let bd = Regex::new(r"(?i)^BD[\s-]+").expect("static regex");
+        static BD_PREFIX:OnceLock<Regex>=OnceLock::new();
+        let bd=BD_PREFIX.get_or_init(||Regex::new(r"(?i)^BD[\s-]+")
+            .expect("registered code prefix"));
         bd.replace(term, "").into_owned()
     } else { term.to_owned() };
     let prefix = if is_model && bare.chars().next().map_or(false, |c| c.is_ascii_alphanumeric()) {
@@ -125,8 +129,10 @@ pub(crate) fn find_term(text: &str, term: &str, is_model: bool) -> Option<(usize
 pub(crate) fn model_names(p: &Value) -> Vec<String> {
     let name = lead(p);
     if name.is_empty() { return vec![]; }
-    let bd = Regex::new(r"(?i)^BD[\s-]+").expect("static regex");
-    let bare = bd.replace(name, "");
+    static BD_PREFIX:OnceLock<Regex>=OnceLock::new();
+    let bd=BD_PREFIX.get_or_init(||Regex::new(r"(?i)^BD[\s-]+")
+        .expect("registered code prefix"));
+    let bare=bd.replace(name,"");
     if bare == name { vec![name.to_owned()] }
     else { vec![name.to_owned(), bare.into_owned()] }
 }
