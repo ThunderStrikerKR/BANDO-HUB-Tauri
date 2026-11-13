@@ -25,7 +25,7 @@ fn client_search(state:&Value,payload:&Value)->Value{
     let query=no_whitespace(field(payload,"query"));
     let raw=field(payload,"raw");
     let matches=clients.iter().filter(|c|{
-        active(c) && !query.is_empty() &&
+        field(c,"deletedAt").is_empty() && !query.is_empty() &&
         ["name","displayName","phone","mobile","address","shortNames","identifiers"]
             .iter().any(|key|no_whitespace(field(c,key)).contains(&query))
     });
