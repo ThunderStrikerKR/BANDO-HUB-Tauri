@@ -7,7 +7,7 @@ import {tsImport} from "tsx/esm/api";
 const {resolvePrice,totals,repriceOrder}=await tsImport("../../../src/domain.ts",import.meta.url);
 const {shouldRefreshUncommittedOrderPricing}=await tsImport("../../../src/orders/passive-pricing.ts",import.meta.url);
 const {recommendShipping}=await tsImport("../../../src/shipping.ts",import.meta.url);
-const {shipmentTotals,stageIssues,groupStep,groupShipments}=
+const {shipmentTotals,stageIssues,groupStep,groupShipments,orderGrandTotal,shipmentVat}=
   await tsImport("../../../src/workflow.ts",import.meta.url);
 const root=fileURLToPath(new URL("../../../",import.meta.url));
 const manifest=fileURLToPath(new URL("./Cargo.toml",import.meta.url));
@@ -213,6 +213,70 @@ checkWorkflow("prepaid step 3",s=>{
   s.orders[0].clientSnapshot.payment="PREPAID";
 });
 checkWorkflow("needs new notice",s=>{s.workflow.groups[0].needsNotice=true;});
+
+// The source of truth for the order detail summary is still the original
+// TS orderGrandTotal/shipmentVat oracle, not a hand-entered expected amount.
+function checkOrderPreview(name, mutate = () => {}) {
+  const state = workflowState();
+  let draft = state.orders[0];
+  mutate(state);
+  draft = state.orders[0] ?? draft;
+  const orderId = draft.id;
+  const rows = state.workflow.shipments.filter((ship) =>
+    ship.orderId === orderId && !ship.legacyArchived &&
+    !state.workflow.groups.find((g) => g.id === ship.groupId)?.deletedAt,
+  );
+  const applies = draft.recipients.map((row) => shipmentVat(draft, row));
+  const vatLabel = applies.some(Boolean) && applies.some((v) => !v)
+    ? "부가세 포함/별도"
+    : applies.some(Boolean) ? "부가세 포함" : "부가세 별도";
+  add("order preview " + name, "preview_order",
+    { state, draft, orderId },
+    () => ({
+      orderId,
+      shipmentCount: rows.length,
+      total: orderGrandTotal(state, orderId),
+      vatLabel,
+    }));
+}
+checkOrderPreview("normal subtotal and VAT");
+checkOrderPreview("recipient VAT disabled", (s) => {
+  s.orders[0].recipients[0].vatOverride = false;
+});
+checkOrderPreview("collect freight has no billed freight", (s) => {
+  s.orders[0].recipients[0].freightCode = "020";
+});
+checkOrderPreview("unknown freight yields null total", (s) => {
+  s.workflow.shipments[0].charges = {};
+});
+checkOrderPreview("deleted group omitted", (s) => {
+  s.workflow.groups[0].deletedAt = "2026-11-13T21:00:00+09:00";
+});
+checkOrderPreview("archived shipment omitted", (s) => {
+  s.workflow.shipments[0].legacyArchived = true;
+});
+checkOrderPreview("transferred frozen invoice totals", (s) => {
+  s.workflow.shipments[0].transferred = true;
+  s.workflow.queue = [{
+    id: "q1", shipmentId: "shipment:o1:r1", origin: "FACTORY",
+    status: "EXPORTED", snapshot: { subtotal: 20000, shipping: 4000, vat: 2400, total: 26400 },
+  }];
+});
+checkOrderPreview("two shipments with mixed VAT", (s) => {
+  const second = structuredClone(s.orders[0].recipients[0]);
+  second.id = "r2";
+  second.vatOverride = false;
+  s.orders[0].recipients.push(second);
+  const ship = structuredClone(s.workflow.shipments[0]);
+  ship.id = "shipment:o1:r2";
+  ship.recipientId = "r2";
+  s.workflow.shipments.push(ship);
+});
+checkOrderPreview("draft-only before dealer selection", (s) => {
+  s.orders = [];
+  s.workflow.shipments = [];
+  s.workflow.groups = [];
+});
 
 test("actual TS price, freight and refresh decisions match staged Rust rules",()=>{
   const proc=spawnSync("cargo",["run","--quiet","--manifest-path",manifest,
