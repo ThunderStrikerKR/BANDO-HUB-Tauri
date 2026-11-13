@@ -1,8 +1,9 @@
 import { useRef, useState } from "react";
 import { confirmAction } from "./dialogs";
+import { businessCoreCall } from "./tauri-bridge";
 import {
   exportRegistrationTemplate,
-  prepareRegistrationCommit, previewRegistrationWorkbook,
+  previewRegistrationWorkbook,
   type RegistrationWorkbookPreview,
 } from "./product-registration-xlsx";
 import type { NoticeSink } from "./shared/notices";
@@ -51,7 +52,12 @@ export function RegistrationManager({
       "개를 등록할까요? 먼저 DB를 백업하고 기존 상품과 가격은 유지합니다."
     ))) return;
     const current = await window.bando!.load();
-    const result = prepareRegistrationCommit(current, preview, current.settings.operatorName ?? "관리자");
+    const result = await businessCoreCall<{ next: State; created: number; skipped: number }>(
+      "catalog_clients", "prepare_registration_commit", {
+        state: current, preview, actor: current.settings.operatorName ?? "관리자",
+        now: new Date().toISOString(), batchId: crypto.randomUUID(),
+      },
+    );
     // Abort the registration if a consistent SQLite backup cannot be created.
     await window.bando!.backup();
     // Existing revision-checked application save performs SQLite validation atomically.
