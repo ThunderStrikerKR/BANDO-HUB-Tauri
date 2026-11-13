@@ -19,6 +19,14 @@ fn shipment_for<'a>(state: &'a Value, ship: &Value) -> Result<(&'a Value,&'a Val
         .ok_or_else(|| "배송 건의 발주서 / 수취인 / 거래처 연결을 확인하세요.".to_string())?;
     let row = find_by_id(field(order,"recipients"),str_field(ship,"recipientId"))
         .ok_or_else(|| "배송 건의 발주서 / 수취인 / 거래처 연결을 확인하세요.".to_string())?;
+    // shipmentContext() requires orderParty(), not merely a recipient.
+    // A retail order synthesizes its company party, while agency/dealer
+    // orders require a live client or their own frozen clientSnapshot.
+    if str_field(order,"orderType")!="RETAIL" &&
+        find_by_id(field(state,"clients"),str_field(order,"clientId")).is_none() &&
+        !has_value(field(order,"clientSnapshot")) {
+        return Err("배송 건의 발주서 / 수취인 / 거래처 연결을 확인하세요.".into());
+    }
     Ok((order,row))
 }
 pub(super) fn validate(state: &Value, before: Option<&Value>) -> Result<(),String> {
@@ -28,7 +36,12 @@ pub(super) fn validate(state: &Value, before: Option<&Value>) -> Result<(),Strin
         if !unique_id(field(w,name)) { return Err("업무 기록 ID가 중복됩니다.".into()); }
     }
     for s in rows(field(w,"shipments")) {
-        if flag(s,"legacyArchived") && shipment_for(state,s).is_err() {continue;}
+        if flag(s,"legacyArchived") &&
+            !find_by_id(field(state,"orders"),str_field(s,"orderId"))
+                .is_some_and(|order|rows(field(order,"recipients")).iter()
+                    .any(|recipient|str_field(recipient,"id")==str_field(s,"recipientId"))) {
+            continue;
+        }
         let (order,_recipient) = shipment_for(state,s)?;
         let group = find_by_id(field(w,"groups"),str_field(s,"groupId"));
         let step = field(s,"step").as_i64();
