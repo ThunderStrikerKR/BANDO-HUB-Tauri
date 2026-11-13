@@ -1,7 +1,6 @@
-import { useLayoutEffect, useRef, useState } from "react";
-import { automaticMessage, withGreeting } from "./automatic-message";
-import { validProductUrl } from "./domain";
-import { groupOrder } from "./workflow";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { withGreeting } from "./automatic-message";
+import { nativeAutomaticMessage, type NativeAutomaticMessage } from "./native-automatic-message";
 import { nativeRecordMessageCopy } from "./native-message-audit";
 import { LinkedText, messageSpans } from "./LinkedText";
 import type { NoticeSink } from "./shared/notices";
@@ -24,14 +23,50 @@ export function MessageWorkspace({
   const [busy, setBusy] = useState(false),
     [status, setStatus] = useState(""),
     [includeLinks, setIncludeLinks] = useState(false),
-    latest = useRef(order);
+    [resolved, setResolved] = useState<{
+      fingerprint: string;
+      groupId: string;
+      links: boolean;
+      result: NativeAutomaticMessage;
+    }>(),
+    [loadError, setLoadError] = useState(""),
+    latest = useRef(order),
+    latestState = useRef(state);
   latest.current = order;
+  latestState.current = state;
+  // Editing a request draft does not change its financial / workflow rules.
+  // A late native response never overwrites a newer state or user input.
+  const fingerprint = useMemo(() => JSON.stringify({
+    ...state,
+    orders: state.orders.map(({ requestMessages: _draft, ...businessOrder }) => businessOrder),
+  }), [state]);
+  useEffect(() => {
+    if (!gid || order.orderType === "RETAIL") {
+      setResolved(undefined);
+      setLoadError("");
+      return;
+    }
+    let cancelled = false;
+    setLoadError("");
+    void nativeAutomaticMessage(latestState.current, gid, includeLinks)
+      .then((result) => {
+        if (!cancelled) setResolved({ fingerprint, groupId: gid, links: includeLinks, result });
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setResolved(undefined);
+          setLoadError(String(error));
+        }
+      });
+    return () => { cancelled = true; };
+  }, [fingerprint, gid, includeLinks, order.orderType]);
   useLayoutEffect(() => {
     setStatus("");
     setIncludeLinks(false);
   }, [order.id, order.raw, gid]);
-  const automatic = gid && order.orderType !== "RETAIL"
-      ? automaticMessage(state, gid, includeLinks)
+  const automatic = resolved?.fingerprint === fingerprint &&
+      resolved?.groupId === gid && resolved?.links === includeLinks
+      ? resolved.result
       : undefined,
     request = automatic?.phase !== "payment",
     baseText = automatic
@@ -41,16 +76,14 @@ export function MessageWorkspace({
       : "",
     // Confirmation links already required by the request remain as-is.
     // The checkbox adds only other valid product links, without duplicates.
-    optionalRequestLinks = includeLinks && request && gid
-      ? [...new Set(groupOrder(state, gid).recipients.flatMap((recipient) =>
-          recipient.items
-            .filter((item) => item.url && validProductUrl(item.url) && !baseText.includes(item.url))
-            .map((item) => item.name + "\n" + item.url),
-        ))].join("\n\n")
+    optionalRequestLinks = includeLinks && request && automatic
+      ? automatic.validRequestLinks
+          .filter((entry) => !baseText.includes(entry.slice(entry.lastIndexOf("\n") + 1)))
+          .join("\n\n")
       : "",
     optionalSuffix = optionalRequestLinks ? "\n\n" + optionalRequestLinks : "",
     text = baseText + optionalSuffix;
-  const disabled = busy || !text.trim() || (!request && !!automatic?.paymentIssues.length);
+  const disabled = busy || !automatic || !text.trim() || (!request && !!automatic.paymentIssues.length);
   const copy = async (greeting: boolean) => {
     if (disabled || !gid) return;
     setBusy(true);
@@ -58,7 +91,7 @@ export function MessageWorkspace({
       await window.bando!.copy(greeting ? withGreeting(text) : text);
       if (latest.current.id !== order.id || latest.current.raw !== order.raw) return;
       if (order.confirmedAt)
-        await onSave(await nativeRecordMessageCopy(state, gid, request ? "REQUEST" : "PAYMENT", crypto.randomUUID()));
+        await onSave(await nativeRecordMessageCopy(state, gid, request ? "REQUEST" : "PAYMENT", crypto.randomUUID(), automatic?.signature));
       else if (request)
         onOrder({
           ...latest.current,
@@ -107,7 +140,7 @@ export function MessageWorkspace({
         />
       </div>
       <div className="message-inline-status" role="status">
-        {status}
+        {loadError || status}
       </div>
       <footer className="message-copy-actions">
         <button disabled={disabled} onClick={() => void copy(false)}>
