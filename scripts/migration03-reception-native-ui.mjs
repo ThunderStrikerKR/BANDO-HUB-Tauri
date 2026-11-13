@@ -152,7 +152,7 @@ try{
     ];
     console.log("NATIVE_RECEPTION_UIA_PASS",JSON.stringify(report.diagnostics.uia));
     await persist();
-  }
+  } else {
   browser=await chromium.connectOverCDP("http://127.0.0.1:"+port,{timeout:20000});
   const context=browser.contexts()[0];
   const page=context?.pages().find(x=>/tauri|localhost/i.test(x.url()))??context?.pages()[0];
@@ -280,6 +280,7 @@ try{
     binaryCommit:binCommit,checks:report.checks.length,
     screenshots:report.screens.length,status:report.status,
   }));
+  }
 }catch(e){
   report.status="FAILED";
   report.failure=e?.stack||String(e);
