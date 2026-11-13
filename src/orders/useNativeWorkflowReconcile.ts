@@ -5,7 +5,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Order, State } from "../types";
-import { nativeReconcileWorkflow } from "./native-rules";
+import { businessCoreCall } from "../tauri-bridge";
 
 export function useNativeWorkflowReconcile(input: State, drafts: Order[]) {
   const fingerprint = useMemo(
@@ -25,7 +25,24 @@ export function useNativeWorkflowReconcile(input: State, drafts: Order[]) {
     void (async () => {
       let value = request.input;
       for (const draft of request.drafts) {
-        value = await nativeReconcileWorkflow(value, draft);
+        // Unlike a durable save, a half-entered reception must be previewable
+        // even when final-workflow validation still reports staff issues.
+        // The Rust reducer mirrors TS reconcileWorkflow without persisting its
+        // temporary audit events to SQLite.
+        const count = Math.max(256, 12 * (value.workflow?.shipments.length ?? 0) +
+          8 * value.orders.length + 64);
+        if (count > 15000)
+          throw Error("재검증 이벤트가 너무 많습니다. 발주 묶음을 나누어 확인하세요.");
+        const eventIds = Array.from({ length: count }, () => crypto.randomUUID());
+        const result = await businessCoreCall<{ state: State; emittedEvents: number }>(
+          "rules", "reconcile_workflow", {
+            state: value,
+            draft,
+            now: new Date().toISOString(),
+            eventIds,
+          },
+        );
+        value = result.state;
       }
       if (!cancelled) {
         setResolved({ fingerprint, value });
