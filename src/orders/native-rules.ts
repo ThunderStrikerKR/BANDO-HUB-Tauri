@@ -4,6 +4,7 @@
  */
 import { businessCoreCall } from "../tauri-bridge";
 import { groupMessages } from "../workflow";
+import { assertRustReceptionAnalysis, type RustReceptionAnalysis } from "./rust-reception";
 import type { Client, Order, Origin, Price, State } from "../types";
 
 export async function nativeRepriceEditedOrder(
@@ -168,6 +169,45 @@ export async function nativeConfirmRetail(
       processEventId: crypto.randomUUID(),
       reconcileEventIds: ids(),
       processReconcileEventIds: ids(),
+    },
+  );
+  await businessCoreCall<{ valid: boolean }>(
+    "rules", "validate_workflow", { state: updated, before: state },
+  );
+  return updated;
+}
+
+/** Re-analyze an employee's working copy of the original order text in
+ * Rust recognition, then apply the Rust raw-correction domain reducer.
+ * Never reparse or change the immutable original/confirmation snapshot in TS.
+ */
+export async function nativeCorrectWorkingRaw(
+  state: State, order: Order, text: string, reason: string,
+): Promise<State> {
+  const client = state.clients.find((candidate) => candidate.id === order.clientId)
+    ?? order.clientSnapshot ?? null;
+  const analyzed = await businessCoreCall<RustReceptionAnalysis>(
+    "recognition", "analyze_order", {
+      raw: text, client,
+      state: {
+        ...state,
+        products: state.products.filter((product) =>
+          product.catalog !== "DEMO" &&
+          !product.variants.some((variant) => variant.source === "DEMO")),
+      },
+    },
+  );
+  assertRustReceptionAnalysis(analyzed, text);
+  const eventCount = Math.max(
+    256, 12 * (state.workflow?.shipments.length ?? 0) + 8 * state.orders.length + 64,
+  );
+  if (eventCount > 15000) throw Error("원문 정정 감사 기록이 너무 많습니다.");
+  const { state: updated } = await businessCoreCall<{ state: State }>(
+    "rules", "apply_raw_correction", {
+      action: "correct_working_raw", state, order, text, reason,
+      parsedRecipients: analyzed.recipients,
+      now: new Date().toISOString(), correctionId: crypto.randomUUID(),
+      eventIds: Array.from({ length: eventCount }, () => crypto.randomUUID()),
     },
   );
   await businessCoreCall<{ valid: boolean }>(
