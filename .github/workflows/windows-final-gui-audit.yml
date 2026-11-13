@@ -1,0 +1,72 @@
+name: FINAL real Windows Tauri GUI and SQLite integration audit
+on:
+  push:
+    branches:
+      - audit/windows-e2e-final-20261114
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: final-windows-gui-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  actual-windows-gui:
+    runs-on: windows-latest
+    env:
+      PYTHONIOENCODING: utf-8
+      PYTHONUTF8: '1'
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Enforce exact release-binary source (no stale EXE)
+        shell: bash
+        run: |
+          git diff --exit-code 3eca217fe2a045e25c6caf0cbedb0bdd234a9afb HEAD -- src src-tauri
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Download current integrated Windows portable candidate, not legacy binary
+        uses: actions/download-artifact@v4
+        with:
+          name: TSBH-migration03-preview-NOT-FINAL
+          path: final-gui-release
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 43460648913
+      - name: Extract the actual bando_hub.exe
+        shell: pwsh
+        run: |
+          Expand-Archive -LiteralPath "final-gui-release/BANDO-HUB-migration03-preview.zip" -DestinationPath "final-gui-release/unpacked" -Force
+          $exe="final-gui-release/unpacked/bando_hub.exe"
+          if (!(Test-Path $exe)) { throw "The exact integration native executable is absent" }
+          Write-Host "REAL_WINDOWS_BINARY $(Get-FileHash -Algorithm SHA256 $exe)"
+      - name: Install Playwright only as a WebView2 CDP client
+        run: npm install --no-save --no-package-lock --no-audit --no-fund playwright@1.55.1
+      - name: Enable CI-only WebView2 loopback debugging
+        shell: pwsh
+        run: |
+          $path="HKCU:\Software\Policies\Microsoft\Edge\WebView2\AdditionalBrowserArguments"
+          New-Item -Path $path -Force | Out-Null
+          New-ItemProperty -Path $path -Name "bando_hub.exe" -Value "--remote-debugging-port=19679 --remote-debugging-address=127.0.0.1" -PropertyType String -Force | Out-Null
+      - name: Exercise native windows, all main menus, UI saves, stale revisions, persisted TEST SQLite
+        env:
+          BANDO_NATIVE_EXE: ${{ github.workspace }}\\final-gui-release\\unpacked\\bando_hub.exe
+          BANDO_NATIVE_OUT: windows-final-gui-evidence
+          BANDO_NATIVE_BIN_COMMIT: 3eca217fe2a045e25c6caf0cbedb0bdd234a9afb
+        run: node scripts/windows-final-gui-audit.mjs
+      - name: Remove temporary debugging policy
+        if: always()
+        shell: pwsh
+        run: |
+          $path="HKCU:\Software\Policies\Microsoft\Edge\WebView2\AdditionalBrowserArguments"
+          Remove-ItemProperty -Path $path -Name "bando_hub.exe" -ErrorAction SilentlyContinue
+      - name: Publish exact native GUI screens, SQLite audit and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: TSBH-final-Windows-GUI-audit
+          path: windows-final-gui-evidence/
+          if-no-files-found: warn
+          retention-days: 14
