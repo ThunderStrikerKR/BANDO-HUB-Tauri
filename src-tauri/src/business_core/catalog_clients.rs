@@ -211,9 +211,61 @@ fn apply_product_workbook(state: &Value, preview: &Value) -> Result<Value, Strin
     }))
 }
 
+fn archive_client(state: &Value, id: &str, at: &str) -> Result<Value, String> {
+    if id.is_empty() || at.is_empty() { return Err("거래처 삭제 요청 정보가 없습니다.".into()); }
+    let mut next = state.clone();
+    let clients = next.get_mut("clients").and_then(Value::as_array_mut)
+        .ok_or("거래처 목록이 없습니다.")?;
+    let client = clients.iter_mut().find(|client| field(client, "id") == id)
+        .ok_or("삭제할 거래처를 찾지 못했습니다.")?;
+    client["deletedAt"] = json!(at);
+    Ok(json!({"state":next}))
+}
+
+/// Original productKey uses a compact upper-case model code and a stable
+/// single-sale-variant ID. Deletion must not relink a later catalog import.
+fn product_key(product: &Value) -> String {
+    let catalog = product.get("catalog").and_then(Value::as_str).unwrap_or_else(|| {
+        if items(product, "variants").iter().any(|v| field(v, "source") == "DEMO") {
+            "DEMO"
+        } else { "BANDOSTAND" }
+    });
+    let code: String = field(product, "code").trim().chars()
+        .flat_map(char::to_uppercase).filter(|c| !c.is_whitespace()).collect();
+    let suffix = if product.get("saleUnit") == Some(&Value::Bool(true)) {
+        format!("|sale:{}", items(product, "variants").first()
+            .map(|v| field(v, "id")).unwrap_or("undefined"))
+    } else { String::new() };
+    format!("{catalog}|{code}{suffix}")
+}
+fn archive_product(state: &Value, id: &str, at: &str) -> Result<Value, String> {
+    if id.is_empty() || at.is_empty() { return Err("상품 삭제 요청 정보가 없습니다.".into()); }
+    let mut next = state.clone();
+    let products = next.get_mut("products").and_then(Value::as_array_mut)
+        .ok_or("상품 목록이 없습니다.")?;
+    let product = products.iter_mut().find(|p| field(p, "id") == id)
+        .ok_or("삭제할 상품을 찾지 못했습니다.")?;
+    let key = product_key(product);
+    product["deletedAt"] = json!(at);
+    let mut keys = items(state, "deletedProductKeys").to_vec();
+    if !keys.iter().any(|entry| entry.as_str() == Some(key.as_str())) {
+        keys.push(json!(key));
+    }
+    next["deletedProductKeys"] = json!(keys);
+    let aliases = items(state, "aliases").iter()
+        .filter(|alias| field(alias, "productId") != id)
+        .cloned().collect::<Vec<_>>();
+    next["aliases"] = json!(aliases);
+    Ok(json!({"state":next}))
+}
+
 pub fn execute(operation: &str, payload: Value) -> Result<Value, String> {
     let state = payload.get("state").ok_or("현재 상태가 없습니다.")?;
     match operation {
+        "archive_client" => archive_client(
+            state, field(&payload, "clientId"), field(&payload, "at")),
+        "archive_product" => archive_product(
+            state, field(&payload, "productId"), field(&payload, "at")),
         "apply_client_workbook" => apply_client_workbook(
             state, payload.get("preview").ok_or("거래처 Excel 검토 자료가 없습니다.")?),
         "apply_product_workbook" => apply_product_workbook(
