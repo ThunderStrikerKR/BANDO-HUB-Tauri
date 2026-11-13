@@ -4,6 +4,23 @@ use serde_json::{json, Value};
 use super::{checked_sum, field, find_by_id, flag, has_value, req, required_str, rows, safe, set, str_field};
 use super::pricing;
 
+pub(super) fn dispatch_state(state: &Value, order_id: &str) -> Result<Value,String> {
+    let shipments=rows(field(field(state,"workflow"),"shipments")).iter()
+        .filter(|ship|str_field(ship,"orderId")==order_id)
+        .collect::<Vec<_>>();
+    let completed=!shipments.is_empty() && shipments.iter().all(|ship| {
+        let order=find_by_id(field(state,"orders"),order_id);
+        let row=order.and_then(|o|find_by_id(field(o,"recipients"),str_field(ship,"recipientId")));
+        let Some(row)=row else {return false};
+        row_origins(row).iter().all(|origin| {
+            let tracking=str_field(field(ship,"tracking"),origin);
+            let actual=field(ship,"actualFreight").get(*origin)
+                .unwrap_or_else(||field(row,"actualFreight"));
+            !tracking.is_empty() && !actual.is_null()
+        })
+    });
+    Ok(json!({"status":if completed {"처리 완료"} else {"처리 중"}}))
+}
 fn index_by_id(values: &Value, id: &str) -> Option<usize> {
     rows(values).iter().position(|v|str_field(v,"id")==id)
 }
