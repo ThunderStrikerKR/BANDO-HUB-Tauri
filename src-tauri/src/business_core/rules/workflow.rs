@@ -594,6 +594,204 @@ pub(super) fn apply(payload:&Value)->Result<Value,String> {
                 before,json!({"origin":origin,"amount":value}),&group_id)?;
             Ok(json!({"state":state,"unchanged":false}))
         }
+        "confirm_group_payment" => {
+            let group_id=required_str(payload,"groupId")?;
+            let (gi,ships)=group_indices(&state,group_id)?;
+            let first_id=str_field(&state["workflow"]["shipments"][ships[0]],"id");
+            let (_si,oi,_ri)=shipment_indices(&state,first_id)?;
+            let client=party(&state,&state["orders"][oi])
+                .ok_or("거래처 정보를 확인하세요.")?.clone();
+            if str_field(&client,"payment")=="POSTPAID" {
+                let mut request=payload.clone();
+                set(&mut request,"action",json!("advance_group"))?;
+                return apply(&request);
+            }
+            if ships.iter().all(|i|field(&state["workflow"]["shipments"][*i],"step").as_i64()==Some(4)) {
+                return Ok(json!({"state":state,"unchanged":true}));
+            }
+            if group_step(&state,group_id)?!=3 ||
+                flag(&state["workflow"]["groups"][gi],"needsNotice") {
+                return Err("계좌 안내를 먼저 완료하세요.".into());
+            }
+            let issues=stage_issues(&state,group_id,3)?;
+            if !issues.is_empty(){return Err(issues.join("\n"));}
+            let group=&state["workflow"]["groups"][gi];
+            let notice=rows(field(group,"notices")).last()
+                .ok_or("확정 청구액과 안내 계좌가 필요합니다.")?;
+            let total=ships.iter().map(|i|{
+                let sid=str_field(&state["workflow"]["shipments"][*i],"id");
+                shipment_totals(&state,sid).ok()
+                    .and_then(|t|safe(field(&t,"total")))
+            }).collect::<Option<Vec<i64>>>()
+              .and_then(checked_sum).ok_or("확정 청구액과 안내 계좌가 필요합니다.")?;
+            let shipment_ids=ships.iter().map(|i|
+                str_field(&state["workflow"]["shipments"][*i],"id").to_string()).collect::<Vec<_>>();
+            for confirmation in rows(field(&state["workflow"],"confirmations")) {
+                if str_field(confirmation,"groupId")==group_id &&
+                    rows(field(confirmation,"shipmentIds")).iter().any(|sid|
+                        shipment_ids.iter().any(|id|sid.as_str()==Some(id.as_str()))) {
+                    return Err("이미 입금 확인한 묶음입니다.".into());
+                }
+            }
+            let mut allocations=Vec::new();
+            for si in &ships {
+                let ship=&state["workflow"]["shipments"][*si];
+                let (_x,oi,_r)=shipment_indices(&state,str_field(ship,"id"))?;
+                let order=&state["orders"][oi];
+                let payer=party(&state,order).ok_or("거래처 정보를 확인하세요.")?;
+                let due=payment_due(&state,ship,order,payer)?
+                    .ok_or("입금액 확인 필요")?;
+                allocations.push(json!({"shipmentId":field(ship,"id"),"amount":due}));
+            }
+            let confirmation_id=required_str(payload,"confirmationId")?;
+            if find_by_id(field(&state["workflow"],"confirmations"),confirmation_id).is_some() {
+                return Err("입금 확인 기록 중복".into());
+            }
+            let confirmation=json!({
+                "id":confirmation_id,"groupId":group_id,
+                "dealerId":field(group,"dealerId"),"shipmentIds":shipment_ids,
+                "amount":total,"confirmedAt":required_str(payload,"now")?,
+                "actor":if str_field(payload,"actor").is_empty() {"직원(이름 미설정)"}
+                    else {str_field(payload,"actor")},
+                "announcedAccount":field(notice,"account"),
+                "amounts":field(notice,"amounts"),"allocations":allocations
+            });
+            if !state["workflow"]["confirmations"].is_array() {
+                set(&mut state["workflow"],"confirmations",json!([]))?;
+            }
+            state["workflow"]["confirmations"].as_array_mut()
+                .ok_or("입금 확인 기록 형식 오류")?.push(confirmation);
+            let mut request=payload.clone();
+            set(&mut request,"action",json!("advance_group"))?;
+            set(&mut request,"state",state)?;
+            apply(&request)
+        }
+        "record_payment" => {
+            let group_id=required_str(payload,"groupId")?;
+            let (gi,_ships)=group_indices(&state,group_id)?;
+            let group=&state["workflow"]["groups"][gi];
+            let first=rows(field(&state["workflow"],"shipments")).iter()
+                .find(|s|str_field(s,"groupId")==group_id)
+                .ok_or("묶음의 배송 건이 없습니다.")?;
+            let (_si,oi,_ri)=shipment_indices(&state,str_field(first,"id"))?;
+            let order=&state["orders"][oi];
+            let client=party(&state,order).ok_or("거래처 정보를 확인하세요.")?;
+            let account=account_for(&state,group,order,client)
+                .ok_or("실제 입금액과 입금 계좌를 확인하세요.")?.clone();
+            if ["number","bank","holder"].iter().any(|key|str_field(&account,key).trim().is_empty()) {
+                return Err("실제 입금액과 입금 계좌를 확인하세요.".into());
+            }
+            let paid=safe(req(payload,"paidAmount")?)
+                .filter(|v|*v>0).ok_or("실제 입금액과 입금 계좌를 확인하세요.")?;
+            let paid_at=required_str(payload,"paidAt")?;
+            if paid_at.len()<10 || !(paid_at.contains('T') || paid_at.contains(' ')) {
+                return Err("실제 입금 일시를 입력하세요.".into());
+            }
+            let allocations=rows(req(payload,"allocations")?);
+            let ids=rows(req(payload,"allocationIds")?);
+            if ids.len()!=allocations.len() {
+                return Err("입금 배분 ID 수를 확인하세요.".into());
+            }
+            let mut seen=std::collections::HashSet::new();
+            let mut total=Vec::new();
+            let mut result_allocations=Vec::new();
+            let mut shipment_ids=Vec::new();
+            for (idx,a) in allocations.iter().enumerate() {
+                let shipment_id=str_field(a,"shipmentId");
+                if !seen.insert(shipment_id) {return Err("배분 대상이 중복됩니다.".into());}
+                let value=safe(field(a,"amount")).ok_or("입금 배분을 확인하세요.")?;
+                let (_s,order_idx,_r)=shipment_indices(&state,shipment_id)?;
+                let target_order=&state["orders"][order_idx];
+                let target_ship=find_by_id(field(&state["workflow"],"shipments"),shipment_id)
+                    .ok_or("입금 배분을 확인하세요.")?;
+                let target_group=find_by_id(field(&state["workflow"],"groups"),
+                    str_field(target_ship,"groupId")).ok_or("입금 배분을 확인하세요.")?;
+                let target_client=party(&state,target_order).ok_or("입금 배분을 확인하세요.")?;
+                let target_account=account_for(&state,target_group,target_order,target_client);
+                let key=|acct:&Value|json!([field(acct,"id"),
+                    str_field(acct,"bank").trim(),str_field(acct,"number").trim(),
+                    str_field(acct,"holder").trim()]);
+                if str_field(target_order,"clientId")!=str_field(group,"dealerId") ||
+                    !target_account.is_some_and(|a|key(a)==key(&account)) {
+                    return Err("다른 거래처 / 계좌의 배송 건에 배분할 수 없습니다.".into());
+                }
+                total.push(value);
+                shipment_ids.push(shipment_id.to_string());
+                if value>0 {
+                    let id=ids[idx].as_str().filter(|s|!s.trim().is_empty())
+                        .ok_or("입금 배분 ID 누락")?;
+                    result_allocations.push(json!({"id":id,"shipmentId":shipment_id,"amount":value}));
+                }
+            }
+            if checked_sum(total).is_none_or(|sum|sum>paid) {
+                return Err("배분액이 실제 입금액을 초과합니다.".into());
+            }
+            let payment_id=required_str(payload,"paymentId")?;
+            if find_by_id(field(&state["workflow"],"payments"),payment_id).is_some() {
+                return Err("입금 기록 ID가 중복됩니다.".into());
+            }
+            let payment=json!({"id":payment_id,"dealerId":field(group,"dealerId"),
+                "account":account,"amount":paid,"paidAt":paid_at,
+                "recordedAt":required_str(payload,"now")?,
+                "actor":if str_field(payload,"actor").is_empty() {"직원(이름 미설정)"}
+                    else {str_field(payload,"actor")},
+                "memo":str_field(payload,"memo"),"allocations":result_allocations});
+            state["workflow"]["payments"].as_array_mut()
+                .ok_or("입금 기록 목록 형식 오류")?.push(payment.clone());
+            append_event(&mut state,payload,"실제 입금 기록",&shipment_ids,
+                Value::Null,payment,group_id)?;
+            Ok(json!({"state":state,"paymentId":payment_id}))
+        }
+        "restore_shipment" => {
+            let id=required_str(payload,"shipmentId")?;
+            let (si,_oi,_ri)=shipment_indices(&state,id)?;
+            if !flag(&state["workflow"]["shipments"][si],"transferred") {
+                return Err("이관된 배송 건을 선택하세요.".into());
+            }
+            let group_id=str_field(&state["workflow"]["shipments"][si],"groupId").to_string();
+            let affected=rows(field(&state["workflow"],"queue")).iter().enumerate()
+                .filter(|(_,q)|str_field(q,"shipmentId")==id &&
+                    str_field(q,"status")!="CANCELLED")
+                .map(|(index,q)|(index,str_field(q,"status").to_string()))
+                .collect::<Vec<_>>();
+            if affected.iter().any(|(_,status)|status!="QUEUED") {
+                return Err("이미 공장 전달 / 매장 발송한 건입니다. 변경 요청을 기록하세요.".into());
+            }
+            for (i,_) in affected {set(&mut state["workflow"]["queue"][i],"status",json!("CANCELLED"))?;}
+            set(&mut state["workflow"]["shipments"][si],"transferred",json!(false))?;
+            append_event(&mut state,payload,"엑셀 이관 복구",&[id.to_string()],
+                Value::Null,Value::Null,&group_id)?;
+            Ok(json!({"state":state,"restored":true}))
+        }
+        "mark_store_sent" => {
+            let queue_id=required_str(payload,"queueId")?;
+            let qi=index_by_id(field(&state["workflow"],"queue"),queue_id)
+                .ok_or("매장 발송 대기 건을 선택하세요.")?;
+            let q=&state["workflow"]["queue"][qi];
+            let status=str_field(q,"status");
+            if str_field(q,"origin")!="STORE" || !["QUEUED","EXPORTED"].contains(&status) {
+                return Err("매장 발송 대기 건을 선택하세요.".into());
+            }
+            if status=="EXPORTED" {
+                let export=find_by_id(field(&state,"exports"),str_field(q,"exportId"));
+                if !export.is_some_and(|e|rows(field(e,"queueEntryIds")).iter().any(|x|
+                    x.as_str()==Some(queue_id))) {
+                    return Err("해당 매장 Excel 출력 이력을 확인할 수 없습니다.".into());
+                }
+            }
+            let shipment_id=str_field(q,"shipmentId").to_string();
+            set(&mut state["workflow"]["queue"][qi],"status",json!("STORE_SENT"))?;
+            set(&mut state["workflow"]["queue"][qi],"fileOnly",json!(false))?;
+            if !has_value(field(&state["workflow"]["queue"][qi],"exportedAt")) {
+                set(&mut state["workflow"]["queue"][qi],"exportedAt",
+                    json!(required_str(payload,"now")?))?;
+            }
+            let group_id=find_by_id(field(&state["workflow"],"shipments"),&shipment_id)
+                .map(|s|str_field(s,"groupId")).unwrap_or("").to_string();
+            append_event(&mut state,payload,"매장 발송 확인",&[shipment_id],
+                Value::Null,Value::Null,&group_id)?;
+            Ok(json!({"state":state,"status":"STORE_SENT"}))
+        }
         _ => Err(format!("지원하지 않는 업무 action: {action}")),
     }
 }
