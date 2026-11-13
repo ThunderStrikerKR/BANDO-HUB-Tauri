@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { won } from "../domain";
+import { won } from "./history-format";
 import type { NoticeSink } from "../shared/notices";
 import type { State } from "../types";
 
