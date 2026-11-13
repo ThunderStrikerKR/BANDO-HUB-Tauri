@@ -25,6 +25,8 @@ import { correctionStatus, requestCorrection, copiedCorrection, confirmCorrectio
 import { orderIssues, approveMissingQuantity, pendingIssue } from "../../../../src/validation.ts";
 import { validateReceptionBoundary, newReception, replaceReception, persistedReceptionState } from "../../../../src/orders/reception.ts";
 import { confirmRetail, newRetailOrder } from "../../../../src/orders/retail.ts";
+import { rawCorrectableIssue, rawCorrectionAllowed, correctWorkingRaw } from "../../../../src/working-raw.ts";
+import { receiptOf, correctReceipt } from "../../../../src/receipt.ts";
 import { companyClient, companyParty } from "../../../../src/order-types.ts";
 import { explicitSender } from "../../../../src/explicit-sender.ts";
 
@@ -2708,6 +2710,120 @@ retailCase("missing sending address blocked",(s,d)=>{
 retailCase("deleted product blocked",(s,d)=>{
   s.products[0].deletedAt=now;
 },false);
+
+
+// Original correction eligibility and receipt fallback tests are fully
+// independent of recognition. Mutations use genuine TS parseOrder output
+// from the identical input state, never a synthesized Rust product mapping.
+for(const kind of ["NAME","ADDRESS","CONTACT","CONTACT_INVALID","MODEL",
+ "QUANTITY_MISSING","QUANTITY_INVALID","ITEM","UNASSIGNED_EVIDENCE",
+ "SALE_STATUS","PRICE","FREIGHT","UNKNOWN"]){
+  add("raw eligibility: "+kind,"apply_raw_correction",{
+    action:"raw_correctable_issue",kind
+  },()=>({correctable:rawCorrectableIssue(kind)}));
+}
+const existingReceipt:any=copy(order);
+existingReceipt.receipt={original:"원문 증거",at:now,actor:"접수자",clientId:"dealer-1",legacy:false};
+add("receipt: existing original","apply_raw_correction",{
+  action:"receipt_of",order:existingReceipt
+},()=>({receipt:receiptOf(existingReceipt)}));
+const historicReceipt:any=copy(order);
+historicReceipt.rawHistory=[{at:now,raw:"최초 입력 원문",actor:"이전 담당"}];
+add("receipt: fallback to first rawHistory","apply_raw_correction",{
+  action:"receipt_of",order:historicReceipt
+},()=>({receipt:receiptOf(historicReceipt)}));
+add("receipt: fallback when no history","apply_raw_correction",{
+  action:"receipt_of",order
+},()=>({receipt:receiptOf(order as any)}));
+function eligibleRawState(){
+  const state:any=copy(baseState);
+  state.products[0].defaultColor="Black";
+  state.products[0].createdAt=now;
+  state.orders[0].recipients[0].name="";
+  state.workflow.shipments[0].step=0;
+  state.workflow.shipments[0].completedAt={};
+  state.workflow.shipments[0].transferred=false;
+  return state;
+}
+function rawAllowedCase(name:string,change:(s:any)=>void,expected:boolean){
+  const state=eligibleRawState();change(state);
+  add("raw allowed: "+name,"apply_raw_correction",{
+    action:"raw_correction_allowed",state,order:state.orders[0]
+  },()=>({allowed:rawCorrectionAllowed(state,state.orders[0])}));
+  cases[cases.length-1].expectedOk=true;
+}
+rawAllowedCase("name issue at stage zero",()=>{},true);
+rawAllowedCase("stage two locked",s=>{s.workflow.shipments[0].step=2;},false);
+rawAllowedCase("already transferred",s=>{s.workflow.shipments[0].transferred=true;},false);
+rawAllowedCase("paid order",s=>{s.orders[0].paid=true;},false);
+rawAllowedCase("notified order",s=>{s.orders[0].notified=true;},false);
+rawAllowedCase("postpaid approved",s=>{s.orders[0].postpaidApproved=true;},false);
+rawAllowedCase("retail order",s=>{s.orders[0].orderType="RETAIL";},false);
+rawAllowedCase("no recognized correction issue",s=>{s.orders[0].recipients[0].name="가상 수취인";},false);
+rawAllowedCase("already linked payment",s=>{s.workflow.payments.push({
+  id:"payment-linked",amount:1000,
+  allocations:[{shipmentId:"shipment:o1:r1",amount:1000}]
+});},false);
+rawAllowedCase("existing payment confirmation",s=>{s.workflow.confirmations.push({
+  id:"confirmation-linked",shipmentIds:["shipment:o1:r1"],allocations:[]
+});},false);
+rawAllowedCase("existing delivery",s=>{s.workflow.shipments[0].delivery={at:now};},false);
+rawAllowedCase("unknown order not eligible",s=>{s.orders[0].id="other-id";},true);
+function correctionWrapperCase(name:string,action:"correct_working_raw"|"correct_receipt",
+ change:(s:any)=>void,text:string,reason:string,expectOk:boolean){
+  const state=eligibleRawState();
+  change(state);
+  const o:any=state.orders[0];
+  const ids=Array.from({length:120},(_,i)=>
+    "audit-"+name.replace(/[^a-zA-Z0-9]/g,"-")+"-"+i);
+  let eventIds:string[]=[],reconcileEventIds:string[]=[],
+    parsedRecipients:any[]=[],correctionId=ids[0];
+  if(expectOk){
+    const beforeReconcile=action==="correct_receipt"?
+      withIdCapture(ids,()=>reconcileWorkflow(state,o)):
+      {result:copy(state),used:0};
+    const base:any=beforeReconcile.result;
+    const effectiveOrder=base.orders.find((x:any)=>x.id===o.id)??o;
+    const party=base.clients.find((c:any)=>c.id===o.clientId)
+      ??effectiveOrder.clientSnapshot ??client;
+    const parsed=withIdCapture(ids.slice(beforeReconcile.used),()=>
+      parseOrder(text,party,base));
+    parsedRecipients=parsed.result as any[];
+    const result=withIdCapture(ids,()=>action==="correct_receipt"?
+      correctReceipt(state,o,text,reason,"가상 담당자"):
+      correctWorkingRaw(state,o,text,reason));
+    const target:any=(result.result as any).orders.find((x:any)=>x.id===o.id);
+    correctionId=target.rawCorrections.at(-1).id;
+    const consumed=ids.indexOf(correctionId);
+    if(consumed<0)throw Error("Failed to identify source correction ID");
+    reconcileEventIds=ids.slice(0,beforeReconcile.used);
+    eventIds=ids.slice(beforeReconcile.used+parsed.used,consumed);
+  }
+  add("raw correction: "+name,"apply_raw_correction",{
+    action,state,order:o,text,reason,actor:"가상 담당자",
+    now:actionNow,parsedRecipients,eventIds,reconcileEventIds,correctionId
+  },()=>({state:deterministicIds(ids,()=>action==="correct_receipt"?
+    correctReceipt(state,o,text,reason,"가상 담당자"):
+    correctWorkingRaw(state,o,text,reason))}));
+  cases[cases.length-1].expectedOk=expectOk;
+}
+correctionWrapperCase("working correction missing source issue","correct_working_raw",
+ s=>{s.orders[0].recipients[0].name="가상 수취인";},
+ "가상 수취인\n서울시 가상로 1\n010-1234-5678\n가상 상품 2개","입력오류",false);
+correctionWrapperCase("working correction without reason","correct_working_raw",
+ ()=>{},"가상 수취인\n서울시 가상로 1\n010-1234-5678\n가상 상품 2개","",false);
+correctionWrapperCase("working correction unchanged","correct_working_raw",
+ ()=>{},"가상 발주서","입력 오류",false);
+correctionWrapperCase("receipt correction missing reason","correct_receipt",
+ ()=>{},"수취인 가상 수취인 1개","",false);
+correctionWrapperCase("working correction valid preserved receipt","correct_working_raw",
+ s=>{s.orders[0].receipt={original:s.orders[0].raw,at:now,
+    actor:"최초 접수자",clientId:"dealer-1",legacy:false};},
+ "가상 수취인\n서울시 가상로 1\n010-1234-5678\n가상 상품 2개",
+ "문자 인식 오류",true);
+correctionWrapperCase("receipt correction valid audit","correct_receipt",
+ ()=>{},"가상 수취인\n서울시 가상로 1\n010-1234-5678\n가상 상품 2개",
+ "붙여넣기 오류",true);
 
 function normalized(v:unknown):string {
   if(Array.isArray(v))return "["+v.map(normalized).join(",")+"]";
