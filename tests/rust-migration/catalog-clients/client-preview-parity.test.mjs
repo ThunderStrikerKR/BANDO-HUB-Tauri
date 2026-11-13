@@ -114,7 +114,8 @@ add("two edited clients collide after file changes",(s,r)=>{
 });
 
 function canonical(result,rows) {
-  const copy=structuredClone(result);
+  // JSON is the real Tauri IPC transport: undefined fields are omitted.
+  const copy=JSON.parse(JSON.stringify(result));
   if(!copy.ok)return copy;
   for(const entry of copy.value.rows){
     const source=rows.find(row=>row.row===entry.row);
