@@ -3,7 +3,7 @@
 //! Derives the visible per-shipment and per-group totals from the same Rust
 //! rules that validate subsequent staff-approved workflow transitions.
 use serde_json::{json, Value};
-use super::{checked_sum, field, find_by_id, flag, has_value, req, rows, safe, str_field};
+use super::{checked_sum, field, find_by_id, flag, has_value, req, rows, safe, set, str_field};
 use super::{workflow, workflow_issues};
 
 fn sum_field(totals: &[Value], key: &str) -> Value {
@@ -42,6 +42,28 @@ pub(super) fn project(payload: &Value) -> Result<Value, String> {
             .collect::<Vec<_>>();
         if ships.is_empty() { continue; }
 
+        // GroupAccount in the original TypeScript sees only this group's
+        // recipients, which matters when one source order is split between
+        // BANDOMALL and BANDOSTAND account mappings.
+        let first_order = find_by_id(orders, str_field(ships[0], "orderId"))
+            .ok_or("배송 건의 발주서 / 수취인 / 거래처 연결을 확인하세요.")?;
+        let mut group_order = first_order.clone();
+        let group_rows = rows(field(first_order, "recipients")).iter()
+            .filter(|row| ships.iter().any(|ship|
+                str_field(ship, "recipientId") == str_field(row, "id")))
+            .cloned().collect::<Vec<_>>();
+        set(&mut group_order, "recipients", json!(group_rows))?;
+        let party = workflow::party(state, &group_order)
+            .ok_or("거래처 정보를 확인하세요.")?;
+        let account = workflow::account_for(state, group, &group_order, party);
+        let account_key = |value: &Value| json!([
+            field(value, "id"),
+            str_field(value, "bank").trim(),
+            str_field(value, "number").trim(),
+            str_field(value, "holder").trim()
+        ]);
+        let account_id = account.map(account_key);
+
         let mut totals = Vec::with_capacity(ships.len());
         let mut shipment_projections = Vec::with_capacity(ships.len());
         let mut all_vat = true;
@@ -55,8 +77,23 @@ pub(super) fn project(payload: &Value) -> Result<Value, String> {
             all_vat &= vat;
             any_vat |= vat;
             let amount = workflow::shipment_totals(state, str_field(ship, "id"))?;
+            // Only settled allocations with the selected group's account
+            // count as paid; confirmations do not create a second payment.
+            let mut paid = 0_i64;
+            for payment in rows(field(workflow_state, "payments")).iter().filter(|payment|
+                str_field(payment, "dealerId") == str_field(order, "clientId") &&
+                account_id.as_ref().is_some_and(|key| *key == account_key(field(payment, "account")))) {
+                for allocation in rows(field(payment, "allocations")).iter().filter(|allocation|
+                    str_field(allocation, "shipmentId") == str_field(ship, "id")) {
+                    let value = safe(field(allocation, "amount"))
+                        .ok_or("입금 배분 금액을 확인하세요.")?;
+                    paid = checked_sum([paid, value])
+                        .ok_or("입금액 합계를 확인하세요.")?;
+                }
+            }
             shipment_projections.push(json!({
                 "shipmentId": field(ship, "id"),
+                "paid": paid,
                 "totals": amount,
                 "freightCode": workflow::shipment_freight_code(order, recipient),
                 "vatIncluded": vat
