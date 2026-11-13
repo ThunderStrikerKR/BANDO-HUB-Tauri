@@ -81,6 +81,20 @@ pub(super) fn project(payload: &Value) -> Result<Value, String> {
             let recipient = find_by_id(field(order, "recipients"), str_field(ship, "recipientId"))
                 .ok_or("배송 건의 발주서 / 수취인 / 거래처 연결을 확인하세요.")?;
             let vat = vat_applies(order, recipient);
+            let freight_code = workflow::shipment_freight_code(order, recipient);
+            let excluded = workflow::party(state, order)
+                .is_some_and(|client| flag(client, "shippingFeeExcluded"));
+            let mut display_charges = serde_json::Map::new();
+            for item in rows(field(recipient, "items")) {
+                let origin = str_field(item, "origin");
+                if !["FACTORY", "STORE"].contains(&origin) { continue; }
+                let value = if freight_code == "020" || excluded {
+                    json!(0)
+                } else {
+                    field(field(ship, "charges"), origin).clone()
+                };
+                display_charges.insert(origin.to_string(), value);
+            }
             all_vat &= vat;
             any_vat |= vat;
             let amount = workflow::shipment_totals(state, str_field(ship, "id"))?;
@@ -102,7 +116,8 @@ pub(super) fn project(payload: &Value) -> Result<Value, String> {
                 "shipmentId": field(ship, "id"),
                 "paid": paid,
                 "totals": amount,
-                "freightCode": workflow::shipment_freight_code(order, recipient),
+                "freightCode": freight_code,
+                "displayCharges": display_charges,
                 "vatIncluded": vat
             }));
             totals.push(amount);
