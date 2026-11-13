@@ -1,12 +1,92 @@
 # TSBH Rust migration — session 2/3: Price, freight and workflow rules
 
+## Session 2 continuation: workflowIssues and stageIssues differential parity — 2026-11-13
+
+**Implementation and verified source checkpoint**
+- Branch: `migration/02-rules`
+- Verified implementation SHA: `dbd2bf9aa19b0d26f7e946877e278fbab6146d18`
+- GitHub Actions: https://github.com/ThunderStrikerKR/TSBH/actions/runs/43366482425
+- **TypeScript original against actual Rust: 240/240 named fixtures PASS, 0 mismatches**
+- **Standalone Rust regression: 47/47 PASS**
+- **Windows Tauri/SQLite integration: SKIPPED on this branch**
+- No source writes outside the session-2 owned directories or test fixtures.
+
+### Source functionality transferred
+
+- `src-tauri/src/business_core/rules/workflow_issues.rs` is a new
+  pure-Rust projection of `src/workflow.ts::workflowIssues` and `stageIssues`.
+- The `workflow_issues` action returns the **full issue object array**, not
+  merely titles. Includes typed field/recipient/item evidence, original
+  issue IDs and group ownership, sales status blockers and historical
+  split-product price references, sender requirements, active item/variant
+  checks, invalid origin, conditional freight blockers, retail-specific
+  exclusions, chosen account and updated-notice issues.
+- The `stage_issues` action returns original ordered, deduplicated blocker
+  strings at the requested stage, combining projected workflow issues,
+  shipment totals, prior freight application, account notice, prepaid
+  payment deficit and per-shipment sales status.
+- The existing `evaluate_workflow` and `advance_group` functions now use
+  this same stage blocker projection instead of the earlier partial helper.
+  Neither a React caller nor a Tauri command binding was changed.
+- Supports normal and deleted/superseded product status, single-price-record
+  historical mapping, invalid/unknown variant, frozen confirmation handling,
+  manual and preferred/brand account selection, retail fallback, multiple
+  shipping origins, legacy confirmed orders, multiple recipients and
+  partially paid or rechecked prepaid orders.
+
+### Differences found by actual differential execution and corrected
+
+1. **Prepaid recheck**: Old Rust stage validation counted a confirmation that
+   TypeScript invalidates with `입금 승인 재확인 필요`. The shared
+   `payment_due` helper now excludes those confirmations by event ID and
+   shipment before determining stage-4 eligibility.
+2. **Retail with no linked dealer/client snapshot**: original `orderParty`
+   supplies the default company client; Rust stage checking now tolerates
+   this valid input rather than failing with a missing-dealer error.
+3. **Unpriced prepaid shipment**: original text is `입금 부족 확인 필요`
+   when the payable total is null; Rust now preserves this exact text.
+4. **Missing both recipient phone numbers**: original title is
+   `연락처가 없습니다` without final punctuation; the shared
+   `orderIssues` projection was fixed to match exactly.
+5. **Explicit sender phone with whitespace**: original
+   `explicitSender` recognizes separated digit blocks; Rust now handles
+   prefixes `010`, `02`, `050x`, regional codes and split groups with
+   whitespace, parentheses, periods and hyphens. The stage sender
+   requirement compares equal for tested full-width colons and spaced input.
+
+### Differential test coverage
+
+Original TS `workflowIssues` and `stageIssues` are executed directly from
+`tests/rust-migration/rules/parity/compare.mts` on the SAME structured
+JSON input as the compiled Rust `json_rules` binary. Fixtures include:
+
+- Baseline/empty/broken recipient, candidate and confirmation evidence
+- Sender missing, explicit sender/phone, account missing/manual/brand
+- Product unknown, missing variant, deleted, frozen and sale status
+- Historical product mappings including mismatches
+- Mixed shipping origins, collect freight and missing charge
+- PREPAID, POSTPAID, partial payment, confirmed and invalidated payment
+- Retail with/without snapshot, grouped multi-recipient and confirmed order
+- Different stage transition thresholds 1, 2, 3 and 4
+
+**240/240 PASS is a corpus-specific result, not proof of all possible
+inputs or all TypeScript functions.** Remaining blockers outside this task
+include `applyOrderRawEdit`, `migrateWorkflow`, some complete
+`validateWorkflow` and `validateReceptionBoundary` conditions, arbitrary
+sender raw-line parsing, unusual JSON key ordering in evidence, and all
+Tauri/SQLite/Windows integration. Session 3 must retain authoritative
+receipt validation and avoid switching production approvals to Rust until
+integration and all remaining validation branches are proven.
+
+---
+
 ## Session 2 continuation: order decisions, guarded deletion and shipping upgrade — 2026-11-13
 
 **Most recent actual source verification**
 - Branch: `migration/02-rules`
 - Implementation/test-source commit: `8b913a9e647a79e3be72241077933177a8060e15`
 - GitHub Actions: https://github.com/ThunderStrikerKR/TSBH/actions/runs/43364642796
-- **TypeScript original vs Rust: 46/46 named differential fixtures PASS, 0 mismatches**
+- **Previous checkpoint: 46/46 named differential fixtures PASS (superseded by 240/240 above)**
 - **Independent Rust regression: 47/47 PASS, 0 failed**
 - **Windows Tauri integration: SKIPPED by branch CI policy**
 - This is named-case parity ONLY; **session 2 is INCOMPLETE**.
