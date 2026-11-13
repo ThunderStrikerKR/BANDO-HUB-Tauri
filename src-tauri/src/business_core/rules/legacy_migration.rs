@@ -64,6 +64,16 @@ pub(super) fn migrate(payload:&Value)->Result<Value,String>{
             set(&mut state["workflow"]["shipments"][si],"confirmedFreightVersion",version)?;
         }
         if step>=3 {
+            // Original billing -> groupAccount -> groupOrder needs an active
+            // shipment in the group. An exclusively archived group cannot
+            // be re-billed during legacy migration.
+            let group_id=str_field(&ship,"groupId");
+            let active=rows(field(&state["workflow"],"shipments")).iter()
+                .any(|candidate|str_field(candidate,"groupId")==group_id &&
+                    !flag(candidate,"legacyArchived")&&
+                    !find_by_id(field(&state,"orders"),str_field(candidate,"orderId"))
+                        .is_some_and(|order|has_value(field(order,"deletedAt"))));
+            if !active{return Err("묶음의 배송 건이 없습니다.".into());}
             let signature=reconciliation::billing(&state,si)?;
             set(&mut state["workflow"]["shipments"][si],"billingSignature",json!(signature))?;
         }
