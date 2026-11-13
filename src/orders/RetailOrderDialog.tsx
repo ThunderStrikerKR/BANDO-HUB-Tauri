@@ -7,7 +7,8 @@ import { companyClient, companySenderMissing } from "../order-types";
 import { deliveryRequirements } from "../delivery-requirements";
 import { contactProblem } from "../contact";
 import { ProductSearchDialog } from "../ProductSearchDialog";
-import { newRetailOrder, confirmRetail } from "./retail";
+import { newRetailOrder } from "./retail";
+import { nativeConfirmRetail } from "./native-rules";
 import type { State } from "../types";
 export function RetailOrderDialog({
   state,
@@ -244,7 +245,7 @@ export function RetailOrderDialog({
                 setAttempted(true);
                 setBusy(true);
                 try {
-                  await onSave(confirmRetail(state, order));
+                  await onSave(await nativeConfirmRetail(state, order));
                   onClose();
                 } catch (e) {
                   setError(String(e));
