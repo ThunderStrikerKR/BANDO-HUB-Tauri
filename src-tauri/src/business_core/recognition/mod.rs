@@ -1282,6 +1282,32 @@ mod tests {
         assert_eq!(String::from_utf16(&encoded[start..end]).unwrap(),"010-1234-5678");
     }
     #[test]
+    fn changed_quantity_rebinds_all_item_sources_to_stable_recipient() {
+        let old_raw="GT-1 2개\n김가상\n서울특별시 마포구 월드컵로 20";
+        let new_raw="GT-1 3개\n김가상\n서울특별시 마포구 월드컵로 20";
+        let analyzed=execute("analyze_order",json!({
+            "raw":old_raw,"state":state()
+        })).expect("old recognition");
+        let mut order=json!({
+            "raw":old_raw,"analysisRaw":new_raw,"clientId":"sample",
+            "recipients":analyzed["recipients"],"status":"RECEIVED"
+        });
+        order["recipients"][0]["id"]=json!("stable-recipient-0");
+        let result=execute("reanalyze_order",json!({
+            "order":order,"state":state()
+        })).expect("reanalysis after quantity edit");
+        let row=&result["recipients"][0];
+        assert_eq!(row["id"],"stable-recipient-0");
+        let item=&row["items"][0];
+        assert_eq!(item["quantity"],3);
+        for span in item["sources"].as_array().unwrap() {
+            assert_eq!(span["recipientId"],row["id"],
+                "new item source must point to stable matched recipient");
+            assert_eq!(span["targetId"],item["id"]);
+        }
+    }
+
+    #[test]
     fn manual_confirmations_survive_identical_order() {
         let analysis=execute("analyze_order",json!({"raw":"709 2개\n김가상\n서울특별시 마포구 월드컵로 20","state":state()})).unwrap();
         let mut order=json!({"raw":"709 2개\n김가상\n서울특별시 마포구 월드컵로 20",
