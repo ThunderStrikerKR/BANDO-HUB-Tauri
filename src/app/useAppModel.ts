@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { confirmAction, askSaveChanges } from "../dialogs";
-import { canQueue, orderClient, reviewIssues, totals } from "../domain";
+import { orderClient } from "../domain";
+import { businessCoreCall } from "../tauri-bridge";
 import { newReception, persistedReceptionState } from "../orders/reception";
 import { useHasPendingChanges } from "../shared/pending-changes";
 import { requestPageLeave } from "../shared/page-leave";
@@ -200,6 +201,8 @@ export function useAppModel() {
       (state?.orders.some((o) => o.id === draft.id)
         ? JSON.stringify(draft) !== JSON.stringify(state.orders.find((o) => o.id === draft.id))
         : !!(draft.raw || draft.clientId || draft.recipients.length)));
+  const latestSaveInputs = useRef({ state, draft });
+  latestSaveInputs.current = { state, draft };
   const saveOrder = async (mode: "save" | "notify" | "pay" | "queue" | "wait") => {
     if (!state || !draft) return;
     if (
@@ -210,41 +213,21 @@ export function useAppModel() {
       throw Error("최종 검수 후 주문 확인 완료로 정식 접수하세요.");
     const c = orderClient(draft, state);
     if (!c) throw Error("거래처를 선택하세요.");
-    if (draft.status === "EXPORTED") throw Error("공장 전달 완료 주문은 변경할 수 없습니다.");
-    const o = clone(draft),
-      next = clone(state);
-    o.clientSnapshot = clone(c);
-    o.updatedAt = new Date().toISOString();
-    o.vatAmount = totals(o, c).vat;
-    const complete = !reviewIssues(o).length && totals(o, c).total !== null;
-    if (mode === "notify") {
-      if (!complete) throw Error("상품 / 배송 정보 / 금액을 먼저 확인하세요.");
-      o.notified = true;
-      o.status = "NOTIFIED";
-    } else if (mode === "pay") {
-      if (!o.notified || !complete) throw Error("주문 검토와 안내 완료를 먼저 처리하세요.");
-      if (c.payment === "PREPAID") o.paid = true;
-      else o.postpaidApproved = true;
-      o.status = "APPROVED";
-    } else if (mode === "wait") {
-      if (!o.notified || c.payment !== "PREPAID")
-        throw Error("선입금 주문의 안내 완료 후 입금 대기를 처리하세요.");
-      o.status = "WAITING";
-    } else if (mode === "queue") {
-      const missing = canQueue(o, c, state.settings);
-      if (missing.length) throw Error(missing.join("\n"));
-      o.status = "QUEUED";
-      next.queue = [...new Set([...next.queue, o.id])];
-    } else if (!o.notified && !o.paid && !o.postpaidApproved)
-      o.status = complete ? "STATEMENT" : "REVIEW";
-    if (mode !== "queue" && o.status !== "QUEUED")
-      next.queue = next.queue.filter((id) => id !== o.id);
-    o.pricesLocked = complete;
-    const i = next.orders.findIndex((x) => x.id === o.id);
-    if (i < 0) next.orders.unshift(o);
-    else next.orders[i] = o;
-    await commit(next);
-    setDraft(o);
+    // The native Rust rules engine owns amounts, approvals, status and queue
+    // membership. A result for an older draft/revision must not be committed.
+    const sourceState = state;
+    const sourceDraft = draft;
+    const result = await businessCoreCall<{ state: State; order: Order }>(
+      "rules", "save_order", {
+        state: sourceState, order: sourceDraft, client: c,
+        mode, now: new Date().toISOString(),
+      },
+    );
+    const current = latestSaveInputs.current;
+    if (current.state !== sourceState || current.draft !== sourceDraft)
+      throw Error("주문 정보가 변경되었습니다. 최신 내용을 확인한 뒤 다시 저장하세요.");
+    await commit(result.state);
+    setDraft(result.order);
     setNotice(mode === "queue" ? "공장 목록에 추가했습니다." : "주문을 저장했습니다.");
   };
   // A new reception cannot be saved until the employee confirms the order.

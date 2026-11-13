@@ -17,11 +17,13 @@ mod shipping;
 mod workflow;
 mod workflow_issues;
 mod validation;
+mod order_save;
 
 const MAX_SAFE: i64 = 9_007_199_254_740_991;
 
 pub fn execute(operation: &str, payload: Value) -> Result<Value, String> {
     match operation {
+        "save_order" => order_save::save(&payload),
         "calculate_price" => pricing::totals(req(&payload, "order")?, req(&payload, "client")?),
         "resolve_unit_price" => pricing::resolve_unit_price(
             req(&payload, "product")?,
