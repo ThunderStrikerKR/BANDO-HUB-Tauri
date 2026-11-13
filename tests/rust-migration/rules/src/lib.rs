@@ -399,4 +399,61 @@ mod regression {
         assert!(execute("calculate_shipping",json!({"order":o,"state":shipping_state()})).is_err());
     }
 
+    #[test]
+    fn mixed_factory_and_store_origins_keep_independent_tariffs() {
+        let mut order=order(1,json!(30000));
+        let mut store_item=item(1,json!(30000));
+        store_item["id"]=json!("item-store");
+        store_item["productId"]=json!("store-product");
+        store_item["variantId"]=json!("store-variant");
+        store_item["origin"]=json!("STORE");
+        order["recipients"][0]["items"].as_array_mut().unwrap().push(store_item);
+        let mut state=shipping_state();
+        state["products"].as_array_mut().unwrap().push(json!({
+            "id":"store-product","name":"가상 매장 상품","origin":"STORE",
+            "shippingGroupId":"store-group","variants":[{
+                "id":"store-variant","wholesale":30000,"semi":35000,"retail":40000
+            }]
+        }));
+        state["shipping"]["groups"].as_array_mut().unwrap().push(json!({
+            "id":"store-group","name":"매장 소형","current":{
+                "version":"v-store","fees":{"1":2500},"maxBundle":null,
+                "maxConfirmed":false,"perItem":null
+            }
+        }));
+        let rates=run("calculate_shipping",json!({"order":order,"state":state}));
+        assert_eq!(rates["total"],5500);
+        assert_eq!(rates["bundles"].as_array().unwrap().len(),2);
+        assert_eq!(rates["bundles"][0]["origin"],"STORE");
+        assert_eq!(rates["bundles"][0]["recommendation"],2500);
+        assert_eq!(rates["bundles"][1]["origin"],"FACTORY");
+        assert_eq!(rates["bundles"][1]["recommendation"],3000);
+
+        let mut frozen=workflow_state("POSTPAID");
+        frozen["orders"][0]["recipients"][0]["items"].as_array_mut().unwrap().push(
+            order["recipients"][0]["items"][1].clone()
+        );
+        frozen["workflow"]["shipments"][0]["charges"]["STORE"]=json!(2500);
+        assert_eq!(run("calculate_shipment_totals",
+            json!({"state":frozen,"shipmentId":"shipment:o1:r1"})),
+            json!({"subtotal":60000,"shipping":5500,"vat":6550,"total":72050}));
+        frozen["orders"][0]["freightCode"]=json!("020");
+        assert_eq!(run("calculate_shipment_totals",
+            json!({"state":frozen,"shipmentId":"shipment:o1:r1"}))["total"],66000);
+    }
+    #[test]
+    fn product_specific_freight_rule_applies_without_group() {
+        let mut state=shipping_state();
+        state["products"][0]["shippingGroupId"]=Value::Null;
+        state["shipping"]["productRules"]["p1"]=json!({
+            "version":"product-override-1","fees":{"1":8000},
+            "maxBundle":null,"maxConfirmed":false,"perItem":null
+        });
+        let quote=run("calculate_shipping",json!({
+            "state":state,"order":order(1,json!(30000))
+        }));
+        assert_eq!(quote["total"],8000);
+        assert_eq!(quote["bundles"][0]["versions"]["product:p1"],"product-override-1");
+    }
+
 }
