@@ -5,7 +5,7 @@ import { invoke } from "@tauri-apps/api/core";
 
 /** Shared Tauri IPC entry point; domain operations remain checked by Rust. */
 export function businessCoreCall<T>(
-  domain: "recognition" | "rules" | "output",
+  domain: "recognition" | "rules" | "output" | "catalog_clients",
   operation: string,
   payload: unknown,
 ): Promise<T> {
