@@ -28,7 +28,9 @@ test("clipboard copy writes audit via Rust only after native clipboard succeeds"
   assert.match(view,/await onSave\(await nativeRecordMessageCopy\(/);
   assert.doesNotMatch(view,/\brecordCopy\(state,/);
   assert.match(adapter,/"rules", "record_message_copy"/);
-  assert.match(adapter,/copyType === "PAYMENT" \? paymentSignature\(state, groupId\)/);
+  assert.match(adapter,/copyType === "PAYMENT" && signature === undefined/);
+  assert.match(view,/automatic\?\.signature/);
+  assert.doesNotMatch(adapter,/paymentSignature\(/);
   assert.match(rules,/"record_message_copy" => message_audit::record\(&payload\)/);
   assert.match(audit,/str_field\(field\(e,"after"\),"token"\)==token/);
   assert.match(audit,/!flag\(s,"legacyArchived"\)/);
