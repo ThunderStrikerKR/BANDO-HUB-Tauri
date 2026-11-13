@@ -870,7 +870,20 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
                 "kind":"COMMON_INHERIT",
                 "term":hit.raw,
                 "productIds":chosen.into_iter().collect::<Vec<_>>()
-            })} else {hit.decision["match"].clone()};
+            })} else {
+                let mut match_data=hit.decision["match"].clone();
+                let alias=match_data["aliasId"].as_str().and_then(|id|
+                    state["aliases"].as_array().and_then(|aliases|
+                        aliases.iter().find(|a|a["id"].as_str()==Some(id))
+                    )).and_then(|alias|alias["text"].as_str());
+                let unknown=Regex::new(r"(?i)(?:BD\s*)?\d{3}[A-Za-z0-9-]*")
+                    .expect("original TypeScript unknownModel");
+                let term=alias
+                    .or_else(||unknown.find(&hit.raw).map(|m|m.as_str()))
+                    .unwrap_or(&hit.raw);
+                match_data["term"]=json!(term);
+                match_data
+            };
             let mut products=hit.decision["productCandidates"].clone();
             if let Some(candidates)=products.as_array_mut() {
                 // src/parser.ts::parseLegacy assigns item.productCandidates
