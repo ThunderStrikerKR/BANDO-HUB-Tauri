@@ -345,3 +345,47 @@ for(let i=0;i<exceptionCases.length;i++){
     assert.equal(exceptionState.shipping.combinations.length,1);
   });
 }
+
+const groupCrudRequests=[
+  {domain:"rules",operation:"apply_shipping_action",payload:{
+    action:"create_group",shipping,groupId:"new-g3",name:"새 배송 그룹",
+    versionId:"new-g3-v1",now,
+  }},
+  {domain:"rules",operation:"apply_shipping_action",payload:{
+    action:"create_group",shipping,groupId:"new-g3",name:"보면대 그룹",
+    versionId:"new-g3-v1",now,
+  }},
+  {domain:"rules",operation:"apply_shipping_action",payload:{
+    action:"rename_group",shipping,groupId:"g1",name:"그룹명 수정",
+  }},
+];
+const crudRun=spawnSync("cargo",["run","--quiet","--manifest-path",cargo,
+  "--bin","reception_runner"],{
+  cwd:root,input:JSON.stringify(groupCrudRequests),encoding:"utf8",
+  timeout:900000,maxBuffer:64*1024*1024
+});
+if(crudRun.error)throw crudRun.error;
+assert.equal(crudRun.status,0,crudRun.stderr);
+const crudResults=JSON.parse(crudRun.stdout);
+test("Rust group creation preserves existing tariff versions",()=>{
+  assert.equal(crudResults[0].ok,true,JSON.stringify(crudResults[0].error));
+  assert.deepEqual(crudResults[0].value.shipping.groups.slice(0,2),shipping.groups);
+  assert.deepEqual(crudResults[0].value.shipping.groups[2],{
+    id:"new-g3",name:"새 배송 그룹",
+    current:{
+      version:"new-g3-v1",at:now,fees:{},maxBundle:null,
+      maxConfirmed:false,perItem:null,notes:"운임 확인 필요",
+    },history:[],
+  });
+});
+test("Rust group creation rejects a duplicate name",()=>{
+  assert.equal(crudResults[1].ok,false);
+  assert.equal(crudResults[1].error,"같은 배송 그룹이 있습니다.");
+});
+test("Rust rename retains current rate and historical records",()=>{
+  assert.equal(crudResults[2].ok,true,JSON.stringify(crudResults[2].error));
+  assert.deepEqual(crudResults[2].value.shipping.groups[0],{
+    ...shipping.groups[0],name:"그룹명 수정",
+  });
+  assert.deepEqual(crudResults[2].value.shipping.groups[1],shipping.groups[1]);
+});
