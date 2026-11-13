@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { requestEditorLeave, requestPageLeave, usePageLeaveGuard } from "./shared/page-leave";
-import { categoryPath, categoryProducts, changeCategory, deleteCategory, descendants } from "./category-tree";
+import { categoryPath, categoryProducts, descendants } from "./category-tree";
+import { nativeChangeCategory as changeCategory, nativeDeleteCategory as deleteCategory } from "./native-category";
 import { CATALOG_ROOTS, catalogFromCategory, isCatalogRoot, withCatalogRoots } from "./category-roots";
 import { Modal } from "./ui";
 import { ManagementSearch } from "./ui/ManagementSearch";
@@ -64,10 +65,10 @@ export function CategoryManager({
     setName(c.name);
     return true;
   };
-  const save = async (next: State, success: string): Promise<boolean> => {
+  const save = async (next: State | Promise<State>, success: string): Promise<boolean> => {
     setBusy(true);
     try {
-      await onSave(next);
+      await onSave(await next);
       onNotice(success, "success");
       setOperation(null);
       return true;
