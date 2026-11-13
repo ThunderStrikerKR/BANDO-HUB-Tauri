@@ -306,11 +306,30 @@ finally:
   ClickUI "기본 설정"
   $operator=@(Elements | Where-Object {$_.name -eq "작업자 이름" -and $_.control -match "Edit"}) | Select-Object -First 1
   if($null -eq $operator){throw "Saved operator field missing after page re-entry"}
-  $pattern=$operator.el.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern)
-  if($pattern.Current.Value -ne "CI-Windows-UIA-검수"){
-    throw "Saved settings value not restored after leaving and reentering screen"
+  # WebView2's Windows accessibility provider sometimes exposes an Edit
+  # element without the ValuePattern. The real control is still keyboard
+  # accessible. Never fail acceptance merely because that API is unsupported.
+  $shown=$null
+  $accessMethod="UIA ValuePattern"
+  try {
+    $pattern=$operator.el.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern)
+    $shown=$pattern.Current.Value
+  } catch {
+    $accessMethod="Native keyboard Ctrl+A / Ctrl+C from focused WebView2 Edit"
+    [BandoAuditNative]::SetForegroundWindow($proc.MainWindowHandle)|Out-Null
+    $operator.el.SetFocus()
+    Start-Sleep -Milliseconds 250
+    [System.Windows.Forms.Clipboard]::Clear()
+    [System.Windows.Forms.SendKeys]::SendWait("^a")
+    Start-Sleep -Milliseconds 120
+    [System.Windows.Forms.SendKeys]::SendWait("^c")
+    Start-Sleep -Milliseconds 250
+    $shown=[System.Windows.Forms.Clipboard]::GetText()
   }
-  $report.sqliteChecks+=@{check="settings_ui_reopen";status="PASS";value=$pattern.Current.Value}
+  if($shown -ne "CI-Windows-UIA-검수"){
+    throw "Saved settings value not restored in real UI after page re-entry (method=$accessMethod, shown=$shown)"
+  }
+  $report.sqliteChecks+=@{check="settings_ui_reopen";status="PASS";value=$shown;method=$accessMethod}
   Capture "reopened" "설정-재진입-값유지"
   ClickUI "거래처 관리"
   ClickUI "거래처 목록"
