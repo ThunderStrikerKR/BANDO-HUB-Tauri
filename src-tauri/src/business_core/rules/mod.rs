@@ -6,6 +6,7 @@ mod pricing;
 mod reconciliation;
 mod issues;
 mod order_mutations;
+mod group_operations;
 mod legacy_migration;
 mod shipping;
 mod workflow;
@@ -43,6 +44,7 @@ pub fn execute(operation: &str, payload: Value) -> Result<Value, String> {
         ),
         "order_issues" => Ok(json!({"issues": issues::order_issues(req(&payload,"order")?)})),
         "apply_issue_action" => issues::issue_action(&payload),
+        "apply_group_action" => group_operations::mutate(&payload),
         "delete_order" => order_mutations::delete_order(&payload),
         "apply_order_raw_edit" => order_mutations::apply_raw_edit(&payload),
         "migrate_workflow" => legacy_migration::migrate(&payload),
