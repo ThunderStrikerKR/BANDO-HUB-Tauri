@@ -16,6 +16,36 @@ await fs.mkdir(out,{recursive:true});
 const root=await fs.mkdtemp(join(tmpdir(),"bando-native-reception-"));
 const port=19651;
 const binCommit=process.env.BANDO_NATIVE_BIN_COMMIT || "";
+// The developer TEST DB clones the master records from an existing DB.
+// This disposable CI VM has no user data. First let the actual Tauri EXE
+// initialize a synthetic master database. Never overwrite an existing DB.
+assert.equal(process.env.GITHUB_ACTIONS,"true","Synthetic bootstrap is CI-only");
+const baseline=resolve(process.env.APPDATA||"",
+  "com.bandostand.bandohub.tauri","bando-hub-v001.sqlite");
+try{
+  await fs.access(baseline);
+  throw Error("Refusing to use an existing baseline DB");
+}catch(e){if(e?.code!=="ENOENT")throw e;}
+const bootstrap=spawn(exe,[],{
+  cwd:dirname(exe),windowsHide:false,stdio:"ignore",
+  env:{...process.env,WEBVIEW2_USER_DATA_FOLDER:join(root,"bootstrap-webview2")},
+});
+try{
+  let ready=false;
+  for(let n=0;n<120;n++){
+    if(bootstrap.exitCode!==null)throw Error("Native baseline exited "+bootstrap.exitCode);
+    try{if((await fs.stat(baseline)).size>4096){ready=true;break;}}
+    catch{/* opening */}
+    await sleep(300);
+  }
+  assert.ok(ready,"Native Tauri did not initialize disposable CI baseline");
+  await sleep(1700);
+}finally{
+  if(bootstrap.exitCode===null)bootstrap.kill();
+  await sleep(750);
+}
+console.log("NATIVE_CI_BASELINE_CREATED",baseline);
+
 const report={
   type:"real-Windows-Tauri-WebView2-IPC",
   automationCommit:process.env.GITHUB_SHA || "",
@@ -76,7 +106,28 @@ try{
       ],{encoding:"utf8",timeout:35000});
       report.diagnostics.desktopProbe=JSON.parse(outText);
     }catch(e){report.diagnostics.desktopProbeError=String(e);}
-    throw Error("Real Windows WebView2 CDP endpoint was unavailable; native GUI interaction is NOT verified");
+    const nativeUia=execFileSync("pwsh.exe",[
+      "-NoProfile","-Sta","-ExecutionPolicy","Bypass",
+      "-File",resolve("scripts/migration03-reception-native-uia.ps1"),
+      "-ProcessId",String(app.pid),"-OutDir",out,
+    ],{encoding:"utf8",timeout:150000,maxBuffer:8*1024*1024});
+    report.diagnostics.uiaLogTail=nativeUia.slice(-2500);
+    const uia=JSON.parse(await fs.readFile(
+      join(out,"native-reception-uia.json"),"utf8"));
+    report.diagnostics.uia={
+      status:uia.status,checks:uia.checks,captures:uia.captures,
+      initialNodes:uia.initialNodes,finalNodes:uia.finalNodes,
+    };
+    assert.equal(uia.status,"NATIVE_RECEPTION_UIA_PASSED",
+      "WebView2 CDP unavailable and actual Windows UIAutomation failed");
+    report.status="NATIVE_RECEPTION_UIA_PASSED_CDP_UNAVAILABLE";
+    report.limitations=[
+      "Real Tauri screen and UIAutomation passed; no fake browser or IPC",
+      "CDP unavailable: direct per-operation native IPC trace unverified",
+      "Only GitHub Windows runner 1024x768 geometry verified"
+    ];
+    console.log("NATIVE_RECEPTION_UIA_PASS",JSON.stringify(report.diagnostics.uia));
+    await persist();
   }
   browser=await chromium.connectOverCDP("http://127.0.0.1:"+port,{timeout:20000});
   const context=browser.contexts()[0];
