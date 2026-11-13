@@ -14,8 +14,9 @@ fn records<'a>(value:&'a Value,key:&str)->Result<&'a [Value],String>{
 }
 fn unique_rows(rows:&[Value],key:&str)->Vec<Value>{
     let mut found=HashSet::new();
-    rows.iter().filter_map(|row|row.get(key)).filter(|v|found.insert((*v).clone()))
-        .cloned().collect()
+    rows.iter().filter_map(|row|row.get(key).and_then(Value::as_str))
+        .filter(|id|found.insert((*id).to_string()))
+        .map(|id|json!(id)).collect()
 }
 pub(super) fn finalize(payload:&Value)->Result<Value,String>{
     let state=payload.get("state").ok_or("출력 데이터 누락")?;
