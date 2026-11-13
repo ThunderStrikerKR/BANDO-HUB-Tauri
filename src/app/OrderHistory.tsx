@@ -1,9 +1,7 @@
-import { trackingMessage } from "../factory-replies";
 import { DateNavigator } from "./DateNavigator";
 import { useEffect, useRef, useState } from "react";
 import { won } from "../domain";
 import { internalModel } from "../matching";
-import { resolveHistoricalProductReference } from "../historical-product-reference";
 import type { State } from "../types";
 import { ManagementSearch } from "../ui/ManagementSearch";
 import { HelpTooltip } from "../ui/HelpTooltip";
@@ -27,7 +25,16 @@ export function OrderHistory({
   onNotice: NoticeSink;
 }) {
   const [expanded, setExpanded] = useState<string[]>([]);
-  type HistoryRow = ReturnType<typeof orderHistory>[number];
+  type HistoryRow = ReturnType<typeof orderHistory>[number] & {
+    display: {
+      trackingMessage: string;
+      paymentEvidenceMissing: boolean;
+      references: {
+        recipientId: string; itemId: string;
+        link: { name: string; via: "CURRENT" | "HISTORICAL" } | null;
+      }[];
+    };
+  };
   const serial = useRef(0);
   const [loaded, setLoaded] = useState<{
     state: State; query: string; date: string; rows: HistoryRow[]
@@ -37,8 +44,14 @@ export function OrderHistory({
     const request = ++serial.current;
     setLoaded(null);
     setFailure("");
-    void businessCoreCall<HistoryRow[]>("rules", "list_order_history", {
-      state, query, date,
+    // JavaScript preserves Object.values insertion order; the key list is
+    // transport metadata only. Rust owns filtering and message decisions.
+    const trackingOrder = (state.workflow?.shipments ?? []).map((shipment) => ({
+      shipmentId: shipment.id,
+      keys: Object.keys(shipment.tracking ?? {}),
+    }));
+    void businessCoreCall<HistoryRow[]>("rules", "list_order_history_view", {
+      state, query, date, trackingOrder,
     }).then((rows) => {
       if (serial.current === request) setLoaded({ state, query, date, rows });
     }).catch((error: unknown) => {
@@ -102,14 +115,14 @@ export function OrderHistory({
                         <div key={r.id}>
                           {r.name} / {r.address}
                           {r.items.map((item) => {
-                            const linked = resolveHistoricalProductReference(
-                              state, item.productId, item.variantId,
-                            );
+                            const linked = row.display.references.find((reference) =>
+                              reference.recipientId === r.id && reference.itemId === item.id
+                            )?.link;
                             return (
                               <p key={item.id}>
                                 주문 당시: {item.name} × {item.quantity ?? "수량 확인"}
                                 {linked?.via === "HISTORICAL" && (
-                                  <> / 현재 연결 상품: {linked.product.name}</>
+                                  <> / 현재 연결 상품: {linked.name}</>
                                 )}
                                 {!linked && item.productId && (
                                   <> / 상품 연결 확인 필요</>
@@ -153,15 +166,14 @@ export function OrderHistory({
                     {row.order.orderType === "RETAIL" && (
                       <small>소매 주문 / 결제 증빙 별도 확인</small>
                     )}
-                    {row.order.paid && !state.workflow?.payments.some((p) =>
-                      p.allocations.some((a) => row.shipmentIds.includes(a.shipmentId))) && (
+                    {row.display.paymentEvidenceMissing && (
                       <small>기존 입금 표시 / 실제 입금 기록 미확인</small>
                     )}
                   </td>
                   <td>
                     <button
-                      disabled={!trackingMessage(state, row.order.id)}
-                      onClick={() => void window.bando!.copy(trackingMessage(state, row.order.id))}
+                      disabled={!row.display.trackingMessage}
+                      onClick={() => void window.bando!.copy(row.display.trackingMessage)}
                     >
                       운송장 복사
                     </button>
