@@ -147,7 +147,7 @@ pub(super) fn recommend(order: &Value, state: &Value) -> Result<Value, String> {
                 .max_by(|a,b| str_field(a,"at").cmp(str_field(b,"at")));
             let (recommendation,reason,source): (Option<i64>,String,&str) =
                 if items.iter().any(|i| !valid_item(i) ||
-                    field(i,"quantity").as_i64().is_none_or(|q| q < 0 || q > super::MAX_SAFE)) {
+                    field(i,"quantity").as_i64().is_none_or(|q| q > super::MAX_SAFE)) {
                     (None,"상품/옵션/수량 확인 필요".into(),"MANUAL")
                 } else if let Some(known) = known.filter(|_| !expired) {
                     (safe(field(known,"charge")),"현재 기준의 확인된 동일 조합".into(),"COMBINATION")
@@ -221,4 +221,211 @@ pub(super) fn recommend(order: &Value, state: &Value) -> Result<Value, String> {
     let version = format!("{{\"epoch\":{epoch},\"groups\":[{}]}}",
         versions_for_string.join(","));
     Ok(json!({"bundles":bundles,"total":total,"version":version}))
+}
+
+
+/// State-changing tariff operations corresponding to src/shipping.ts. IDs and
+/// timestamps are supplied by the caller instead of reading process globals.
+pub(super) fn shipping_action(payload: &Value) -> Result<Value, String> {
+    use super::{req, required_str, set};
+    let action=required_str(payload,"action")?;
+    match action {
+        "upgrade" => {
+            // src/shipping.ts::upgradeShipping: preserve every existing record
+            // and append only missing historical base classifications.
+            let mut shipping=req(payload,"shipping")?.clone();
+            let now=required_str(payload,"now")?;
+            for (prefix,label,names) in [
+                ("music","일반 보면대",["경량형","표준형","중량형"]),
+                ("microphone","일반 마이크스탠드",["소형 포장","중형 포장","대형 포장"])
+            ] {
+                for (i,name) in names.iter().enumerate() {
+                    let id=format!("{prefix}-type-{}",i+1);
+                    let exists=rows(field(&shipping,"groups")).iter()
+                        .any(|g|str_field(g,"id")==id);
+                    if exists {continue;}
+                    let version=field(field(payload,"groupVersions"),&id)
+                        .as_str().filter(|value|!value.is_empty())
+                        .ok_or_else(||format!("기존 운임 그룹 버전 ID 누락: {id}"))?;
+                    let group=json!({"id":id,"name":format!("{label} / {name}"),
+                        "current":{
+                            "version":version,"at":now,
+                            "fees":{"1":null,"2":null,"3":null,"4":null,"5":null,"6":null},
+                            "maxBundle":null,"maxConfirmed":false,"perItem":null,
+                            "notes":"직원이 분류와 운임을 확인해 입력하세요."
+                        },"history":[]});
+                    shipping["groups"].as_array_mut().ok_or("운임 그룹 목록 누락")?
+                        .push(group);
+                }
+            }
+            Ok(json!({"shipping":shipping}))
+        }
+        "save_combination" => {
+            let mut shipping=req(payload,"shipping")?.clone();
+            let bundle=req(payload,"bundle")?;
+            let charge=safe(req(payload,"charge")?)
+                .ok_or("운임은 0 이상의 원 단위 정수로 입력하세요.")?;
+            let actual=field(payload,"actual");
+            if !actual.is_null() && safe(actual).is_none() {
+                return Err("운임은 0 이상의 원 단위 정수로 입력하세요.".into());
+            }
+            let id=required_str(payload,"combinationId")?;
+            let at=required_str(payload,"now")?;
+            if find_by_id(field(&shipping,"combinations"),id).is_some() {
+                return Err("운임 조합 ID가 중복됩니다.".into());
+            }
+            let key=str_field(bundle,"key");
+            for previous in shipping["combinations"].as_array_mut()
+                .ok_or("운임 조합 목록 누락")? {
+                if str_field(previous,"key")==key && flag(previous,"active") {
+                    set(previous,"active",json!(false))?;
+                }
+            }
+            let combination=json!({
+                "id":id,"key":key,"epoch":field(&shipping,"epoch"),
+                "versions":field(bundle,"versions"),"charge":charge,
+                "actual":actual,"at":at,"active":true,
+                "description":field(bundle,"description")
+            });
+            shipping["combinations"].as_array_mut()
+                .ok_or("운임 조합 목록 누락")?.push(combination);
+            Ok(json!({"shipping":shipping}))
+        }
+        "delete_group" => {
+            let mut state=req(payload,"state")?.clone();
+            let id=required_str(payload,"groupId")?;
+            let idx=rows(field(field(&state,"shipping"),"groups")).iter().position(|g|
+                str_field(g,"id")==id && !has_value(field(g,"deletedAt")))
+                .ok_or("현재 그룹이 없습니다.")?;
+            let linked=rows(field(&state,"products")).iter().filter(|p|
+                !has_value(field(p,"deletedAt")) &&
+                !has_value(field(p,"supersededBy")) &&
+                str_field(p,"shippingGroupId")==id)
+                .map(|p|str_field(p,"name").to_string())
+                .collect::<Vec<_>>();
+            if !linked.is_empty() && !flag(payload,"detach") {
+                return Err(format!("사용 중인 상품: {}",linked.join(", ")));
+            }
+            for product in state["products"].as_array_mut().ok_or("상품 목록 누락")? {
+                if str_field(product,"shippingGroupId")==id {
+                    product.as_object_mut().ok_or("상품 정보 오류")?.remove("shippingGroupId");
+                }
+            }
+            set(&mut state["shipping"]["groups"][idx],"deletedAt",
+                json!(required_str(payload,"now")?))?;
+            for combination in state["shipping"]["combinations"].as_array_mut()
+                .ok_or("운임 조합 목록 누락")? {
+                if has_value(field(field(combination,"versions"),&format!("group:{id}"))) {
+                    set(combination,"active",json!(false))?;
+                }
+            }
+            Ok(json!({"state":state}))
+        }
+        "change_basis" => {
+            let mut shipping=req(payload,"shipping")?.clone();
+            let group_id=payload.get("groupId").and_then(Value::as_str);
+            let now=required_str(payload,"now")?;
+            if group_id.is_none() {
+                let epoch=field(&shipping,"epoch").as_i64().unwrap_or(1);
+                set(&mut shipping,"epoch",json!(epoch+1))?;
+                let rules=field(&shipping,"productRules").as_object()
+                    .cloned().unwrap_or_default();
+                for (pid,old) in rules {
+                    if !shipping["productHistory"].is_object() {
+                        set(&mut shipping,"productHistory",json!({}))?;
+                    }
+                    if !shipping["productHistory"][&pid].is_array() {
+                        set(&mut shipping["productHistory"],&pid,json!([]))?;
+                    }
+                    shipping["productHistory"][&pid].as_array_mut()
+                        .ok_or("운임 이력 오류")?.push(old.clone());
+                    let new_version=field(field(payload,"productVersions"),&pid)
+                        .as_str().filter(|v|!v.is_empty())
+                        .ok_or_else(||format!("상품 운임 버전 ID 누락: {pid}"))?;
+                    let mut next=old;
+                    set(&mut next,"version",json!(new_version))?;
+                    set(&mut next,"at",json!(now))?;
+                    set(&mut next,"fees",json!({}))?;
+                    set(&mut next,"perItem",Value::Null)?;
+                    set(&mut next,"notes",json!("새 기준의 운임 확인 필요"))?;
+                    set(&mut shipping["productRules"],&pid,next)?;
+                }
+            }
+            for group in shipping["groups"].as_array_mut()
+                .ok_or("운임 그룹 목록 누락")? {
+                let group_key=str_field(group,"id").to_string();
+                if group_id.is_some_and(|id|id!=group_key) {continue;}
+                let new_version=field(field(payload,"groupVersions"),&group_key)
+                    .as_str().filter(|v|!v.is_empty())
+                    .ok_or_else(||format!("그룹 운임 버전 ID 누락: {group_key}"))?;
+                let old=field(group,"current").clone();
+                if !field(group,"history").is_array() {set(group,"history",json!([]))?;}
+                group["history"].as_array_mut().ok_or("운임 이력 오류")?.push(old.clone());
+                let mut next=old;
+                set(&mut next,"version",json!(new_version))?;
+                set(&mut next,"at",json!(now))?;
+                set(&mut next,"fees",json!({
+                    "1":null,"2":null,"3":null,"4":null,"5":null,"6":null
+                }))?;
+                set(&mut next,"perItem",Value::Null)?;
+                set(&mut next,"notes",json!("새 기준의 운임 확인 필요"))?;
+                set(group,"current",next)?;
+            }
+            Ok(json!({"shipping":shipping}))
+        }
+        "editable_rule" => {
+            let mut rule=req(payload,"rule")?.clone();
+            if let Some(per_item)=safe(field(&rule,"perItem")) {
+                if !field(&rule,"fees").is_object() {set(&mut rule,"fees",json!({}))?;}
+                set(&mut rule["fees"],"1",json!(per_item))?;
+                set(&mut rule,"perItem",Value::Null)?;
+                set(&mut rule,"maxBundle",json!(1))?;
+                set(&mut rule,"maxConfirmed",json!(true))?;
+            }
+            Ok(json!({"rule":rule}))
+        }
+        "combination_versions" => {
+            let state=req(payload,"state")?;
+            let key=required_str(payload,"key")?;
+            let fallback;
+            let shipping=if field(state,"shipping").is_object() {field(state,"shipping")}
+                else {fallback=initial_shipping(); &fallback};
+            let versions=combination_versions(key,shipping,state);
+            Ok(json!({"versions":versions_value(&versions)}))
+        }
+        "combination_current" => {
+            let state=req(payload,"state")?;
+            let c=req(payload,"combination")?;
+            let shipping=field(state,"shipping");
+            if !shipping.is_object() || !flag(c,"active") ||
+                field(c,"epoch")!=field(shipping,"epoch") {
+                return Ok(json!({"current":false}));
+            }
+            let current=field(c,"versions").as_object().is_some_and(|versions|
+                versions.iter().all(|(key,version)| {
+                    if let Some(id)=key.strip_prefix("group:") {
+                        rows(field(shipping,"groups")).iter().any(|g|
+                            str_field(g,"id")==id &&
+                            field(field(g,"current"),"version")==version &&
+                            field(g,"current").is_object())
+                    } else if let Some(id)=key.strip_prefix("product:") {
+                        let rule=field(field(shipping,"productRules"),id);
+                        if rule.is_object() {field(rule,"version")==version}
+                        else {version=="unregistered"}
+                    } else if let Some(id)=key.strip_prefix("assignment:") {
+                        let assigned=find_by_id(field(state,"products"),id)
+                            .map(|p|str_field(p,"shippingGroupId"))
+                            .filter(|id|!id.is_empty()).unwrap_or("individual");
+                        version==assigned
+                    } else {
+                        rows(field(shipping,"groups")).iter().find(|g|
+                            str_field(g,"id")==key).is_some_and(|g|
+                                field(field(g,"current"),"version")==version)
+                    }
+                })
+            );
+            Ok(json!({"current":current}))
+        }
+        _=>Err(format!("지원하지 않는 운임 action: {action}"))
+    }
 }

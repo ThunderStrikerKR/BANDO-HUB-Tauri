@@ -1,0 +1,455 @@
+// This test crate compiles and exercises the real production recognition module.
+// No duplicate or mock recognition implementation is used here.
+#[path = "../../../../src-tauri/src/business_core/recognition/mod.rs"]
+pub mod recognition;
+
+#[cfg(test)]
+mod catalog_audit;
+
+#[cfg(test)]
+mod differential;
+
+#[cfg(test)]
+mod regressions {
+    use super::recognition;
+    use serde_json::{json, Value};
+
+    fn seed() -> Value {
+        serde_json::from_str(include_str!(
+            "../../../../src-tauri/resources/state-seed.json"
+        )).expect("committed seed state")
+    }
+
+    fn samples() -> Vec<Value> {
+        // Reuse the original untouched 20-order audit inputs and expected values.
+        // The samples are a strict JSON array embedded in the JS test file.
+        let fixture = include_str!("../../../audit-20-order-samples.test.mjs");
+        let start = fixture.find("const samples=[").expect("samples declaration")
+            + "const samples=".len();
+        let end = fixture[start..].find("\n];").expect("end of sample array") + start + 2;
+        let all: Vec<Value> = serde_json::from_str(&fixture[start..end])
+            .expect("20 original sample records");
+        assert_eq!(all.len(), 20);
+        all
+    }
+
+    fn verify(id: usize) {
+        let samples = samples();
+        let case = &samples[id - 1];
+        let raw = case["raw"].as_str().expect("sample raw");
+        let state = seed();
+        let client = json!({"id":"ci-dealer","name":"가상거래처","tier":"wholesale",
+            "overrides":{},"active":true,"payment":"PREPAID"});
+        let result = recognition::execute("analyze_order",json!({
+            "raw":raw,"client":client,"state":state
+        })).expect("recognition execution");
+        let recipients = result["recipients"].as_array().expect("recipients");
+        assert_eq!(recipients.len(),case["expectedRecipients"].as_u64().unwrap() as usize,
+            "order {id}: delivery count, full response {result}");
+        let mut got: Vec<String> = recipients.iter().flat_map(|r|
+            r["items"].as_array().into_iter().flatten()
+                .map(|item| item["quantity"].to_string())).collect();
+        let mut expected: Vec<String> = case["expectedQuantities"]
+            .as_array().unwrap().iter().map(Value::to_string).collect();
+        got.sort();
+        expected.sort();
+        assert_eq!(got,expected,"order {id}: quantities or product ownership, {result}");
+
+        if id == 6 {
+            assert_eq!(recipients[0]["items"][0]["quantityConfirmed"],false,
+                "unwritten quantity must stay unconfirmed");
+        }
+        if id == 18 {
+            let item=&recipients[0]["items"][0];
+            let product_name=item["name"].as_str().unwrap_or("");
+            assert!(item["productId"].is_null() ||
+                product_name.contains("비타공") || product_name.contains("무타공"),
+                "709 민판 must not select a perforated SKU");
+            assert_eq!(recipients[0]["name"],"이가상");
+        }
+        let expected_names = match id {
+            5 => Some(vec!["정가상"]),
+            16 => Some(vec!["배가상"]),
+            17 => Some(vec!["김가상","박가상"]),
+            _ => None,
+        };
+        if let Some(names)=expected_names {
+            let actual:Vec<_>=recipients.iter().map(|r|r["name"].as_str().unwrap_or("")).collect();
+            assert_eq!(actual,names,"order {id}: institution/name boundary");
+            assert!(recipients.iter().all(|r|r["address"].as_str()
+                .map_or(false,|v|!v.is_empty()) && (
+                !r["phone"].as_str().unwrap_or("").is_empty() ||
+                !r["mobile"].as_str().unwrap_or("").is_empty())),
+                "order {id}: recipient lost its address or contact");
+        }
+        if id==19 || id==20 {
+            assert_eq!(recipients.len(),1,"tabular order must not split a delivery");
+        }
+    }
+
+    macro_rules! case {
+        ($fn_name:ident,$number:literal) => {
+            #[test] fn $fn_name() { verify($number); }
+        }
+    }
+    case!(order_01,1);
+    case!(order_02,2);
+    case!(order_03,3);
+    case!(order_04,4);
+    case!(order_05,5);
+    case!(order_06,6);
+    case!(order_07,7);
+    case!(order_08,8);
+    case!(order_09,9);
+    case!(order_10,10);
+    case!(order_11,11);
+    case!(order_12,12);
+    case!(order_13,13);
+    case!(order_14,14);
+    case!(order_15,15);
+    case!(order_16,16);
+    case!(order_17,17);
+    case!(order_18,18);
+    case!(order_19,19);
+    case!(order_20,20);
+
+    #[test]
+    fn an_explicitly_unregistered_color_does_not_select_black() {
+        let state=json!({"products":[{
+            "id":"only-black","name":"709 / 타공 상판","category":"보면대",
+            "origin":"FACTORY","active":true,
+            "variants":[{"id":"black","color":"Black"}]
+        }],"aliases":[]});
+        let result=recognition::execute("match_products",json!({
+            "text":"709 그레이","state":state
+        })).unwrap();
+        assert_eq!(result["productId"],Value::Null);
+    }
+
+    #[test]
+    fn other_model_families_do_not_inherit_music_stand_minus_one_rules() {
+        let state=json!({"products":[
+            {"id":"gt","name":"GT-1 / 기타 스탠드","category":"기타",
+             "origin":"FACTORY","active":true,
+             "variants":[{"id":"vgt","color":"Black"}]},
+            {"id":"cart10","name":"Cart-10 / 보면대 카트","category":"악세사리",
+             "origin":"FACTORY","active":true,
+             "variants":[{"id":"vc10","color":"Black"}]},
+            {"id":"cart20","name":"Cart-20 / 보면대 카트","category":"악세사리",
+             "origin":"FACTORY","active":true,
+             "variants":[{"id":"vc20","color":"Black"}]}
+        ],"aliases":[]});
+        let gt=recognition::execute("match_products",json!({"text":"GT-1","state":state})).unwrap();
+        assert_eq!(gt["productId"],"gt");
+        let cart=recognition::execute("match_products",json!({"text":"Cart-10","state":state})).unwrap();
+        assert_eq!(cart["productId"],"cart10");
+    }
+
+    #[test]
+    fn conflicting_alias_does_not_override_registered_sku() {
+        let state=json!({"products":[
+            {"id":"p709","name":"709 / 타공 상판","category":"보면대",
+             "origin":"FACTORY","active":true,
+             "variants":[{"id":"v709","color":"Black"}]},
+            {"id":"other","name":"독립 상품 / 거치대","category":"액세서리",
+             "origin":"STORE","active":true,
+             "variants":[{"id":"vother","color":"Black"}]}
+        ],"aliases":[{"id":"a1","clientId":null,"text":"709","productId":"other"}]});
+        let outcome=recognition::execute("match_products",json!({"text":"709","state":state})).unwrap();
+        assert_eq!(outcome["productId"],Value::Null);
+        assert_eq!(outcome["match"]["kind"],"CONFLICT");
+    }
+
+    #[test]
+    fn two_recipient_product_ownership_uses_original_evidence_order() {
+        // Source: audit-20-order-samples.test.mjs, sample 13.
+        // A SKU preceding the first address belongs to its following
+        // recipient; the next SKU belongs to the following recipient.
+        let case=&samples()[12];
+        let result=recognition::execute("analyze_order",json!({
+            "raw":case["raw"],"state":seed()
+        })).expect("sample 13");
+        let rows=result["recipients"].as_array().expect("recipients");
+        assert_eq!(rows.len(),2);
+        assert_eq!(rows[0]["name"],"장가상");
+        assert_eq!(rows[1]["name"],"정가상");
+        assert_eq!(rows[0]["items"].as_array().unwrap().len(),1);
+        assert_eq!(rows[1]["items"].as_array().unwrap().len(),1);
+        assert_eq!(rows[0]["items"][0]["quantity"],2);
+        assert!(rows[0]["items"][0]["raw"].as_str().unwrap().contains("SSB"));
+        assert_eq!(rows[1]["items"][0]["quantity"],1);
+        assert!(rows[1]["items"][0]["raw"].as_str().unwrap().contains("705"));
+    }
+
+    #[test]
+    fn tabular_orders_preserve_exact_utf16_evidence_spans() {
+        // Source: parser.ts + order-evidence.ts, 19/20.
+        // Every returned source/candidate must point into the untouched raw
+        // UTF-16 string, not a reconstructed table cell.
+        for id in [19_usize,20] {
+            let case=&samples()[id-1];
+            let raw=case["raw"].as_str().unwrap();
+            let original:Vec<u16>=raw.encode_utf16().collect();
+            let output=recognition::execute("analyze_order",json!({
+                "raw":raw,"state":seed()
+            })).expect("tabular recognition");
+            let mut checked=0;
+            for candidate in output["candidates"].as_array().unwrap() {
+                let start=candidate["start"].as_u64().unwrap() as usize;
+                let end=candidate["end"].as_u64().unwrap() as usize;
+                assert!(start<=end && end<=original.len(),"order {id}: invalid candidate bounds");
+                let original_text=String::from_utf16(&original[start..end]).unwrap();
+                assert_eq!(original_text,candidate["text"].as_str().unwrap(),"order {id}: candidate source was shifted");
+                checked+=1;
+            }
+            for row in output["recipients"].as_array().unwrap() {
+                for item in row["items"].as_array().unwrap() {
+                    for source in item["sources"].as_array().unwrap() {
+                        let start=source["start"].as_u64().unwrap() as usize;
+                        let end=source["end"].as_u64().unwrap() as usize;
+                        assert!(start<=end && end<=original.len(),"order {id}: bad item span");
+                        assert_eq!(String::from_utf16(&original[start..end]).unwrap(),
+                            source["text"].as_str().unwrap(),"order {id}: source must equal original bytes in UTF-16");
+                    }
+                }
+            }
+            assert!(checked>0,"order {id} must retain evidence");
+        }
+    }
+
+    #[test]
+    fn mixed_address_and_contact_reproduce_legacy_phone_masking() {
+        // parser.ts::parseLegacy first masks the phone before matching the
+        // address, so inline numbers never become part of the address value.
+        let fixtures=samples();
+        for id in [7_usize,8] {
+            let raw=fixtures[id-1]["raw"].as_str().unwrap();
+            let result=recognition::execute("analyze_order",json!({
+                "raw":raw,"state":seed()
+            })).unwrap();
+            let row=&result["recipients"][0];
+            let address=row["address"].as_str().unwrap_or("");
+            assert!(!address.contains("010-1234-5678"),
+                "order {id}: address contains a separately recognized phone");
+            assert_eq!(row["mobile"],"010-1234-5678",
+                "order {id}: mobile number must remain a contact field");
+        }
+    }
+
+    #[test]
+    fn source_multiline_address_and_parenthetical_note_are_retained() {
+        // Source: order-evidence.ts:140-188; samples 08 and 09.
+        let samples=samples();
+        let note_raw=samples[7]["raw"].as_str().unwrap();
+        let noted=recognition::execute("analyze_order",json!({
+            "raw":note_raw,"state":seed()
+        })).unwrap();
+        assert!(noted["recipients"][0]["note"].as_str().unwrap_or("")
+            .contains("문안에 넣어주세요"),
+            "sample 08: parenthesized delivery note must survive");
+        let address_raw=samples[8]["raw"].as_str().unwrap();
+        let addressed=recognition::execute("analyze_order",json!({
+            "raw":address_raw,"state":seed()
+        })).unwrap();
+        assert!(addressed["recipients"][0]["address"].as_str().unwrap_or("")
+            .contains("가상카페 1층"),
+            "sample 09: indented building/floor detail must be part of delivery address");
+        assert!(!addressed["recipients"][0]["address"].as_str().unwrap_or("")
+            .contains("가상오디오"),
+            "sample 09: sender section must never bleed into recipient");
+    }
+
+    #[test]
+    fn old_false_manual_flag_does_not_block_reanalysis() {
+        let state=json!({"products":[],"aliases":[]});
+        let order=json!({
+            "raw":"고객정보\n이가상\n경기도 의정부시 시민로 100",
+            "manualClassification":false,
+            "recipients":[],
+            "analysisEvidence":[]
+        });
+        let result=recognition::execute("reanalyze_order",json!({
+            "order":order,"state":state
+        })).expect("reanalyze false manual flag");
+        assert!(!result["recipients"].as_array().unwrap().is_empty());
+    }
+
+    #[test]
+    fn common_total_is_not_copied_to_every_recipient_without_each_evidence() {
+        let state=seed();
+        let suffix="\n김가상\n경기도 의정부시 시민로 100\n박가상\n서울특별시 마포구 월드컵로 20";
+        let raw=format!("모두 709 4개{suffix}");
+        let result=recognition::execute("analyze_order",json!({
+            "raw":raw,"state":state
+        })).unwrap();
+        let rows=result["recipients"].as_array().unwrap();
+        assert_eq!(rows.len(),2);
+        for row in rows {
+            assert_eq!(row["items"].as_array().unwrap().len(),1);
+            assert!(row["items"][0]["quantity"].is_null(),
+                "TypeScript common total is not 4 items for each recipient");
+            assert_eq!(row["items"][0]["quantityConfirmed"],false);
+        }
+        let each=format!("모두 각각 709 4개{suffix}");
+        let result=recognition::execute("analyze_order",json!({
+            "raw":each,"state":seed()
+        })).unwrap();
+        let rows=result["recipients"].as_array().unwrap();
+        assert_eq!(rows.len(),2);
+        for row in rows {
+            assert_eq!(row["items"][0]["quantity"],4);
+            assert_eq!(row["items"][0]["quantityConfirmed"],true);
+        }
+    }
+
+    #[test]
+    fn source_requires_option_keeps_variant_unconfirmed() {
+        let state=json!({"products":[{
+            "id":"sku-option","name":"BD OPTION-X / 가방 선택","code":"BD OPTION-X",
+            "category":"기타","defaultColor":"Black","active":true,
+            "origin":"FACTORY","requiresOption":true,"saleUnit":false,
+            "variants":[{"id":"bag","color":"Black","url":"https://example.com/option","wholesale":100}]
+        }],"aliases":[]});
+        let match_result=recognition::execute("match_products",json!({
+            "text":"BD OPTION-X","state":state
+        })).unwrap();
+        assert_eq!(match_result["productId"],"sku-option");
+        assert!(match_result["variantId"].is_null());
+        let order=recognition::execute("analyze_order",json!({
+            "raw":"BD OPTION-X 2개\n김가상\n경기도 의정부시 시민로 100",
+            "state":state
+        })).unwrap();
+        let item=&order["recipients"][0]["items"][0];
+        assert_eq!(item["productId"],"sku-option");
+        assert!(item["variantId"].is_null());
+        assert!(item["issues"].as_array().unwrap().iter()
+            .any(|x|x.as_str().unwrap_or("").contains("상품 구성 미확정")));
+    }
+
+    #[test]
+    fn source_item_color_default_url_catalog_and_price_snapshot() {
+        let state=json!({"products":[{
+            "id":"sku-solo","name":"BD SOLO-X / 블랙","code":"BD SOLO-X",
+            "category":"기타","defaultColor":"Black","active":true,
+            "origin":"STORE","saleUnit":true,"requiresOption":false,
+            "catalog":"BANDOSTAND",
+            "variants":[{
+                "id":"vsolo","color":"Black","url":"https://example.com/sku",
+                "wholesale":1234,"semi":1500,"retail":1800,"source":"OFFICIAL"
+            }]
+        }],"aliases":[]});
+        let client=json!({"id":"buyer","tier":"wholesale","overrides":{}});
+        let output=recognition::execute("analyze_order",json!({
+            "raw":"BD SOLO-X 2개\n김가상\n경기도 의정부시 시민로 100",
+            "client":client,"state":state
+        })).unwrap();
+        let item=&output["recipients"][0]["items"][0];
+        assert_eq!(item["productId"],"sku-solo");
+        assert_eq!(item["variantId"],"vsolo");
+        assert_eq!(item["name"],"BD SOLO-X / 블랙");
+        assert_eq!(item["color"],"Black");
+        assert_eq!(item["defaulted"],true);
+        assert_eq!(item["url"],"https://example.com/sku");
+        assert_eq!(item["catalog"],"BANDOSTAND");
+        assert_eq!(item["origin"],"STORE");
+        assert_eq!(item["unitPrice"],1234);
+    }
+
+    #[test]
+    fn original_brand_and_catalog_candidates_are_filtered() {
+        let branded=json!({"products":[
+            {"id":"brand-a","name":"BD ZZZ-X / 타입A","code":"BD ZZZ-X",
+             "category":"기타","brandId":"a","active":true,
+             "origin":"FACTORY","defaultColor":"Black",
+             "variants":[{"id":"a-v","color":"Black","source":"OFFICIAL"}]},
+            {"id":"brand-b","name":"BD ZZZ-X / 타입B","code":"BD ZZZ-X",
+             "category":"기타","brandId":"b","active":true,
+             "origin":"FACTORY","defaultColor":"Black",
+             "variants":[{"id":"b-v","color":"Black","source":"OFFICIAL"}]}
+        ],"aliases":[],"brands":[
+            {"id":"a","name":"Alpha Stand","korean":"알파","aliases":[]},
+            {"id":"b","name":"Beta Stand","korean":"베타","aliases":[]}
+        ]});
+        let result=recognition::execute("match_products",json!({
+            "text":"알파 BD ZZZ-X","state":branded
+        })).unwrap();
+        assert_eq!(result["productId"],"brand-a");
+        let catalog=json!({"products":[
+            {"id":"factory","name":"709 / 타공 상판","code":"709",
+             "catalog":"BANDOSTAND","category":"보면대","active":true,
+             "origin":"FACTORY","defaultColor":"Black",
+             "variants":[{"id":"f-v","color":"Black","source":"OFFICIAL"}]},
+            {"id":"mall","name":"709 / 타공 상판","code":"709",
+             "catalog":"BANDOMALL","category":"보면대","active":true,
+             "origin":"STORE","defaultColor":"Black",
+             "variants":[{"id":"m-v","color":"Black","source":"OFFICIAL"}]}
+        ],"aliases":[]});
+        let result=recognition::execute("match_products",json!({
+            "text":"709 1개","state":catalog
+        })).unwrap();
+        assert_eq!(result["productId"],"factory");
+    }
+
+    #[test]
+    fn original_model_color_prefix_and_suffix() {
+        let state=json!({"products":[
+            {"id":"black","name":"BD 970 / 블랙","code":"BD 970",
+             "category":"기타","active":true,"defaultColor":"Black",
+             "origin":"FACTORY","variants":[{"id":"vb","color":"Black","source":"OFFICIAL"}]},
+            {"id":"chrome","name":"BD 970 / 크롬","code":"BD 970",
+             "category":"기타","active":true,"defaultColor":"Chrome",
+             "origin":"FACTORY","variants":[{"id":"vc","color":"Chrome","source":"OFFICIAL"}]}
+        ],"aliases":[]});
+        for input in ["970 C","C 970","970(크롬)"] {
+            let output=recognition::execute("match_products",json!({
+                "text":input,"state":state
+            })).unwrap();
+            assert_eq!(output["productId"],"chrome","case: {input}, {output}");
+        }
+        let output=recognition::execute("match_products",json!({
+            "text":"B 970","state":state
+        })).unwrap();
+        assert_eq!(output["productId"],"black");
+    }
+
+    #[test]
+    fn note_stops_when_next_line_is_registered_product() {
+        let result=recognition::execute("analyze_order",json!({
+            "raw":"배송메모: 문앞에 부탁\nBD 709 2개\n김가상\n경기도 의정부시 시민로 100",
+            "state":seed()
+        })).unwrap();
+        let row=&result["recipients"][0];
+        assert!(row["note"].as_str().unwrap_or("").contains("문앞에 부탁"));
+        assert!(!row["note"].as_str().unwrap_or("").contains("709"));
+        assert_eq!(row["items"][0]["quantity"],2);
+    }
+
+    #[test]
+    fn bundled_sale_unit_does_not_become_order_quantity() {
+        let state=json!({"products":[{
+            "id":"bundle","name":"BD BUNDLE-X / 2개 구성","code":"BD BUNDLE-X",
+            "category":"기타","active":true,"origin":"FACTORY",
+            "defaultColor":"Black","sellingUnit":"2개 구성","requiresOption":false,
+            "saleUnit":true,
+            "variants":[{"id":"v-bundle","color":"Black","option":"2개 구성",
+                "source":"OFFICIAL"}]
+        }],"aliases":[]});
+        let result=recognition::execute("analyze_order",json!({
+            "raw":"BD BUNDLE-X 2개 구성\n김가상\n경기도 의정부시 시민로 100",
+            "state":state
+        })).unwrap();
+        let item=&result["recipients"][0]["items"][0];
+        assert!(item["quantity"].is_null());
+        assert_eq!(item["quantityConfirmed"],false);
+    }
+
+    #[test]
+    fn a_negative_quantity_never_becomes_approved() {
+        let state=json!({"products":[],"aliases":[]});
+        let result=recognition::execute("analyze_order",json!({
+            "raw":"미확정 보면대 -1개","state":state
+        })).unwrap();
+        let first=&result["recipients"][0]["items"][0];
+        assert_eq!(first["quantityConfirmed"],false);
+    }
+}

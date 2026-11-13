@@ -1,0 +1,297 @@
+//! Full catalog audit against the committed, immutable 360-product seed.
+//! No fake products or mock match engine. This calls the production Rust path.
+//!
+//! Accuracy policy:
+//! 1. Full unique registered name: expected exact productId.
+//! 2. Identical registered full names: a name alone must not select one SKU.
+//! 3. Model-only: if several independently registered products share the lead,
+//!    selecting one without evidence is UNSAFE.
+//! 4. Model+registered color: never choose outside the matching lead/color set.
+//!    Where two products share that combination, do not select arbitrarily.
+use crate::recognition;
+use serde_json::{json, Value};
+use std::collections::{BTreeMap, BTreeSet};
+
+fn seed() -> Value {
+    serde_json::from_str(include_str!("../../../../src-tauri/resources/state-seed.json"))
+        .expect("committed 360-product seed")
+}
+
+fn key(s: &str) -> String {
+    s.chars().filter(|c|!c.is_whitespace())
+        .flat_map(char::to_uppercase).collect()
+}
+fn registered_color(s: &str) -> Option<&'static str> {
+    match s.trim().to_lowercase().as_str() {
+        "black"|"블랙"|"검정"|"검정색" => Some("Black"),
+        "white"|"화이트"|"흰색" => Some("White"),
+        "brown"|"브라운" => Some("Brown"),
+        "gray"|"grey"|"그레이"|"회색" => Some("Gray"),
+        "silver"|"실버" => Some("Silver"),
+        "red"|"레드" => Some("Red"),
+        "blue"|"블루" => Some("Blue"),
+        "gold"|"골드" => Some("Gold"),
+        "chrome"|"크롬" => Some("Chrome"),
+        "clear"|"클리어" => Some("Clear"),
+        "frost"|"프로스트" => Some("Frost"),
+        _ => None,
+    }
+}
+fn match_id(text: &str,state: &Value) -> (Option<String>,String) {
+    let outcome=recognition::execute("match_products",json!({
+        "text":text,"state":state
+    })).unwrap_or_else(|e|panic!("match_products failed for {text}: {e}"));
+    (outcome["productId"].as_str().map(str::to_owned),
+        outcome["match"]["kind"].as_str().unwrap_or("?").to_owned())
+}
+
+/// A self-contained machine-readable CI report: always emit all anomalies,
+/// including null results, to distinguish lack of evidence from a wrong SKU.
+#[test]
+fn complete_360_product_name_matching_audit() {
+    let state=seed();
+    let products=state["products"].as_array().expect("seed products");
+    assert_eq!(products.len(),360,"this audit requires the exact 360 SKU seed");
+    let mut names=BTreeMap::<String,BTreeSet<String>>::new();
+    for p in products {
+        let name=p["name"].as_str().expect("name");
+        let id=p["id"].as_str().expect("id");
+        names.entry(name.to_owned()).or_default().insert(id.to_owned());
+    }
+    let mut exact=0;
+    let mut redirected_successor=0;
+    let mut unresolved_unique=Vec::new();
+    let mut wrong_unique=Vec::new();
+    let mut safely_ambiguous=0;
+    let mut unsafe_duplicate=Vec::new();
+    for (index,p) in products.iter().enumerate() {
+        let name=p["name"].as_str().unwrap();
+        let expected=p["id"].as_str().unwrap();
+        let (actual,kind)=match_id(name,&state);
+        // Two older music-tray rows in the 360-entry seed are explicitly
+        // inactive/superseded. Recognizing their active replacement SKU is
+        // correct (not a cross-SKU false positive).
+        if p["active"]==false || !p["supersededBy"].is_null() {
+            if actual.as_deref()==p["supersededBy"].as_str() {
+                redirected_successor+=1;
+            } else {
+                wrong_unique.push(json!({
+                    "index":index,"name":name,"expectedSuccessor":p["supersededBy"],
+                    "got":actual,"match":kind,"status":"inactive-or-superseded"
+                }));
+            }
+            continue;
+        }
+        let peers=&names[name];
+        if peers.len()>1 {
+            if let Some(chosen)=actual {
+                unsafe_duplicate.push(json!({
+                    "index":index,"name":name,"expectedCandidates":peers,
+                    "got":chosen,"match":kind
+                }));
+            } else {safely_ambiguous+=1;}
+        } else {
+            match actual {
+                Some(chosen) if chosen==expected =>exact+=1,
+                Some(chosen)=>wrong_unique.push(json!({
+                    "index":index,"name":name,"expected":expected,
+                    "got":chosen,"match":kind
+                })),
+                None=>unresolved_unique.push(json!({
+                    "index":index,"name":name,"expected":expected,
+                    "match":kind
+                })),
+            }
+        }
+    }
+    println!("CATALOG_FULL_NAME_SUMMARY {}",json!({
+        "checked":360,"distinctNames":names.len(),"exact":exact,
+        "redirectedSuperseded":redirected_successor,
+        "unresolvedUnique":unresolved_unique.len(),
+        "wrongUnique":wrong_unique.len(),
+        "safelyAmbiguousDuplicate":safely_ambiguous,
+        "unsafeDuplicate":unsafe_duplicate.len()
+    }));
+    for x in &wrong_unique {println!("CATALOG_WRONG {}",x);}
+    for x in &unresolved_unique {println!("CATALOG_UNRESOLVED {}",x);}
+    for x in &unsafe_duplicate {println!("CATALOG_UNSAFE_DUPLICATE {}",x);}
+    assert_eq!(redirected_successor,2,"seed contains exactly two superseded legacy products");
+    assert!(wrong_unique.is_empty() && unsafe_duplicate.is_empty(),
+        "unsafe full-name recognition: {} wrong products, {} arbitrarily selected duplicate names",
+        wrong_unique.len(),unsafe_duplicate.len());
+}
+
+/// The model lead itself (before /) must not cause false positive matches.
+/// Separate exact-code uniqueness from shared-code option/color ambiguity.
+#[test]
+fn complete_distinct_model_and_color_matching_audit() {
+    let state=seed();
+    let products=state["products"].as_array().expect("seed products");
+    assert_eq!(products.len(),360);
+    let mut leads=BTreeMap::<String,(String,BTreeSet<String>)>::new();
+    let mut colors=BTreeMap::<(String,String),(String,BTreeSet<String>)>::new();
+    for p in products {
+        let lead=p["name"].as_str().unwrap().split('/').next().unwrap().trim();
+        let id=p["id"].as_str().unwrap();
+        let k=key(lead);
+        let entry=leads.entry(k.clone()).or_insert_with(||(lead.to_owned(),BTreeSet::new()));
+        entry.1.insert(id.to_owned());
+        if let Some(color)=p["defaultColor"].as_str().and_then(registered_color){
+            let entry=colors.entry((k,color.to_owned()))
+                .or_insert_with(||(lead.to_owned(),BTreeSet::new()));
+            entry.1.insert(id.to_owned());
+        }
+    }
+    let mut safe=0;
+    let mut unresolved=0;
+    let mut outside=Vec::new();
+    let mut guessed=Vec::new();
+    for (_, (lead,ids)) in &leads {
+        let (actual,kind)=match_id(lead,&state);
+        match actual {
+            None=>unresolved+=1,
+            Some(got) if ids.contains(&got) && ids.len()==1=>safe+=1,
+            Some(got) if ids.contains(&got)=>guessed.push(json!({
+                "probe":lead,"ids":ids,"got":got,"match":kind
+            })),
+            Some(got)=>outside.push(json!({
+                "probe":lead,"expectedSet":ids,"got":got,"match":kind
+            }))
+        }
+    }
+    let mut safe_color=0;
+    let mut unresolved_color=0;
+    let mut outside_color=Vec::new();
+    let mut guessed_color=Vec::new();
+    for ((_,color),(lead,ids)) in &colors {
+        let input=format!("{lead} {color}");
+        let (actual,kind)=match_id(&input,&state);
+        match actual {
+            None=>unresolved_color+=1,
+            Some(got) if ids.contains(&got) && ids.len()==1=>safe_color+=1,
+            Some(got) if ids.contains(&got)=>guessed_color.push(json!({
+                "probe":input,"ids":ids,"got":got,"match":kind
+            })),
+            Some(got)=>outside_color.push(json!({
+                "probe":input,"expectedSet":ids,"got":got,"match":kind
+            }))
+        }
+    }
+    println!("CATALOG_MODEL_COLOR_SUMMARY {}",json!({
+        "distinctModelProbes":leads.len(),"safeUniqueModel":safe,
+        "unresolvedModel":unresolved,"outsideModel":outside.len(),
+        "unsafeAmbiguousModel":guessed.len(),
+        "modelColorProbes":colors.len(),"safeUniqueModelColor":safe_color,
+        "unresolvedModelColor":unresolved_color,
+        "outsideModelColor":outside_color.len(),
+        "unsafeAmbiguousModelColor":guessed_color.len()
+    }));
+    for x in &outside {println!("MODEL_OUTSIDE {}",x);}
+    for x in &guessed {println!("MODEL_UNSAFE_GUESS {}",x);}
+    for x in &outside_color {println!("COLOR_OUTSIDE {}",x);}
+    for x in &guessed_color {println!("COLOR_UNSAFE_GUESS {}",x);}
+    assert!(outside.is_empty() && guessed.is_empty()
+        && outside_color.is_empty() && guessed_color.is_empty(),
+        "wrong or speculative model-only/color match: {}, {}, {}, {}",
+        outside.len(),guessed.len(),outside_color.len(),guessed_color.len());
+}
+
+
+#[test]
+fn registered_model_suffix_is_not_a_fabricated_color() {
+    let state=seed();
+    for (input,expected) in [
+        ("BD 700W / 와이드형 / 대형 접이식 상판","bando-site-327"),
+        ("BD 801C / 바퀴 포함","bando-site-57"),
+        ("BD 719B / 이동형 보면대","bando-site-19"),
+        ("BD 930BK / 일자형 마이크 스탠드","bando-site-96"),
+    ] {
+        let (actual,kind)=match_id(input,&state);
+        assert_eq!(actual.as_deref(),Some(expected),
+            "full registered code was mistaken for color abbreviation: {input}, {kind}");
+    }
+}
+
+
+/// Run a source-guarded dry-run of the 15 catalog corrections. Recognition
+/// must match the independently registered SKU once *both* color fields
+/// agree; editing only one field is insufficient under TypeScript rules.
+/// The committed production seed and operational SQLite remain untouched.
+#[test]
+fn fifteen_registered_title_colors_become_matchable_after_validated_data_repair() {
+    let original=seed();
+    let mut corrected=original.clone();
+    let manifest:Value=serde_json::from_str(include_str!(
+        "../catalog-color-corrections-15.json"
+    )).expect("audited color correction manifest");
+    let changes=manifest["corrections"].as_array()
+        .expect("color corrections array");
+    assert_eq!(changes.len(),15);
+    let mut updated=BTreeSet::<String>::new();
+    {
+        let products=corrected["products"].as_array_mut().expect("products");
+        for change in changes {
+            let id=change["productId"].as_str().expect("registered productId");
+            let variant_id=change["variantId"].as_str().expect("registered variantId");
+            let name=change["expectedName"].as_str().expect("full registered name");
+            let desired=change["color"].as_str().expect("canonical color");
+            assert!(matches!(desired,"Black"|"Silver"|"Red"),
+                "unreviewed color {desired}");
+            assert!(updated.insert(id.to_owned()),"duplicate correction ID: {id}");
+            let product=products.iter_mut().find(|p|p["id"]==id)
+                .unwrap_or_else(||panic!("missing product: {id}"));
+            assert_eq!(product["active"],true,"inactive product must not change");
+            assert_eq!(product["name"],name,"name was edited since source review");
+            assert_eq!(product["defaultColor"],change["expectedDefaultColor"],
+                "unexpected previous defaultColor for {id}");
+            let declared_color_word=match desired {
+                "Black"=>"블랙","Silver"=>"실버","Red"=>"레드",_=>unreachable!()
+            };
+            assert!(name.split('/').skip(1).any(|part|
+                part.trim()==declared_color_word),
+                "product name does not explicitly support color for {id}");
+            assert_eq!(product["variants"].as_array().unwrap().len(),1,
+                "do not combine distinct sale variants");
+            let variant=&mut product["variants"][0];
+            assert_eq!(variant["id"],variant_id);
+            assert_eq!(variant["color"],change["expectedVariantColor"],
+                "unexpected previous variant color for {id}");
+            assert_eq!(variant["url"],change["registeredSourceUrl"]);
+            // Correct the existing catalog fields, not the recognition
+            // rules, so TypeScript and Rust both use their existing logic.
+            variant["color"]=json!(desired);
+            product["defaultColor"]=json!(desired);
+        }
+    }
+    assert_eq!(updated.len(),15);
+    let before=original["products"].as_array().unwrap();
+    let after=corrected["products"].as_array().unwrap();
+    assert_eq!(before.len(),after.len());
+    for (a,b) in before.iter().zip(after.iter()) {
+        let id=a["id"].as_str().unwrap();
+        if !updated.contains(id) {
+            assert_eq!(a,b,"unexpected change to unrelated product {id}");
+        }
+    }
+    for change in changes {
+        let text=change["expectedName"].as_str().unwrap();
+        let id=change["productId"].as_str().unwrap();
+        let (actual,kind)=match_id(text,&corrected);
+        assert_eq!(actual.as_deref(),Some(id),
+            "repaired full registered SKU still did not match: {text}, {kind}");
+        let result=recognition::execute("match_products",json!({
+            "text":text,"state":corrected
+        })).unwrap();
+        assert_eq!(result["variantId"],change["variantId"],
+            "single selected variant must be restored for {id}");
+        assert_eq!(result["color"],change["color"],
+            "explicit source color must remain unchanged for {id}");
+        println!("CATALOG_COLOR_REPAIRED {} {} {}",id,
+            change["color"],text);
+    }
+    println!("CATALOG_COLOR_REPAIR_SUMMARY {}",json!({
+        "sourceSeedUnchanged":true,"correctedInMemory":updated.len(),
+        "fullNameMatchesAfterCorrection":updated.len(),
+        "otherProductsUnmodified":before.len()-updated.len()
+    }));
+}

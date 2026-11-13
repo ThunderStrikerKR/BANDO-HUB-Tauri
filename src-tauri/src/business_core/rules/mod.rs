@@ -3,8 +3,19 @@
 use serde_json::{json, Value};
 
 mod pricing;
+mod reconciliation;
+mod issues;
+mod order_mutations;
+mod group_operations;
+mod correction_rules;
+mod reception_operations;
+mod retail_operations;
+mod raw_corrections;
+mod reply_rules;
+mod legacy_migration;
 mod shipping;
 mod workflow;
+mod workflow_issues;
 mod validation;
 
 const MAX_SAFE: i64 = 9_007_199_254_740_991;
@@ -19,6 +30,8 @@ pub fn execute(operation: &str, payload: Value) -> Result<Value, String> {
         ).map(|price| json!({"unitPrice": price})),
         "reprice_order" => pricing::reprice_order(&payload),
         "should_refresh_pricing" => Ok(json!({"refresh": pricing::should_refresh(&payload)?})),
+        "apply_shipping_action" => shipping::shipping_action(&payload),
+        "reconcile_workflow" => reconciliation::reconcile(&payload),
         "calculate_shipping" => shipping::recommend(
             req(&payload, "order")?, req(&payload, "state")?,
         ),
@@ -26,9 +39,25 @@ pub fn execute(operation: &str, payload: Value) -> Result<Value, String> {
             req(&payload, "state")?, required_str(&payload, "shipmentId")?,
         ),
         "evaluate_workflow" => workflow::evaluate(&payload),
+        "workflow_issues" => Ok(json!({"issues":workflow_issues::workflow_issues(
+            req(&payload,"state")?,required_str(&payload,"groupId")?)?})),
+        "stage_issues" => Ok(json!({"issues":workflow_issues::stage_issues(
+            req(&payload,"state")?,required_str(&payload,"groupId")?,
+            req(&payload,"next")?.as_i64().ok_or("진행 단계 숫자가 필요합니다.")?)?})),
         "evaluate_dispatch_state" => workflow::dispatch_state(
             req(&payload, "state")?, required_str(&payload, "orderId")?,
         ),
+        "order_issues" => Ok(json!({"issues": issues::order_issues(req(&payload,"order")?)})),
+        "apply_issue_action" => issues::issue_action(&payload),
+        "apply_reply_action" => reply_rules::apply(&payload),
+        "apply_raw_correction" => raw_corrections::apply(&payload),
+        "apply_retail_action" => retail_operations::apply(&payload),
+        "apply_reception_action" => reception_operations::apply(&payload),
+        "apply_correction_action" => correction_rules::apply(&payload),
+        "apply_group_action" => group_operations::mutate(&payload),
+        "delete_order" => order_mutations::delete_order(&payload),
+        "apply_order_raw_edit" => order_mutations::apply_raw_edit(&payload),
+        "migrate_workflow" => legacy_migration::migrate(&payload),
         "validate_workflow" => {
             validation::validate(req(&payload, "state")?, payload.get("before"))?;
             Ok(json!({"valid": true}))

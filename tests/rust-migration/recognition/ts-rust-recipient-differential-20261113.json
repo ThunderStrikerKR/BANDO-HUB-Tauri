@@ -1,0 +1,1296 @@
+{
+  "schema": "tsbh-recognition-real-ts-rust-recipient-v1",
+  "date": "2026-11-13",
+  "branch": "migration/01-recognition",
+  "sourceCommit": "cc5a73a4bbe3996a2856ab548a4d7a4db877652b",
+  "githubActionsRun": "43381317874",
+  "githubActionsJob": "131739581028",
+  "method": "recipient analyze: 44 same-raw cases, all recipient fields except Item fields (already audited separately), candidates, unassigned and source-link integrity",
+  "runner": "original src/parser.ts::parseEvidence and reanalyzeWithAliases run via tsx/esm/api; actual Rust analyze_order/reanalyze_order",
+  "normalization": "Fresh generated IDs canonicalized, stable employee-defined recipient/item IDs preserved. Evidence arrays aligned by immutable ID or source span; unmatched entries reported; evidence array ordering differences themselves are not counted as separate errors.",
+  "interpretation": "CI passes invariant tests and completes audit, NOT full TS/Rust JSON parity. Remaining differences are not all approved exceptions.",
+  "result": {
+    "cases": 44,
+    "casesWithDifferences": 15,
+    "comparedLeaves": 4982,
+    "mismatchCount": 78
+  },
+  "byField": [
+    {
+      "count": 8,
+      "field": "candidates.missingRust[]"
+    },
+    {
+      "count": 6,
+      "field": "candidates.missingTs[]"
+    },
+    {
+      "count": 6,
+      "field": "recipients[].candidates.missingTs[]"
+    },
+    {
+      "count": 6,
+      "field": "recipients[].sources.missingTs[]"
+    },
+    {
+      "count": 4,
+      "field": "candidates[].reason"
+    },
+    {
+      "count": 4,
+      "field": "recipients[].candidates.length"
+    },
+    {
+      "count": 4,
+      "field": "recipients[].sources.length"
+    },
+    {
+      "count": 4,
+      "field": "candidates.length"
+    },
+    {
+      "count": 3,
+      "field": "candidates[].value"
+    },
+    {
+      "count": 3,
+      "field": "recipients[].evidence.anchorId"
+    },
+    {
+      "count": 3,
+      "field": "recipients[].evidence.end"
+    },
+    {
+      "count": 3,
+      "field": "recipients[].evidence.start"
+    },
+    {
+      "count": 3,
+      "field": "recipients[].name"
+    },
+    {
+      "count": 2,
+      "field": "recipients[].unassignedEvidence"
+    },
+    {
+      "count": 2,
+      "field": "recipients[].candidates.missingRust[]"
+    },
+    {
+      "count": 2,
+      "field": "recipients[].sources.missingRust[]"
+    },
+    {
+      "count": 2,
+      "field": "recipients.length"
+    },
+    {
+      "count": 2,
+      "field": "recipients[].address"
+    },
+    {
+      "count": 2,
+      "field": "recipients[]"
+    },
+    {
+      "count": 1,
+      "field": "recipients[].candidates[].field"
+    },
+    {
+      "count": 1,
+      "field": "recipients[].sources[].field"
+    },
+    {
+      "count": 1,
+      "field": "recipients[].addressKind"
+    },
+    {
+      "count": 1,
+      "field": "recipients[].addressParts"
+    },
+    {
+      "count": 1,
+      "field": "recipients[].addressStatus"
+    },
+    {
+      "count": 1,
+      "field": "recipients[].mobile"
+    },
+    {
+      "count": 1,
+      "field": "recipients[].phone"
+    },
+    {
+      "count": 1,
+      "field": "recipients[].addressParts.detail"
+    },
+    {
+      "count": 1,
+      "field": "recipients[].addressParts.town"
+    }
+  ],
+  "byCase": [
+    {
+      "id": "original-01",
+      "mismatchCount": 2,
+      "rustRecipientCount": 1,
+      "tsRecipientCount": 1
+    },
+    {
+      "id": "original-02",
+      "mismatchCount": 1,
+      "rustRecipientCount": 1,
+      "tsRecipientCount": 1
+    },
+    {
+      "id": "original-03",
+      "mismatchCount": 1,
+      "rustRecipientCount": 1,
+      "tsRecipientCount": 1
+    },
+    {
+      "id": "original-04",
+      "mismatchCount": 1,
+      "rustRecipientCount": 1,
+      "tsRecipientCount": 1
+    },
+    {
+      "id": "original-05",
+      "mismatchCount": 1,
+      "rustRecipientCount": 1,
+      "tsRecipientCount": 1
+    },
+    {
+      "id": "original-06",
+      "mismatchCount": 0,
+      "rustRecipientCount": 1,
+      "tsRecipientCount": 1
+    },
+    {
+      "id": "original-07",
+      "mismatchCount": 0,
+      "rustRecipientCount": 1,
+      "tsRecipientCount": 1
+    },
+    {
+      "id": "original-08",
+      "mismatchCount": 1,
+      "rustRecipientCount": 1,
+      "tsRecipientCount": 1
+    },
+    {
+      "id": "original-09",
+      "mismatchCount": 0,
+      "rustRecipientCount": 1,
+      "tsRecipientCount": 1
+    },
+    {
+      "id": "original-10",
+      "mismatchCount": 0,
+      "rustRecipientCount": 1,
+      "tsRecipientCount": 1
+    },
+    {
+      "id": "original-11",
+      "mismatchCount": 0,
+      "rustRecipientCount": 1,
+      "tsRecipientCount": 1
+    },
+    {
+      "id": "original-12",
+      "mismatchCount": 0,
+      "rustRecipientCount": 1,
+      "tsRecipientCount": 1
+    },
+    {
+      "id": "original-13",
+      "mismatchCount": 0,
+      "rustRecipientCount": 2,
+      "tsRecipientCount": 2
+    },
+    {
+      "id": "original-14",
+      "mismatchCount": 1,
+      "rustRecipientCount": 1,
+      "tsRecipientCount": 1
+    },
+    {
+      "id": "original-15",
+      "mismatchCount": 0,
+      "rustRecipientCount": 1,
+      "tsRecipientCount": 1
+    },
+    {
+      "id": "original-16",
+      "mismatchCount": 0,
+      "rustRecipientCount": 1,
+      "tsRecipientCount": 1
+    },
+    {
+      "id": "original-17",
+      "mismatchCount": 2,
+      "rustRecipientCount": 2,
+      "tsRecipientCount": 2
+    },
+    {
+      "id": "original-18",
+      "mismatchCount": 1,
+      "rustRecipientCount": 1,
+      "tsRecipientCount": 1
+    },
+    {
+      "id": "original-19",
+      "mismatchCount": 13,
+      "rustRecipientCount": 1,
+      "tsRecipientCount": 1
+    },
+    {
+      "id": "original-20",
+      "mismatchCount": 30,
+      "rustRecipientCount": 1,
+      "tsRecipientCount": 2
+    },
+    {
+      "id": "color-01",
+      "mismatchCount": 0,
+      "rustRecipientCount": 1,
+      "tsRecipientCount": 1
+    },
+    {
+      "id": "color-02",
+      "mismatchCount": 0,
+      "rustRecipientCount": 1,
+      "tsRecipientCount": 1
+    },
+    {
+      "id": "color-03",
+      "mismatchCount": 0,
+      "rustRecipientCount": 1,
+      "tsRecipientCount": 1
+    },
+    {
+      "id": "color-04",
+      "mismatchCount": 0,
+      "rustRecipientCount": 1,
+      "tsRecipientCount": 1
+    },
+    {
+      "id": "color-05",
+      "mismatchCount": 0,
+      "rustRecipientCount": 1,
+      "tsRecipientCount": 1
+    },
+    {
+      "id": "color-06",
+      "mismatchCount": 0,
+      "rustRecipientCount": 1,
+      "tsRecipientCount": 1
+    },
+    {
+      "id": "color-07",
+      "mismatchCount": 0,
+      "rustRecipientCount": 1,
+      "tsRecipientCount": 1
+    },
+    {
+      "id": "color-08",
+      "mismatchCount": 0,
+      "rustRecipientCount": 1,
+      "tsRecipientCount": 1
+    },
+    {
+      "id": "color-09",
+      "mismatchCount": 0,
+      "rustRecipientCount": 1,
+      "tsRecipientCount": 1
+    },
+    {
+      "id": "color-10",
+      "mismatchCount": 0,
+      "rustRecipientCount": 1,
+      "tsRecipientCount": 1
+    },
+    {
+      "id": "color-11",
+      "mismatchCount": 0,
+      "rustRecipientCount": 1,
+      "tsRecipientCount": 1
+    },
+    {
+      "id": "color-12",
+      "mismatchCount": 0,
+      "rustRecipientCount": 1,
+      "tsRecipientCount": 1
+    },
+    {
+      "id": "color-13",
+      "mismatchCount": 0,
+      "rustRecipientCount": 1,
+      "tsRecipientCount": 1
+    },
+    {
+      "id": "color-14",
+      "mismatchCount": 0,
+      "rustRecipientCount": 1,
+      "tsRecipientCount": 1
+    },
+    {
+      "id": "color-15",
+      "mismatchCount": 0,
+      "rustRecipientCount": 1,
+      "tsRecipientCount": 1
+    },
+    {
+      "id": "recipient-two",
+      "mismatchCount": 0,
+      "rustRecipientCount": 2,
+      "tsRecipientCount": 2
+    },
+    {
+      "id": "recipient-name-contact",
+      "mismatchCount": 4,
+      "rustRecipientCount": 1,
+      "tsRecipientCount": 2
+    },
+    {
+      "id": "recipient-note",
+      "mismatchCount": 0,
+      "rustRecipientCount": 1,
+      "tsRecipientCount": 1
+    },
+    {
+      "id": "recipient-inline",
+      "mismatchCount": 10,
+      "rustRecipientCount": 1,
+      "tsRecipientCount": 1
+    },
+    {
+      "id": "recipient-address-detail",
+      "mismatchCount": 9,
+      "rustRecipientCount": 1,
+      "tsRecipientCount": 1
+    },
+    {
+      "id": "recipient-shipping",
+      "mismatchCount": 0,
+      "rustRecipientCount": 1,
+      "tsRecipientCount": 1
+    },
+    {
+      "id": "recipient-unnamed",
+      "mismatchCount": 0,
+      "rustRecipientCount": 1,
+      "tsRecipientCount": 1
+    },
+    {
+      "id": "recipient-duplicate-name",
+      "mismatchCount": 0,
+      "rustRecipientCount": 2,
+      "tsRecipientCount": 2
+    },
+    {
+      "id": "recipient-common",
+      "mismatchCount": 1,
+      "rustRecipientCount": 3,
+      "tsRecipientCount": 3
+    }
+  ],
+  "differences": [
+    {
+      "caseId": "original-01",
+      "path": "recipients[0].candidates[3].field",
+      "rust": "mobile",
+      "ts": "phone"
+    },
+    {
+      "caseId": "original-01",
+      "path": "recipients[0].sources[3].field",
+      "rust": "mobile",
+      "ts": "phone"
+    },
+    {
+      "caseId": "original-02",
+      "path": "candidates[0].reason",
+      "rust": "같은 행의 대안 후보; 직원 확인 필요 / 배송 건 원문 경계와 연결",
+      "ts": "수취인 복수 표기 이름 / 배송 건 원문 경계와 연결"
+    },
+    {
+      "caseId": "original-03",
+      "path": "recipients[0].unassignedEvidence",
+      "rust": null,
+      "ts": [
+        {
+          "end": 55,
+          "id": "quantity:53:55",
+          "kind": "quantity",
+          "line": 6,
+          "paragraph": 0,
+          "reason": "원문 전체 수량 후보 독립 추출",
+          "start": 53,
+          "text": "2개",
+          "value": "2"
+        }
+      ]
+    },
+    {
+      "caseId": "original-04",
+      "path": "candidates[4].reason",
+      "rust": "연락처 모양의 원문 보존; 유효성은 별도 검증 / 배송 건 원문 경계와 연결",
+      "ts": "전화번호 구간 독립 추출 / 배송 건 원문 경계와 연결"
+    },
+    {
+      "caseId": "original-05",
+      "path": "candidates[3].reason",
+      "rust": "같은 행의 대안 후보; 직원 확인 필요 / 배송 건 원문 경계와 연결",
+      "ts": "수취 기관 또는 직함을 포함한 이름 / 배송 건 원문 경계와 연결"
+    },
+    {
+      "caseId": "original-08",
+      "path": "candidates[0].value",
+      "rust": "BD 950       6  개   ㅣ   임가상",
+      "ts": "BD 950       6  개"
+    },
+    {
+      "caseId": "original-14",
+      "path": "candidates[1].reason",
+      "rust": "원문 전체 수량 후보 독립 추출",
+      "ts": "같은 상품 행 또는 독립 수량 구간"
+    },
+    {
+      "caseId": "original-17",
+      "path": "candidates.missingRust[3]",
+      "rust": "<MISSING>",
+      "ts": {
+        "end": 72,
+        "id": "product:66:72",
+        "itemId": "<GENERATED_ID>",
+        "kind": "product",
+        "line": 4,
+        "paragraph": 0,
+        "reason": "상품 코드 / 별칭 / 옵션 인식 결과; 귀속은 별도 판정",
+        "recipientId": "<GENERATED_ID>",
+        "start": 66,
+        "text": "BD 709",
+        "value": "BD 709 (블랙) 4개"
+      }
+    },
+    {
+      "caseId": "original-17",
+      "path": "candidates.missingTs[3]",
+      "rust": {
+        "end": 77,
+        "id": "product:66:77",
+        "itemId": "<GENERATED_ID>",
+        "kind": "product",
+        "line": 4,
+        "paragraph": 0,
+        "reason": "상품 코드 / 별칭 / 옵션 인식 결과; 귀속은 별도 판정",
+        "recipientId": "<GENERATED_ID>",
+        "start": 66,
+        "text": "BD 709 (블랙)",
+        "value": "BD 709 (블랙) 4개"
+      },
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-18",
+      "path": "candidates[0].value",
+      "rust": "반도 709 민판 한개 이가상 010-1234-5678",
+      "ts": "709 민판 한개"
+    },
+    {
+      "caseId": "original-19",
+      "path": "recipients[0].candidates.length",
+      "rust": 3,
+      "ts": 4
+    },
+    {
+      "caseId": "original-19",
+      "path": "recipients[0].candidates.missingRust[0]",
+      "rust": "<MISSING>",
+      "ts": {
+        "end": 69,
+        "field": "name",
+        "id": "name:64:69",
+        "label": "연주용의자",
+        "start": 64,
+        "value": "연주용의자"
+      }
+    },
+    {
+      "caseId": "original-19",
+      "path": "recipients[0].evidence.anchorId",
+      "rust": "name:88:91",
+      "ts": "name:64:69"
+    },
+    {
+      "caseId": "original-19",
+      "path": "recipients[0].evidence.end",
+      "rust": 91,
+      "ts": 69
+    },
+    {
+      "caseId": "original-19",
+      "path": "recipients[0].evidence.start",
+      "rust": 88,
+      "ts": 64
+    },
+    {
+      "caseId": "original-19",
+      "path": "recipients[0].name",
+      "rust": "여가상",
+      "ts": "연주용의자"
+    },
+    {
+      "caseId": "original-19",
+      "path": "recipients[0].sources.length",
+      "rust": 3,
+      "ts": 4
+    },
+    {
+      "caseId": "original-19",
+      "path": "recipients[0].sources.missingRust[0]",
+      "rust": "<MISSING>",
+      "ts": {
+        "end": 69,
+        "field": "name",
+        "recipientId": "<GENERATED_ID>",
+        "start": 64,
+        "targetId": "<GENERATED_ID>",
+        "text": "연주용의자"
+      }
+    },
+    {
+      "caseId": "original-19",
+      "path": "candidates.length",
+      "rust": 5,
+      "ts": 6
+    },
+    {
+      "caseId": "original-19",
+      "path": "candidates.missingRust[0]",
+      "rust": "<MISSING>",
+      "ts": {
+        "end": 15,
+        "id": "product:11:15",
+        "itemId": "<GENERATED_ID>",
+        "kind": "product",
+        "line": 1,
+        "paragraph": 0,
+        "reason": "상품 코드 / 별칭 / 옵션 인식 결과; 귀속은 별도 판정",
+        "recipientId": "<GENERATED_ID>",
+        "start": 11,
+        "text": "2026",
+        "value": "발주일자 2026년 10월 22일"
+      }
+    },
+    {
+      "caseId": "original-19",
+      "path": "candidates.missingRust[1]",
+      "rust": "<MISSING>",
+      "ts": {
+        "end": 69,
+        "id": "name:64:69",
+        "kind": "name",
+        "line": 4,
+        "paragraph": 0,
+        "reason": "같은 행의 대안 후보; 직원 확인 필요 / 배송 건 원문 경계와 연결",
+        "recipientId": "<GENERATED_ID>",
+        "start": 64,
+        "text": "연주용의자",
+        "value": "연주용의자"
+      }
+    },
+    {
+      "caseId": "original-19",
+      "path": "candidates[2].value",
+      "rust": "연주용의자 | BB-3 | EA | 1 | 여가상 / 0502-1234-5678 / (51263)",
+      "ts": "BB-3"
+    },
+    {
+      "caseId": "original-19",
+      "path": "candidates.missingTs[1]",
+      "rust": {
+        "end": 85,
+        "id": "quantity:84:85",
+        "itemId": "<GENERATED_ID>",
+        "kind": "quantity",
+        "line": 4,
+        "paragraph": 0,
+        "reason": "원문 전체 수량 후보 독립 추출",
+        "recipientId": "<GENERATED_ID>",
+        "start": 84,
+        "text": "1",
+        "value": "1"
+      },
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-20",
+      "path": "recipients.length",
+      "rust": 1,
+      "ts": 2
+    },
+    {
+      "caseId": "original-20",
+      "path": "recipients[0].address",
+      "rust": "경북 경산시 원효로 309-6 가상교육지원청",
+      "ts": ""
+    },
+    {
+      "caseId": "original-20",
+      "path": "recipients[0].addressKind",
+      "rust": "ROAD",
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-20",
+      "path": "recipients[0].addressParts",
+      "rust": {
+        "building": "309-6",
+        "city": "경산시",
+        "detail": "가상교육지원청",
+        "province": "경북",
+        "road": "원효로"
+      },
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-20",
+      "path": "recipients[0].addressStatus",
+      "rust": "COMPLETE",
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-20",
+      "path": "recipients[0].candidates.length",
+      "rust": 4,
+      "ts": 1
+    },
+    {
+      "caseId": "original-20",
+      "path": "recipients[0].candidates.missingRust[0]",
+      "rust": "<MISSING>",
+      "ts": {
+        "end": 9,
+        "field": "name",
+        "id": "name:6:9",
+        "label": "발주일",
+        "start": 6,
+        "value": "발주일"
+      }
+    },
+    {
+      "caseId": "original-20",
+      "path": "recipients[0].candidates.missingTs[0]",
+      "rust": {
+        "end": 76,
+        "field": "address",
+        "id": "address:52:76",
+        "label": "경북 경산시 원효로 309-6 가상교육지원청",
+        "start": 52,
+        "value": "경북 경산시 원효로 309-6 가상교육지원청"
+      },
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-20",
+      "path": "recipients[0].candidates.missingTs[1]",
+      "rust": {
+        "end": 86,
+        "field": "name",
+        "id": "name:83:86",
+        "label": "이가상",
+        "start": 83,
+        "value": "이가상"
+      },
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-20",
+      "path": "recipients[0].candidates.missingTs[2]",
+      "rust": {
+        "end": 107,
+        "field": "phone",
+        "id": "phone:95:107",
+        "label": "053-123-4567",
+        "start": 95,
+        "value": "053-123-4567"
+      },
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-20",
+      "path": "recipients[0].candidates.missingTs[3]",
+      "rust": {
+        "end": 123,
+        "field": "mobile",
+        "id": "mobile:110:123",
+        "label": "010-1234-5678",
+        "start": 110,
+        "value": "010-1234-5678"
+      },
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-20",
+      "path": "recipients[0].evidence.anchorId",
+      "rust": "name:83:86",
+      "ts": "name:6:9"
+    },
+    {
+      "caseId": "original-20",
+      "path": "recipients[0].evidence.end",
+      "rust": 86,
+      "ts": 9
+    },
+    {
+      "caseId": "original-20",
+      "path": "recipients[0].evidence.start",
+      "rust": 83,
+      "ts": 6
+    },
+    {
+      "caseId": "original-20",
+      "path": "recipients[0].mobile",
+      "rust": "010-1234-5678",
+      "ts": ""
+    },
+    {
+      "caseId": "original-20",
+      "path": "recipients[0].name",
+      "rust": "이가상",
+      "ts": "발주일"
+    },
+    {
+      "caseId": "original-20",
+      "path": "recipients[0].phone",
+      "rust": "053-123-4567",
+      "ts": ""
+    },
+    {
+      "caseId": "original-20",
+      "path": "recipients[0].sources.length",
+      "rust": 4,
+      "ts": 1
+    },
+    {
+      "caseId": "original-20",
+      "path": "recipients[0].sources.missingRust[0]",
+      "rust": "<MISSING>",
+      "ts": {
+        "end": 9,
+        "field": "name",
+        "recipientId": "<GENERATED_ID>",
+        "start": 6,
+        "targetId": "<GENERATED_ID>",
+        "text": "발주일"
+      }
+    },
+    {
+      "caseId": "original-20",
+      "path": "recipients[0].sources.missingTs[0]",
+      "rust": {
+        "end": 76,
+        "field": "address",
+        "recipientId": "<GENERATED_ID>",
+        "start": 52,
+        "targetId": "<GENERATED_ID>",
+        "text": "경북 경산시 원효로 309-6 가상교육지원청"
+      },
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-20",
+      "path": "recipients[0].sources.missingTs[1]",
+      "rust": {
+        "end": 86,
+        "field": "name",
+        "recipientId": "<GENERATED_ID>",
+        "start": 83,
+        "targetId": "<GENERATED_ID>",
+        "text": "이가상"
+      },
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-20",
+      "path": "recipients[0].sources.missingTs[2]",
+      "rust": {
+        "end": 107,
+        "field": "phone",
+        "recipientId": "<GENERATED_ID>",
+        "start": 95,
+        "targetId": "<GENERATED_ID>",
+        "text": "053-123-4567"
+      },
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-20",
+      "path": "recipients[0].sources.missingTs[3]",
+      "rust": {
+        "end": 123,
+        "field": "mobile",
+        "recipientId": "<GENERATED_ID>",
+        "start": 110,
+        "targetId": "<GENERATED_ID>",
+        "text": "010-1234-5678"
+      },
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-20",
+      "path": "recipients[1]",
+      "rust": "<MISSING>",
+      "ts": {
+        "address": "경북 경산시 원효로 309-6 가상교육지원청",
+        "addressKind": "ROAD",
+        "addressParts": {
+          "building": "309-6",
+          "city": "경산시",
+          "detail": "가상교육지원청",
+          "district": "<MISSING>",
+          "province": "경북",
+          "road": "원효로",
+          "town": "<MISSING>"
+        },
+        "addressStatus": "COMPLETE",
+        "candidates": [
+          {
+            "end": 44,
+            "field": "name",
+            "id": "name:40:44",
+            "label": "납품장소",
+            "start": 40,
+            "value": "납품장소"
+          },
+          {
+            "end": 76,
+            "field": "address",
+            "id": "address:52:76",
+            "label": "경북 경산시 원효로 309-6 가상교육지원청",
+            "start": 52,
+            "value": "경북 경산시 원효로 309-6 가상교육지원청"
+          },
+          {
+            "end": 107,
+            "field": "phone",
+            "id": "phone:95:107",
+            "label": "053-123-4567",
+            "start": 95,
+            "value": "053-123-4567"
+          },
+          {
+            "end": 123,
+            "field": "mobile",
+            "id": "mobile:110:123",
+            "label": "010-1234-5678",
+            "start": 110,
+            "value": "010-1234-5678"
+          }
+        ],
+        "evidence": {
+          "anchorId": "name:40:44",
+          "end": 44,
+          "start": 40
+        },
+        "id": "<GENERATED_ID>",
+        "items": "<MISSING>",
+        "mobile": "010-1234-5678",
+        "name": "납품장소",
+        "note": "",
+        "phone": "053-123-4567",
+        "sources": [
+          {
+            "end": 44,
+            "field": "name",
+            "recipientId": "<GENERATED_ID>",
+            "start": 40,
+            "targetId": "<GENERATED_ID>",
+            "text": "납품장소"
+          },
+          {
+            "end": 76,
+            "field": "address",
+            "recipientId": "<GENERATED_ID>",
+            "start": 52,
+            "targetId": "<GENERATED_ID>",
+            "text": "경북 경산시 원효로 309-6 가상교육지원청"
+          },
+          {
+            "end": 107,
+            "field": "phone",
+            "recipientId": "<GENERATED_ID>",
+            "start": 95,
+            "targetId": "<GENERATED_ID>",
+            "text": "053-123-4567"
+          },
+          {
+            "end": 123,
+            "field": "mobile",
+            "recipientId": "<GENERATED_ID>",
+            "start": 110,
+            "targetId": "<GENERATED_ID>",
+            "text": "010-1234-5678"
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "original-20",
+      "path": "candidates.length",
+      "rust": 6,
+      "ts": 7
+    },
+    {
+      "caseId": "original-20",
+      "path": "candidates.missingRust[0]",
+      "rust": "<MISSING>",
+      "ts": {
+        "end": 9,
+        "id": "name:6:9",
+        "kind": "name",
+        "line": 1,
+        "paragraph": 0,
+        "reason": "상품 / 수량과 같은 행에서 분리한 이름 / 배송 건 원문 경계와 연결",
+        "recipientId": "<GENERATED_ID>",
+        "start": 6,
+        "text": "발주일",
+        "value": "발주일"
+      }
+    },
+    {
+      "caseId": "original-20",
+      "path": "candidates.missingRust[1]",
+      "rust": "<MISSING>",
+      "ts": {
+        "end": 20,
+        "id": "product:10:20",
+        "itemId": "<GENERATED_ID>",
+        "kind": "product",
+        "line": 1,
+        "paragraph": 0,
+        "reason": "상품 코드 / 별칭 / 옵션 인식 결과; 귀속은 별도 판정",
+        "recipientId": "<GENERATED_ID>",
+        "start": 10,
+        "text": "2026-11-03",
+        "value": "발주일 2026-11-03"
+      }
+    },
+    {
+      "caseId": "original-20",
+      "path": "candidates.missingRust[2]",
+      "rust": "<MISSING>",
+      "ts": {
+        "end": 44,
+        "id": "name:40:44",
+        "kind": "name",
+        "line": 4,
+        "paragraph": 0,
+        "reason": "같은 행의 대안 후보; 직원 확인 필요 / 배송 건 원문 경계와 연결",
+        "recipientId": "<GENERATED_ID>",
+        "start": 40,
+        "text": "납품장소",
+        "value": "납품장소"
+      }
+    },
+    {
+      "caseId": "original-20",
+      "path": "candidates.missingTs[1]",
+      "rust": {
+        "end": 86,
+        "id": "name:83:86",
+        "kind": "name",
+        "line": 6,
+        "paragraph": 0,
+        "reason": "같은 행의 대안 후보; 직원 확인 필요 / 배송 건 원문 경계와 연결",
+        "recipientId": "<GENERATED_ID>",
+        "start": 83,
+        "text": "이가상",
+        "value": "이가상"
+      },
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-20",
+      "path": "candidates.missingTs[5]",
+      "rust": {
+        "end": 189,
+        "id": "quantity:188:189",
+        "itemId": "<GENERATED_ID>",
+        "kind": "quantity",
+        "line": 9,
+        "paragraph": 0,
+        "reason": "원문 전체 수량 후보 독립 추출",
+        "recipientId": "<GENERATED_ID>",
+        "start": 188,
+        "text": "1",
+        "value": "1"
+      },
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "recipient-name-contact",
+      "path": "recipients.length",
+      "rust": 1,
+      "ts": 2
+    },
+    {
+      "caseId": "recipient-name-contact",
+      "path": "recipients[1]",
+      "rust": "<MISSING>",
+      "ts": {
+        "address": "",
+        "candidates": [
+          {
+            "end": 57,
+            "field": "name",
+            "id": "name:55:57",
+            "label": "민판",
+            "start": 55,
+            "value": "민판"
+          }
+        ],
+        "evidence": {
+          "anchorId": "name:55:57",
+          "end": 57,
+          "start": 55
+        },
+        "id": "<GENERATED_ID>",
+        "items": "<MISSING>",
+        "mobile": "",
+        "name": "민판",
+        "note": "",
+        "phone": "",
+        "sources": [
+          {
+            "end": 57,
+            "field": "name",
+            "recipientId": "<GENERATED_ID>",
+            "start": 55,
+            "targetId": "<GENERATED_ID>",
+            "text": "민판"
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "recipient-name-contact",
+      "path": "candidates.length",
+      "rust": 5,
+      "ts": 6
+    },
+    {
+      "caseId": "recipient-name-contact",
+      "path": "candidates.missingRust[4]",
+      "rust": "<MISSING>",
+      "ts": {
+        "end": 57,
+        "id": "name:55:57",
+        "kind": "name",
+        "line": 3,
+        "paragraph": 0,
+        "reason": "상품 / 수량과 같은 행에서 분리한 이름 / 배송 건 원문 경계와 연결",
+        "recipientId": "<GENERATED_ID>",
+        "start": 55,
+        "text": "민판",
+        "value": "민판"
+      }
+    },
+    {
+      "caseId": "recipient-inline",
+      "path": "recipients[0].candidates.length",
+      "rust": 3,
+      "ts": 2
+    },
+    {
+      "caseId": "recipient-inline",
+      "path": "recipients[0].candidates.missingTs[0]",
+      "rust": {
+        "end": 16,
+        "field": "name",
+        "id": "name:13:16",
+        "label": "이가상",
+        "start": 13,
+        "value": "이가상"
+      },
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "recipient-inline",
+      "path": "recipients[0].evidence.anchorId",
+      "rust": "name:13:16",
+      "ts": "address:31:48"
+    },
+    {
+      "caseId": "recipient-inline",
+      "path": "recipients[0].evidence.end",
+      "rust": 16,
+      "ts": 48
+    },
+    {
+      "caseId": "recipient-inline",
+      "path": "recipients[0].evidence.start",
+      "rust": 13,
+      "ts": 31
+    },
+    {
+      "caseId": "recipient-inline",
+      "path": "recipients[0].name",
+      "rust": "이가상",
+      "ts": ""
+    },
+    {
+      "caseId": "recipient-inline",
+      "path": "recipients[0].sources.length",
+      "rust": 3,
+      "ts": 2
+    },
+    {
+      "caseId": "recipient-inline",
+      "path": "recipients[0].sources.missingTs[0]",
+      "rust": {
+        "end": 16,
+        "field": "name",
+        "recipientId": "<GENERATED_ID>",
+        "start": 13,
+        "targetId": "<GENERATED_ID>",
+        "text": "이가상"
+      },
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "recipient-inline",
+      "path": "candidates.length",
+      "rust": 5,
+      "ts": 4
+    },
+    {
+      "caseId": "recipient-inline",
+      "path": "candidates.missingTs[2]",
+      "rust": {
+        "end": 16,
+        "id": "name:13:16",
+        "kind": "name",
+        "line": 0,
+        "paragraph": 0,
+        "reason": "같은 행의 대안 후보; 직원 확인 필요 / 배송 건 원문 경계와 연결",
+        "recipientId": "<GENERATED_ID>",
+        "start": 13,
+        "text": "이가상",
+        "value": "이가상"
+      },
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "recipient-address-detail",
+      "path": "recipients[0].address",
+      "rust": "서울특별시 성북구 길음로 11 101동 1102호",
+      "ts": "서울특별시 성북구 길음로 11"
+    },
+    {
+      "caseId": "recipient-address-detail",
+      "path": "recipients[0].addressParts.detail",
+      "rust": "101동 1102호",
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "recipient-address-detail",
+      "path": "recipients[0].addressParts.town",
+      "rust": "101동",
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "recipient-address-detail",
+      "path": "recipients[0].candidates.length",
+      "rust": 4,
+      "ts": 3
+    },
+    {
+      "caseId": "recipient-address-detail",
+      "path": "recipients[0].candidates.missingTs[3]",
+      "rust": {
+        "end": 47,
+        "field": "address",
+        "id": "address:37:47",
+        "label": "101동 1102호",
+        "start": 37,
+        "value": "101동 1102호"
+      },
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "recipient-address-detail",
+      "path": "recipients[0].sources.length",
+      "rust": 4,
+      "ts": 3
+    },
+    {
+      "caseId": "recipient-address-detail",
+      "path": "recipients[0].sources.missingTs[3]",
+      "rust": {
+        "end": 47,
+        "field": "address",
+        "recipientId": "<GENERATED_ID>",
+        "start": 37,
+        "targetId": "<GENERATED_ID>",
+        "text": "101동 1102호"
+      },
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "recipient-address-detail",
+      "path": "candidates.missingRust[3]",
+      "rust": "<MISSING>",
+      "ts": {
+        "end": 40,
+        "id": "product:37:40",
+        "itemId": "<GENERATED_ID>",
+        "kind": "product",
+        "line": 3,
+        "paragraph": 0,
+        "reason": "상품 코드 / 별칭 / 옵션 인식 결과; 귀속은 별도 판정",
+        "recipientId": "<GENERATED_ID>",
+        "start": 37,
+        "text": "101",
+        "value": "101동 1102호"
+      }
+    },
+    {
+      "caseId": "recipient-address-detail",
+      "path": "candidates.missingTs[3]",
+      "rust": {
+        "end": 47,
+        "id": "address:37:47",
+        "kind": "address",
+        "line": 3,
+        "paragraph": 0,
+        "reason": "들여쓰기된 상세주소 연속 행 / 배송 건 원문 경계와 연결",
+        "recipientId": "<GENERATED_ID>",
+        "start": 37,
+        "text": "101동 1102호",
+        "value": "101동 1102호"
+      },
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "recipient-common",
+      "path": "recipients[0].unassignedEvidence",
+      "rust": null,
+      "ts": [
+        {
+          "end": 9,
+          "id": "quantity:7:9",
+          "kind": "quantity",
+          "line": 0,
+          "paragraph": 0,
+          "reason": "원문 전체 수량 후보 독립 추출",
+          "start": 7,
+          "text": "2개",
+          "value": "2"
+        }
+      ]
+    }
+  ]
+}

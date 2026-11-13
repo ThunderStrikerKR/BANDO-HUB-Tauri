@@ -1,0 +1,143 @@
+{
+  "schema": "tsbh-recognition-catalog-color-corrections-v1",
+  "source": "src-tauri/resources/state-seed.json",
+  "sourceBlob": "b1d529237b8cea5a0b91eb8b826e94b5b607484f",
+  "instructions": "Apply both defaultColor and variants[0].color only when productId, variantId, current field values and registered name all match. This fixture is a reviewed correction proposal; it does not silently mutate operating DB.",
+  "corrections": [
+    {
+      "productId": "bando-site-104",
+      "variantId": "bando-104-single",
+      "expectedName": "BD 911R / 레드",
+      "expectedDefaultColor": "색상 미표기",
+      "expectedVariantColor": "색상 미표기",
+      "color": "Red",
+      "registeredSourceUrl": "https://bandostand.com/product/detail.html?product_no=104"
+    },
+    {
+      "productId": "bando-site-337",
+      "variantId": "bando-337-single",
+      "expectedName": "BD Floor-BTS / 블랙 / 높이 27cm",
+      "expectedDefaultColor": "색상 미표기",
+      "expectedVariantColor": "색상 미표기",
+      "color": "Black",
+      "registeredSourceUrl": "https://bandostand.com/product/detail.html?product_no=337"
+    },
+    {
+      "productId": "bando-site-334",
+      "variantId": "bando-334-single",
+      "expectedName": "BD Desk-BTS / 블랙 / 높이 27cm",
+      "expectedDefaultColor": "색상 미표기",
+      "expectedVariantColor": "색상 미표기",
+      "color": "Black",
+      "registeredSourceUrl": "https://bandostand.com/product/detail.html?product_no=334"
+    },
+    {
+      "productId": "bando-site-324",
+      "variantId": "bando-324-single",
+      "expectedName": "BD Floor TS-3 / 실버 / 높이 32cm",
+      "expectedDefaultColor": "색상 미표기",
+      "expectedVariantColor": "색상 미표기",
+      "color": "Silver",
+      "registeredSourceUrl": "https://bandostand.com/product/detail.html?product_no=324"
+    },
+    {
+      "productId": "bando-site-323",
+      "variantId": "bando-323-single",
+      "expectedName": "BD Floor TS-2 / 실버 / 높이 22cm",
+      "expectedDefaultColor": "색상 미표기",
+      "expectedVariantColor": "색상 미표기",
+      "color": "Silver",
+      "registeredSourceUrl": "https://bandostand.com/product/detail.html?product_no=323"
+    },
+    {
+      "productId": "bando-site-322",
+      "variantId": "bando-322-single",
+      "expectedName": "BD Floor TS-1 / 실버 / 높이 17cm",
+      "expectedDefaultColor": "색상 미표기",
+      "expectedVariantColor": "색상 미표기",
+      "color": "Silver",
+      "registeredSourceUrl": "https://bandostand.com/product/detail.html?product_no=322"
+    },
+    {
+      "productId": "bando-site-321",
+      "variantId": "bando-321-single",
+      "expectedName": "BD FloorJS-4BK / 블랙 / 자바라 길이 60cm",
+      "expectedDefaultColor": "색상 미표기",
+      "expectedVariantColor": "색상 미표기",
+      "color": "Black",
+      "registeredSourceUrl": "https://bandostand.com/product/detail.html?product_no=321"
+    },
+    {
+      "productId": "bando-site-320",
+      "variantId": "bando-320-single",
+      "expectedName": "BD FloorJS-3BK / 블랙 / 자바라 길이 43cm",
+      "expectedDefaultColor": "색상 미표기",
+      "expectedVariantColor": "색상 미표기",
+      "color": "Black",
+      "registeredSourceUrl": "https://bandostand.com/product/detail.html?product_no=320"
+    },
+    {
+      "productId": "bando-site-319",
+      "variantId": "bando-319-single",
+      "expectedName": "BD FloorJS-2BK / 블랙 / 자바라 길이 35cm",
+      "expectedDefaultColor": "색상 미표기",
+      "expectedVariantColor": "색상 미표기",
+      "color": "Black",
+      "registeredSourceUrl": "https://bandostand.com/product/detail.html?product_no=319"
+    },
+    {
+      "productId": "bando-site-252",
+      "variantId": "bando-252-single",
+      "expectedName": "BD Desk IS-1 / 블랙 / Bar 길이 10cm",
+      "expectedDefaultColor": "색상 미표기",
+      "expectedVariantColor": "색상 미표기",
+      "color": "Black",
+      "registeredSourceUrl": "https://bandostand.com/product/detail.html?product_no=252"
+    },
+    {
+      "productId": "bando-site-251",
+      "variantId": "bando-251-single",
+      "expectedName": "BD Desk IS-2 / 블랙 / Bar 길이 15cm",
+      "expectedDefaultColor": "색상 미표기",
+      "expectedVariantColor": "색상 미표기",
+      "color": "Black",
+      "registeredSourceUrl": "https://bandostand.com/product/detail.html?product_no=251"
+    },
+    {
+      "productId": "bando-site-250",
+      "variantId": "bando-250-single",
+      "expectedName": "BD Desk IS-3 / 블랙 / Bar 길이 26cm",
+      "expectedDefaultColor": "색상 미표기",
+      "expectedVariantColor": "색상 미표기",
+      "color": "Black",
+      "registeredSourceUrl": "https://bandostand.com/product/detail.html?product_no=250"
+    },
+    {
+      "productId": "bando-site-249",
+      "variantId": "bando-249-single",
+      "expectedName": "BD Desk TS-3 / 실버 / Bar 길이 32cm",
+      "expectedDefaultColor": "색상 미표기",
+      "expectedVariantColor": "색상 미표기",
+      "color": "Silver",
+      "registeredSourceUrl": "https://bandostand.com/product/detail.html?product_no=249"
+    },
+    {
+      "productId": "bando-site-248",
+      "variantId": "bando-248-single",
+      "expectedName": "BD Desk TS-2 / 실버 / Bar 길이 22cm",
+      "expectedDefaultColor": "색상 미표기",
+      "expectedVariantColor": "색상 미표기",
+      "color": "Silver",
+      "registeredSourceUrl": "https://bandostand.com/product/detail.html?product_no=248"
+    },
+    {
+      "productId": "bando-site-247",
+      "variantId": "bando-247-single",
+      "expectedName": "BD Desk TS-1 / 실버 / Bar 길이 15cm",
+      "expectedDefaultColor": "색상 미표기",
+      "expectedVariantColor": "색상 미표기",
+      "color": "Silver",
+      "registeredSourceUrl": "https://bandostand.com/product/detail.html?product_no=247"
+    }
+  ]
+}

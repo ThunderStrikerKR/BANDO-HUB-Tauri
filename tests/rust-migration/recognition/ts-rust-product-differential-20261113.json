@@ -1,0 +1,1946 @@
+{
+  "schema": "tsbh-recognition-cross-runtime-product-fields-v1",
+  "date": "2026-11-13",
+  "branch": "migration/01-recognition",
+  "sourceCommit": "513369276af3aeab8917f81d2f08f060ee78112d",
+  "githubActionsRun": "43371988997",
+  "githubActionsJob": "131709625658",
+  "toolchain": "original TypeScript src/parser.ts::parseEvidence, imported with tsx; actual Rust recognition::execute analyze_order",
+  "testCases": "15 independently registered color-corrected names + 20 original order forms; both runtimes execute on identical raw, client, in-memory corrected state",
+  "details": "Every parsed Item field was compared recursively; generated UUID/target IDs normalized; extra TS-only order items aligned by SKU before comparison",
+  "interpretation": "Audit execution succeeded, parity did NOT pass; mismatchCount is not a test-pass number",
+  "result": {
+    "cases": 35,
+    "casesWithDifferences": 35,
+    "comparedLeaves": 1478,
+    "mismatchCount": 219
+  },
+  "fields": [
+    {
+      "count": 39,
+      "field": "items[].match.aliasId"
+    },
+    {
+      "count": 36,
+      "field": "items[].productCandidates[].end"
+    },
+    {
+      "count": 36,
+      "field": "items[].productCandidates[].label"
+    },
+    {
+      "count": 36,
+      "field": "items[].recognitionReason"
+    },
+    {
+      "count": 25,
+      "field": "items[].match.term"
+    },
+    {
+      "count": 17,
+      "field": "items[].productCandidates[].start"
+    },
+    {
+      "count": 3,
+      "field": "items[].name"
+    },
+    {
+      "count": 3,
+      "field": "items[].raw"
+    },
+    {
+      "count": 2,
+      "field": "items[0].issues.length"
+    },
+    {
+      "count": 2,
+      "field": "items[].issues[]"
+    },
+    {
+      "count": 2,
+      "field": "items.length"
+    },
+    {
+      "count": 2,
+      "field": "items[].quantity"
+    },
+    {
+      "count": 2,
+      "field": "items[].quantityConfirmed"
+    },
+    {
+      "count": 2,
+      "field": "items[0].sources.length"
+    },
+    {
+      "count": 2,
+      "field": "items[].sources[]"
+    },
+    {
+      "count": 2,
+      "field": "items.unmatchedTs[]"
+    },
+    {
+      "count": 1,
+      "field": "items[].catalog"
+    },
+    {
+      "count": 1,
+      "field": "items[].color"
+    },
+    {
+      "count": 1,
+      "field": "items[].match.kind"
+    },
+    {
+      "count": 1,
+      "field": "items[].productId"
+    },
+    {
+      "count": 1,
+      "field": "items[].url"
+    },
+    {
+      "count": 1,
+      "field": "items[].variantId"
+    },
+    {
+      "count": 1,
+      "field": "items[].sources[].end"
+    },
+    {
+      "count": 1,
+      "field": "items[].sources[].text"
+    }
+  ],
+  "cases": [
+    {
+      "id": "corrected-01",
+      "mismatchCount": 14,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-104"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        null
+      ]
+    },
+    {
+      "id": "corrected-02",
+      "mismatchCount": 5,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-337"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "bando-site-337"
+      ]
+    },
+    {
+      "id": "corrected-03",
+      "mismatchCount": 5,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-334"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "bando-site-334"
+      ]
+    },
+    {
+      "id": "corrected-04",
+      "mismatchCount": 5,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-324"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "bando-site-324"
+      ]
+    },
+    {
+      "id": "corrected-05",
+      "mismatchCount": 5,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-323"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "bando-site-323"
+      ]
+    },
+    {
+      "id": "corrected-06",
+      "mismatchCount": 5,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-322"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "bando-site-322"
+      ]
+    },
+    {
+      "id": "corrected-07",
+      "mismatchCount": 5,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-321"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "bando-site-321"
+      ]
+    },
+    {
+      "id": "corrected-08",
+      "mismatchCount": 5,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-320"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "bando-site-320"
+      ]
+    },
+    {
+      "id": "corrected-09",
+      "mismatchCount": 5,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-319"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "bando-site-319"
+      ]
+    },
+    {
+      "id": "corrected-10",
+      "mismatchCount": 5,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-252"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "bando-site-252"
+      ]
+    },
+    {
+      "id": "corrected-11",
+      "mismatchCount": 5,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-251"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "bando-site-251"
+      ]
+    },
+    {
+      "id": "corrected-12",
+      "mismatchCount": 5,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-250"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "bando-site-250"
+      ]
+    },
+    {
+      "id": "corrected-13",
+      "mismatchCount": 5,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-249"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "bando-site-249"
+      ]
+    },
+    {
+      "id": "corrected-14",
+      "mismatchCount": 5,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-248"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "bando-site-248"
+      ]
+    },
+    {
+      "id": "corrected-15",
+      "mismatchCount": 5,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-247"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "bando-site-247"
+      ]
+    },
+    {
+      "id": "original-01",
+      "mismatchCount": 17,
+      "rustItemCount": 3,
+      "rustProductIds": [
+        "sku:bando-site-50:bando-50-P00000BX000C",
+        "bando-site-63",
+        "bando-site-83"
+      ],
+      "tsItemCount": 3,
+      "tsProductIds": [
+        "sku:bando-site-50:bando-50-P00000BX000C",
+        "bando-site-63",
+        "bando-site-83"
+      ]
+    },
+    {
+      "id": "original-02",
+      "mismatchCount": 6,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-290"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "bando-site-290"
+      ]
+    },
+    {
+      "id": "original-03",
+      "mismatchCount": 4,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-107"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "bando-site-107"
+      ]
+    },
+    {
+      "id": "original-04",
+      "mismatchCount": 5,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-87"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "bando-site-87"
+      ]
+    },
+    {
+      "id": "original-05",
+      "mismatchCount": 2,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        null
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        null
+      ]
+    },
+    {
+      "id": "original-06",
+      "mismatchCount": 3,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        null
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        null
+      ]
+    },
+    {
+      "id": "original-07",
+      "mismatchCount": 5,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-130"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "bando-site-130"
+      ]
+    },
+    {
+      "id": "original-08",
+      "mismatchCount": 5,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-290"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "bando-site-290"
+      ]
+    },
+    {
+      "id": "original-09",
+      "mismatchCount": 6,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-176"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "bando-site-176"
+      ]
+    },
+    {
+      "id": "original-10",
+      "mismatchCount": 5,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "sku:bando-site-48:bando-48-P00000BV000B"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "sku:bando-site-48:bando-48-P00000BV000B"
+      ]
+    },
+    {
+      "id": "original-11",
+      "mismatchCount": 6,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-202"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "bando-site-202"
+      ]
+    },
+    {
+      "id": "original-12",
+      "mismatchCount": 5,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "sku:bando-site-48:bando-48-P00000BV000B"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "sku:bando-site-48:bando-48-P00000BV000B"
+      ]
+    },
+    {
+      "id": "original-13",
+      "mismatchCount": 7,
+      "rustItemCount": 2,
+      "rustProductIds": [
+        null,
+        "sku:bando-site-23:bando-23-P000000W000F"
+      ],
+      "tsItemCount": 2,
+      "tsProductIds": [
+        null,
+        "sku:bando-site-23:bando-23-P000000W000F"
+      ]
+    },
+    {
+      "id": "original-14",
+      "mismatchCount": 6,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-150"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "bando-site-150"
+      ]
+    },
+    {
+      "id": "original-15",
+      "mismatchCount": 5,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-70"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "bando-site-70"
+      ]
+    },
+    {
+      "id": "original-16",
+      "mismatchCount": 5,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-63"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "bando-site-63"
+      ]
+    },
+    {
+      "id": "original-17",
+      "mismatchCount": 14,
+      "rustItemCount": 2,
+      "rustProductIds": [
+        "sku:bando-site-48:bando-48-P00000BV000B",
+        "sku:bando-site-237:bando-237-P00000JC000J"
+      ],
+      "tsItemCount": 2,
+      "tsProductIds": [
+        "sku:bando-site-48:bando-48-P00000BV000B",
+        "sku:bando-site-237:bando-237-P00000JC000J"
+      ]
+    },
+    {
+      "id": "original-18",
+      "mismatchCount": 5,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "sku:bando-site-48:bando-48-P00000BV000C"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "sku:bando-site-48:bando-48-P00000BV000C"
+      ]
+    },
+    {
+      "id": "original-19",
+      "mismatchCount": 12,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-219"
+      ],
+      "tsItemCount": 2,
+      "tsProductIds": [
+        null,
+        "bando-site-219"
+      ]
+    },
+    {
+      "id": "original-20",
+      "mismatchCount": 12,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-248"
+      ],
+      "tsItemCount": 2,
+      "tsProductIds": [
+        null,
+        "bando-site-248"
+      ]
+    }
+  ],
+  "differences": [
+    {
+      "caseId": "corrected-01",
+      "path": "items[0].catalog",
+      "rust": "BANDOSTAND",
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "corrected-01",
+      "path": "items[0].color",
+      "rust": "Red",
+      "ts": "레드"
+    },
+    {
+      "caseId": "corrected-01",
+      "path": "items[0].issues.length",
+      "rust": 0,
+      "ts": 1
+    },
+    {
+      "caseId": "corrected-01",
+      "path": "items[0].issues[0]",
+      "rust": "<MISSING>",
+      "ts": "제품명이 확인되지 않습니다."
+    },
+    {
+      "caseId": "corrected-01",
+      "path": "items[0].match.aliasId",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "corrected-01",
+      "path": "items[0].match.kind",
+      "rust": "NAME",
+      "ts": "UNKNOWN"
+    },
+    {
+      "caseId": "corrected-01",
+      "path": "items[0].match.term",
+      "rust": "BD 911R / 레드",
+      "ts": "BD 911R"
+    },
+    {
+      "caseId": "corrected-01",
+      "path": "items[0].name",
+      "rust": "BD 911R / 레드",
+      "ts": "BD 911R"
+    },
+    {
+      "caseId": "corrected-01",
+      "path": "items[0].productCandidates[0].end",
+      "rust": 12,
+      "ts": 15
+    },
+    {
+      "caseId": "corrected-01",
+      "path": "items[0].productCandidates[0].label",
+      "rust": "BD 911R / 레드",
+      "ts": "BD 911R / 레드 레드"
+    },
+    {
+      "caseId": "corrected-01",
+      "path": "items[0].productId",
+      "rust": "bando-site-104",
+      "ts": null
+    },
+    {
+      "caseId": "corrected-01",
+      "path": "items[0].recognitionReason",
+      "rust": null,
+      "ts": "등록된 모델명 또는 별칭과 일치하지 않습니다."
+    },
+    {
+      "caseId": "corrected-01",
+      "path": "items[0].url",
+      "rust": "https://bandostand.com/product/detail.html?product_no=104",
+      "ts": ""
+    },
+    {
+      "caseId": "corrected-01",
+      "path": "items[0].variantId",
+      "rust": "bando-104-single",
+      "ts": null
+    },
+    {
+      "caseId": "corrected-02",
+      "path": "items[0].match.aliasId",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "corrected-02",
+      "path": "items[0].match.term",
+      "rust": "BD Floor-BTS / 블랙 / 높이 27cm",
+      "ts": "BD Floor-BTS / 블랙 / 높이 27cm 2개"
+    },
+    {
+      "caseId": "corrected-02",
+      "path": "items[0].productCandidates[0].end",
+      "rust": 27,
+      "ts": 30
+    },
+    {
+      "caseId": "corrected-02",
+      "path": "items[0].productCandidates[0].label",
+      "rust": "BD Floor-BTS / 블랙 / 높이 27cm",
+      "ts": "BD Floor-BTS / 블랙 / 높이 27cm 블랙"
+    },
+    {
+      "caseId": "corrected-02",
+      "path": "items[0].recognitionReason",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "corrected-03",
+      "path": "items[0].match.aliasId",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "corrected-03",
+      "path": "items[0].match.term",
+      "rust": "BD Desk-BTS / 블랙 / 높이 27cm",
+      "ts": "BD Desk-BTS / 블랙 / 높이 27cm 2개"
+    },
+    {
+      "caseId": "corrected-03",
+      "path": "items[0].productCandidates[0].end",
+      "rust": 26,
+      "ts": 29
+    },
+    {
+      "caseId": "corrected-03",
+      "path": "items[0].productCandidates[0].label",
+      "rust": "BD Desk-BTS / 블랙 / 높이 27cm",
+      "ts": "BD Desk-BTS / 블랙 / 높이 27cm 블랙"
+    },
+    {
+      "caseId": "corrected-03",
+      "path": "items[0].recognitionReason",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "corrected-04",
+      "path": "items[0].match.aliasId",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "corrected-04",
+      "path": "items[0].match.term",
+      "rust": "BD Floor TS-3 / 실버 / 높이 32cm",
+      "ts": "BD Floor TS-3 / 실버 / 높이 32cm 2개"
+    },
+    {
+      "caseId": "corrected-04",
+      "path": "items[0].productCandidates[0].end",
+      "rust": 28,
+      "ts": 31
+    },
+    {
+      "caseId": "corrected-04",
+      "path": "items[0].productCandidates[0].label",
+      "rust": "BD Floor TS-3 / 실버 / 높이 32cm",
+      "ts": "BD Floor TS-3 / 실버 / 높이 32cm 실버"
+    },
+    {
+      "caseId": "corrected-04",
+      "path": "items[0].recognitionReason",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "corrected-05",
+      "path": "items[0].match.aliasId",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "corrected-05",
+      "path": "items[0].match.term",
+      "rust": "BD Floor TS-2 / 실버 / 높이 22cm",
+      "ts": "BD Floor TS-2 / 실버 / 높이 22cm 2개"
+    },
+    {
+      "caseId": "corrected-05",
+      "path": "items[0].productCandidates[0].end",
+      "rust": 28,
+      "ts": 31
+    },
+    {
+      "caseId": "corrected-05",
+      "path": "items[0].productCandidates[0].label",
+      "rust": "BD Floor TS-2 / 실버 / 높이 22cm",
+      "ts": "BD Floor TS-2 / 실버 / 높이 22cm 실버"
+    },
+    {
+      "caseId": "corrected-05",
+      "path": "items[0].recognitionReason",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "corrected-06",
+      "path": "items[0].match.aliasId",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "corrected-06",
+      "path": "items[0].match.term",
+      "rust": "BD Floor TS-1 / 실버 / 높이 17cm",
+      "ts": "BD Floor TS-1 / 실버 / 높이 17cm 2개"
+    },
+    {
+      "caseId": "corrected-06",
+      "path": "items[0].productCandidates[0].end",
+      "rust": 28,
+      "ts": 31
+    },
+    {
+      "caseId": "corrected-06",
+      "path": "items[0].productCandidates[0].label",
+      "rust": "BD Floor TS-1 / 실버 / 높이 17cm",
+      "ts": "BD Floor TS-1 / 실버 / 높이 17cm 실버"
+    },
+    {
+      "caseId": "corrected-06",
+      "path": "items[0].recognitionReason",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "corrected-07",
+      "path": "items[0].match.aliasId",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "corrected-07",
+      "path": "items[0].match.term",
+      "rust": "BD FloorJS-4BK / 블랙 / 자바라 길이 60cm",
+      "ts": "BD FloorJS-4BK / 블랙 / 자바라 길이 60cm 2개"
+    },
+    {
+      "caseId": "corrected-07",
+      "path": "items[0].productCandidates[0].end",
+      "rust": 33,
+      "ts": 36
+    },
+    {
+      "caseId": "corrected-07",
+      "path": "items[0].productCandidates[0].label",
+      "rust": "BD FloorJS-4BK / 블랙 / 자바라 길이 60cm",
+      "ts": "BD FloorJS-4BK / 블랙 / 자바라 길이 60cm 블랙"
+    },
+    {
+      "caseId": "corrected-07",
+      "path": "items[0].recognitionReason",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "corrected-08",
+      "path": "items[0].match.aliasId",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "corrected-08",
+      "path": "items[0].match.term",
+      "rust": "BD FloorJS-3BK / 블랙 / 자바라 길이 43cm",
+      "ts": "BD FloorJS-3BK / 블랙 / 자바라 길이 43cm 2개"
+    },
+    {
+      "caseId": "corrected-08",
+      "path": "items[0].productCandidates[0].end",
+      "rust": 33,
+      "ts": 36
+    },
+    {
+      "caseId": "corrected-08",
+      "path": "items[0].productCandidates[0].label",
+      "rust": "BD FloorJS-3BK / 블랙 / 자바라 길이 43cm",
+      "ts": "BD FloorJS-3BK / 블랙 / 자바라 길이 43cm 블랙"
+    },
+    {
+      "caseId": "corrected-08",
+      "path": "items[0].recognitionReason",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "corrected-09",
+      "path": "items[0].match.aliasId",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "corrected-09",
+      "path": "items[0].match.term",
+      "rust": "BD FloorJS-2BK / 블랙 / 자바라 길이 35cm",
+      "ts": "BD FloorJS-2BK / 블랙 / 자바라 길이 35cm 2개"
+    },
+    {
+      "caseId": "corrected-09",
+      "path": "items[0].productCandidates[0].end",
+      "rust": 33,
+      "ts": 36
+    },
+    {
+      "caseId": "corrected-09",
+      "path": "items[0].productCandidates[0].label",
+      "rust": "BD FloorJS-2BK / 블랙 / 자바라 길이 35cm",
+      "ts": "BD FloorJS-2BK / 블랙 / 자바라 길이 35cm 블랙"
+    },
+    {
+      "caseId": "corrected-09",
+      "path": "items[0].recognitionReason",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "corrected-10",
+      "path": "items[0].match.aliasId",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "corrected-10",
+      "path": "items[0].match.term",
+      "rust": "BD Desk IS-1 / 블랙 / Bar 길이 10cm",
+      "ts": "BD Desk IS-1 / 블랙 / Bar 길이 10cm 2개"
+    },
+    {
+      "caseId": "corrected-10",
+      "path": "items[0].productCandidates[0].end",
+      "rust": 31,
+      "ts": 34
+    },
+    {
+      "caseId": "corrected-10",
+      "path": "items[0].productCandidates[0].label",
+      "rust": "BD Desk IS-1 / 블랙 / Bar 길이 10cm",
+      "ts": "BD Desk IS-1 / 블랙 / Bar 길이 10cm 블랙"
+    },
+    {
+      "caseId": "corrected-10",
+      "path": "items[0].recognitionReason",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "corrected-11",
+      "path": "items[0].match.aliasId",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "corrected-11",
+      "path": "items[0].match.term",
+      "rust": "BD Desk IS-2 / 블랙 / Bar 길이 15cm",
+      "ts": "BD Desk IS-2 / 블랙 / Bar 길이 15cm 2개"
+    },
+    {
+      "caseId": "corrected-11",
+      "path": "items[0].productCandidates[0].end",
+      "rust": 31,
+      "ts": 34
+    },
+    {
+      "caseId": "corrected-11",
+      "path": "items[0].productCandidates[0].label",
+      "rust": "BD Desk IS-2 / 블랙 / Bar 길이 15cm",
+      "ts": "BD Desk IS-2 / 블랙 / Bar 길이 15cm 블랙"
+    },
+    {
+      "caseId": "corrected-11",
+      "path": "items[0].recognitionReason",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "corrected-12",
+      "path": "items[0].match.aliasId",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "corrected-12",
+      "path": "items[0].match.term",
+      "rust": "BD Desk IS-3 / 블랙 / Bar 길이 26cm",
+      "ts": "BD Desk IS-3 / 블랙 / Bar 길이 26cm 2개"
+    },
+    {
+      "caseId": "corrected-12",
+      "path": "items[0].productCandidates[0].end",
+      "rust": 31,
+      "ts": 34
+    },
+    {
+      "caseId": "corrected-12",
+      "path": "items[0].productCandidates[0].label",
+      "rust": "BD Desk IS-3 / 블랙 / Bar 길이 26cm",
+      "ts": "BD Desk IS-3 / 블랙 / Bar 길이 26cm 블랙"
+    },
+    {
+      "caseId": "corrected-12",
+      "path": "items[0].recognitionReason",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "corrected-13",
+      "path": "items[0].match.aliasId",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "corrected-13",
+      "path": "items[0].match.term",
+      "rust": "BD Desk TS-3 / 실버 / Bar 길이 32cm",
+      "ts": "BD Desk TS-3 / 실버 / Bar 길이 32cm 2개"
+    },
+    {
+      "caseId": "corrected-13",
+      "path": "items[0].productCandidates[0].end",
+      "rust": 31,
+      "ts": 34
+    },
+    {
+      "caseId": "corrected-13",
+      "path": "items[0].productCandidates[0].label",
+      "rust": "BD Desk TS-3 / 실버 / Bar 길이 32cm",
+      "ts": "BD Desk TS-3 / 실버 / Bar 길이 32cm 실버"
+    },
+    {
+      "caseId": "corrected-13",
+      "path": "items[0].recognitionReason",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "corrected-14",
+      "path": "items[0].match.aliasId",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "corrected-14",
+      "path": "items[0].match.term",
+      "rust": "BD Desk TS-2 / 실버 / Bar 길이 22cm",
+      "ts": "BD Desk TS-2 / 실버 / Bar 길이 22cm 2개"
+    },
+    {
+      "caseId": "corrected-14",
+      "path": "items[0].productCandidates[0].end",
+      "rust": 31,
+      "ts": 34
+    },
+    {
+      "caseId": "corrected-14",
+      "path": "items[0].productCandidates[0].label",
+      "rust": "BD Desk TS-2 / 실버 / Bar 길이 22cm",
+      "ts": "BD Desk TS-2 / 실버 / Bar 길이 22cm 실버"
+    },
+    {
+      "caseId": "corrected-14",
+      "path": "items[0].recognitionReason",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "corrected-15",
+      "path": "items[0].match.aliasId",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "corrected-15",
+      "path": "items[0].match.term",
+      "rust": "BD Desk TS-1 / 실버 / Bar 길이 15cm",
+      "ts": "BD Desk TS-1 / 실버 / Bar 길이 15cm 2개"
+    },
+    {
+      "caseId": "corrected-15",
+      "path": "items[0].productCandidates[0].end",
+      "rust": 31,
+      "ts": 34
+    },
+    {
+      "caseId": "corrected-15",
+      "path": "items[0].productCandidates[0].label",
+      "rust": "BD Desk TS-1 / 실버 / Bar 길이 15cm",
+      "ts": "BD Desk TS-1 / 실버 / Bar 길이 15cm 실버"
+    },
+    {
+      "caseId": "corrected-15",
+      "path": "items[0].recognitionReason",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-01",
+      "path": "items[0].match.aliasId",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-01",
+      "path": "items[0].productCandidates[0].end",
+      "rust": 128,
+      "ts": 18
+    },
+    {
+      "caseId": "original-01",
+      "path": "items[0].productCandidates[0].label",
+      "rust": "BD 708-1 / 블랙 / 비타공 상판",
+      "ts": "BD 708-1 / 블랙 / 비타공 상판 블랙"
+    },
+    {
+      "caseId": "original-01",
+      "path": "items[0].productCandidates[0].start",
+      "rust": 123,
+      "ts": 0
+    },
+    {
+      "caseId": "original-01",
+      "path": "items[0].recognitionReason",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-01",
+      "path": "items[1].match.aliasId",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-01",
+      "path": "items[1].match.term",
+      "rust": "BD CONDUCTOR",
+      "ts": "지휘자보면대 BD CONDUCTOR / 1개"
+    },
+    {
+      "caseId": "original-01",
+      "path": "items[1].productCandidates[0].end",
+      "rust": 154,
+      "ts": 24
+    },
+    {
+      "caseId": "original-01",
+      "path": "items[1].productCandidates[0].label",
+      "rust": "BD Conductor / 지휘자 보면대",
+      "ts": "BD Conductor / 지휘자 보면대 "
+    },
+    {
+      "caseId": "original-01",
+      "path": "items[1].productCandidates[0].start",
+      "rust": 142,
+      "ts": 0
+    },
+    {
+      "caseId": "original-01",
+      "path": "items[1].recognitionReason",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-01",
+      "path": "items[2].match.aliasId",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-01",
+      "path": "items[2].match.term",
+      "rust": "Cart-10",
+      "ts": "보면대카트 Cart-10 / 2개"
+    },
+    {
+      "caseId": "original-01",
+      "path": "items[2].productCandidates[0].end",
+      "rust": 173,
+      "ts": 18
+    },
+    {
+      "caseId": "original-01",
+      "path": "items[2].productCandidates[0].label",
+      "rust": "Cart-10 / 보면대카트",
+      "ts": "Cart-10 / 보면대카트 "
+    },
+    {
+      "caseId": "original-01",
+      "path": "items[2].productCandidates[0].start",
+      "rust": 166,
+      "ts": 0
+    },
+    {
+      "caseId": "original-01",
+      "path": "items[2].recognitionReason",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-02",
+      "path": "items[0].match.aliasId",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-02",
+      "path": "items[0].match.term",
+      "rust": "BD-950",
+      "ts": "950"
+    },
+    {
+      "caseId": "original-02",
+      "path": "items[0].productCandidates[0].end",
+      "rust": 67,
+      "ts": 21
+    },
+    {
+      "caseId": "original-02",
+      "path": "items[0].productCandidates[0].label",
+      "rust": "BD 950 / 미니형 마이크 스탠드",
+      "ts": "BD 950 / 미니형 마이크 스탠드 "
+    },
+    {
+      "caseId": "original-02",
+      "path": "items[0].productCandidates[0].start",
+      "rust": 61,
+      "ts": 0
+    },
+    {
+      "caseId": "original-02",
+      "path": "items[0].recognitionReason",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-03",
+      "path": "items[0].match.aliasId",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-03",
+      "path": "items[0].productCandidates[0].end",
+      "rust": 3,
+      "ts": 6
+    },
+    {
+      "caseId": "original-03",
+      "path": "items[0].productCandidates[0].label",
+      "rust": "BD 270 / 높낮이 고정형",
+      "ts": "BD 270 / 높낮이 고정형 "
+    },
+    {
+      "caseId": "original-03",
+      "path": "items[0].recognitionReason",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-04",
+      "path": "items[0].match.aliasId",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-04",
+      "path": "items[0].productCandidates[0].end",
+      "rust": 19,
+      "ts": 32
+    },
+    {
+      "caseId": "original-04",
+      "path": "items[0].productCandidates[0].label",
+      "rust": "BD 250CC / 원형 / 크롬",
+      "ts": "BD 250CC / 원형 / 크롬 "
+    },
+    {
+      "caseId": "original-04",
+      "path": "items[0].productCandidates[0].start",
+      "rust": 14,
+      "ts": 0
+    },
+    {
+      "caseId": "original-04",
+      "path": "items[0].recognitionReason",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-05",
+      "path": "items[0].match.aliasId",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-05",
+      "path": "items[0].name",
+      "rust": "Z-1(건반 스탠드) * 1EA",
+      "ts": "Z-1(건반 스탠드) *"
+    },
+    {
+      "caseId": "original-06",
+      "path": "items[0].issues.length",
+      "rust": 2,
+      "ts": 1
+    },
+    {
+      "caseId": "original-06",
+      "path": "items[0].issues[1]",
+      "rust": "수량 미기재 / 거래처 확인 필요",
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-06",
+      "path": "items[0].match.aliasId",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-07",
+      "path": "items[0].match.aliasId",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-07",
+      "path": "items[0].productCandidates[0].end",
+      "rust": 12,
+      "ts": 22
+    },
+    {
+      "caseId": "original-07",
+      "path": "items[0].productCandidates[0].label",
+      "rust": "BD 409 / X자형 키보드 스탠드",
+      "ts": "BD 409 / X자형 키보드 스탠드 "
+    },
+    {
+      "caseId": "original-07",
+      "path": "items[0].productCandidates[0].start",
+      "rust": 9,
+      "ts": 0
+    },
+    {
+      "caseId": "original-07",
+      "path": "items[0].recognitionReason",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-08",
+      "path": "items[0].match.aliasId",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-08",
+      "path": "items[0].productCandidates[0].end",
+      "rust": 6,
+      "ts": 17
+    },
+    {
+      "caseId": "original-08",
+      "path": "items[0].productCandidates[0].label",
+      "rust": "BD 950 / 미니형 마이크 스탠드",
+      "ts": "BD 950 / 미니형 마이크 스탠드 "
+    },
+    {
+      "caseId": "original-08",
+      "path": "items[0].raw",
+      "rust": "BD 950       6  개   ㅣ   임가상",
+      "ts": "BD 950       6  개"
+    },
+    {
+      "caseId": "original-08",
+      "path": "items[0].recognitionReason",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-09",
+      "path": "items[0].match.aliasId",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-09",
+      "path": "items[0].match.term",
+      "rust": "BD Boss101",
+      "ts": "101"
+    },
+    {
+      "caseId": "original-09",
+      "path": "items[0].productCandidates[0].end",
+      "rust": 16,
+      "ts": 24
+    },
+    {
+      "caseId": "original-09",
+      "path": "items[0].productCandidates[0].label",
+      "rust": "Boss101 / 스피커스탠드 / 1개",
+      "ts": "Boss101 / 스피커스탠드 / 1개 "
+    },
+    {
+      "caseId": "original-09",
+      "path": "items[0].productCandidates[0].start",
+      "rust": 6,
+      "ts": 0
+    },
+    {
+      "caseId": "original-09",
+      "path": "items[0].recognitionReason",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-10",
+      "path": "items[0].match.aliasId",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-10",
+      "path": "items[0].productCandidates[0].end",
+      "rust": 12,
+      "ts": 30
+    },
+    {
+      "caseId": "original-10",
+      "path": "items[0].productCandidates[0].label",
+      "rust": "BD 709 / 블랙 / 타공 상판",
+      "ts": "BD 709 / 블랙 / 타공 상판 블랙"
+    },
+    {
+      "caseId": "original-10",
+      "path": "items[0].productCandidates[0].start",
+      "rust": 9,
+      "ts": 0
+    },
+    {
+      "caseId": "original-10",
+      "path": "items[0].recognitionReason",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-11",
+      "path": "items[0].match.aliasId",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-11",
+      "path": "items[0].match.term",
+      "rust": "BD-LP-WA",
+      "ts": "모델명 : BD-LP-WA A타입 수량 : 1ea"
+    },
+    {
+      "caseId": "original-11",
+      "path": "items[0].productCandidates[0].end",
+      "rust": 35,
+      "ts": 27
+    },
+    {
+      "caseId": "original-11",
+      "path": "items[0].productCandidates[0].label",
+      "rust": "BD LP-WA / A타입 상판",
+      "ts": "BD LP-WA / A타입 상판 "
+    },
+    {
+      "caseId": "original-11",
+      "path": "items[0].productCandidates[0].start",
+      "rust": 27,
+      "ts": 0
+    },
+    {
+      "caseId": "original-11",
+      "path": "items[0].recognitionReason",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-12",
+      "path": "items[0].match.aliasId",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-12",
+      "path": "items[0].productCandidates[0].end",
+      "rust": 75,
+      "ts": 12
+    },
+    {
+      "caseId": "original-12",
+      "path": "items[0].productCandidates[0].label",
+      "rust": "BD 709 / 블랙 / 타공 상판",
+      "ts": "BD 709 / 블랙 / 타공 상판 블랙"
+    },
+    {
+      "caseId": "original-12",
+      "path": "items[0].productCandidates[0].start",
+      "rust": 72,
+      "ts": 0
+    },
+    {
+      "caseId": "original-12",
+      "path": "items[0].recognitionReason",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-13",
+      "path": "items[0].match.aliasId",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-13",
+      "path": "items[0].name",
+      "rust": "반도 SSB 가방 2EA",
+      "ts": "반도 SSB 가방"
+    },
+    {
+      "caseId": "original-13",
+      "path": "items[1].match.aliasId",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-13",
+      "path": "items[1].productCandidates[0].end",
+      "rust": 82,
+      "ts": 14
+    },
+    {
+      "caseId": "original-13",
+      "path": "items[1].productCandidates[0].label",
+      "rust": "BD 705 / 타공 상판",
+      "ts": "BD 705 / 타공 상판 "
+    },
+    {
+      "caseId": "original-13",
+      "path": "items[1].productCandidates[0].start",
+      "rust": 79,
+      "ts": 0
+    },
+    {
+      "caseId": "original-13",
+      "path": "items[1].recognitionReason",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-14",
+      "path": "items[0].match.aliasId",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-14",
+      "path": "items[0].match.term",
+      "rust": "BC-105",
+      "ts": "105"
+    },
+    {
+      "caseId": "original-14",
+      "path": "items[0].productCandidates[0].end",
+      "rust": 33,
+      "ts": 17
+    },
+    {
+      "caseId": "original-14",
+      "path": "items[0].productCandidates[0].label",
+      "rust": "BD BC-105 / 첼로 스탠드",
+      "ts": "BD BC-105 / 첼로 스탠드 "
+    },
+    {
+      "caseId": "original-14",
+      "path": "items[0].productCandidates[0].start",
+      "rust": 27,
+      "ts": 0
+    },
+    {
+      "caseId": "original-14",
+      "path": "items[0].recognitionReason",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-15",
+      "path": "items[0].match.aliasId",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-15",
+      "path": "items[0].productCandidates[0].end",
+      "rust": 25,
+      "ts": 26
+    },
+    {
+      "caseId": "original-15",
+      "path": "items[0].productCandidates[0].label",
+      "rust": "BD 609 / 블랙",
+      "ts": "BD 609 / 블랙 블랙"
+    },
+    {
+      "caseId": "original-15",
+      "path": "items[0].productCandidates[0].start",
+      "rust": 19,
+      "ts": 0
+    },
+    {
+      "caseId": "original-15",
+      "path": "items[0].recognitionReason",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-16",
+      "path": "items[0].match.aliasId",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-16",
+      "path": "items[0].match.term",
+      "rust": "BD CONDUCTOR",
+      "ts": "BD CONDUCTOR (1ea)"
+    },
+    {
+      "caseId": "original-16",
+      "path": "items[0].productCandidates[0].end",
+      "rust": 12,
+      "ts": 18
+    },
+    {
+      "caseId": "original-16",
+      "path": "items[0].productCandidates[0].label",
+      "rust": "BD Conductor / 지휘자 보면대",
+      "ts": "BD Conductor / 지휘자 보면대 "
+    },
+    {
+      "caseId": "original-16",
+      "path": "items[0].recognitionReason",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-17",
+      "path": "items[0].match.aliasId",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-17",
+      "path": "items[0].match.term",
+      "rust": "BD 709 (블랙)",
+      "ts": "BD 709"
+    },
+    {
+      "caseId": "original-17",
+      "path": "items[0].productCandidates[0].end",
+      "rust": 77,
+      "ts": 14
+    },
+    {
+      "caseId": "original-17",
+      "path": "items[0].productCandidates[0].label",
+      "rust": "BD 709 / 블랙 / 타공 상판",
+      "ts": "BD 709 / 블랙 / 타공 상판 블랙"
+    },
+    {
+      "caseId": "original-17",
+      "path": "items[0].productCandidates[0].start",
+      "rust": 66,
+      "ts": 0
+    },
+    {
+      "caseId": "original-17",
+      "path": "items[0].recognitionReason",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-17",
+      "path": "items[0].sources[0].end",
+      "rust": 77,
+      "ts": 72
+    },
+    {
+      "caseId": "original-17",
+      "path": "items[0].sources[0].text",
+      "rust": "BD 709 (블랙)",
+      "ts": "BD 709"
+    },
+    {
+      "caseId": "original-17",
+      "path": "items[1].match.aliasId",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-17",
+      "path": "items[1].match.term",
+      "rust": "뮤직트레이",
+      "ts": "반도 뮤직트레이 그레이 1개"
+    },
+    {
+      "caseId": "original-17",
+      "path": "items[1].productCandidates[0].end",
+      "rust": 162,
+      "ts": 15
+    },
+    {
+      "caseId": "original-17",
+      "path": "items[1].productCandidates[0].label",
+      "rust": "뮤직 트레이 / 그레이",
+      "ts": "뮤직 트레이 / 그레이 그레이"
+    },
+    {
+      "caseId": "original-17",
+      "path": "items[1].productCandidates[0].start",
+      "rust": 157,
+      "ts": 0
+    },
+    {
+      "caseId": "original-17",
+      "path": "items[1].recognitionReason",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-18",
+      "path": "items[0].match.aliasId",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-18",
+      "path": "items[0].productCandidates[0].end",
+      "rust": 6,
+      "ts": 12
+    },
+    {
+      "caseId": "original-18",
+      "path": "items[0].productCandidates[0].label",
+      "rust": "BD 709-1 / 블랙 / 비타공 상판",
+      "ts": "BD 709-1 / 블랙 / 비타공 상판 블랙"
+    },
+    {
+      "caseId": "original-18",
+      "path": "items[0].raw",
+      "rust": "반도 709 민판 한개 이가상 010-1234-5678",
+      "ts": "709 민판 한개"
+    },
+    {
+      "caseId": "original-18",
+      "path": "items[0].recognitionReason",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-19",
+      "path": "items.length",
+      "rust": 1,
+      "ts": 2
+    },
+    {
+      "caseId": "original-19",
+      "path": "items[0].match.aliasId",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-19",
+      "path": "items[0].productCandidates[0].end",
+      "rust": 76,
+      "ts": 12
+    },
+    {
+      "caseId": "original-19",
+      "path": "items[0].productCandidates[0].label",
+      "rust": "BD BB-3",
+      "ts": "BD BB-3 "
+    },
+    {
+      "caseId": "original-19",
+      "path": "items[0].productCandidates[0].start",
+      "rust": 72,
+      "ts": 8
+    },
+    {
+      "caseId": "original-19",
+      "path": "items[0].quantity",
+      "rust": 1,
+      "ts": null
+    },
+    {
+      "caseId": "original-19",
+      "path": "items[0].quantityConfirmed",
+      "rust": true,
+      "ts": false
+    },
+    {
+      "caseId": "original-19",
+      "path": "items[0].raw",
+      "rust": "연주용의자 | BB-3 | EA | 1 | 여가상 / 0502-1234-5678 / (51263)",
+      "ts": "BB-3"
+    },
+    {
+      "caseId": "original-19",
+      "path": "items[0].recognitionReason",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-19",
+      "path": "items[0].sources.length",
+      "rust": 2,
+      "ts": 1
+    },
+    {
+      "caseId": "original-19",
+      "path": "items[0].sources[1]",
+      "rust": {
+        "end": 85,
+        "field": "quantity",
+        "recipientId": "<GENERATED_ID>",
+        "start": 84,
+        "targetId": "<GENERATED_ID>",
+        "text": "1"
+      },
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-19",
+      "path": "items.unmatchedTs[0]",
+      "rust": "<MISSING>",
+      "ts": {
+        "color": "",
+        "defaulted": false,
+        "id": "<GENERATED_ID>",
+        "issues": [
+          "제품명이 확인되지 않습니다."
+        ],
+        "match": {
+          "aliasId": "<MISSING>",
+          "kind": "UNKNOWN",
+          "productIds": [],
+          "term": "2026"
+        },
+        "name": "2026",
+        "origin": "FACTORY",
+        "productCandidates": [],
+        "productId": null,
+        "quantity": null,
+        "quantityConfirmed": false,
+        "raw": "발주일자 2026년 10월 22일",
+        "recognitionReason": "등록된 모델명 또는 별칭과 일치하지 않습니다.",
+        "sources": [
+          {
+            "end": 15,
+            "field": "product",
+            "recipientId": "<GENERATED_ID>",
+            "start": 11,
+            "targetId": "<GENERATED_ID>",
+            "text": "2026"
+          }
+        ],
+        "unitPrice": null,
+        "url": "",
+        "variantId": null
+      }
+    },
+    {
+      "caseId": "original-20",
+      "path": "items.length",
+      "rust": 1,
+      "ts": 2
+    },
+    {
+      "caseId": "original-20",
+      "path": "items[0].match.aliasId",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-20",
+      "path": "items[0].match.term",
+      "rust": "BD Desk TS-2",
+      "ts": "1 | 반도스탠드 마이크 스탠드 T자형 탁상용 BD Desk TS-2 | 1 | | -"
+    },
+    {
+      "caseId": "original-20",
+      "path": "items[0].productCandidates[0].end",
+      "rust": 185,
+      "ts": 48
+    },
+    {
+      "caseId": "original-20",
+      "path": "items[0].productCandidates[0].label",
+      "rust": "BD Desk TS-2 / 실버 / Bar 길이 22cm",
+      "ts": "BD Desk TS-2 / 실버 / Bar 길이 22cm 실버"
+    },
+    {
+      "caseId": "original-20",
+      "path": "items[0].productCandidates[0].start",
+      "rust": 173,
+      "ts": 0
+    },
+    {
+      "caseId": "original-20",
+      "path": "items[0].quantity",
+      "rust": 1,
+      "ts": null
+    },
+    {
+      "caseId": "original-20",
+      "path": "items[0].quantityConfirmed",
+      "rust": true,
+      "ts": false
+    },
+    {
+      "caseId": "original-20",
+      "path": "items[0].recognitionReason",
+      "rust": null,
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-20",
+      "path": "items[0].sources.length",
+      "rust": 2,
+      "ts": 1
+    },
+    {
+      "caseId": "original-20",
+      "path": "items[0].sources[1]",
+      "rust": {
+        "end": 189,
+        "field": "quantity",
+        "recipientId": "<GENERATED_ID>",
+        "start": 188,
+        "targetId": "<GENERATED_ID>",
+        "text": "1"
+      },
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-20",
+      "path": "items.unmatchedTs[0]",
+      "rust": "<MISSING>",
+      "ts": {
+        "color": "",
+        "defaulted": false,
+        "id": "<GENERATED_ID>",
+        "issues": [
+          "제품명이 확인되지 않습니다."
+        ],
+        "match": {
+          "aliasId": "<MISSING>",
+          "kind": "UNKNOWN",
+          "productIds": [],
+          "term": "2026-11-03"
+        },
+        "name": "2026-11-03",
+        "origin": "FACTORY",
+        "productCandidates": [],
+        "productId": null,
+        "quantity": null,
+        "quantityConfirmed": false,
+        "raw": "발주일 2026-11-03",
+        "recognitionReason": "등록된 모델명 또는 별칭과 일치하지 않습니다.",
+        "sources": [
+          {
+            "end": 20,
+            "field": "product",
+            "recipientId": "<GENERATED_ID>",
+            "start": 10,
+            "targetId": "<GENERATED_ID>",
+            "text": "2026-11-03"
+          }
+        ],
+        "unitPrice": null,
+        "url": "",
+        "variantId": null
+      }
+    }
+  ]
+}

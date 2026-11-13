@@ -54,7 +54,7 @@ fn group_step(state: &Value, group_id: &str) -> Result<i64,String> {
     Ok(ids.iter().filter_map(|i|field(&state["workflow"]["shipments"][*i],"step").as_i64())
         .min().unwrap_or(0))
 }
-fn party<'a>(state: &'a Value, order: &'a Value) -> Option<&'a Value> {
+pub(super) fn party<'a>(state: &'a Value, order: &'a Value) -> Option<&'a Value> {
     if (has_value(field(order,"confirmedAt")) || flag(order,"pricesLocked") ||
         str_field(order,"orderType")=="RETAIL") &&
         has_value(field(order,"clientSnapshot")) {
@@ -71,7 +71,7 @@ fn row_origins(row: &Value) -> Vec<&str> {
     }
     origins
 }
-fn shipment_freight_code<'a>(order: &'a Value, row: &'a Value) -> &'a str {
+pub(super) fn shipment_freight_code<'a>(order: &'a Value, row: &'a Value) -> &'a str {
     if has_value(field(row,"freightCode")) {str_field(row,"freightCode")}
     else {str_field(order,"freightCode")}
 }
@@ -80,7 +80,7 @@ fn shipment_vat(order: &Value, row: &Value) -> bool {
     if let Some(v)=field(row,"vatDefault").as_bool() {return v;}
     flag(order,"applyVat")
 }
-fn fee_total(ship: &Value, row: &Value, order: &Value) -> Option<i64> {
+pub(super) fn fee_total(ship: &Value, row: &Value, order: &Value) -> Option<i64> {
     if shipment_freight_code(order,row)=="020" {return Some(0);}
     let os=row_origins(row);
     if os.is_empty() {return None;}
@@ -117,7 +117,7 @@ pub(super) fn shipment_totals(state: &Value, shipment_id: &str) -> Result<Value,
     set(&mut view,"vatAmount",Value::Null)?;
     pricing::totals(&view,client)
 }
-fn account_for<'a>(state: &'a Value,group:&Value,order:&Value,client:&Value) -> Option<&'a Value> {
+pub(super) fn account_for<'a>(state: &'a Value,group:&Value,order:&Value,client:&Value) -> Option<&'a Value> {
     let settings=field(state,"settings");
     let accounts=field(settings,"accounts");
     if str_field(group,"accountMode")=="MANUAL" || str_field(order,"accountMode")=="MANUAL" {
@@ -199,98 +199,10 @@ fn basic_issues(order:&Value,recipient:&Value,client:&Value) -> Vec<String> {
     }
     issues
 }
-fn payment_won(value: Option<i64>) -> String {
-    let Some(n) = value else { return "확인 필요".into() };
-    let digits = n.unsigned_abs().to_string();
-    let groups = digits.as_bytes().rchunks(3).rev()
-        .map(|part| std::str::from_utf8(part).unwrap_or(""))
-        .collect::<Vec<_>>().join(",");
-    format!("{}{}원", if n < 0 { "-" } else { "" }, groups)
+fn stage_issues(state:&Value,group_id:&str,next:i64)->Result<Vec<String>,String>{
+    super::workflow_issues::stage_issues(state,group_id,next)
 }
-fn stage_issues(state:&Value,group_id:&str,next:i64) -> Result<Vec<String>,String> {
-    let (gi,ids)=group_indices(state,group_id)?;
-    let group=&state["workflow"]["groups"][gi];
-    let mut issues=Vec::new();
-    let mut prepay=false;
-    for si in ids {
-        let ship=&state["workflow"]["shipments"][si];
-        let (_s,oi,ri)=shipment_indices(state,str_field(ship,"id"))?;
-        let order=&state["orders"][oi];
-        let row=&order["recipients"][ri];
-        let client=party(state,order).ok_or_else(||"거래처 정보를 확인하세요.".to_string())?;
-        prepay |= str_field(client,"payment")=="PREPAID";
-        if next>=1 {
-            if str_field(order,"clientId").is_empty() && str_field(order,"orderType")!="RETAIL" {
-                issues.push("거래처를 선택하면 단가가 적용됩니다".into());
-            }
-            issues.extend(basic_issues(order,row,client));
-            let sender=field(order,"senderSnapshot");
-            if !has_value(sender) && str_field(order,"orderType")=="AGENCY" {
-                // An explicit sender extracted from the source must be provided
-                // to the stage-1 action, or already present on the order.
-                // This cannot be guessed from a dealer's name.
-            } else if has_value(sender) {
-                if str_field(sender,"name").trim().is_empty() {issues.push("송하인 거래처명을 확인하세요".into());}
-                if str_field(sender,"address").trim().is_empty() {issues.push("송하인 거래처 주소를 확인하세요".into());}
-                if str_field(sender,"phone").trim().is_empty() &&
-                    str_field(sender,"mobile").trim().is_empty() {
-                    issues.push("송하인 거래처 연락처를 확인하세요".into());
-                }
-            }
-            for item in rows(field(row,"items")) {
-                if let Some(p)=find_by_id(field(state,"products"),str_field(item,"productId")) {
-                    if has_value(field(p,"deletedAt")) || has_value(field(p,"supersededBy")) ||
-                        field(p,"active").as_bool()==Some(false) {
-                        issues.push("판매 상태 확인 필요".into());
-                    }
-                }
-            }
-        }
-        if next>=2 && str_field(order,"orderType")!="RETAIL" {
-            if fee_total(ship,row,order).is_none() {
-                issues.push(format!("{}: 배송 운임을 확인하세요",str_field(row,"name")));
-            }
-            if field(&shipment_totals(state,str_field(ship,"id"))?,"total").is_null() {
-                issues.push(format!("{}: 청구액 미확정",str_field(row,"name")));
-            }
-        }
-        if next>=3 && str_field(order,"orderType")!="RETAIL" {
-            if field(ship,"step").as_i64().unwrap_or(0)<2 &&
-                shipment_freight_code(order,row)!="020" {
-                issues.push(format!("{}: 운임 적용 필요",str_field(row,"name")));
-            }
-            let account=account_for(state,group,order,client);
-            if account.is_none_or(|a|["bank","number","holder"].iter().any(|k|
-                str_field(a,k).trim().is_empty())) {
-                issues.push("입금 계좌를 등록 / 선택하세요".into());
-            }
-            if flag(group,"needsNotice") {
-                let recipient_name = str_field(row,"name").trim();
-                let prefix = if recipient_name.is_empty() { "수취인" } else { recipient_name };
-                issues.push(format!("{}: 변경된 금액 / 계좌 재안내 필요", prefix));
-            }
-        }
-        if next>=4 && str_field(order,"orderType")!="RETAIL" {
-            if field(ship,"step").as_i64().unwrap_or(0)<3 {
-                issues.push(format!("{}: 계좌 안내 완료 필요",str_field(row,"name")));
-            }
-            if str_field(client,"payment")=="PREPAID" && !flag(ship,"legacyApproval") {
-                let due=payment_due(state,ship,order,client)?;
-                if due.is_none_or(|v|v>0) {
-                    issues.push(format!("{}: 입금 부족 {}",str_field(row,"name"),
-                        payment_won(due)));
-                }
-            }
-        }
-    }
-    let _=prepay;
-    // TypeScript's [...new Set(issues)] preserves first-seen issue order.
-    // Alphabetically sorting changes the priority shown to staff.
-    let mut seen = std::collections::HashSet::new();
-    issues.retain(|issue| seen.insert(issue.clone()));
-    Ok(issues)
-}
-fn payment_due(state:&Value,ship:&Value,order:&Value,client:&Value)->Result<Option<i64>,String>{
+pub(super) fn payment_due(state:&Value,ship:&Value,order:&Value,client:&Value)->Result<Option<i64>,String>{
     let t=shipment_totals(state,str_field(ship,"id"))?;
     let total=safe(field(&t,"total"));
     let group_id=str_field(ship,"groupId");
@@ -310,6 +222,11 @@ fn payment_due(state:&Value,ship:&Value,order:&Value,client:&Value)->Result<Opti
     let acknowledged=rows(field(field(state,"workflow"),"confirmations")).iter()
         .filter(|p|str_field(p,"dealerId")==str_field(order,"clientId") &&
             account.is_some_and(|a|key(field(p,"announcedAccount"))==key(a)))
+        .filter(|p| !rows(field(field(state,"workflow"),"events")).iter().any(|event|
+            str_field(event,"action")=="입금 승인 재확인 필요" &&
+            field(event,"before")==field(p,"id") &&
+            rows(field(event,"shipmentIds")).iter().any(|sid|
+                sid.as_str()==Some(str_field(ship,"id")))))
         .flat_map(|p|rows(field(p,"allocations")).iter())
         .filter(|a|str_field(a,"shipmentId")==str_field(ship,"id"))
         .filter_map(|a|safe(field(a,"amount")))
@@ -337,9 +254,27 @@ fn append_event(state:&mut Value,payload:&Value,action:&str,ids:&[String],
     if find_by_id(&state["workflow"]["events"],id).is_some() {
         return Err("업무 이벤트 ID가 중복됩니다.".into());
     }
-    let event=json!({"id":id,"at":now,"actor":if actor.is_empty() {"직원(이름 미설정)"}else{actor},
-        "action":action,"shipmentIds":ids,"groupId":group_id,
-        "before":before,"after":after});
+    let mut event=json!({"id":id,"at":now,"actor":if actor.is_empty() {"직원(이름 미설정)"}else{actor},
+        "action":action,"shipmentIds":ids});
+    // Original TypeScript event() receives optional before/after/groupId
+    // arguments. An absent argument serializes as an OMITTED property, not
+    // explicit null. Preserve genuine null only for recordActualFreight's
+    // "before" evidence when no old freight exists.
+    if !["실제 출고 운임 입력","매장 발송 확인"].contains(&action) {
+        set(&mut event,"groupId",json!(group_id))?;
+    }
+    if !["처리완료 / 엑셀 관리 목록 이관","실제 입금 기록",
+        "엑셀 이관 복구","매장 발송 확인",
+        "전달 후 변경 요청 기록","묶음 입금 계좌 변경",
+        "실제 배송 완료 / 운임 검증"].contains(&action) {
+        set(&mut event,"before",before)?;
+    }
+    if !["엑셀 이관 복구","매장 발송 확인"].contains(&action) {
+        set(&mut event,"after",after)?;
+    }
+    if action=="이전 단계 취소" {
+        set(&mut event,"reason",json!("입금 기록과 이전 완료 이력은 보존"))?;
+    }
     state["workflow"]["events"].as_array_mut().ok_or("업무 이벤트 목록 누락")?.push(event);
     Ok(())
 }
@@ -349,9 +284,14 @@ fn append_extra_event(state:&mut Value,payload:&Value,id:&str,action:&str,
     if find_by_id(field(field(state,"workflow"),"events"),id).is_some() {
         return Err("업무 이벤트 ID가 중복됩니다.".into());
     }
-    let event=json!({"id":id,"at":required_str(payload,"now")?,
+    let mut event=json!({"id":id,"at":required_str(payload,"now")?,
         "actor":actor,"action":action,"shipmentIds":ship_ids,
-        "groupId":group_id,"before":before,"after":after,"reason":reason});
+        "groupId":group_id,"before":before,"reason":reason});
+    // The original downgrade event does not supply an "after" argument
+    // for confirmation invalidation, only for the stage recheck.
+    if action!="입금 승인 재확인 필요" {
+        set(&mut event,"after",after)?;
+    }
     state["workflow"]["events"].as_array_mut()
         .ok_or("업무 이벤트 목록 누락")?.push(event);
     Ok(())
@@ -363,8 +303,23 @@ fn ensure_clock(payload:&Value)->Result<(),String>{
 }
 pub(super) fn apply(payload:&Value)->Result<Value,String> {
     ensure_clock(payload)?;
-    let mut state=req(payload,"state")?.clone();
     let action=required_str(payload,"action")?;
+    let mut state=req(payload,"state")?.clone();
+    // All original workflow mutations except the three direct-clone
+    // operations first run reconcileWorkflow(input). Keep that transition
+    // inside this pure Rust entry point: without it, recipientSnapshot,
+    // infoSignature and tariff revisions can remain stale between actions.
+    // Any reconcile-created audit IDs are caller-injected independently of
+    // the action's own eventId, preserving the original chronology.
+    if payload.get("reconcileEventIds").is_some() &&
+        !["record_actual_freight","mark_store_sent","record_change_request"]
+            .contains(&action) {
+        let reconciled=super::reconciliation::reconcile(&json!({
+            "state":state,"now":required_str(payload,"now")?,
+            "eventIds":field(payload,"reconcileEventIds")
+        }))?;
+        state=field(&reconciled,"state").clone();
+    }
     match action {
         "advance_group" => {
             let id=required_str(payload,"groupId")?;
@@ -443,18 +398,45 @@ pub(super) fn apply(payload:&Value)->Result<Value,String> {
             }
             let ship_ids=ships.iter().map(|i|str_field(&state["workflow"]["shipments"][*i],"id").to_string()).collect::<Vec<_>>();
             for si in &ships {
+                // advanceGroup resolves rechecks when the new step reaches
+                // their original fromStage. It does not erase audit history.
+                if let Some(rechecks)=state["workflow"]["shipments"][*si].get_mut("rechecks")
+                    .and_then(Value::as_array_mut) {
+                    for record in rechecks {
+                        if !has_value(field(record,"resolvedAt")) &&
+                            field(record,"fromStage").as_i64().is_some_and(|n|next>=n){
+                            set(record,"resolvedAt",json!(now))?;
+                        }
+                    }
+                }
                 let ship_id=str_field(&state["workflow"]["shipments"][*si],"id").to_string();
                 let (_index,oi,ri)=shipment_indices(&state,&ship_id)?;
                 if next==1 {
-                    let sender=field(&state["orders"][oi],"senderSnapshot").clone();
+                    let sender=super::reconciliation::sender_for(&state,&state["orders"][oi]);
                     set(&mut state["workflow"]["shipments"][*si],"sender",sender)?;
                 }
                 if next==2 {
+                    let mut individual=state["orders"][oi].clone();
+                    let row=state["orders"][oi]["recipients"][ri].clone();
+                    set(&mut individual,"recipients",json!([row]))?;
+                    let recommendation=super::shipping::recommend(&individual,&state)?;
+                    let version=field(&state["workflow"]["shipments"][*si],"freightVersion").clone();
+                    let basis_current=version==*field(&recommendation,"version");
                     let charges=field(&state["workflow"]["shipments"][*si],"charges").clone();
-                    let verified=field(&state["workflow"]["shipments"][*si],"freightVersion").clone();
                     set(&mut state["orders"][oi]["recipients"][ri],"shippingCharges",charges)?;
                     set(&mut state["workflow"]["shipments"][*si],"chargeMode",json!("MANUAL"))?;
-                    set(&mut state["workflow"]["shipments"][*si],"confirmedFreightVersion",verified)?;
+                    set(&mut state["workflow"]["shipments"][*si],"confirmedFreightVersion",version)?;
+                    if basis_current {
+                        let epoch=field(field(&state,"shipping"),"epoch").as_i64().unwrap_or(1);
+                        let applied=rows(field(&recommendation,"bundles")).iter().map(|bundle|
+                            json!({"origin":field(bundle,"origin"),
+                                "key":field(bundle,"key"),
+                                "versions":field(bundle,"versions"),
+                                "description":field(bundle,"description")}))
+                            .collect::<Vec<_>>();
+                        set(&mut state["workflow"]["shipments"][*si],"appliedEpoch",json!(epoch))?;
+                        set(&mut state["workflow"]["shipments"][*si],"appliedBundles",json!(applied))?;
+                    }
                 }
                 if next==3 {
                     // Session 3 should feed the exact message/account billing
@@ -482,8 +464,49 @@ pub(super) fn apply(payload:&Value)->Result<Value,String> {
             }
             let step=group_step(&state,id)?;
             if step==0 {return Err("첫 단계입니다.".into());}
-            if step==4 && !rows(field(state.get("workflow").unwrap_or(&Value::Null),"confirmations")).is_empty() {
-                return Err("입금 승인 취소 기록의 재검증이 필요합니다.".into());
+            if step==4 {
+                // Source undoGroup revokes only confirmations that include
+                // an affected shipment and are not already invalidated
+                // by a prior recheck event. For partial confirmations retain
+                // allocations belonging to unaffected shipments.
+                let affected=ships.iter().map(|i|
+                    str_field(&state["workflow"]["shipments"][*i],"id").to_string()
+                ).collect::<std::collections::HashSet<_>>();
+                let old=rows(field(&state["workflow"],"confirmations")).to_vec();
+                let mut next_confirmations=Vec::new();
+                for mut confirmation in old {
+                    let already_invalidated=rows(field(&state["workflow"],"events")).iter()
+                        .any(|e|str_field(e,"action")=="입금 승인 재확인 필요" &&
+                            field(e,"before")==field(&confirmation,"id"));
+                    let contains_affected=rows(field(&confirmation,"shipmentIds")).iter()
+                        .any(|sid|sid.as_str().is_some_and(|v|affected.contains(v)));
+                    if already_invalidated||!contains_affected{
+                        next_confirmations.push(confirmation);continue;
+                    }
+                    let remaining=rows(field(&confirmation,"shipmentIds")).iter()
+                        .filter(|id|!id.as_str().is_some_and(|sid|affected.contains(sid)))
+                        .cloned().collect::<Vec<_>>();
+                    if remaining.is_empty(){continue;}
+                    let mut amounts=serde_json::Map::new();
+                    for id in &remaining{
+                        let sid=id.as_str().unwrap_or("");
+                        let v=field(field(&confirmation,"amounts"),sid)
+                            .as_i64().or_else(||rows(field(&confirmation,"allocations"))
+                                .iter().find(|a|str_field(a,"shipmentId")==sid)
+                                .and_then(|a|field(a,"amount").as_i64())).unwrap_or(0);
+                        amounts.insert(sid.to_string(),json!(v));
+                    }
+                    let allocations=rows(field(&confirmation,"allocations")).iter()
+                        .filter(|allocation|!affected.contains(str_field(allocation,"shipmentId")))
+                        .cloned().collect::<Vec<_>>();
+                    let total=amounts.values().filter_map(Value::as_i64).sum::<i64>();
+                    set(&mut confirmation,"shipmentIds",json!(remaining))?;
+                    set(&mut confirmation,"allocations",json!(allocations))?;
+                    set(&mut confirmation,"amounts",Value::Object(amounts))?;
+                    set(&mut confirmation,"amount",json!(total))?;
+                    next_confirmations.push(confirmation);
+                }
+                set(&mut state["workflow"],"confirmations",json!(next_confirmations))?;
             }
             for si in &ships {
                 let current=field(&state["workflow"]["shipments"][*si],"step").as_i64().unwrap_or(0);
@@ -543,14 +566,21 @@ pub(super) fn apply(payload:&Value)->Result<Value,String> {
                     "fromStage":old_step,"toStage":1
                 }));
                 let seed=required_str(payload,"eventId")?;
+                let audit_ids=rows(field(payload,"auditEventIds"));
+                let mut audit_cursor=0usize;
                 for confirmation_id in active_confirms {
-                    append_extra_event(&mut state,payload,
-                        &format!("{seed}:reconfirm:{ship_id}:{confirmation_id}"),
+                    let fallback=format!("{seed}:reconfirm:{ship_id}:{confirmation_id}");
+                    let id=audit_ids.get(audit_cursor).and_then(Value::as_str)
+                        .unwrap_or(fallback.as_str());
+                    audit_cursor+=1;
+                    append_extra_event(&mut state,payload,id,
                         "입금 승인 재확인 필요",&[ship_id.to_string()],&group_id,
                         json!(confirmation_id),Value::Null,"시스템","직원이 운임 변경")?;
                 }
-                append_extra_event(&mut state,payload,
-                    &format!("{seed}:recheck:{ship_id}"),"재검증 필요",
+                let fallback=format!("{seed}:recheck:{ship_id}");
+                let id=audit_ids.get(audit_cursor).and_then(Value::as_str)
+                    .unwrap_or(fallback.as_str());
+                append_extra_event(&mut state,payload,id,"재검증 필요",
                     &[ship_id.to_string()],&group_id,json!(old_step),json!(1),
                     "시스템","직원이 운임 변경")?;
             }
@@ -591,8 +621,15 @@ pub(super) fn apply(payload:&Value)->Result<Value,String> {
                 let sender=state["workflow"]["shipments"][si].get("sender")
                     .filter(|v|!v.is_null()).unwrap_or(&client).clone();
                 let totals=shipment_totals(&state,&ship_id)?;
-                for key in ["total","subtotal","shipping","vat"] {
-                    if safe(field(&totals,key)).is_none() {return Err("청구액 미확정".into());}
+                // The original processGroup persists RETAIL queue snapshots
+                // even when their outside-payment accounting fields are null.
+                // Other order types still require confirmed numeric totals.
+                if str_field(&order,"orderType")!="RETAIL" {
+                    for key in ["total","subtotal","shipping","vat"] {
+                        if safe(field(&totals,key)).is_none() {
+                            return Err("청구액 미확정".into());
+                        }
+                    }
                 }
                 let freight_code=shipment_freight_code(&order,&row).to_string();
                 for origin in row_origins(&row) {
@@ -860,6 +897,10 @@ pub(super) fn apply(payload:&Value)->Result<Value,String> {
             let ship_id=required_str(payload,"shipmentId")?;
             let reason=required_str(payload,"text")?.trim();
             if reason.is_empty(){return Err("배송 건과 변경 요청 내용을 확인하세요.".into());}
+            if !rows(field(&state["workflow"],"shipments")).iter()
+                .any(|ship|str_field(ship,"id")==ship_id) {
+                return Err("배송 건과 변경 요청 내용을 확인하세요.".into());
+            }
             let (si,_oi,_ri)=shipment_indices(&state,ship_id)?;
             let group_id=str_field(&state["workflow"]["shipments"][si],"groupId").to_string();
             let request_id=required_str(payload,"changeRequestId")?;
@@ -899,6 +940,8 @@ pub(super) fn apply(payload:&Value)->Result<Value,String> {
             set(&mut state["orders"][oi]["groupAccounts"],group_id,group_account)?;
             let now=required_str(payload,"now")?.to_string();
             let seed=required_str(payload,"eventId")?;
+            let audit_ids=rows(field(payload,"auditEventIds"));
+            let mut audit_cursor=0usize;
             for si in &ships {
                 let old_step=field(&state["workflow"]["shipments"][*si],"step").as_i64().unwrap_or(0);
                 if old_step < 3 {continue;}
@@ -924,13 +967,19 @@ pub(super) fn apply(payload:&Value)->Result<Value,String> {
                         "at":now,"reason":"입금 계좌 변경","fromStage":old_step,"toStage":2
                     }));
                 for confirmation_id in active_confirms {
-                    append_extra_event(&mut state,payload,
-                        &format!("{seed}:reconfirm:{ship_id}:{confirmation_id}"),
+                    let fallback=format!("{seed}:reconfirm:{ship_id}:{confirmation_id}");
+                    let id=audit_ids.get(audit_cursor).and_then(Value::as_str)
+                        .unwrap_or(fallback.as_str());
+                    audit_cursor+=1;
+                    append_extra_event(&mut state,payload,id,
                         "입금 승인 재확인 필요",&[ship_id.clone()],group_id,
                         json!(confirmation_id),Value::Null,"시스템","입금 계좌 변경")?;
                 }
-                append_extra_event(&mut state,payload,
-                    &format!("{seed}:recheck:{ship_id}"),"재검증 필요",&[ship_id],
+                let fallback=format!("{seed}:recheck:{ship_id}");
+                let id=audit_ids.get(audit_cursor).and_then(Value::as_str)
+                    .unwrap_or(fallback.as_str());
+                audit_cursor+=1;
+                append_extra_event(&mut state,payload,id,"재검증 필요",&[ship_id],
                     group_id,json!(old_step),json!(2),"시스템","입금 계좌 변경")?;
             }
             let all_ids=ships.iter().map(|i|str_field(&state["workflow"]["shipments"][*i],"id")
@@ -938,6 +987,117 @@ pub(super) fn apply(payload:&Value)->Result<Value,String> {
             append_event(&mut state,payload,"묶음 입금 계좌 변경",&all_ids,
                 Value::Null,json!(account_id.unwrap_or("AUTO")),group_id)?;
             Ok(json!({"state":state,"accountMode":mode,"accountId":account_id}))
+        }
+        "detach_shipment" => {
+            // Parity target: workflow.ts::detachShipment. IDs and clock are
+            // injected by the host to keep this module deterministic.
+            let id=required_str(payload,"shipmentId")?;
+            let (si,oi,_ri)=shipment_indices(&state,id)?;
+            if flag(&state["workflow"]["shipments"][si],"transferred") {
+                return Err("현재 관리 중인 배송 건을 선택하세요.".into());
+            }
+            let old_group_id=str_field(&state["workflow"]["shipments"][si],"groupId").to_string();
+            let (gi,ships)=group_indices(&state,&old_group_id)?;
+            if ships.len()<2 {return Err("이미 독립 관리 중입니다.".into());}
+            let new_group_id=required_str(payload,"newGroupId")?;
+            if new_group_id.trim().is_empty() ||
+                find_by_id(field(&state["workflow"],"groups"),new_group_id).is_some() {
+                return Err("새로운 묶음 ID를 확인하세요.".into());
+            }
+            let old_group=state["workflow"]["groups"][gi].clone();
+            let order=state["orders"][oi].clone();
+            let client=party(&state,&order).ok_or("거래처 정보를 확인하세요.")?;
+            let account=account_for(&state,&old_group,&order,client).cloned();
+            let had_notices=!rows(field(&old_group,"notices")).is_empty();
+            let any_advanced=ships.iter().any(|i|
+                field(&state["workflow"]["shipments"][*i],"step").as_i64().unwrap_or(0)>=3);
+            let mut separated=old_group.clone();
+            set(&mut separated,"id",json!(new_group_id))?;
+            set(&mut separated,"createdAt",json!(required_str(payload,"now")?))?;
+            set(&mut separated,"notices",json!([]))?;
+            set(&mut separated,"needsNotice",json!(had_notices ||
+                field(&state["workflow"]["shipments"][si],"step").as_i64().unwrap_or(0)>=3))?;
+            if let Some(ref account)=account {
+                set(&mut separated,"accountMode",json!("MANUAL"))?;
+                set(&mut separated,"accountId",field(account,"id").clone())?;
+            }
+            state["workflow"]["groups"].as_array_mut()
+                .ok_or("주문 묶음 목록 누락")?.push(separated);
+            set(&mut state["workflow"]["shipments"][si],"groupId",json!(new_group_id))?;
+            if had_notices || any_advanced {
+                set(&mut state["workflow"]["groups"][gi],"needsNotice",json!(true))?;
+                if let Some(ref account)=account {
+                    set(&mut state["workflow"]["groups"][gi],"accountMode",json!("MANUAL"))?;
+                    set(&mut state["workflow"]["groups"][gi],"accountId",field(account,"id").clone())?;
+                }
+            }
+            append_event(&mut state,payload,"묶음 해제",&[id.to_string()],
+                json!(old_group_id),json!(new_group_id),new_group_id)?;
+            Ok(json!({"state":state,"groupId":new_group_id}))
+        }
+        "regroup_shipment" => {
+            // Parity target: workflow.ts::regroupShipment.
+            let id=required_str(payload,"shipmentId")?;
+            let target_id=required_str(payload,"targetGroupId")?;
+            let (si,oi,_ri)=shipment_indices(&state,id)?;
+            if flag(&state["workflow"]["shipments"][si],"transferred") {
+                return Err("엑셀 이관 배송 건은 일반 다시 묶기에서 제외됩니다.".into());
+            }
+            let old_id=str_field(&state["workflow"]["shipments"][si],"groupId").to_string();
+            let (old_gi,_old_ships)=group_indices(&state,&old_id)?;
+            let (target_gi,target_ships)=group_indices(&state,target_id)?;
+            if old_id==target_id {return Err("이미 같은 묶음입니다.".into());}
+            let old_group=state["workflow"]["groups"][old_gi].clone();
+            let target_group=state["workflow"]["groups"][target_gi].clone();
+            if field(&old_group,"sourceId")!=field(&target_group,"sourceId") ||
+                field(&old_group,"dealerId")!=field(&target_group,"dealerId") {
+                return Err("같은 최초 발주서 / 거래처의 배송 건만 다시 묶을 수 있습니다.".into());
+            }
+            let step=field(&state["workflow"]["shipments"][si],"step");
+            if target_ships.iter().any(|i|flag(&state["workflow"]["shipments"][*i],"transferred") ||
+                field(&state["workflow"]["shipments"][*i],"step")!=step) {
+                return Err("진행 단계가 같고 이관되지 않은 배송 건만 다시 묶을 수 있습니다.".into());
+            }
+            let order=&state["orders"][oi];
+            let client=party(&state,order).ok_or("거래처 정보를 확인하세요.")?;
+            let key=|account:Option<&Value>|->Value {
+                if let Some(a)=account {
+                    json!([field(a,"id"),str_field(a,"bank").trim(),
+                        str_field(a,"number").trim(),str_field(a,"holder").trim()])
+                } else {Value::Null}
+            };
+            let old_account=account_for(&state,&old_group,order,client);
+            let target_account=account_for(&state,&target_group,order,client);
+            if key(old_account)!=key(target_account) {
+                return Err("입금 계좌가 다른 묶음은 합칠 수 없습니다.".into());
+            }
+            let affected_ids=std::iter::once(id.to_string()).chain(
+                target_ships.iter().map(|i|
+                    str_field(&state["workflow"]["shipments"][*i],"id").to_string())
+            ).collect::<Vec<_>>();
+            let payments_affected=rows(field(&state["workflow"],"payments")).iter()
+                .any(|p|rows(field(p,"allocations")).iter().any(|a|
+                    affected_ids.iter().any(|sid|sid==str_field(a,"shipmentId"))));
+            let warned=step.as_i64().unwrap_or(0)>=3 ||
+                !rows(field(&old_group,"notices")).is_empty() ||
+                !rows(field(&target_group,"notices")).is_empty() ||
+                payments_affected;
+            if warned && !flag(payload,"ack") {
+                return Err("기존 안내 금액과 입금 배분을 확인한 뒤 다시 묶기를 승인하세요.".into());
+            }
+            set(&mut state["workflow"]["shipments"][si],"groupId",json!(target_id))?;
+            if warned {
+                set(&mut state["workflow"]["groups"][old_gi],"needsNotice",json!(true))?;
+                set(&mut state["workflow"]["groups"][target_gi],"needsNotice",json!(true))?;
+            }
+            let actor=if str_field(payload,"actor").trim().is_empty() {
+                "직원(이름 미설정)"
+            } else {str_field(payload,"actor")};
+            let event_id=required_str(payload,"eventId")?.to_string();
+            append_extra_event(&mut state,payload,&event_id,"다시 묶기",
+                &[id.to_string()],target_id,json!(old_id),json!(target_id),
+                actor,"배송 ID / 단계 / 입금 배분 유지")?;
+            Ok(json!({"state":state,"groupId":target_id}))
         }
         "complete_delivery" => {
             let shipment_id=required_str(payload,"shipmentId")?;
