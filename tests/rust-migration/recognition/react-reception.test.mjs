@@ -25,7 +25,7 @@ const { newReception }=await tsImport("../../../src/orders/reception.ts",import.
 const { applyRustReceptionAnalysis,assertRustReceptionAnalysis,receptionAnalysisAllowed }=
   await tsImport("../../../src/orders/rust-reception.ts",import.meta.url);
 
-const selected=[1,13,19,20];
+const selected=Array.from({length:20},(_,i)=>i+1);
 const inputs=selected.map(id=>({id,raw:samples[id-1].raw}));
 inputs.push({id:"13-edited",raw:samples[12].raw+" "});
 const rustRequests=inputs.map(x=>({domain:"recognition",operation:"analyze_order",
@@ -60,6 +60,27 @@ function apply(previous,id,raw=samples[id-1].raw) {
     raw,state,pricingClient:client,at:"2026-11-13T00:00:00.000Z"
   });
 }
+
+test("all twenty original orders pass the Rust-to-React reception boundary",()=>{
+  for(let id=1;id<=20;id++){
+    const before=orderFor(id);
+    const after=apply(before,id);
+    assert.equal(after.recipients.length,samples[id-1].expectedRecipients,
+      "sample "+id+" recipient count");
+    assert.deepEqual(
+      after.recipients.flatMap(r=>r.items.map(i=>i.quantity)).sort(),
+      samples[id-1].expectedQuantities.slice().sort(),
+      "sample "+id+" shipment quantities",
+    );
+    assert.equal(after.analysisEvidence.length,natives.get(id).candidates.length);
+    for(const r of after.recipients)
+      for(const item of r.items)
+        for(const span of item.sources??[]){
+          assert.equal(span.recipientId,r.id,"sample "+id+" stable recipient reference");
+          assert.equal(span.targetId,item.id,"sample "+id+" stable item reference");
+        }
+  }
+});
 
 test("native parser's two-recipient shipment attaches to the real reception draft",()=>{
   const before=orderFor(13);
