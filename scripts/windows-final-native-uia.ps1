@@ -186,7 +186,8 @@ public static class BandoAuditNative {
   function Snapshot {
     $script=@'
 import sqlite3,json,sys
-con=sqlite3.connect("file:"+sys.argv[1]+"?mode=ro",uri=True,timeout=20)
+from pathlib import Path
+con=sqlite3.connect(Path(sys.argv[1]).resolve().as_uri()+"?mode=ro",uri=True,timeout=20)
 try:
     raw=json.loads(con.execute("SELECT payload FROM app_state WHERE id=1").fetchone()[0])
     n=con.execute("SELECT COUNT(*) FROM core_clients").fetchone()[0]
