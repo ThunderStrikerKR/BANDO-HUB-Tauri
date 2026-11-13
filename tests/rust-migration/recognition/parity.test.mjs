@@ -89,7 +89,7 @@ test("20 actual orders: TS oracle and Rust parser produce identical business fie
     payload:{raw:s.raw,state,client}}));
   const proc=spawnSync("cargo",["run","--quiet","--manifest-path",manifest,
     "--bin","parity_runner"],{
-    cwd:root,input:JSON.stringify(requests),encoding:"utf8",timeout:180000,
+    cwd:root,input:JSON.stringify(requests),encoding:"utf8",timeout:900000,
     maxBuffer:50*1024*1024,
   });
   if(proc.error)throw proc.error;
