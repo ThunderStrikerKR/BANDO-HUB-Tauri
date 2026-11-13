@@ -1,5 +1,7 @@
 #[path = "../../../../src-tauri/src/business_core/output/mod.rs"]
 pub mod output;
+#[path = "../../../../src-tauri/src/business_core/rules/mod.rs"]
+pub mod rules;
 
 #[cfg(test)]
 mod tests {
