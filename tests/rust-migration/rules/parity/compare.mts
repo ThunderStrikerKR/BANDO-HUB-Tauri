@@ -766,7 +766,25 @@ function migrationCase(name:string,mutate:(state:any)=>void=()=>{}){
   const ids=Array.from({length:160},(_,i)=>"legacy-uuid-"+(i+1));
   add("legacy migration: "+name,"migrate_workflow",{
     state:legacy,now:actionNow,eventIds:ids
-  },()=>({state:deterministicIds(ids,()=>migrateWorkflow(legacy))}));
+  },()=>{
+    const migrated:any=deterministicIds(ids,()=>migrateWorkflow(legacy));
+    // In addition to parity, require the source implementation to retain
+    // every pre-existing immutable payment, source and audit record.
+    for(const key of ["payments","sources","events","deliveries",
+      "changeRequests","confirmations","queue"]){
+      for(const previous of legacy.workflow?.[key]??[]){
+        const current=migrated.workflow?.[key]?.find((entry:any)=>entry.id===previous.id);
+        if(!current||normalized(current)!==normalized(previous))
+          throw Error("Migration modified historic "+key+" record: "+previous.id);
+      }
+    }
+    for(const previous of legacy.workflow?.groups??[]){
+      const current=migrated.workflow?.groups?.find((entry:any)=>entry.id===previous.id);
+      if(!current||normalized(current.notices)!==normalized(previous.notices))
+        throw Error("Migration modified historical group notice: "+previous.id);
+    }
+    return {state:migrated};
+  });
   cases[cases.length-1].expectedOk=true;
 }
 migrationCase("REVIEW with no prior workflow",s=>{
@@ -865,6 +883,76 @@ migrationCase("multi-origin invoice snapshot remains item-filtered",s=>{
   const next=copy(s.orders[0].recipients[0].items[0]);
   next.id="store-item";next.origin="STORE";
   s.orders[0].recipients[0].items.push(next);
+});
+
+
+migrationCase("legacy explicit sender is stored in sender snapshot",s=>{
+  delete s.workflow;
+  s.orders[0].status="PAID";
+  s.orders[0].paid=true;
+  s.orders[0].raw=[
+    "송하인: 별도 대리점",
+    "연락처: 010-4444-8888",
+    "송하인주소: 서울특별시 가상로 16"
+  ].join("\n");
+});
+migrationCase("existing independent sender snapshot is preserved",s=>{
+  delete s.workflow;
+  s.orders[0].status="STATEMENT";
+  s.orders[0].notified=true;
+  s.orders[0].senderSnapshot={
+    ...copy(s.clients[0]),name:"기존 발송 주체",
+    displayName:"기존 발송 주체",
+    phone:"02-8888-1111"
+  };
+});
+migrationCase("legacy collect shipment has zero prepaid freight",s=>{
+  delete s.workflow;
+  s.orders[0].status="QUEUED";
+  s.orders[0].freightCode="020";
+  s.queue=["o1"];
+});
+migrationCase("legacy no shipping fee retains automatic tariff",s=>{
+  delete s.workflow;
+  s.orders[0].shippingFee=null;
+  s.orders[0].status="STATEMENT";
+  s.orders[0].notified=true;
+});
+migrationCase("legacy STORE-only shipment receives manual historic fee",s=>{
+  delete s.workflow;
+  s.orders[0].status="QUEUED";
+  s.queue=["o1"];
+  s.orders[0].shippingFee=2500;
+  s.orders[0].recipients[0].items[0].origin="STORE";
+});
+migrationCase("legacy with existing receipt and frozen invoice audit",s=>{
+  s.orders[0].status="EXPORTED";
+  s.orders[0].receipt={
+    original:"옛 원문",at:now,actor:"이전 직원",
+    clientId:"dealer-1",legacy:true
+  };
+  s.orders[0].rawHistory=[{at:now,raw:"최초 원문",actor:"이전 직원"}];
+  s.workflow.groups[0].notices.push({
+    id:"old-notice",at:now,actor:"이전 직원",
+    shipmentIds:["shipment:o1:r1"],amounts:{"shipment:o1:r1":70000},
+    total:70000,account:copy(s.settings.accounts[0]),message:"기존 청구 내역"
+  });
+});
+migrationCase("existing delivery and payment remain immutable",s=>{
+  s.orders[0].status="EXPORTED";
+  s.workflow.payments.push({
+    id:"payment-existing",dealerId:"dealer-1",
+    account:copy(s.settings.accounts[0]),
+    amount:55000,allocations:[{shipmentId:"shipment:o1:r1",amount:55000}]
+  });
+  s.workflow.deliveries.push({
+    id:"delivery-existing",shipmentId:"shipment:o1:r1",
+    origin:"FACTORY",completedAt:now,tracking:"TEST-001"
+  });
+  s.workflow.changeRequests.push({
+    id:"request-existing",shipmentId:"shipment:o1:r1",
+    at:now,actor:"이전 직원",reason:"주소 확인"
+  });
 });
 
 function normalized(v:unknown):string {
