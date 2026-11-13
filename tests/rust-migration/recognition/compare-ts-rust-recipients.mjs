@@ -25,7 +25,7 @@ const canonical=(v,key="")=>{
   }
   return v;
 };
-const diff=[],byField=new Map(),byCase=[];
+const diff=[],byField=new Map(),byCase=[],referenceFailuresRust=[],referenceFailuresTs=[];
 let compared=0;
 function difference(caseId,path,ts,rust){
   diff.push({caseId,path,ts,rust});
@@ -130,7 +130,8 @@ function report(mode){
     mismatchCount:diff.length,
     byField:[...byField.entries()].sort((a,b)=>b[1]-a[1])
       .map(([field,count])=>({field,count})),
-    byCase,differences:diff.slice(0,5000),truncated:diff.length>5000
+    byCase,referenceFailuresTs,referenceFailuresRust,
+    differences:diff.slice(0,5000),truncated:diff.length>5000
   };
 }
 function updateStableIds(order,index){
@@ -219,8 +220,10 @@ for(const x of cases){
     compare(x.id,"recipients",recipientShape(ts,false),recipientShape(rust,false));
     compare(x.id,"candidates",ts.candidates,rust.candidates);
     compare(x.id,"unassigned",ts.unassigned,rust.unassigned);
-    compare(x.id,"referenceIntegrity.ts",validateLinks(ts),[]);
-    compare(x.id,"referenceIntegrity.rust",[],validateLinks(rust));
+    const tsBroken=validateLinks(ts),rustBroken=validateLinks(rust);
+    if(tsBroken.length)referenceFailuresTs.push({id:x.id,paths:tsBroken});
+    if(rustBroken.length)referenceFailuresRust.push({id:x.id,paths:rustBroken});
+    compare(x.id,"referenceIntegrity",tsBroken,rustBroken);
     byCase.push({id:x.id,tsRecipientCount:ts.recipients.length,
       rustRecipientCount:rust.recipients.length,mismatchCount:diff.length-before});
   }else{
@@ -228,8 +231,10 @@ for(const x of cases){
     const ts=reanalyzeWithAliases(structuredClone(x.order),data.state);
     const rust=x.rustReanalyzed;
     compare(x.id,"reanalyzed",ts,rust);
-    compare(x.id,"referenceIntegrity.ts",validateLinks(ts),[]);
-    compare(x.id,"referenceIntegrity.rust",[],validateLinks(rust));
+    const tsBroken=validateLinks(ts),rustBroken=validateLinks(rust);
+    if(tsBroken.length)referenceFailuresTs.push({id:x.id,paths:tsBroken});
+    if(rustBroken.length)referenceFailuresRust.push({id:x.id,paths:rustBroken});
+    compare(x.id,"referenceIntegrity",tsBroken,rustBroken);
     const old=x.order;
     const sameIds=(result)=>result.recipients.map(r=>({
       id:r.id,items:r.items.map(item=>({
