@@ -121,6 +121,40 @@ mod regressions {
     }
 
     #[test]
+    fn other_model_families_do_not_inherit_music_stand_minus_one_rules() {
+        let state=json!({"products":[
+            {"id":"gt","name":"GT-1 / 기타 스탠드","category":"기타",
+             "origin":"FACTORY","active":true,
+             "variants":[{"id":"vgt","color":"Black"}]},
+            {"id":"cart10","name":"Cart-10 / 보면대 카트","category":"악세사리",
+             "origin":"FACTORY","active":true,
+             "variants":[{"id":"vc10","color":"Black"}]},
+            {"id":"cart20","name":"Cart-20 / 보면대 카트","category":"악세사리",
+             "origin":"FACTORY","active":true,
+             "variants":[{"id":"vc20","color":"Black"}]}
+        ],"aliases":[]});
+        let gt=recognition::execute("match_products",json!({"text":"GT-1","state":state})).unwrap();
+        assert_eq!(gt["productId"],"gt");
+        let cart=recognition::execute("match_products",json!({"text":"Cart-10","state":state})).unwrap();
+        assert_eq!(cart["productId"],"cart10");
+    }
+
+    #[test]
+    fn conflicting_alias_does_not_override_registered_sku() {
+        let state=json!({"products":[
+            {"id":"p709","name":"709 / 타공 상판","category":"보면대",
+             "origin":"FACTORY","active":true,
+             "variants":[{"id":"v709","color":"Black"}]},
+            {"id":"other","name":"독립 상품 / 거치대","category":"액세서리",
+             "origin":"STORE","active":true,
+             "variants":[{"id":"vother","color":"Black"}]}
+        ],"aliases":[{"id":"a1","clientId":null,"text":"709","productId":"other"}]});
+        let outcome=recognition::execute("match_products",json!({"text":"709","state":state})).unwrap();
+        assert_eq!(outcome["productId"],Value::Null);
+        assert_eq!(outcome["match"]["kind"],"CONFLICT");
+    }
+
+    #[test]
     fn a_negative_quantity_never_becomes_approved() {
         let state=json!({"products":[],"aliases":[]});
         let result=recognition::execute("analyze_order",json!({
