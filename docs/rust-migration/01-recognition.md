@@ -1,6 +1,6 @@
 # TSBH Rust 이전 세션 1 — recognition 인계 기록
 
-**판정: 부분 구현, Rust 컴파일/20건 회귀 검증 미완료. 시연 빌드 통합 금지.**
+**판정: Rust 컴파일 성공, 발주서 회귀 검증 실패/중단. 시연 빌드 통합 금지.**
 
 ## 저장소와 커밋
 - 저장소: ThunderStrikerKR/TSBH (Public 변경 없음)
@@ -8,7 +8,7 @@
 - 공통 기준: d5ea8ed20b8120b844437263c2eb2b8963559e8d
 - 선행 모델 선택 구현: 3f8e062e1e049b5297b0fd78a285dad7a679d6f5
 - 마지막 소스 수정 커밋: 24e53a5acfc48301af14e5bf4a2fc201f5b20955
-- 마지막 **Rust 컴파일 검증 완료 커밋: 없음.**
+- 마지막 **Rust 컴파일 확인 커밋: `61dc08d428c3447fc0336a0f793587aa04b1b5c8`**, GitHub Actions에서 컴파일 성공 후 테스트 실행 확인. 전체 테스트 통과는 아님.
 - 작업 경로는 사용자 지정 허용 경로로 제한. 기존 TS 및 공통 Rust/설정 파일은 미수정.
 
 ## 담당 소스 및 구현 상태
@@ -65,8 +65,8 @@
 - seed state 상품 360개, 별칭 0개임을 원격 저장소에서 확인.
 
 미확인:
-- cargo/rustc 도구가 현재 실행 환경에 없어 Rust 컴파일과 cargo test 실행 불가.
-- 20건 중 실제 통과 건수 **미측정**. 테스트 통과 주장 금지.
+- 로컬 작업 환경에는 cargo/rustc가 없으나, GitHub Actions Rust 러너에서 컴파일 및 테스트 실행 확인 (run 43351947913).
+- 20건 회귀 전체 통과 건수 미측정: `order_02`, `order_04` 실패 확인 후 실행이 취소되어 전체 완료 아님.
 - Windows 실행 및 Tauri 연동, SQLite 영속, 가격/운임 연동 모두 미검증.
 
 ## 다음 담당자가 즉시 실행할 작업
@@ -99,10 +99,19 @@
 - [x] 수량/주소/연락처/수취인/상품 근거 코드
 - [x] 실제 20건 원본 fixture를 참조하는 Rust 테스트 작성
 - [x] 독점 브랜치 소스 커밋
-- [ ] Rust 컴파일 성공
+- [x] Rust 컴파일 성공 (GitHub Actions, `61dc08d4`; 회귀 테스트는 미통과)
 - [ ] 20건 Rust 회귀 실측 및 회귀 없음 입증
 - [ ] TS 결과/신규 오류 비교
 - [ ] JSON 스키마/기존 React 연결 실측
 - [ ] Windows/Tauri 최종 통합(세션 3)
 
 **결론: 작업 중이며 완료 판정 불가.**
+
+## 2026-11-13 추가 검증 기록 (CI 소스 수정 이후)
+
+- 소스 수정: `a46a61576448e712dad059584bbaf9f502669f1e` (후보 범위 변수 e 정정, find_term regex 임시 참조 수명 해결), `61dc08d428c3447fc0336a0f793587aa04b1b5c8` (quantity iterator 수명 해결).
+- GitHub Actions: https://github.com/ThunderStrikerKR/TSBH/actions/runs/43351947913
+- 확인: 해당 커밋의 독립 Rust 크레이트는 컴파일에 성공하고 테스트 실행에 진입함.
+- 확인된 회귀 실패: `recognition::tests::separate_recipients_and_utf16_spans` (기대 수취인 2명, 실제 결과 관련 필드 Null), `regressions::order_02` (배송건 2 / 기대 1), `regressions::order_04` (배송건 2 / 기대 1). 4번에서는 '택배'를 수취인명으로 판단하고 TEL 연락처 행을 상품 행으로 판단함.
+- 실행 전체는 다른 워크플로 실행으로 취소되어 20건 최종 합격 건수 미확정. **컴파일 성공과 분석 정확성 합격은 구분할 것.**
+- 다음 작업: 위 세 회귀 실패의 원문/분석 근거를 수정하고 전체 20건을 끝까지 통과시킬 것. TS JSON 계약 및 Windows 통합은 여전히 미검증.
