@@ -1,5 +1,143 @@
 # TSBH Rust migration — session 2/3: Price, freight and workflow rules
 
+## Session 2: direct source parity for all 14 workflow actions — 2026-11-13
+
+**Latest verified checkpoint (supersedes the older audit statement that these 14 actions lack direct TS comparison)**
+- Branch: `migration/02-rules`
+- Implementation and test fixture SHA: `8673288dd08306e6bf1a302111d3a15d51e80211`
+- GitHub Actions: https://github.com/ThunderStrikerKR/TSBH/actions/runs/43385251793
+- **Real TypeScript vs compiled Rust: 528 / 528 named cases PASS, 0 mismatches**
+- **50 newly added direct workflow-action comparison cases**, across **all 14** original mutation functions. Previous checkpoint: 478 / 478.
+- **Standalone Rust regression: 47 / 47 PASS**.
+- **Windows/Tauri/SQLite integrated job: SKIPPED**.
+- All modifications confined to session-2 `workflow.rs`, parity
+  `compare.mts` and this handoff. No TypeScript original, React,
+  recognition algorithm, SQLite schema or Tauri wiring was edited.
+
+### Original source operations now directly exercised
+
+Rust `execute("apply_workflow_action",{state,action,...})` compared to
+the actual TypeScript functions:
+
+| Rust action | Original TypeScript | Direct scenarios |
+| --- | --- | --- |
+| `advance_group` | `advanceGroup` | stage 0->1, 1->2, 2->3 and 3->4, blocked prepaid jump, transferred guard |
+| `undo_group` | `undoGroup` | stage rollback, stage 4, confirmed PREPAID approval cancellation, transferred guard |
+| `set_shipment_freight` | `setShipmentFreight` | ordinary edit, previously notified downgrade, transferred guard |
+| `process_group` | `processGroup` | valid Excel queue conversion, not-ready refusal, already transferred |
+| `record_actual_freight` | `recordActualFreight` | new observation, unchanged value/no event, invalid amount |
+| `confirm_group_payment` | `confirmGroupPayment` | successful prepaid confirmation, missing prior notice |
+| `record_payment` | `recordPayment` | valid entry and allocation, zero, duplicate/overallocated/missing-time refusal |
+| `restore_shipment` | `restoreShipment` | queued restore, not-transferred and already-exported refusal |
+| `mark_store_sent` | `markStoreSent` | queued store, historically exported store with valid export link, wrong origin and missing export link |
+| `record_change_request` | `recordChangeRequest` | append-only request, blank text and missing shipment refusal |
+| `set_group_account` | `setGroupAccount` | valid change, after-notice downgrade, unknown account refusal |
+| `detach_shipment` | `detachShipment` | split multi-recipient group, preserve prior notice, already independent refusal |
+| `regroup_shipment` | `regroupShipment` | same-source regrouping, required notice acknowledgment, identical-group refusal |
+| `complete_delivery` | `completeDelivery` | actual delivery, repeat/no-op, pre-transfer, queued export and fileOnly refusal |
+
+The harness freezes `Date` and `crypto.randomUUID`, builds the exact
+same initialized State for both implementations, separately requires
+expected success or failure for each fixture, and compares the **entire
+returned State** including receipts, payment allocations, frozen Excel
+snapshots, recheck records and ordered audit events. Rust-only adapter
+metadata (`step`, `paymentId`, `changeRequestId`, etc.) is excluded
+from the State comparison; TypeScript operations only return State.
+For blocked cases, **exact original Korean error text** is compared.
+
+### Source differences found and corrected
+
+1. `workflow.rs::append_event` previously serialized absent optional
+   `before`, `after` or `groupId` fields as null; original TypeScript
+   serializes undefined event parameters as absent keys. Now matches
+   original event schemas by action and includes original undo reason.
+2. Stage-1 `advanceGroup` must set a shipment sender from
+   `senderFor(order,state)`, not just copy a possibly missing
+   `order.senderSnapshot`.
+3. Stage-2 `advanceGroup` must resolve eligible historical
+   `rechecks` and save `appliedEpoch` / `appliedBundles` when the
+   shipment's freight basis is still current, besides saving manual
+   charges and `confirmedFreightVersion`.
+4. `undoGroup` after a PREPAID stage-4 confirmation must revoke only
+   non-invalidated confirmations for affected shipment IDs; partial
+   confirmations retain unaffected allocations, amounts and IDs.
+   The old unconditional rejection when any confirmation existed
+   was incorrect.
+5. Financial downgrade events caused by updated freight/account
+   need the exact *original chronology* and caller-generated
+   `auditEventIds`. Source `입금 승인 재확인 필요` omits its after
+   field; `재검증 필요` includes the stage transition. Rust now
+   accepts injected IDs for the audit sequence, with the legacy
+   deterministic-ID fallback retained for old callers.
+6. `record_change_request` now returns original missing-shipment
+   error instead of the lower-level lookup error.
+7. A stage-3 action can require reconciliation of the recipient's
+   newly confirmed `shippingCharges` into `recipientSnapshot`.
+   Unconditionally reconciling every Rust action broke 11 existing
+   standalone tests that do not provide reconciliation event IDs;
+   that change was **reverted**. Rust performs source reconciliation
+   when the caller explicitly provides `reconcileEventIds`.
+   The original TypeScript calls reconcileWorkflow internally for
+   most mutation actions, while `recordActualFreight`,
+   `markStoreSent` and `recordChangeRequest` directly clone input
+   without reconciliation. **Session 3 must enforce this workflow
+   boundary contract for every call.**
+
+### Rust integration contract for session 3
+
+All 14 actions remain pure in-memory transformations with explicit
+`state`, `action`, `now`, `actor`, `eventId` and their
+action-specific parameters. No implicit clock, DB access or
+cryptographic UUID generator is used by Rust.
+
+- If the source action internally calls `reconcileWorkflow`, either
+  feed a pre-reconciled State with frozen signatures **and verify it
+  cannot produce new reconciliation changes**, or provide the
+  `reconcileEventIds` key (ordered list, possibly empty) to let
+  the action run native reconciliation. Without this key, the
+  Rust adapter retains the older caller contract and does not
+  automatically reconcile.
+- For advanced freight/account changes, provide `auditEventIds`
+  ordered like the original emitted recheck/confirmation-invalidating
+  events and a distinct `eventId` for the final staff action.
+- For `advance_group` at stage 3, the current Rust adapter takes
+  `noticeId`, exact `paymentMessage` and `billingSignature`
+  as host parameters. It does **not** itself implement the original
+  `groupMessages`/invoice message renderer; this belongs to
+  session 3 integration and must be source-equivalent.
+- For `advance_group` on initial reception step 1, pass the proper
+  `sender` when the caller wants the original saved confirmation
+  snapshot. Stage 2 may require original tariff-adjustment creation
+  when staff-confirmed freight differs from a current recommendation;
+  this **adjustment mismatch path was not covered** in the 50
+  action fixtures and must be checked before using as production
+  audit evidence.
+- For `record_payment`, source UUID order is payment ID,
+  allocation IDs, then event ID; for PREPAID
+  `confirm_group_payment` it is confirmation ID then
+  advancement event ID; for group detach, new group ID then
+  event ID. Preserve this order and use exactly one atomic DB
+  transaction when integrating.
+
+### Remaining limits and stop conditions
+
+**528/528 is verified for the synthetic fixture corpus, not an
+exhaustive equivalence proof.** Uncovered cases include complex
+multi-confirmation partial invalidation, current-tariff override
+adjustment snapshots, multiple shipment groups with independent
+simultaneous financial changes, arbitrary JSON property insertion
+order, and multiple generated reconcile/audit UUIDs in one
+transaction. Do not represent this as all Rust migration functions
+complete or Windows/production ready.
+
+The earlier **function inventory audit** below recorded the historical
+state where no workflow actions had been directly compared. That
+particular finding is now resolved. Its other missing module coverage
+items (`group-trash.ts`, `corrections.ts`, `working-raw.ts`,
+`orders/retail.ts`, etc.) remain unresolved.
+
+---
+
 ## Session 2 function inventory and cross-module gap audit — 2026-11-13
 
 **Verdict: SECURITY_LIMITED / INCOMPLETE; no session-2 final PASS.**
