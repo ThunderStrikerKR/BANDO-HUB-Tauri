@@ -174,6 +174,103 @@ pub(super) fn list(state:&Value,query:&str,date:&str)->Result<Value,String>{
     Ok(json!(result))
 }
 
+
+/// Read-only UI projection in addition to the accounting/history rows.
+/// The item-reference and bank-evidence decisions previously lived inside
+/// OrderHistory.tsx; canonical list_order_history stays byte-for-byte stable
+/// for settlement and the original TypeScript parity oracle.
+pub(super) fn list_view(
+    state:&Value, query:&str, date:&str, tracking_order:&Value,
+)->Result<Value,String> {
+    let mut result=list(state,query,date)?;
+    let Some(history_rows)=result.as_array_mut() else {
+        return Err("주문 이력 조회 결과 형식을 확인하세요.".into())
+    };
+    for row in history_rows {
+        let order=field(row,"order");
+        let order_id=str_field(order,"id").to_owned();
+        let shipment_ids=rows(field(row,"shipmentIds")).iter()
+            .filter_map(Value::as_str).collect::<HashSet<_>>();
+        let evidence_missing=flag(order,"paid") &&
+            !rows(field(field(state,"workflow"),"payments")).iter().any(|p|
+                rows(field(p,"allocations")).iter()
+                    .any(|a|shipment_ids.contains(str_field(a,"shipmentId"))));
+        let mut links=Vec::new();
+        for recipient in rows(field(row,"recipients")) {
+            for item in rows(field(recipient,"items")) {
+                links.push(json!({
+                    "recipientId":str_field(recipient,"id"),
+                    "itemId":str_field(item,"id"),
+                    "link":historical_link(state,item)
+                }));
+            }
+        }
+        let text=tracking_message(state,&order_id,tracking_order);
+        row["display"]=json!({
+            "trackingMessage":text,
+            "paymentEvidenceMissing":evidence_missing,
+            "references":links,
+        });
+    }
+    Ok(result)
+}
+/// The historical product reference is checked by BOTH old parent and old
+/// price-record IDs. Never match by name/color or replace the frozen price.
+fn historical_link(state:&Value,item:&Value)->Value {
+    let product_id=str_field(item,"productId");
+    let variant_id=str_field(item,"variantId");
+    if product_id.is_empty()||variant_id.is_empty(){return Value::Null}
+    let products=field(state,"products");
+    if let Some(found)=find_by_id(products,product_id) {
+        let variants=rows(field(found,"variants"));
+        if variants.len()==1 && str_field(&variants[0],"id")==variant_id {
+            return json!({"name":str_field(found,"name"),"via":"CURRENT"})
+        }
+        return Value::Null
+    }
+    let key=format!("{product_id}|{variant_id}");
+    let mapped_id=str_field(field(state,"productMappings"),&key);
+    if mapped_id.is_empty(){return Value::Null}
+    if let Some(found)=find_by_id(products,mapped_id) {
+        let variants=rows(field(found,"variants"));
+        if str_field(found,"sourceProductId")==product_id &&
+            variants.len()==1 && str_field(&variants[0],"id")==variant_id {
+            return json!({"name":str_field(found,"name"),"via":"HISTORICAL"})
+        }
+    }
+    Value::Null
+}
+fn tracking_message(state:&Value,order_id:&str,tracking_order:&Value)->String {
+    let mut lines=Vec::<String>::new();
+    let order=find_by_id(field(state,"orders"),order_id);
+    for ship in rows(field(field(state,"workflow"),"shipments")) {
+        if str_field(ship,"orderId")!=order_id{continue}
+        let recipient=order.and_then(|o|rows(field(o,"recipients")).iter()
+            .find(|r|str_field(r,"id")==str_field(ship,"recipientId")));
+        let recipient_name=recipient
+            .map(|r|str_field(r,"name")).unwrap_or("수취인");
+        let tracking=field(ship,"tracking");
+        let requested=rows(tracking_order).iter()
+            .find(|entry|str_field(entry,"shipmentId")==str_field(ship,"id"))
+            .and_then(|entry|field(entry,"keys").as_array());
+        // JavaScript Object.values historically preserves insertion order;
+        // serde_json::Value's default map is lexicographically sorted.
+        // The UI sends *only key order* as transport metadata so Rust can
+        // reproduce original copied text without running TS business logic.
+        if let Some(keys)=requested {
+            for key in keys.iter().filter_map(Value::as_str) {
+                let val=str_field(tracking,key);
+                if !val.is_empty(){lines.push(format!("{recipient_name} {val}"))}
+            }
+        } else if let Some(map)=tracking.as_object(){
+            for value in map.values().filter_map(Value::as_str) {
+                if !value.is_empty(){lines.push(format!("{recipient_name} {value}"))}
+            }
+        }
+    }
+    lines.join("\n")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
