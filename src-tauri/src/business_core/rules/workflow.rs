@@ -133,7 +133,7 @@ fn valid_contact(value:&str)->bool {
 fn valid_address(row:&Value,legacy:bool)->bool {
     let address=str_field(row,"address").trim();
     if address.is_empty() || (legacy && str_field(row,"addressStatus")=="CONFIRMED") {return legacy && !address.is_empty();}
-    if str_field(row,"addressStatus")=="INCOMPLETE" || address.contains(['#','@']) {return false;}
+    if str_field(row,"addressStatus")=="INCOMPLETE" || (address.contains('#') || address.contains('@')) {return false;}
     // Conservative non-regex equivalent for common road / lot / PO box forms.
     let markers=["대로","로","길","동 ","리 ","읍 ","면 ","사서함"];
     markers.iter().any(|m|address.match_indices(m).any(|(i,_)| {
@@ -214,7 +214,7 @@ fn stage_issues(state:&Value,group_id:&str,next:i64) -> Result<Vec<String>,Strin
             }
             for item in rows(field(row,"items")) {
                 if let Some(p)=find_by_id(field(state,"products"),str_field(item,"productId")) {
-                    if has_value(field(p,"deletedAt")) || flag(p,"supersededBy") ||
+                    if has_value(field(p,"deletedAt")) || has_value(field(p,"supersededBy")) ||
                         field(p,"active").as_bool()==Some(false) {
                         issues.push("판매 상태 확인 필요".into());
                     }
@@ -399,13 +399,11 @@ pub(super) fn apply(payload:&Value)->Result<Value,String> {
                     set(&mut state["workflow"]["shipments"][*si],"sender",sender)?;
                 }
                 if next==2 {
-                    let row=&state["orders"][oi]["recipients"][ri];
                     let charges=field(&state["workflow"]["shipments"][*si],"charges").clone();
                     let verified=field(&state["workflow"]["shipments"][*si],"freightVersion").clone();
                     set(&mut state["orders"][oi]["recipients"][ri],"shippingCharges",charges)?;
                     set(&mut state["workflow"]["shipments"][*si],"chargeMode",json!("MANUAL"))?;
                     set(&mut state["workflow"]["shipments"][*si],"confirmedFreightVersion",verified)?;
-                    let _=row;
                 }
                 if next==3 {
                     // Session 3 should feed the exact message/account billing
@@ -488,7 +486,8 @@ pub(super) fn apply(payload:&Value)->Result<Value,String> {
             append_event(&mut state,payload,"배송 건 운임 수정",&[ship_id.to_string()],
                 json!({"origin":origin,"value":previous}),
                 json!({"origin":origin,"value":value}),&group_id)?;
-            Ok(json!({"state":state,"step":field(&state["workflow"]["shipments"][si],"step")}))
+            let result_step=field(&state["workflow"]["shipments"][si],"step").clone();
+            Ok(json!({"state":state,"step":result_step}))
         }
         _ => Err(format!("지원하지 않는 업무 action: {action}")),
     }
