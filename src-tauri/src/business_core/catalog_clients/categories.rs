@@ -74,8 +74,32 @@ fn set_product_path(product:&mut Value,cats:&[Value])->Result<(),String>{
     }
     Ok(())
 }
-fn change(input:&Value,id:&str,name:&str,parent:Option<&str>,transfer:bool)
-    ->Result<Value,String>{
+fn change(input:&Value,id:&str,name:&str,parent:Option<&str>,transfer:bool,
+    guard_catalog_move:bool,guard_message:&str)->Result<Value,String>{
+    // This is the original CategoryManager move check, previously in React.
+    // Empty/unknown catalog roots impose no additional restriction, matching
+    // catalogFromCategory() + categoryProducts() in the original UI.
+    if guard_catalog_move {
+        let cats=items(input,"categories");
+        let target_path=category_path(cats,parent.unwrap_or(""))?;
+        let destination_catalog=target_path.first().and_then(|root|
+            match field(root,"id"){
+                "catalog-root:BANDOSTAND"=>Some("BANDOSTAND"),
+                "catalog-root:BANDOMALL"=>Some("BANDOMALL"),
+                _=>None,
+            });
+        if let Some(catalog)=destination_catalog {
+            let linked=descendants(cats,id)?;
+            let mismatch=items(input,"products").iter().any(|p|{
+                field(p,"deletedAt").is_empty() &&
+                field(p,"supersededBy").is_empty() &&
+                category_ids(p).iter().any(|cat|linked.contains(cat)) &&
+                !field(p,"catalog").is_empty() && field(p,"catalog")!="DEMO" &&
+                field(p,"catalog")!=catalog
+            });
+            if mismatch {return Err(guard_message.to_owned())}
+        }
+    }
     let mut next=input.clone();
     let mut cats=items(input,"categories").to_vec();
     let name=name.trim();
@@ -222,7 +246,9 @@ pub(super) fn execute(operation:&str,payload:&Value)->Result<Value,String>{
     match operation{
         "change_category"=>change(state,id,field(payload,"name"),
             payload.get("parentId").and_then(Value::as_str),
-            payload.get("transfer")==Some(&Value::Bool(true))),
+            payload.get("transfer")==Some(&Value::Bool(true)),
+            payload.get("guardCatalogMove")==Some(&Value::Bool(true)),
+            field(payload,"guardError")),
         "delete_category"=>delete(state,id,field(payload,"destination")),
         "legacy_add_category"=>legacy_add(state,id,field(payload,"name"),
             payload.get("parentId").and_then(Value::as_str)),
@@ -244,7 +270,7 @@ mod tests{
             "products":[{"id":"p1","name":"상품","categories":["root"],
                 "category":"기존"}],"orders":[{"id":"o1","price":12000}]
         });
-        let r=change(&state,"root","변경",None,false).unwrap();
+        let r=change(&state,"root","변경",None,false,false,"").unwrap();
         assert_eq!(r["state"]["products"][0]["category"],"변경");
         assert_eq!(r["state"]["products"][0]["id"],"p1");
         assert_eq!(r["state"]["orders"][0]["price"],12000);
