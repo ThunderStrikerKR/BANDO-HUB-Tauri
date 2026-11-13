@@ -1,5 +1,142 @@
 # TSBH Rust migration — session 2/3: Price, freight and workflow rules
 
+## [TSBH] Session 2 final owned-source handoff — 2026-11-13
+
+**Scope decision: session-2 Rust pure business-rule implementation is CLOSED
+for the owned source contracts listed here. This is NOT a production or
+integrated app PASS.**
+
+- Branch: `migration/02-rules`
+- Last verified source commit: `71d370858ab833dcf891b16c0687aeb6a177137c`
+- Passing GitHub Actions:
+  https://github.com/ThunderStrikerKR/TSBH/actions/runs/43389663844
+- **Actual TypeScript source vs compiled Rust: 678/678 named fixtures PASS**
+- **Independent Rust regression: 47/47 PASS**
+- **Windows/Tauri/SQLite app integration: SKIPPED / NOT PERFORMED**
+- All new changes are in `src-tauri/src/business_core/rules/**`,
+  `tests/rust-migration/rules/parity/compare.mts`, and this document.
+  No TypeScript original, recognition engine, UI, SQLite, Tauri commands,
+  factory Excel import/export source, or session-3 output code was changed.
+
+This checkpoint **supersedes historical audit passages below** that
+previously described the following six business-module families as
+unimplemented. Their current status is:
+**IMPLEMENTED + directly compared with actual original TypeScript**.
+
+### Newly ported families and operating contracts
+
+| Source TypeScript | Session-2 Rust module / API | Preserved behavior |
+| --- | --- | --- |
+| `group-trash.ts::deleteGroup/restoreGroup` | `group_operations.rs` / `apply_group_action` | group soft-delete/restore, transfer/payment veto, unchanged historical shipments, chronological audit |
+| `corrections.ts::correctionStatus/requestCorrection/copiedCorrection/confirmCorrection/markFactoryDelivered/markCollected/reopenUnsentExport` | `correction_rules.rs` / `apply_correction_action` | structured pre-dispatch correction and status, recipient ID and origin checks, old/new copies, proof of factory handoff, collection, original Excel file proof before reopening |
+| `orders/reception.ts::newReception/replaceReception/persistedReceptionState` | `reception_operations.rs` / `apply_reception_action` | 100,000 UTF-16-unit raw cap, creator/recipient identity and timestamps, eliminate new unconfirmed draft entities from unrelated settings saves, reject drafts with payment/export/confirmation records |
+| `orders/retail.ts::newRetailOrder/confirmRetail` | `retail_operations.rs` / `apply_retail_action` | no-client paid externally reception, exact company sender/party, immutable receipt+confirmation snapshot, step-four shipments, verification event and Excel queue; RETAIL nullable invoice amount **does not block** export |
+| `working-raw.ts` and `receipt.ts` correction/eligibility/receiptOf | `raw_corrections.rs` / `apply_raw_correction` | correction eligibility (pre-shipping/pre-payment only), immutable original receipt, audit reason, rawCorrections and old/current analysisRaw, strict recipient identity on working correction |
+| `replies.ts::billingSnapshot/applyReply` | `reply_rules.rs` / `apply_reply_action` | frozen pre-reply invoice history, stale product/recipient reject, approval acknowledgment, field-by-field confirmedFields, reset of paid/notice/lock, price/freight re-evaluation and reply audit |
+
+The original `src/corrections.ts::correctionMessage`,
+`src/factory-replies.ts::trackingMessage` and
+`src/workflow.ts::groupMessages` are **output formatting** and
+belong to session 3, not the session-2 pure state mutation boundary.
+The original `src/replies.ts::proposeReply/bulkColorPreview` and
+`src/issue-actions.ts` product/alias interpretation or state-confirmation
+work is assigned to session 1 and must be coordinated with its
+recognition owner; session 2 does not add a second product matcher.
+
+**Required external inputs for the new state operations**
+- `apply_raw_correction`: `parsedRecipients` from the authenticated
+  session-1 order parser for precisely the same raw text/client/state,
+  chronological `eventIds`, optional preceding `reconcileEventIds`,
+  explicit correction UUID, clock and actor. Never take unverified
+  arbitrary parsed recipients from the UI.
+- `apply_reply_action`: a structured `ReplyPreview` produced by the
+  original-equivalent session-1 proposal analyzer. If the address
+  changes, supply `addresses[recipientId]` with source-equivalent
+  `addressInfo`/`addressParts` result. The Rust module does not
+  invent address normalization.
+- `apply_retail_action` confirmation: inject a UUID for the order
+  confirmation event and a separate UUID for the processing event,
+  plus ordered reconciliation IDs where needed. The adapter calls
+  pure Rust reconciliation and processGroup; no database commit.
+- `apply_group_action` and `apply_correction_action`: inject the
+  actual historical state, stable order/recipient/shipment IDs and
+  action-specific UUIDs/clock. Commit the entire returned state in
+  a **single** transaction, not piecemeal UI writes.
+- `apply_reception_action::persisted_reception_state`: use this
+  only at the original unrelated-settings persistence boundary to
+  remove transient unconfirmed reception state. It refuses any
+  draft already linked to money or exported receipts.
+
+### Final direct comparison coverage added in this closure pass
+
+The parity suite grew **528 -> 678** named examples (+150).
+New cases compare complete source output, error text, expected success
+vs rejection and side-effect history:
+
+- Group soft-delete/restore: deleted, missing, transferred, step four,
+  paid, delivered, zero and multiple shipments
+- Corrections: creation, pending factory, confirmed/repeated/no-op,
+  concurrent recipient changes, origin changes, invalid freight,
+  exported/handoff/collected and proof-backed reopens
+- Reception: new/replaced raw and persisted draft filtering, including
+  external payment/confirmation/Excel attachment errors
+- Retail: full successful factory/store queue creation and all guards,
+  including nullable amounts and source-generated UUID chronology
+- Working raw/receipt: correctable issues, legal edit gates, unchanged
+  edit, missing reason, valid correction with original parser output
+  and complete rawCorrections/receipt history
+- Replies: billing snapshot, warning/empty/change/reapproval/stale
+  guards, successful quantity and recipient updates, address parser
+  output and recalculated price/shipping history
+- Pricing and dispatch: source `repriceOrder` plus original
+  `shouldRefreshUncommittedOrderPricing` gating, confirmed/locked/
+  persisted orders, group step/evaluation and complete dispatch
+- Shipping: original `deleteShippingGroup`, `changeShippingBasis`,
+  archival versions, product detach and combination invalidation
+
+All original TS invocations ran during CI, not against a duplicated
+expected Rust calculation. The newer cases assert expected successful
+original invocations as well as their Rust match, so a pair of equal
+errors cannot satisfy a success fixture.
+
+### Remaining **non-session-2** implementation owners
+
+**Session 1 — recognition and decisions**:
+`parseOrder/parseSmart`, product aliases and model resolution,
+`issue-actions.ts` product confirmation/alias writes, reply
+proposal extraction (`proposeReply` / `bulkColorPreview`),
+raw line evidence and address parser. Session 2's pure mutators
+require their already-validated source-equivalent output.
+
+**Session 3 — integration and output**:
+Tauri command routing, SQLite transaction/rollback/backup,
+real Windows executable testing, actual Excel import/export and
+factory reply matching `connectFactoryReply`/`replyNeedsReview`,
+tracking and customer formatted messages, cross-session
+UUID/time injection. Ownership includes safe call order for
+`validate_workflow` and `validate_reception_boundary` and
+guarding `migrate_workflow` as a one-time operation.
+
+### Closing decision and strict safety limitations
+
+**Session-2 pure-Rust implementation for the agreed business-rule
+boundary is delivered and the current comparison corpus passes.**
+Do not reopen this session with an unbounded list of speculative
+fixtures. Open a specific new defect only when a reproducible TS/Rust
+difference, user-specified business rule, or integration failure
+is observed.
+
+This is **NOT** 100% mathematical proof of TypeScript equivalence
+for arbitrary malformed JSON, insertion-ordered evidence, exotic
+phone/address formats or multiple simultaneous actor events.
+No actual business database was opened or migrated and no app-level
+Windows runtime was executed by this session. The existing app must
+retain its validated production authority until session 3 verifies
+full transaction integration. App-release/merge authorization remains
+**BLOCKED pending sessions 1 and 3 integration**.
+
+---
+
 ## Session 2: direct source parity for all 14 workflow actions — 2026-11-13
 
 **Latest verified checkpoint (supersedes the older audit statement that these 14 actions lack direct TS comparison)**
