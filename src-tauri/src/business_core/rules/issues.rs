@@ -212,7 +212,7 @@ pub(super) fn order_issues(o:&Value)->Vec<Value>{
             let evidence=json!([field(row,"phone"),field(row,"mobile")]);
             let absent=phone.is_empty()&&mobile.is_empty();
             let invalid_mobile=!mobile.is_empty()&&!valid_contact(mobile);
-            let (title,field_name)=if absent{("연락처가 없습니다.".to_string(),"mobile")}
+            let (title,field_name)=if absent{("연락처가 없습니다".to_string(),"mobile")}
                 else{(contact_problem(if invalid_mobile{mobile}else{phone},invalid_mobile),
                     if invalid_mobile{"mobile"}else{"phone"})};
             add(&mut issues,o,Some(row),None,"CONTACT",title,field_name,
