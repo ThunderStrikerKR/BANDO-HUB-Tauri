@@ -53,16 +53,23 @@ pub(super) fn project(payload: &Value) -> Result<Value, String> {
                 str_field(ship, "recipientId") == str_field(row, "id")))
             .cloned().collect::<Vec<_>>();
         set(&mut group_order, "recipients", json!(group_rows))?;
-        let party = workflow::party(state, &group_order)
-            .ok_or("거래처 정보를 확인하세요.")?;
-        let account = workflow::account_for(state, group, &group_order, party);
+        if let Some(mode) = group.get("accountMode").filter(|v| !v.is_null()) {
+            set(&mut group_order, "accountMode", mode.clone())?;
+        }
+        if str_field(group, "accountMode") == "MANUAL" {
+            set(&mut group_order, "accountId", field(group, "accountId").clone())?;
+        }
         let account_key = |value: &Value| json!([
             field(value, "id"),
             str_field(value, "bank").trim(),
             str_field(value, "number").trim(),
             str_field(value, "holder").trim()
         ]);
-        let account_id = account.map(account_key);
+        // Retail can legitimately have no saved client; it has no account
+        // allocations to display in group management.
+        let account_id = workflow::party(state, &group_order)
+            .and_then(|party| workflow::account_for(state, group, &group_order, party))
+            .map(account_key);
 
         let mut totals = Vec::with_capacity(ships.len());
         let mut shipment_projections = Vec::with_capacity(ships.len());
