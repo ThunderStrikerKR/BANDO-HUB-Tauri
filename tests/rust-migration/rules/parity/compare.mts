@@ -1444,6 +1444,32 @@ validationCase("decimal payment allocation rejected",unchanged,s=>{
     amount:100,allocations:[{shipmentId:"shipment:o1:r1",amount:2.5}]});
 },false);
 
+
+validationCase("negative allocation with positive safe aggregate reaches link guard",unchanged,s=>{
+  s.workflow.payments.push({id:"negative-pay",dealerId:"dealer-1",
+    amount:100,allocations:[
+      {shipmentId:"shipment:o1:r1",amount:-1},
+      {shipmentId:"shipment:o1:r1",amount:2}
+    ]});
+},false);
+validationCase("negative aggregate triggers sum error",unchanged,s=>{
+  s.workflow.payments.push({id:"negative-pay",dealerId:"dealer-1",
+    amount:100,allocations:[
+      {shipmentId:"shipment:o1:r1",amount:-2},
+      {shipmentId:"shipment:o1:r1",amount:1}
+    ]});
+},false);
+validationCase("payment without allocation is permitted",unchanged,s=>{
+  s.workflow.payments.push({id:"unallocated-pay",dealerId:"dealer-1",
+    amount:100,allocations:[]});
+},true);
+validationCase("invalid negative payment amount wins before aggregate error",unchanged,s=>{
+  s.workflow.payments.push({id:"negative-pay",dealerId:"dealer-1",
+    amount:-1,allocations:[
+      {shipmentId:"shipment:o1:r1",amount:2.5}
+    ]});
+},false);
+
 function normalized(v:unknown):string {
   if(Array.isArray(v))return "["+v.map(normalized).join(",")+"]";
   if(v&&typeof v==="object") {
