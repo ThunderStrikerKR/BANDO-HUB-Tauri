@@ -1,5 +1,44 @@
 # Session 3: Output and integration handoff (2026-11-13)
 
+## 2026-11-13 continued integration: native output ledger, copy audit and TS retirement gate
+
+**This updates the runtime routing facts below. It is not a finished whole-app
+Rust migration or approval to remove original TypeScript business oracles.**
+
+- `WorkflowQueue.tsx`: both factory/store native Save As flows still prepare
+  immutable rows through Rust. After saving the file, they now call
+  `output.finalize_export` through `src/native-export.ts`. Rust
+  `export_history.rs` revalidates current queue rows and revision, marks only
+  selected entries `EXPORTED` and `fileOnly=true`, preserves queued snapshots,
+  and emits the Excel audit event. It does **not** mark a parcel sent.
+- `MessageWorkspace.tsx`: successful clipboard copies now call
+  `rules.record_message_copy` through `src/native-message-audit.ts`, not TS
+  `recordCopy`. The Rust reducer rejects duplicate copy tokens and owns the
+  immutable event. The payment text signature still comes from the TS
+  `paymentSignature`; message text/phase parity is a separate unfinished task.
+- Earlier native UI connections on this branch include employee product
+  selection/confirmation, direct-entry retail confirmation, corrections and
+  factory handoff, native freight rules, and the working-raw-correction
+  handler. The correction dialog itself is **not** reachable from active order
+  review; no unrequested UI entrypoint was added.
+- Differential tests in `tests/rust-migration/output/parity.test.mjs`
+  compare the old TS `recordFactoryExportPrepared` and
+  `recordStoreExportPrepared` with compiled Rust. Message copy audits are
+  compared with real `recordCopy` in
+  `tests/rust-migration/rules/parity/compare.mts`.
+- `npm run audit:ts-business` now audits the import graph from
+  `src/main.tsx`; `--strict` deliberately fails while legacy business
+  modules remain reachable.
+- The authoritative removal checklist and remaining blockers are in
+  [03-ts-retirement-checklist.md](03-ts-retirement-checklist.md).
+  **Do not delete original `domain.ts`, `workflow.ts`, message algorithms,
+  ExcelJS modules, order-history or factory reply logic yet.**
+- Expected Windows Kakao native test failures must be tracked separately from
+  successful Rust/TS business parity. Require exact HEAD CI and physical
+  Windows/SQLite validation before any final release.
+
+
+
 ## 2026-11-13 session 3 interrupted shipping-work checkpoint
 
 **Scope: finish the interrupted native freight-management operation, not the entire Rust migration.**
