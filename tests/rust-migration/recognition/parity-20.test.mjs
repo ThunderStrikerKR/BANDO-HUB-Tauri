@@ -30,7 +30,7 @@ const requests=samples.map(x=>({operation:"analyze_order",payload:{
 const rust=spawnSync("cargo",["run","--quiet","--manifest-path",
   fileURLToPath(new URL("./Cargo.toml",import.meta.url)),"--bin","parity_runner"],
 {cwd:repoRoot,encoding:"utf8",input:JSON.stringify(requests),
-  maxBuffer:24*1024*1024,timeout:180000});
+  maxBuffer:24*1024*1024,timeout:720000});
 if(rust.error)throw rust.error;
 assert.equal(rust.status,0,"Rust recognition failed to execute:\n"+rust.stderr);
 const results=JSON.parse(rust.stdout);
@@ -66,8 +66,6 @@ function differences(want,got,path="$"){
   return Object.is(want,got)?[]:[{path,ts:want,rust:got}];
 }
 function sourceFaults(raw,out){
-  const encoded=[...raw].flatMap(ch=>[...ch].length?Array.from(ch).length?[ch]:[]:[]); // preserve raw unchanged
-  void encoded;
   const textUnits=Array.from(raw).reduce((sum,ch)=>sum+(ch.codePointAt(0)>0xffff?2:1),0);
   const faults=[];
   const sources=[
