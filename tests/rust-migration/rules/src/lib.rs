@@ -377,4 +377,26 @@ mod regression {
         assert_eq!(result["state"]["workflow"]["events"][0]["action"],"매장 발송 확인");
     }
 
+    #[test]
+    fn dispatch_change_request_is_append_only_and_audited() {
+        let before=workflow_state("POSTPAID");
+        let result=run("apply_workflow_action",json!({
+            "state":before,"action":"record_change_request",
+            "shipmentId":"shipment:o1:r1","changeRequestId":"request-1",
+            "text":"공장 전달 후 수취인 연락처 확인 요청",
+            "eventId":"event-1","now":"2026-11-13T12:00:00+09:00"
+        }));
+        assert_eq!(result["state"]["workflow"]["changeRequests"][0]["text"],
+            "공장 전달 후 수취인 연락처 확인 요청");
+        assert_eq!(result["state"]["workflow"]["events"][0]["action"],"전달 후 변경 요청 기록");
+        assert_eq!(run("validate_workflow",json!({"state":result["state"],"before":before}))["valid"],true);
+    }
+    #[test]
+    fn excessive_bundle_quantity_fails_without_integer_panic() {
+        let mut o=order(i64::MAX,json!(30000));
+        let second=item(i64::MAX,json!(30000));
+        o["recipients"][0]["items"].as_array_mut().unwrap().push(second);
+        assert!(execute("calculate_shipping",json!({"order":o,"state":shipping_state()})).is_err());
+    }
+
 }
