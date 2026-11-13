@@ -4,6 +4,9 @@
 pub mod recognition;
 
 #[cfg(test)]
+mod catalog_audit;
+
+#[cfg(test)]
 mod regressions {
     use super::recognition;
     use serde_json::{json, Value};
