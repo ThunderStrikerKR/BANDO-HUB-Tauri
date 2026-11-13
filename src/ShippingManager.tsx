@@ -12,10 +12,8 @@ import { sameFreightEditor } from "./shared/meaningful-changes";
 import { requestEditorLeave, requestPageLeave, usePageLeaveGuard } from "./shared/page-leave";
 
 import {
-  changeShippingBasis,
   combinationCurrent,
   combinationVersions,
-  deleteShippingGroup,
   editableShippingRule,
   emptyProductRule,
   initialShipping,
@@ -77,6 +75,45 @@ export function ShippingManager({
         onNotice(message, "success");
       })
     ).ok;
+  const applyBasis = async (groupId?: string): Promise<boolean> => {
+    try {
+      const groupVersions = Object.fromEntries(
+        shipping.groups.filter((g) => !groupId || g.id === groupId)
+          .map((g) => [g.id, crypto.randomUUID()]),
+      );
+      const productVersions = groupId ? {} : Object.fromEntries(
+        Object.keys(shipping.productRules ?? {}).map((id) => [id, crypto.randomUUID()]),
+      );
+      const { shipping: updated } = await businessCoreCall<{ shipping: ShippingState }>(
+        "rules", "apply_shipping_action", {
+          action: "change_basis", shipping, groupId,
+          now: new Date().toISOString(), groupVersions, productVersions,
+        },
+      );
+      return await save(
+        { ...state, shipping: updated },
+        groupId ? "그룹 운임 기준을 변경했습니다."
+          : "전체 운임 기준을 변경했습니다. 새 운임을 등록하세요.",
+      );
+    } catch (error) {
+      onNotice(error instanceof Error ? error.message : String(error), "error");
+      return false;
+    }
+  };
+  const removeGroup = async (groupId: string, detach: boolean): Promise<void> => {
+    try {
+      const { state: updated } = await businessCoreCall<{ state: State }>(
+        "rules", "apply_shipping_action", {
+          action: "delete_group", state, groupId, detach,
+          now: new Date().toISOString(),
+        },
+      );
+      if (await save(updated, "그룹을 삭제하고 과거 운임 기록을 보존했습니다."))
+        setDeleting("");
+    } catch (error) {
+      onNotice(error instanceof Error ? error.message : String(error), "error");
+    }
+  };
   const applyBulk = () => {
     if (!selected.length) return;
     setPending((prev) => ({
@@ -426,10 +463,7 @@ export function ShippingManager({
                     "전체 운임 기준을 변경하면 이전 운임의 자동 추천을 중단합니다. 새 운임은 다시 확인하여 등록해야 합니다. 계속할까요?",
                   )
                 )
-                  void save(
-                    { ...state, shipping: changeShippingBasis(shipping) },
-                    "전체 운임 기준을 변경했습니다. 새 운임을 등록하세요.",
-                  );
+                  void applyBasis();
               }}
             >
               전체 운임 기준 변경
@@ -533,13 +567,7 @@ export function ShippingManager({
                               g.name + " 기준을 변경하고 이전 운임 추천을 중단할까요?",
                             )
                           )
-                            void save(
-                              {
-                                ...state,
-                                shipping: changeShippingBasis(shipping, g.id),
-                              },
-                              "그룹 운임 기준을 변경했습니다.",
-                            );
+                            void applyBasis(g.id);
                         }}
                       >
                         기준 변경
@@ -680,12 +708,7 @@ export function ShippingManager({
                     : "이 그룹을 삭제할까요?",
                 )
               )
-                void save(
-                  deleteShippingGroup(state, deleting, linked),
-                  "그룹을 삭제하고 과거 운임 기록을 보존했습니다.",
-                ).then((ok) => {
-                  if (ok) setDeleting("");
-                });
+                void removeGroup(deleting, linked);
             }}
           >
             {products.some((p) => p.shippingGroupId === deleting)
