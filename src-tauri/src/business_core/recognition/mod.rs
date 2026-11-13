@@ -31,6 +31,7 @@ struct Line<'a> {
 #[derive(Clone, Debug)]
 struct ProductHit {
     evidence: usize,
+    source_start: usize,
     line: usize,
     raw: String,
     decision: Value,
@@ -53,7 +54,17 @@ pub fn execute(operation: &str, payload: Value) -> Result<Value, String> {
                 .and_then(Value::as_str).ok_or("match_products requires text or raw string")?;
             let client = client_id(payload.get("client"));
             let decision = model::decide(text, state, client);
-            Ok(model::decision_json(&decision))
+            let mut result=model::decision_json(&decision);
+            if let Some(span)=result.get_mut("evidence") {
+                if let (Some(start),Some(end))=(span["start"].as_u64(),span["end"].as_u64()) {
+                    let start=start as usize;
+                    let end=end as usize;
+                    if text.is_char_boundary(start) && text.is_char_boundary(end) {
+                        *span=json!({"start":utf16(text,start),"end":utf16(text,end)});
+                    }
+                }
+            }
+            Ok(result)
         }
         "reanalyze_order" => reanalyze(&payload),
         _ => Err(format!("unknown recognition operation: {operation}")),
@@ -405,7 +416,8 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
         let product_evidence = add_match(&mut events,line,offset+p_start,offset+p_end,
             "product",trimmed.to_owned(),"상품명/모델명/별칭 인식 근거");
         product_hits.push(ProductHit {
-            evidence:product_evidence,line:line.number,raw:trimmed.to_owned(),
+            evidence:product_evidence,source_start:line.start+offset,
+            line:line.number,raw:trimmed.to_owned(),
             decision:matched,quantities:quantity_indexes,
             common:Regex::new(r"공통|모두|전부|전원|각\s*수취인|같은\s*상품")
                 .expect("common item").is_match(trimmed),
@@ -516,6 +528,16 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
                 "term":hit.raw,
                 "productIds":chosen.into_iter().collect::<Vec<_>>()
             })} else {hit.decision["match"].clone()};
+            let mut products=hit.decision["productCandidates"].clone();
+            if let Some(candidates)=products.as_array_mut() {
+                let base=utf16(raw,hit.source_start);
+                for candidate in candidates {
+                    if let (Some(start),Some(end))=(candidate["start"].as_u64(),candidate["end"].as_u64()) {
+                        candidate["start"]=json!(base+start as usize);
+                        candidate["end"]=json!(base+end as usize);
+                    }
+                }
+            }
             let mut item = json!({
                 "id":id,"productId":chosen,"variantId":hit.decision["variantId"],
                 "raw":hit.raw,"name":name,
@@ -524,7 +546,7 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
                 "origin":hit.decision.get("origin").and_then(Value::as_str).unwrap_or("FACTORY"),
                 "defaulted":false,"recognitionReason":reason,"issues":issues,
                 "url":"","match":term,
-                "productCandidates":hit.decision["productCandidates"],"sources":[],
+                "productCandidates":products,"sources":[],
             });
             let mut sources = vec![source_json(raw,&events[hit.evidence],&rid,&id)];
             if unique {
