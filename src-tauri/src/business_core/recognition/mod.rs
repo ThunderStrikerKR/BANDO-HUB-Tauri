@@ -546,12 +546,6 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
                 }
             }
         }
-        // Bare EA suffixes are separate quantity evidence; unlike a
-        // parenthesized '(1ea)' they do not belong to the item label.
-        if let Some(q)=Regex::new(r"(?i)\s+\d+\s*EA$")
-            .expect("trailing EA").find(&item_raw) {
-            item_raw=item_raw[..q.start()].trim_end().to_owned();
-        }
         product_hits.push(ProductHit {
             evidence:product_evidence,source_start:line.start+offset,
             line:line.number,raw:item_raw,
@@ -646,8 +640,18 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
             } else {None};
             let chosen = hit.decision.get("productId").and_then(Value::as_str)
                 .filter(|s| !s.is_empty());
-            let name = hit.decision.get("name").and_then(Value::as_str)
+            let recognized_name = hit.decision.get("name").and_then(Value::as_str)
                 .filter(|s|!s.is_empty()).unwrap_or(&hit.raw);
+            // The TS recognizer keeps the complete source line in Item.raw,
+            // but for an unresolved EA order it removes the numeric EA
+            // suffix from the human-readable provisional Item.name.
+            let provisional_name = if chosen.is_none() {
+                Regex::new(r"(?i)\s+\d+\s*EA$")
+                    .expect("unresolved EA name")
+                    .find(recognized_name)
+                    .map(|m|recognized_name[..m.start()].trim_end().to_owned())
+            } else {None};
+            let name = provisional_name.as_deref().unwrap_or(recognized_name);
             let reason = hit.decision.get("recognitionReason").cloned().unwrap_or(Value::Null);
             let mut issues: Vec<String> = Vec::new();
             if chosen.is_none() {
