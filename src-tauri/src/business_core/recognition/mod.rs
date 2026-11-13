@@ -662,31 +662,49 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
         }
         let has_name = events.iter().any(|e| e.kind == "name" && e.line == line.number);
         if !has_name && address.is_none() {
-            if let Some(c) = Regex::new(r"^([가-힣]{2,5})\s+(?:목사|선생님)$")
-                .expect("recipient title").captures(text) {
-                if let Some(name) = c.get(1) {
-                    if is_person(name.as_str()) {
-                        if let Some(at) = line.text.find(name.as_str()) {
-                            add_match(&mut events,line,at,at+name.len(),"name",
-                                name.as_str().to_owned(),"직함 앞 독립 수취인 이름");
+            let mut recognized_full_name=false;
+            // order-evidence.ts::multiName preserves the entire two-word
+            // recipient including the honorific as source evidence, while
+            // stripping only the final 님 from the stored display name.
+            if Regex::new(r"^[가-힣]{2,5}\s+[가-힣]{2,5}님$")
+                .expect("two-word recipient").is_match(text) {
+                if let Some(at)=line.text.find(text) {
+                    add_match(&mut events,line,at,at+text.len(),"name",
+                        text.trim_end_matches('님').to_owned(),
+                        "수취인 복수 표기 이름");
+                    recognized_full_name=true;
+                }
+            }
+            if !recognized_full_name {
+                if let Some(c)=Regex::new(r"^([가-힣]{2,5})\s+(?:목사|선생님)$")
+                    .expect("recipient title").captures(text) {
+                    if let Some(name)=c.get(1) {
+                        if is_person(name.as_str()) {
+                            if let Some(at)=line.text.find(text) {
+                                add_match(&mut events,line,at,at+text.len(),"name",
+                                    name.as_str().to_owned(),
+                                    "수취 기관 또는 직함을 포함한 이름");
+                                recognized_full_name=true;
+                            }
                         }
                     }
                 }
             }
-            let standalone = text.trim_end_matches('님');
-            if is_person(standalone) || is_institution(text) {
-                if let Some(at) = line.text.find(text) {
-                    add_match(&mut events, line, at, at + text.len(), "name",
-                        standalone.to_owned(), "독립 수취인 또는 기관명");
+            if !recognized_full_name {
+                let standalone=text.trim_end_matches('님');
+                if is_person(standalone) || is_institution(text) {
+                    if let Some(at)=line.text.find(text) {
+                        add_match(&mut events,line,at,at+text.len(),"name",
+                            standalone.to_owned(),"독립 수취인 또는 기관명");
+                    }
                 }
-            }
-            if text.starts_with("김") || text.starts_with("박") || text.starts_with("이") {
-                // Name followed by a short note, e.g. '김가상 예수아님'.
-                let first = text.split_whitespace().next().unwrap_or("");
-                if is_person(first) && text.split_whitespace().count() == 2 {
-                    if let Some(at) = line.text.find(first) {
-                        add_match(&mut events,line,at,at+first.len(),"name",
-                            first.to_owned(),"수취인명과 부연 문구");
+                if text.starts_with("김") || text.starts_with("박") || text.starts_with("이") {
+                    let first=text.split_whitespace().next().unwrap_or("");
+                    if is_person(first) && text.split_whitespace().count()==2 {
+                        if let Some(at)=line.text.find(first) {
+                            add_match(&mut events,line,at,at+first.len(),"name",
+                                first.to_owned(),"수취인명과 부연 문구");
+                        }
                     }
                 }
             }
