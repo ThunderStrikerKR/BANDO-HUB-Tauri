@@ -255,8 +255,12 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
     ).expect("name label");
     let inline_person = Regex::new(r"(?:^|[\s|/])([가-힣]{2,5})(?:님)?\s+(?:0(?:50\d|1[016789]|2|[3-6]\d|70|80))")
         .expect("inline name");
-    let note_label = Regex::new(r"^\s*(?:배송\s*)?(?:메모|메시지|메세지|요청사항)\s*[:：]?\s*(.*)$")
-        .expect("note");
+    // Direct translation of order-evidence.ts:140-170: parenthesized
+    // delivery requests and note continuation remain separate evidence.
+    let note_label = Regex::new(
+        r"^\s*\(?(?:배송\s*)?(?:메세지|메시지|요청(?:사항)?|메모)(?:\s*[:：]\s*|\s+)(.*)$"
+    ).expect("note");
+    let mut note_continuation: Option<usize>=None;
     let mut sender_section = false;
     for line in &lines {
         let text = line.text.trim();
@@ -266,14 +270,54 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
         }
         if sender_section { continue; }
         if is_money_or_header(text) { continue; }
+        // The TS recognizer extends a memo through subsequent non-field
+        // lines in the same paragraph, stopping at any contact/address/item.
+        if let Some(i)=note_continuation {
+            let field=person_label.is_match(line.text)
+                || inline_person.is_match(line.text)
+                || address_begin(line.text).is_some()
+                || phone.is_match(line.text)
+                || is_person(text) || is_institution(text)
+                || (quantity::extract(line.text).len()>0
+                    && model::category(line.text).is_some());
+            if !field && line.paragraph==events[i].paragraph {
+                events[i].end=line.start+line.text.len();
+                if !events[i].value.is_empty(){events[i].value.push('\n');}
+                events[i].value.push_str(text);
+                continue;
+            }
+            note_continuation=None;
+        }
         if let Some(c) = note_label.captures(line.text) {
             if let Some(v) = c.get(1) {
-                if !v.as_str().trim().is_empty() {
-                    add_match(&mut events, line, v.start(), v.end(), "note",
-                        v.as_str().trim().to_owned(), "배송 요청사항 표제어");
-                }
+                let value=if text.starts_with('(') {
+                    v.as_str().trim_end_matches(')').trim().to_owned()
+                } else {v.as_str().trim().to_owned()};
+                let i=add_match(&mut events, line, v.start(), v.end(), "note",
+                    value,"배송 요청사항 표제어");
+                note_continuation=Some(i);
             }
             continue;
+        }
+
+        // order-evidence.ts:170-188: an indented building/floor line
+        // is continuation of the preceding address, never a new item.
+        if line.text.starts_with("  ") && address_begin(line.text).is_none()
+            && !phone.is_match(line.text)
+            && !is_person(text)
+            && Regex::new(r"\d+\s*(?:층|호)").expect("address detail").is_match(text) {
+            if let Some(previous)=events.iter().rev()
+                .find(|e|e.kind=="address" && e.paragraph==line.paragraph) {
+                if previous.start<line.start
+                    && !events.iter().any(|e|e.start>previous.end
+                        && e.start<line.start
+                        && (e.kind=="name"||e.kind=="phone"||e.kind=="mobile"||e.kind=="product")) {
+                    let at=line.text.find(text).unwrap_or(0);
+                    add_match(&mut events,line,at,at+text.len(),"address",
+                        text.to_owned(),"들여쓰기된 상세주소 연속 행");
+                    continue;
+                }
+            }
         }
 
         let address = address_begin(line.text);
