@@ -1,6 +1,7 @@
 use regex::{Regex, RegexBuilder};
 use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
+use std::sync::{Mutex, OnceLock};
 
 #[derive(Clone, Debug)]
 pub(crate) struct Decision {
@@ -40,7 +41,8 @@ fn score_stand(p: &Value) -> bool {
 }
 fn score_model(p: &Value) -> Option<(String, bool, String)> {
     if !score_stand(p) { return None; }
-    let re = Regex::new(r"(?i)^(?:BD[\s-]*)?(\d{3})(-1)?\s*(BR|G|W)?$").ok()?;
+    static SCORE_MODEL: OnceLock<Regex> = OnceLock::new();
+    let re = SCORE_MODEL.get_or_init(|| Regex::new(r"(?i)^(?:BD[\s-]*)?(\d{3})(-1)?\s*(BR|G|W)?$").expect("model code regex"));
     let cap = re.captures(lead(p))?;
     Some((cap[1].to_owned(), cap.get(2).is_some(),
         cap.get(3).map(|m| m.as_str().to_uppercase()).unwrap_or_default()))
@@ -69,13 +71,15 @@ fn top(p: &Value, verified: &HashSet<String>) -> Option<&'static str> {
     } else { None }
 }
 fn no_holes(text: &str) -> bool {
-    Regex::new(r"민\s*판|무\s*타공|비\s*타공|구멍\s*(?:없음|없는|안\s*뚫린)")
-        .expect("static regex").is_match(text)
+    static NO_HOLES: OnceLock<Regex> = OnceLock::new();
+    NO_HOLES.get_or_init(|| Regex::new(r"민\s*판|무\s*타공|비\s*타공|구멍\s*(?:없음|없는|안\s*뚫린)").expect("static regex")).is_match(text)
 }
 fn with_holes(text: &str) -> bool {
     !no_holes(text) &&
-        Regex::new(r"(?:^|[\s/,(])타\s*공|구멍\s*(?:있는|있음|뚫린)")
-            .expect("static regex").is_match(text)
+        {
+            static WITH_HOLES: OnceLock<Regex> = OnceLock::new();
+            WITH_HOLES.get_or_init(|| Regex::new(r"(?:^|[\s/,(])타\s*공|구멍\s*(?:있는|있음|뚫린)").expect("static regex")).is_match(text)
+        }
 }
 fn is_boundary(text: &str, begin: usize, end: usize) -> bool {
     let disallow = |ch: char| ch.is_ascii_alphanumeric() || ch == '-';
@@ -84,8 +88,9 @@ fn is_boundary(text: &str, begin: usize, end: usize) -> bool {
 }
 fn spell(term: &str, is_model: bool) -> String {
     let bare = if is_model {
-        let bd = Regex::new(r"(?i)^BD[\s-]+").expect("static regex");
-        bd.replace(term, "").into_owned()
+        static BD_PREFIX: OnceLock<Regex> = OnceLock::new();
+        BD_PREFIX.get_or_init(|| Regex::new(r"(?i)^BD[\s-]+").expect("static regex"))
+            .replace(term, "").into_owned()
     } else { term.to_owned() };
     let prefix = if is_model && bare.chars().next().map_or(false, |c| c.is_ascii_alphanumeric()) {
         r"(?:BD[\s-]*)?"
@@ -98,18 +103,38 @@ fn spell(term: &str, is_model: bool) -> String {
     }
     result
 }
-pub(crate) fn find_term(text: &str, term: &str, is_model: bool) -> Option<(usize, usize)> {
-    if term.trim().is_empty() { return None; }
-    let re = RegexBuilder::new(&spell(term.trim(), is_model))
+// The existing catalog has hundreds of independent sale SKUs. Rebuilding the
+// same regex for every line/SKU costs seconds per order. Cache compiled
+// patterns only; ordering, candidate priority and match semantics are unchanged.
+fn matching_regex(term: &str, is_model: bool) -> Option<Regex> {
+    static CACHE: OnceLock<Mutex<HashMap<(String, bool), Regex>>> = OnceLock::new();
+    let cache=CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+    let key=(term.to_owned(),is_model);
+    if let Ok(saved)=cache.lock() {
+        if let Some(re)=saved.get(&key) {return Some(re.clone());}
+    }
+    let re=RegexBuilder::new(&spell(term,is_model))
         .case_insensitive(true).build().ok()?;
-    let found = re.find_iter(text).find(|m| is_boundary(text, m.start(), m.end()))
-        .map(|m| (m.start(), m.end()));
-    found
+    // Bound memory usage for malformed or very large custom catalogs.
+    if term.len()<=256 {
+        if let Ok(mut saved)=cache.lock() {
+            if saved.len()<4096 {saved.insert(key,re.clone());}
+        }
+    }
+    Some(re)
+}
+pub(crate) fn find_term(text: &str, term: &str, is_model: bool) -> Option<(usize, usize)> {
+    let term=term.trim();
+    if term.is_empty() { return None; }
+    let re = matching_regex(term,is_model)?;
+    re.find_iter(text).find(|m| is_boundary(text, m.start(), m.end()))
+        .map(|m| (m.start(), m.end()))
 }
 pub(crate) fn model_names(p: &Value) -> Vec<String> {
     let name = lead(p);
     if name.is_empty() { return vec![]; }
-    let bd = Regex::new(r"(?i)^BD[\s-]+").expect("static regex");
+    static BD_PREFIX: OnceLock<Regex> = OnceLock::new();
+    let bd = BD_PREFIX.get_or_init(|| Regex::new(r"(?i)^BD[\s-]+").expect("static regex"));
     let bare = bd.replace(name, "");
     if bare == name { vec![name.to_owned()] }
     else { vec![name.to_owned(), bare.into_owned()] }
@@ -338,7 +363,8 @@ fn name_entries<'a>(text: &str, ps: &[&'a Value],
     } else if with_holes(text) {
         entries.retain(|e| top(e.p, verified) != Some("UNPERFORATED"));
     }
-    let numeric = Regex::new(r"(?i)(?:BD[\s-]*)?(\d{3})(?:\b|$)").expect("static regex");
+    static NUMERIC: OnceLock<Regex> = OnceLock::new();
+    let numeric=NUMERIC.get_or_init(|| Regex::new(r"(?i)(?:BD[\s-]*)?(\d{3})(?:\b|$)").expect("static regex"));
     if let Some(m) = numeric.captures(text) {
         if let Some(whole) = m.get(0) {
             let base = m.get(1).map(|n| n.as_str()).unwrap_or("");
