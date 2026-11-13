@@ -1,5 +1,129 @@
 # TSBH Rust migration — session 2/3: Price, freight and workflow rules
 
+## Session 2 continuation: validateReceptionBoundary original-TS parity — 2026-11-13
+
+**Latest audited source / test checkpoint**
+- Branch: `migration/02-rules`
+- Verified implementation and fixture commit: `dac5e32f33da0191bb82d0ab2854d79685689e14`
+- GitHub Actions CI: https://github.com/ThunderStrikerKR/TSBH/actions/runs/43380061844
+- **Real TypeScript against compiled Rust: 478/478 named differential cases PASS, 0 mismatch**
+- **Independent Rust regression: 47/47 PASS**
+- **Tauri/SQLite/Windows integrated job: SKIPPED (not tested)**
+- The comparison corpus increased from 383 to **478**, with 95 additional
+  direct cases for new and existing reception boundary checks. All new
+  cases separately assert intended original TypeScript success vs rejection,
+  in addition to exact original/Rust result parity.
+- Source of truth: `src/orders/reception.ts::validateReceptionBoundary`
+  at TS baseline `d5ea8ed20b8120b844437263c2eb2b8963559e8d`.
+- Rust target: `src-tauri/src/business_core/rules/validation.rs::validate_reception`,
+  exposed through `execute("validate_reception_boundary",{before,state})`.
+- No edits to TypeScript, original recognition parser, Rust SQLite/Tauri
+  integration or UI. Only session-2 Rust rules, direct comparison fixtures
+  and this handoff document were touched.
+
+### Exact behavior implemented / verified
+
+1. **Original receipt version and order type gates**: reject invalid order
+   type; reject new RETAIL orders unless `receptionVersion===1`; refuse
+   new unconfirmed v1 orders without truthy `confirmedAt` and
+   `confirmationSnapshot`; old unconfirmed draft edits remain legal.
+2. **Immutable existing confirmation**: a previously confirmed order
+   cannot change its confirmed time, original raw text or captured
+   `confirmationSnapshot`. Existing orders cannot change `orderType`
+   or `senderSnapshot`. Distinguishes a missing `senderSnapshot` key
+   from an explicitly present `null`, as TypeScript `JSON.stringify`
+   does. Mutations of unrelated mutable fields remain allowed.
+3. **Expected new sender**: for DEALER and RETAIL, derive exact
+   company sender from settings; for AGENCY, use the live client
+   plus explicitly marked sender in `analysisRaw ?? raw` (not the
+   historical `clientSnapshot`). Verify `senderSnapshot` against
+   that expected value before all product/receipt checks.
+4. **RETAIL validation**: require the exact `companyParty` as
+   `clientSnapshot`; execute `retailIssues` business checks in
+   original error order: actionable `orderIssues`, dispatch origin,
+   actual freight, valid non-superseded current product, manually
+   confirmed item quantity, company sender contact/address and
+   `saleIssues`. Deduplicate messages in first-seen order. Forbid
+   separate client ID, nonempty raw, analysis snapshot, paid=false
+   and any item price **other than explicit null**. A missing
+   `unitPrice` is not treated as null.
+5. **Products before snapshot**: check each newly received item
+   resolves to registered, active, non-deleted independent product
+   and matching variant. A historical sale status check in
+   retailIssues can reject a product before this general check.
+6. **Original confirmation snapshot and receipt**: check raw,
+   data.id, data.raw, both recipient lists, time, receipt.original,
+   receipt.at and client ID. Preserve first-failing-condition
+   priority and original Korean error messages.
+7. **Shipment coverage**: exclude legacyArchived shipments; ensure
+   **every confirmed recipient** has a corresponding active shipment
+   before checking for a nonempty shipment set, step >=1 and an
+   actual `주문 확인 완료` event mentioning at least one current shipment.
+   For each distinct shipment group, execute the previously ported
+   TypeScript-equivalent `stageIssues(...,1)` gate and propagate
+   ordered customer/operation issues before allowing persistence.
+8. **Separate validation contracts**: `validate_reception_boundary`
+   is independently callable. `validate_workflow` does not silently
+   invoke it, matching the original TypeScript architecture.
+
+### Direct tests added
+
+Full valid new AGENCY / DEALER / RETAIL orders; old legacy order and
+editable draft; invalid type/reception version/unconfirmed v1; frozen
+confirmedAt/raw/snapshot and immutable sender/type; expected sender from
+master client, company and explicit sender (full-width colon, spaced phone,
+phone punctuation, analysisRaw override); RETAIL company party, dispatch,
+contact/address, freight, status/superseded product, null/missing unitPrice,
+manual quantity, forbidden payment and raw analysis flags, combined
+multi-issue ordering; deleted/inactive/unregistered product and variant;
+each field of receipt/confirmationSnapshot; incomplete/archived shipments,
+missing confirmation event, step-0 block, active multi-recipient coverage,
+multi-group confirmation, stage-1 origin, address and evidence conflicts.
+Includes both successful and invalid before/after snapshots and identity
+key-presence corner cases.
+
+### Source divergences discovered and repaired
+
+- Rust previously **omitted** expected sender snapshot verification.
+- Retail-specific company party, `retailIssues` and retail no-pricing/
+  no-raw constraints were entirely missing.
+- Rust previously checked snapshot before product validity, whereas
+  original TypeScript checks product first; returned error priority
+  differed on invalid product/variant.
+- Rust previously missed the confirmed-recipient shipment coverage guard.
+- Rust previously omitted the final stage-1 business issue gate.
+- Missing vs null `senderSnapshot` and missing vs explicit-null retail
+  `unitPrice` needed key-presence semantics, not a generic null fallback.
+- Original's truthiness rules for confirmation time and snapshot are
+  explicitly honored for successful/blocked v1 registration.
+
+### Remaining limitations / ownership handoff
+
+The **478/478 result is for this specific synthetic corpus**, not a
+formal proof of every possible JSON object, timestamp, sender parser
+sequence or original TypeScript implementation path. Original JS
+`JSON.stringify` can consider object field insertion order; generic
+Rust `serde_json::Value` equality is object order insensitive, so
+arbitrary reordered snapshot property keys remain a known source of
+possible divergence. The sender line parser likewise has no
+exhaustive fuzz proof; tested practical formats match.
+No existing business database was read, migrated or modified.
+
+Session 3 must call **both** validation boundaries at the appropriate
+original business transitions and verify durable SQLite transaction
+semantics, generated receipt snapshots and grouped stage-1 approval
+in the Windows Tauri application before production adoption. It
+must not mistake the pure Rust module CI for an integrated Windows
+app test. The original TS modules remain unchanged.
+
+**Session 2 remaining:** final whole-function inventory, any
+uncovered JSON/serialization and historical payment/confirmation
+corner cases, and explicit ownership handoff to session 3.
+Do not advertise total application migration or production
+readiness based on the selected-input tests.
+
+---
+
 ## Session 2 continuation: validateWorkflow full-branch audit — 2026-11-13
 
 **Current verified checkpoint**
