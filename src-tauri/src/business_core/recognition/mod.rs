@@ -1206,6 +1206,20 @@ fn reanalyze(payload: &Value) -> Result<Value, String> {
                     }
                 }
             }
+            // A changed product raw may deliberately prevent preserving
+            // the previous Item ID. The new Item must nonetheless refer
+            // to the *stable recipient* rather than the temporary analysis
+            // recipient that was just replaced. Upstream TS currently
+            // omits this rebinding for unmatched items (source defect).
+            for item in next_items.iter_mut() {
+                let item_id=item["id"].clone();
+                if let Some(sources)=item["sources"].as_array_mut() {
+                    for source in sources {
+                        source["recipientId"]=old_row["id"].clone();
+                        source["targetId"]=item_id.clone();
+                    }
+                }
+            }
         }
         if let Some(sources)=row["sources"].as_array_mut() {
             for source in sources {source["targetId"]=old_row["id"].clone();
