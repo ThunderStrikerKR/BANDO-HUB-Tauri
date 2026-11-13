@@ -115,3 +115,21 @@ export async function nativeApplyWorkflowAction(
   );
   return result.state;
 }
+
+/** Soft deletion/restoration of a shipment group is also an audited Rust rule.
+ * This keeps its event history and protects payment/exported groups.
+ */
+export async function nativeChangeGroup(
+  state: State, groupId: string, action: "delete_group" | "restore_group",
+): Promise<State> {
+  const result = await businessCoreCall<{ state: State }>(
+    "rules", "apply_group_action", {
+      state, groupId, action, now: new Date().toISOString(),
+      eventId: crypto.randomUUID(),
+    },
+  );
+  await businessCoreCall<{ valid: boolean }>(
+    "rules", "validate_workflow", { state: result.state, before: state },
+  );
+  return result.state;
+}

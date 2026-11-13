@@ -2,7 +2,7 @@ import { paymentWasCopied } from "./automatic-message";
 import { useEffect, useRef, useState } from "react";
 import { confirmAction } from "./dialogs";
 import { won } from "./domain";
-import { deleteGroup, restoreGroup } from "./group-trash";
+import { nativeApplyWorkflowAction, nativeChangeGroup } from "./orders/native-rules";
 import { internalModel } from "./matching";
 import type { NoticeSink } from "./shared/notices";
 import type { State } from "./types";
@@ -11,13 +11,11 @@ import { blocking, orderIssues } from "./validation";
 import {
   advanceGroup,
   confirmGroupPayment,
-  detachShipment,
   groupShipments,
   groupStep,
   groupTotals,
   paymentBalance,
   processGroup,
-  regroupShipment,
   shipmentContext,
   shipmentFreightCode,
   shipmentTotals,
@@ -260,7 +258,7 @@ export function WorkflowBoard({
                     return;
                   setBusy(true);
                   try {
-                    const next = deleteGroup(state, g.id);
+                    const next = await nativeChangeGroup(state, g.id, "delete_group");
                     await onSave(next);
                     setUndoDelete({
                       gid: g.id,
@@ -472,7 +470,7 @@ export function WorkflowBoard({
                   undoDelete.at
                 )
                   throw Error("직전 삭제 상태가 변경되었습니다.");
-                await onSave(restoreGroup(state, undoDelete.gid));
+                await onSave(await nativeChangeGroup(state, undoDelete.gid, "restore_group"));
                 setUndoDelete(undefined);
               } catch (e) {
                 onNotice(e instanceof Error ? e.message : String(e), "error");
@@ -526,10 +524,10 @@ function GroupManagement({
       t.dealerId === g.dealerId &&
       groupShipments(state, t.id).some((s) => !s.transferred),
   );
-  const run = async (fn: () => State) => {
+  const run = async (fn: () => Promise<State> | State) => {
     setBusy(true);
     try {
-      await onSave(fn());
+      await onSave(await fn());
     } catch (e) {
       onNotice(e instanceof Error ? e.message : String(e), "error");
     } finally {
@@ -551,7 +549,7 @@ function GroupManagement({
           </span>
           <button
             disabled={busy || ss.length < 2 || s.transferred}
-            onClick={() => void run(() => detachShipment(state, s.id))}
+            onClick={() => void run(() => nativeApplyWorkflowAction(state, "detach_shipment", { shipmentId: s.id }))}
           >
             이 배송 건 분리
           </button>
@@ -580,7 +578,7 @@ function GroupManagement({
             <button
               key={s.id}
               disabled={busy || !target || s.transferred}
-              onClick={() => void run(() => regroupShipment(state, s.id, target, ack))}
+              onClick={() => void run(() => nativeApplyWorkflowAction(state, "regroup_shipment", { shipmentId: s.id, targetGroupId: target, ack }))}
             >
               {shipmentContext(state, s).recipient.name} 다시 묶기
             </button>
