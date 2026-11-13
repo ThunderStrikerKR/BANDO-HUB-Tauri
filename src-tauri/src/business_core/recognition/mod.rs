@@ -251,6 +251,24 @@ fn address_info(value: &str) -> (String, String, Value) {
     }
     (kind.into(),status.into(),parts)
 }
+fn ts_color_label(value: &str) -> String {
+    match value.trim().to_lowercase().as_str() {
+        "black" | "검정" | "블랙" => "블랙".into(),
+        "white" | "흰색" | "화이트" => "화이트".into(),
+        "brown" | "브라운" => "브라운".into(),
+        "gray" | "grey" | "회색" | "그레이" => "그레이".into(),
+        "gold" | "골드" => "골드".into(),
+        "rose gold" => "로즈골드".into(),
+        "cosmo black" => "코스모블랙".into(),
+        "silver" => "실버".into(),
+        "blue" => "블루".into(),
+        "red" => "레드".into(),
+        "clear" => "클리어".into(),
+        "frost" | "frosted" => "프로스트".into(),
+        "색상 미표기" => String::new(),
+        _ => value.to_owned(),
+    }
+}
 fn blank_recipient(id: &str, name: &str, anchor: Option<&Evidence>, raw: &str) -> Value {
     let mut value = json!({
         "id":id, "name":name, "address":"", "phone":"", "mobile":"", "note":"",
@@ -731,6 +749,7 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
         let rid = recipients[row_index]["id"].as_str().unwrap_or("").to_owned();
         let e = &events[index];
         let kind = e.kind;
+        let mut source_field = kind;
         // Parenthesized postal codes are a distinct field in parseLegacy:
         // (11806) 경기도... stores the address without "(11806)", while
         // the evidence span still points into the untouched original text.
@@ -747,13 +766,15 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
             let other = if kind=="phone" { "mobile" } else { "phone" };
             if recipients[row_index][other].as_str().unwrap_or("").is_empty() {
                 recipients[row_index][other] = json!(v);
+                source_field = other;
             }
         }
-        let src = source_json(raw,e,&rid,&rid);
+        let mut src = source_json(raw,e,&rid,&rid);
+        src["field"]=json!(source_field);
         recipients[row_index]["sources"].as_array_mut().expect("sources").push(src);
         recipients[row_index]["candidates"].as_array_mut().expect("candidates")
             .push(json!({"id":format!("{}:{}:{}",kind,utf16(raw,e.start),utf16(raw,e.end)),
-                "field":kind,"value":e.value,"label":e.value,
+                "field":source_field,"value":e.value,"label":e.value,
                 "start":utf16(raw,e.start),"end":utf16(raw,e.end)}));
         events[index].recipient = Some(row_index);
     }
@@ -831,11 +852,31 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
             })} else {hit.decision["match"].clone()};
             let mut products=hit.decision["productCandidates"].clone();
             if let Some(candidates)=products.as_array_mut() {
-                let base=utf16(raw,hit.source_start);
+                // src/parser.ts::parseLegacy assigns item.productCandidates
+                // the *local recognized item line span*, not an absolute
+                // document position and not the matched model-only span.
+                let local_start=lines.iter().find(|line|line.number==hit.line)
+                    .map(|line|{
+                        let at=hit.source_start.saturating_sub(line.start)
+                            .min(line.text.len());
+                        line.text.get(..at).unwrap_or("").encode_utf16().count()
+                    }).unwrap_or(0);
+                let local_end=local_start+hit.raw.encode_utf16().count();
                 for candidate in candidates {
-                    if let (Some(start),Some(end))=(candidate["start"].as_u64(),candidate["end"].as_u64()) {
-                        candidate["start"]=json!(base+start as usize);
-                        candidate["end"]=json!(base+end as usize);
+                    candidate["start"]=json!(local_start);
+                    candidate["end"]=json!(local_end);
+                    if let Some(pid)=candidate["productId"].as_str() {
+                        if let Some(p)=model::products(state).into_iter().find(|p|
+                            p["id"].as_str()==Some(pid)) {
+                            let name=p["name"].as_str().unwrap_or("");
+                            let color=p["variants"].as_array()
+                                .and_then(|vs|vs.first())
+                                .and_then(|v|v["color"].as_str()).unwrap_or("");
+                            let color=if p["colorStatus"]=="NOT_REQUIRED" {
+                                String::new()
+                            } else {ts_color_label(color)};
+                            candidate["label"]=json!(format!("{} {}",name,color));
+                        }
                     }
                 }
             }
@@ -907,7 +948,13 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
             }
         }
     }
-    let candidates: Vec<Value> = events.iter().map(|e| {
+    // The TypeScript evidence extractor emits items in raw reading order.
+    // Rust encounters quantities before product hits during construction,
+    // and sometimes discovers detached quantities in a later sweep. Sort
+    // only the published candidate view; ownership retains stable indices.
+    let mut ordered_events:Vec<&Evidence>=events.iter().collect();
+    ordered_events.sort_by_key(|e| (e.start,e.end));
+    let candidates: Vec<Value> = ordered_events.into_iter().map(|e| {
         let mut candidate=e_json(raw,e);
         if let Some(idx) = e.recipient {
             candidate["recipientId"]=recipients[idx]["id"].clone();
