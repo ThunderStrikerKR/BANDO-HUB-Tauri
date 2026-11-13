@@ -420,6 +420,41 @@ pub(super) fn shipping_action(payload: &Value) -> Result<Value, String> {
             set(&mut shipping["productRules"],product_id,next)?;
             Ok(json!({"shipping":shipping}))
         }
+        "revise_combination" => {
+            // ShippingManager history: a manual price revision retires
+            // only the selected combination and retains its charge/actual
+            // metadata on a new active version. Calculation of the version
+            // fingerprint uses the actual current product/group assignments.
+            let mut shipping=req(payload,"shipping")?.clone();
+            let state=req(payload,"state")?;
+            let source_id=required_str(payload,"combinationId")?;
+            let new_id=required_str(payload,"newId")?;
+            let charge=safe(req(payload,"charge")?)
+                .ok_or("올바른 운임을 입력하세요.")?;
+            let now=required_str(payload,"now")?;
+            let index=rows(field(&shipping,"combinations")).iter()
+                .position(|v|str_field(v,"id")==source_id)
+                .ok_or("수정할 예외 운임 기록이 없습니다.")?;
+            let original=shipping["combinations"][index].clone();
+            let key=str_field(&original,"key");
+            let versions=combination_versions(key,&shipping,state);
+            let mut next=original.clone();
+            let obj=next.as_object_mut().ok_or("예외 운임 기록 형식 오류")?;
+            for key in ["verifiedAt","shipmentId","observedCharge"] {
+                obj.remove(key);
+            }
+            set(&mut next,"sampleCount",json!(0))?;
+            set(&mut next,"id",json!(new_id))?;
+            set(&mut next,"charge",json!(charge))?;
+            set(&mut next,"epoch",field(&shipping,"epoch").clone())?;
+            set(&mut next,"versions",versions_value(&versions))?;
+            set(&mut next,"at",json!(now))?;
+            set(&mut next,"active",json!(true))?;
+            set(&mut shipping["combinations"][index],"active",json!(false))?;
+            shipping["combinations"].as_array_mut()
+                .ok_or("예외 운임 이력 형식 오류")?.push(next);
+            Ok(json!({"shipping":shipping}))
+        }
         "save_combination" => {
             let mut shipping=req(payload,"shipping")?.clone();
             let bundle=req(payload,"bundle")?;
