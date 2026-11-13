@@ -3,11 +3,12 @@ on:
   push:
     branches:
       - migration/03-integration
+      - migration/05-factory-reply
   workflow_dispatch:
 permissions:
   contents: read
 concurrency:
-  group: rust-output-migration03
+  group: rust-output-migration03-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   output-rust:
