@@ -317,7 +317,14 @@ test("actual xlsx roundtrip retains separate dated order billing and account rec
 test("real XLSX history export uses current filtered rows and never changes state", async () => {
   const state=base();
   const before=JSON.stringify(state);
-  const selected=orderHistory(state,"",DAY);
+  const selected=orderHistory(state,"",DAY).map((row) => ({
+    ...row,
+    // This is a serialization fixture only. Runtime verdicts are obtained
+    // from Rust list_order_history_view and compared in history-parity.test.
+    display:{paymentEvidenceMissing:!!row.order.paid &&
+      !(state.workflow?.payments??[]).some((p) =>
+        p.allocations.some((a) => row.shipmentIds.includes(a.shipmentId)))},
+  }));
   const bytes=await exportOrderHistoryWorkbook(state,selected);
   const book=new ExcelJS.Workbook();
   await book.xlsx.load(Buffer.from(bytes));
