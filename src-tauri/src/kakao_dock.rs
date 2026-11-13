@@ -675,6 +675,14 @@ mod native {
         unsafe extern "system" fn simple_window_proc(
             hwnd:Hwnd,msg:u32,wparam:usize,lparam:isize,
         )->isize {
+            // The copied KakaoTalk.exe fixture must behave like a real
+            // resizable chat window when the production layout queries
+            // WM_GETMINMAXINFO across process boundaries.
+            if msg==WM_GETMINMAXINFO && lparam!=0 {
+                let limits=unsafe{&mut *(lparam as *mut MinMaxInfo)};
+                limits.min_track=Point{x:250,y:240};
+                return 0;
+            }
             unsafe { DefWindowProcW(hwnd,msg,wparam,lparam) }
         }
         fn wide(s:&str)->Vec<u16> {
@@ -815,8 +823,19 @@ mod native {
         #[test] fn native_layouts_do_not_treat_a_third_state_as_a_view() {
             assert_eq!(Mode::Overlap.name(),"OVERLAP");
             assert_eq!(Mode::Stack.name(),"STACK");
-            assert!(stack_targets(Rect{left:0,top:0,right:500,bottom:700},
-                0,&[]).is_ok(),"no chat retains the full Kakao pane");
+            // stack_targets reads a real HWND's previous visible height.
+            // HWND 0 was never a valid no-chat scenario.
+            let messenger=spawn_fixture_window("BANDO HUB no-chat layout fixture");
+            let pane=Rect{left:0,top:0,right:500,bottom:700};
+            let previous=visible_rect(messenger).expect("visible synthetic messenger");
+            assert!((100..pane.height()).contains(&previous.height()),
+                "fixture must represent a messenger previously split above chat");
+            let (main_slot,unused_chat_slot)=stack_targets(pane,messenger,&[])
+                .expect("closing the final chat must preserve messenger geometry");
+            assert_eq!(main_slot,Rect{left:pane.left,top:pane.top,
+                right:pane.right,bottom:pane.top+previous.height()});
+            assert_eq!(unused_chat_slot,pane);
+            unsafe{DestroyWindow(messenger);}
         }
     }
 }
