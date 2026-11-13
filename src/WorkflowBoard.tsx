@@ -8,10 +8,9 @@ import { internalModel } from "./matching";
 import type { NoticeSink } from "./shared/notices";
 import type { State } from "./types";
 import { Field, Modal } from "./ui";
-import { blocking, orderIssues } from "./validation";
+
 import {
   groupShipments,
-  paymentBalance,
   shipmentContext,
 } from "./workflow";
 export interface WorkflowSelection {
@@ -153,7 +152,8 @@ export function WorkflowBoard({
     } catch (e) {
       const issue = native.ready && stageGroupId
         ? native.byId[stageGroupId]?.issues.find((issue) =>
-            blocking(issue, Math.min(4, native.byId[stageGroupId]?.nextStep ?? 4)),
+            issue.severity === "ACTION" &&
+            issue.blockingStage <= Math.min(4, native.byId[stageGroupId]?.nextStep ?? 4),
           )
         : undefined;
       if (stageGroupId && issue) {
@@ -429,7 +429,7 @@ export function WorkflowBoard({
                           <span
                             className={
                               "product-chip" +
-                              (orderIssues(first.order).some(
+                              (nativeGroup?.issues.some(
                                 (issue) => issue.itemId === i.id && issue.severity === "ACTION",
                               )
                                 ? " product-chip-error"
@@ -544,7 +544,7 @@ function GroupManagement({
         <div className="flow-manage-row" key={s.id}>
           <span>
             {shipmentContext(state, s).recipient.name} / {s.step}/4 완료 / 입금{" "}
-            {won(paymentBalance(state, s).paid)}
+            {won(native.byId[groupId]?.shipments.find((row) => row.shipmentId === s.id)?.paid ?? null)}
           </span>
           <button
             disabled={!native.ready || busy || ss.length < 2 || s.transferred}
