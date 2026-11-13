@@ -198,7 +198,7 @@ fn written_color(text: &str) -> Option<String> {
         "gold","골드","black","블랙","검정","gray","grey","그레이",
         "회색","white","화이트","흰색","brown","브라운","clear",
         "클리어","frost","프로스트","silver","실버","blue",
-        "블루","red","레드","pink","핑크","chrome","크롬"] {
+        "블루","red","레드","pink","핑크"] {
         if find_term(text,word,false).is_some() {
             return Some(norm_color(word));
         }
@@ -519,8 +519,16 @@ pub(crate) fn decide(text: &str, state: &Value, client_id: &str) -> Decision {
         .filter_map(|e| names.remove(str_field(e.p,"id"))).take(20).collect();
     let (product_id, variant_id, name, origin) = if let Some(ref entry) = chosen {
         let p = entry.p;
-        let selected_variant = variants(p).into_iter().find(|v|
-            explicit.as_ref().map_or(true, |c| norm_color(str_field(v,"color")) == *c));
+        // domain.ts::itemFromProduct: only a single sale variant without
+        // a configuration requirement may be selected automatically.
+        let variants=variants(p);
+        let selectable=variants.len()==1
+            && p.get("requiresOption").and_then(Value::as_bool)!=Some(true);
+        let selected_variant=if selectable {
+            variants.into_iter().find(|v|
+                explicit.as_ref().map_or(true,|c|
+                    norm_color(str_field(v,"color"))==*c))
+        } else {None};
         (Some(str_field(p,"id").to_owned()),
             selected_variant.map(|v| str_field(v,"id").to_owned()),
             str_field(p,"name").to_owned(),
