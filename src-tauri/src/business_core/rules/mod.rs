@@ -26,6 +26,9 @@ pub fn execute(operation: &str, payload: Value) -> Result<Value, String> {
             req(&payload, "state")?, required_str(&payload, "shipmentId")?,
         ),
         "evaluate_workflow" => workflow::evaluate(&payload),
+        "evaluate_dispatch_state" => workflow::dispatch_state(
+            req(&payload, "state")?, required_str(&payload, "orderId")?,
+        ),
         "validate_workflow" => {
             validation::validate(req(&payload, "state")?, payload.get("before"))?;
             Ok(json!({"valid": true}))
