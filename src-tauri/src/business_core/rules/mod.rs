@@ -3,6 +3,7 @@
 use serde_json::{json, Value};
 
 mod pricing;
+mod reconciliation;
 mod shipping;
 mod workflow;
 mod validation;
@@ -20,6 +21,7 @@ pub fn execute(operation: &str, payload: Value) -> Result<Value, String> {
         "reprice_order" => pricing::reprice_order(&payload),
         "should_refresh_pricing" => Ok(json!({"refresh": pricing::should_refresh(&payload)?})),
         "apply_shipping_action" => shipping::shipping_action(&payload),
+        "reconcile_workflow" => reconciliation::reconcile(&payload),
         "calculate_shipping" => shipping::recommend(
             req(&payload, "order")?, req(&payload, "state")?,
         ),
