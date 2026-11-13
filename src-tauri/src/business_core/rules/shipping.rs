@@ -420,6 +420,39 @@ pub(super) fn shipping_action(payload: &Value) -> Result<Value, String> {
             set(&mut shipping["productRules"],product_id,next)?;
             Ok(json!({"shipping":shipping}))
         }
+        "create_group" => {
+            // ShippingManager: staff adds a new, unconfirmed packaging group.
+            let mut shipping=req(payload,"shipping")?.clone();
+            let id=required_str(payload,"groupId")?;
+            let name=required_str(payload,"name")?.trim();
+            let version=required_str(payload,"versionId")?;
+            let now=required_str(payload,"now")?;
+            if name.is_empty() {return Err("새 배송 그룹명을 입력하세요.".into());}
+            if rows(field(&shipping,"groups")).iter().any(|g|
+                str_field(g,"name")==name) {
+                return Err("같은 배송 그룹이 있습니다.".into());
+            }
+            shipping["groups"].as_array_mut().ok_or("운임 그룹 목록 오류")?.push(json!({
+                "id":id,"name":name,
+                "current":{"version":version,"at":now,"fees":{},"maxBundle":null,
+                    "maxConfirmed":false,"perItem":null,"notes":"운임 확인 필요"},
+                "history":[]
+            }));
+            Ok(json!({"shipping":shipping}))
+        }
+        "rename_group" => {
+            // Match ShippingManager::rename group: does not rotate tariff
+            // versions and must not erase existing rate history.
+            let mut shipping=req(payload,"shipping")?.clone();
+            let group_id=required_str(payload,"groupId")?;
+            let name=required_str(payload,"name")?.trim();
+            if name.is_empty() {return Err("배송 그룹명을 입력하세요.".into());}
+            let index=rows(field(&shipping,"groups")).iter()
+                .position(|g|str_field(g,"id")==group_id)
+                .ok_or("수정할 운임 그룹이 없습니다.")?;
+            set(&mut shipping["groups"][index],"name",json!(name))?;
+            Ok(json!({"shipping":shipping}))
+        }
         "revise_combination" => {
             // ShippingManager history: a manual price revision retires
             // only the selected combination and retains its charge/actual
