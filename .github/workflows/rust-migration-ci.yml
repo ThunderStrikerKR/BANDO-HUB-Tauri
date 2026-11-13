@@ -1,0 +1,76 @@
+name: Rust migration branch verification
+
+on:
+  push:
+    branches:
+      - migration/01-recognition
+      - migration/02-rules
+      - migration/03-integration
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-migration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  isolated-rust-tests:
+    name: Rust migration module tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Require this session's test crate
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "${GITHUB_REF_NAME}" in
+            migration/01-recognition)
+              required="tests/rust-migration/recognition/Cargo.toml"
+              ;;
+            migration/02-rules)
+              required="tests/rust-migration/rules/Cargo.toml"
+              ;;
+            migration/03-integration)
+              required="tests/rust-migration/output/Cargo.toml"
+              ;;
+            *)
+              echo "::error::Unexpected migration branch: ${GITHUB_REF_NAME}"
+              exit 1
+              ;;
+          esac
+          if [[ ! -f "$required" ]]; then
+            echo "::error::Required test crate missing: $required. This session is not verified."
+            exit 1
+          fi
+      - name: Run every present Rust migration test crate
+        shell: bash
+        run: |
+          set -euo pipefail
+          for suite in recognition rules output; do
+            manifest="tests/rust-migration/$suite/Cargo.toml"
+            if [[ -f "$manifest" ]]; then
+              echo "::group::cargo test ($suite)"
+              cargo test --manifest-path "$manifest" -- --nocapture
+              echo "::endgroup::"
+            else
+              echo "::notice::Not present on this branch: $manifest"
+            fi
+          done
+
+  integration-windows-rust:
+    name: Integrated app Rust tests (Windows)
+    if: github.ref == 'refs/heads/migration/03-integration'
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+      - name: Compile and test actual Tauri Rust library
+        run: cargo test --manifest-path src-tauri/Cargo.toml --lib -- --nocapture
