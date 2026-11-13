@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { requestEditorLeave, requestPageLeave, usePageLeaveGuard } from "./shared/page-leave";
-import { categoryPath, categoryProducts, changeCategory, deleteCategory, descendants } from "./category-tree";
-import { CATALOG_ROOTS, catalogFromCategory, isCatalogRoot, withCatalogRoots } from "./category-roots";
+import { categoryPath, categoryProducts, descendants } from "./category-tree";
+import { nativeChangeCategory as changeCategory, nativeDeleteCategory as deleteCategory } from "./native-category";
+import { CATALOG_ROOTS, isCatalogRoot, withCatalogRoots } from "./category-roots";
 import { Modal } from "./ui";
 import { ManagementSearch } from "./ui/ManagementSearch";
 import type { Category, State } from "./types";
@@ -64,10 +65,10 @@ export function CategoryManager({
     setName(c.name);
     return true;
   };
-  const save = async (next: State, success: string): Promise<boolean> => {
+  const save = async (next: State | Promise<State>, success: string): Promise<boolean> => {
     setBusy(true);
     try {
-      await onSave(next);
+      await onSave(await next);
       onNotice(success, "success");
       setOperation(null);
       return true;
@@ -98,12 +99,10 @@ export function CategoryManager({
           transferConfirmed && children(current.id).length === 0), "하위 분류를 추가했습니다.");
       }
       if (operation === "move") {
-        const destinationCatalog = catalogFromCategory(base.categories, target);
-        const linked = categoryProducts(state, current.id);
-        if (destinationCatalog && linked.some((p) =>
-          p.catalog && p.catalog !== "DEMO" && p.catalog !== destinationCatalog))
-          throw Error("분류 소속이 다른 상품이 있습니다. 상품 연결을 먼저 확인하세요.");
-        return save(changeCategory(base, current.id, current.name, target), "분류 위치를 변경했습니다.");
+        return save(changeCategory(
+          base, current.id, current.name, target, false, true,
+          "분류 소속이 다른 상품이 있습니다. 상품 연결을 먼저 확인하세요.",
+        ), "분류 위치를 변경했습니다.");
       }
       if (renameDirty)
         return save(changeCategory(base, current.id, name.trim(), current.parentId), "분류 이름을 변경했습니다.");
@@ -350,15 +349,10 @@ export function CategoryManager({
                       void save(changeCategory(base, crypto.randomUUID(), newName, current.id, transferConfirmed && children(current.id).length === 0), "하위 분류를 추가했습니다.");
                     } catch (error) { onNotice(String(error), "error"); }
                   } else if (operation === "move") {
-                    try {
-                      const destinationCatalog = catalogFromCategory(base.categories, target);
-                      const linked = categoryProducts(state, current.id);
-                      if (
-                        destinationCatalog &&
-                        linked.some((p) => p.catalog && p.catalog !== "DEMO" && p.catalog !== destinationCatalog)
-                      ) throw Error("이 분류에는 이동할 최상위 구분과 다른 상품이 연결되어 있습니다. 상품 소속을 먼저 확인하세요.");
-                      void save(changeCategory(base, current.id, current.name, target), "분류 위치를 변경했습니다.");
-                    } catch (error) { onNotice(String(error), "error"); }
+                    void save(changeCategory(
+                      base, current.id, current.name, target, false, true,
+                      "이 분류에는 이동할 최상위 구분과 다른 상품이 연결되어 있습니다. 상품 소속을 먼저 확인하세요.",
+                    ), "분류 위치를 변경했습니다.");
                   } else {
                     void (async () => {
                       const ok = await save(deleteCategory(base, current.id), "빈 분류를 삭제했습니다.");

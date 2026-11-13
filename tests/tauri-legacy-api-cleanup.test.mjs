@@ -36,8 +36,10 @@ test("actively used product, dealer and freight workbook paths remain available"
   assert.match(manager, /<RegistrationManager state=\{state\}/);
   assert.match(manager, /<ProductSyncWorkbookTools onSave=\{onSave\}/);
   assert.match(dealer, /<ClientWorkbookTools onSave=\{onSave\}/);
-  assert.match(registration, /previewRegistrationWorkbook\(current, file\)/);
-  assert.match(registration, /prepareRegistrationCommit\(current, preview/);
+  assert.match(registration, /previewNativeRegistrationWorkbook\(current, file\)/);
+  assert.match(read("src/native-registration-workbook.ts"), /"catalog_clients", "preview_registration_rows"/);
+  assert.match(registration, /"catalog_clients", "prepare_registration_commit"/);
+  assert.match(read("src-tauri/src/business_core/catalog_clients/registration.rs"), /fn existing_matches\(/);
   assert.match(productWorkbook, /saveProductSyncWorkbook/);
   assert.match(clientWorkbook, /saveClientWorkbook/);
   assert.match(factory, /saveFactoryWorkbook\(bytes\)/);

@@ -8,16 +8,16 @@ import { useEffect, useMemo, useState } from "react";
 import { AliasManager } from "./AliasManager";
 import { ClassificationFilters, RegistrySettings } from "./Classification";
 import { confirmAction } from "./dialogs";
-import { normalizeColor, uid, validateProduct } from "./domain";
+import { uid } from "./domain";
+import { businessCoreCall } from "./tauri-bridge";
 import { PriceCell } from "./PriceCell";
 import {
   colorLabel,
-  productKey,
   registeredProducts,
   sortProducts,
   variantLabel,
 } from "./product-models";
-import { classifiedProducts } from "./product-registry";
+import { useNativeProductIds } from "./native-catalog-queries";
 import { ProductImports } from "./ProductImports";
 import { ProductSyncWorkbookTools } from "./ProductSyncWorkbookTools";
 import { optimizeProductImage } from "./product-image-preprocess";
@@ -79,23 +79,12 @@ export function ProductManager({
     edit.imageOverride === "MANUAL" ? edit.imageData :
     (localImage?.id === edit.id ? localImage.data : edit.imageData)
   );
-  const classifiedIds = useMemo(
-    () => new Set(classifiedProducts(state, category, "", brand).map((p) => p.id)),
-    [state.products, state.categories, category, brand],
+  const { products: selectedProducts, error: productQueryError } = useNativeProductIds(
+    state, "management_products", { category, brand, query: search, missing },
+    [category, brand, search, missing],
   );
-  const products = sortProducts(
-    state.products.filter((p) => !p.deletedAt && !p.supersededBy),
-  ).filter(
-    (p) =>
-      p.catalog !== "DEMO" &&
-      !p.variants.some((v) => v.source === "DEMO") &&
-      classifiedIds.has(p.id) &&
-      (p.name + " " + (p.subtitle ?? ""))
-        .toLowerCase()
-        .replace(/\s/g, "")
-        .includes(search.toLowerCase().replace(/\s/g, "")) &&
-      (!missing || p.variants.some((v) => !v.wholesale || !v.semi || !v.retail)),
-  );
+  // Only locale-aware presentation ordering remains in React.
+  const products = useMemo(() => sortProducts(selectedProducts), [selectedProducts]);
   const create = () => {
     setDetailPriceMode(false);
     setCategoryPicker(false);
@@ -133,31 +122,13 @@ export function ProductManager({
   const save = async (): Promise<boolean> => {
     if (!edit) return true;
     const result = await runSave(async () => {
-      const p = clone(edit);
-      p.name = p.name.trim();
-      // Existing databases still have a legacy code column; new rows store
-      // an opaque immutable ID there until the versioned SQLite migration.
-      p.code ||= p.id;
-      if (p.variants.length !== 1) throw Error("상품은 한 가지 판매 구성으로만 등록할 수 있습니다. 기존 복수 구성은 각각 별도 상품으로 전환하세요.");
-      p.saleUnit = true;
-      p.familyKey ??= p.id;
-      p.modelKey = productKey(p);
-      // No new model-code list: the model is part of the product name.
-      p.variants = p.variants.map((v) => ({
-        ...v,
-        color: normalizeColor(v.color),
-      }));
-      p.defaultColor = normalizeColor(p.defaultColor);
-      p.updatedAt = new Date().toISOString();
-      if (p.categories?.length) {
-        const rootCatalog = catalogFromCategory(withCatalogRoots(state.categories), p.categories.at(-1)!);
-        if (rootCatalog) p.catalog = rootCatalog;
-      }
-      validateProduct(p, registeredProducts(state.products));
-      const next = clone(state),
-        index = next.products.findIndex((x) => x.id === p.id);
-      if (index >= 0) next.products[index] = p;
-      else next.products.push(p);
+      // The native reducer owns normalization, legacy modelKey semantics,
+      // category-root reconciliation and the final candidate validation.
+      const { state: next } = await businessCoreCall<{ state: State }>(
+        "catalog_clients", "upsert_product_from_editor", {
+          state, product: edit, updatedAt: new Date().toISOString(),
+        },
+      );
       await onSave(next);
       setEdit(undefined);
       setOriginalEdit(undefined);
@@ -209,10 +180,11 @@ export function ProductManager({
     )
       return;
     try {
-      const next = clone(state);
-      next.products.find((x) => x.id === p.id)!.deletedAt = new Date().toISOString();
-      next.deletedProductKeys = [...new Set([...(next.deletedProductKeys ?? []), productKey(p)])];
-      next.aliases = next.aliases.filter((a) => a.productId !== p.id);
+      const { state: next } = await businessCoreCall<{ state: State }>(
+        "catalog_clients", "archive_product", {
+          state, productId: p.id, at: new Date().toISOString(),
+        },
+      );
       await onSave(next);
       setEdit(undefined);
       setOriginalEdit(undefined);
@@ -369,6 +341,7 @@ export function ProductManager({
           <CategoryManager state={state} onSave={onSave} onNotice={onNotice}
             query={search} onQueryChange={setSearch} />
         )}
+        {productQueryError && <p role="alert" className="warnings">{productQueryError}</p>}
         {section === "모델군 관리" && <ColorGuidanceManager state={state} onRefresh={onRefresh}
           query={search} onQueryChange={setSearch} />}
         {section === "별칭 관리" && (

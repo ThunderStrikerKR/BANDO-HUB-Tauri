@@ -1,7 +1,9 @@
 import { HelpTooltip } from "./ui/HelpTooltip";
 import { useEffect, useRef, useState } from "react";
 import { confirmAction, promptText } from "./dialogs";
-import { clientCandidates, suggestClient, won } from "./domain";
+import { won } from "./domain";
+import { useNativeClients } from "./native-catalog-queries";
+import { businessCoreCall } from "./tauri-bridge";
 import { applyCatalogPriceSync, previewCatalogPriceSync, type CatalogPricePreview } from "./catalog-price-sync";
 import type { NoticeSink } from "./shared/notices";
 import { useAsyncTask } from "./shared/useAsyncTask";
@@ -35,12 +37,10 @@ export function ClientPicker({
     [dismissed, setDismissed] = useState("");
   const selectRef = useRef(onSelect);
   selectRef.current = onSelect;
-  const results = query ? clientCandidates(query, clients) : [],
-    suggested = suggestClient(raw, clients),
-    key = suggested
-      .map((c) => c.id)
-      .sort()
-      .join("|");
+  const nativeClients = useNativeClients(clients, query, raw);
+  const results = query ? nativeClients.results : [];
+  const suggested = nativeClients.suggested;
+  const key = suggested.map((c) => c.id).sort().join("|");
   useEffect(() => {
     if (selected) {
       setPopup(false);
@@ -90,10 +90,13 @@ export function ClientPicker({
           <button onClick={() => setAll(true)}>전체 거래처 목록</button>
         </div>
       )}
+      {nativeClients.error && <p role="alert">{nativeClients.error}</p>}
       {query && (
         <div className="client-results">
           {results.length ? (
             results.slice(0, 20).map(row)
+          ) : nativeClients.pending ? (
+            <p className="muted">검색 중</p>
           ) : (
             <p className="muted">검색 결과가 없습니다.</p>
           )}
@@ -385,17 +388,13 @@ export function CategoriesPanel({
               return;
             }
             try {
-              await onSave({
-                ...state,
-                categories: [
-                  ...cats,
-                  {
-                    id: crypto.randomUUID(),
-                    name: name.trim(),
-                    parentId: parent || null,
-                  },
-                ],
-              });
+              const { state: next } = await businessCoreCall<{ state: State }>(
+                "catalog_clients", "legacy_add_category", {
+                  state, categoryId: crypto.randomUUID(),
+                  name, parentId: parent || null,
+                },
+              );
+              await onSave(next);
               setName("");
             } catch (e) {
               onError(String(e), "error");
@@ -418,18 +417,12 @@ export function CategoriesPanel({
                 const value = await promptText("새 분류명", c.name);
                 if (!value?.trim()) return;
                 try {
-                  await onSave({
-                    ...state,
-                    categories: cats.map((x) => (x.id === c.id ? { ...x, name: value.trim() } : x)),
-                    products: state.products.map((p) =>
-                      p.categories?.includes(c.id)
-                        ? {
-                            ...p,
-                            category: p.category.replace(c.name, value.trim()),
-                          }
-                        : p,
-                    ),
-                  });
+                  const { state: next } = await businessCoreCall<{ state: State }>(
+                    "catalog_clients", "legacy_rename_category", {
+                      state, categoryId: c.id, name: value,
+                    },
+                  );
+                  await onSave(next);
                 } catch (e) {
                   onError(String(e), "error");
                 }

@@ -23,15 +23,16 @@ test("Official page read is bounded by size and time", () => {
   assert.match(rust, /String::from_utf8\(body\)/);
   assert.match(rust, /fetch_official_product_html\s*,?\s*\n/);
 });
-test("Frontend uses DOMParser, model and site ID, and blocks ambiguous options", () => {
-  const parser = read("src/official-product-import.ts");
-  assert.match(parser, /new DOMParser\(\)\.parseFromString\(html, "text\/html"\)/);
-  assert.match(parser, /siteProductId\(url\)/);
-  assert.match(parser, /selectableOptions/);
-  assert.match(parser, /matches\.length > 1/);
-  assert.match(parser, /variants\.length !== 1/);
-  assert.match(parser, /deletedAt/);
-  assert.match(parser, /canApply: reasons\.length === 0/);
+test("Native HTML parser identifies model, options, price and duplicate sources", () => {
+  const rust = read("src-tauri/src/business_core/catalog_clients/official_html.rs");
+  assert.match(rust, /Html::parse_document\(html\)/);
+  assert.match(rust, /fn site_id\(/);
+  assert.match(rust, /fn model_code\(/);
+  assert.match(rust, /fn option_evidence\(/);
+  assert.match(rust, /fn price\(/);
+  assert.match(rust, /matches\.len\(\)>1/);
+  assert.match(rust, /fn is_registered\(/);
+  assert.match(rust, /"canApply":can_apply/);
 });
 test("Official import saves only after review, backup and revision validation", () => {
   const parser = read("src/official-product-import.ts");
@@ -49,7 +50,8 @@ test("Official import saves only after review, backup and revision validation", 
 test("Tauri preview replaces previous not-ready bridge and leaves non-product methods untouched", () => {
   const bridge = read("src/tauri-bridge.ts");
   const rust = read("src-tauri/src/lib.rs");
-  assert.match(bridge, /parseOfficialProductPage\(url, html, state\)/);
+  assert.match(bridge, /"catalog_clients", "preview_official_product_html"/);
+  assert.doesNotMatch(bridge, /parseOfficialProductPage\(url, html, state\)/);
   assert.match(bridge, /fetch_official_product_html/);
   assert.doesNotMatch(bridge, /previewImport: async \(\) => notReady/);
   assert.match(rust, /fetch_official_product_html/);

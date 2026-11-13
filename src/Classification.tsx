@@ -3,7 +3,9 @@ import { categoryFilterLevels } from "./category-filter-levels";
 import { sameValue } from "./shared/draft";
 import { requestEditorLeave, usePageLeaveGuard } from "./shared/page-leave";
 import { CategoriesPanel } from "./ManagementUI";
-import { classifiedProducts, registryKey, validateBrands, type Brand } from "./product-registry";
+import type { Brand } from "./product-registry";
+import { useNativeProductIds } from "./native-catalog-queries";
+import { businessCoreCall } from "./tauri-bridge";
 import type { NoticeSink } from "./shared/notices";
 import type { Product, State } from "./types";
 import { Field } from "./ui";
@@ -20,7 +22,10 @@ export function ClassificationFilters({
   onChange: (category: string, brand: string) => void;
 }) {
   const levels = categoryFilterLevels(state.categories ?? [], category);
-  const available = new Set(classifiedProducts(state, category).map((p) => p.brandId));
+  const { products: classified, error: classificationError } = useNativeProductIds(
+    state, "classified_products", { category }, [category],
+  );
+  const available = new Set(classified.map((p) => p.brandId));
   return (
     <>
       <div className="product-category-filter" role="group" aria-label="상품 카테고리 필터">
@@ -45,6 +50,7 @@ export function ClassificationFilters({
           </button>
         )}
       </div>
+      {classificationError && <span role="alert">{classificationError}</span>}
       <select
         aria-label="상품 브랜드"
         value={brand}
@@ -88,16 +94,14 @@ export function RegistrySettings({
   };
   const saveBrand = async (): Promise<boolean> => {
     try {
-      const official = name.trim();
-      const knownNames = new Map<string,string>();
-      for (const value of aliases.split(",").map((value)=>value.trim()).filter(Boolean))
-        knownNames.set(registryKey(value),value);
-      const brandRow = {
-        id: editing ?? crypto.randomUUID(),name:official,korean:korean.trim(),
-        aliases:[...knownNames.values()],evidenceUrl:evidence.trim(),
-      };
-      const next = {...state,brands:[...(state.brands??[]).filter((brand)=>brand.id!==editing),brandRow]};
-      validateBrands(next,state);
+      // Rust normalizes aliases, validates official evidence and prevents
+      // cross-brand collisions. The existing onSave persists only that result.
+      const { state: next } = await businessCoreCall<{ state: State }>(
+        "catalog_clients", "upsert_brand", {
+          state, editing, id: editing ?? crypto.randomUUID(),
+          name, korean, aliases, evidence,
+        },
+      );
       await onSave(next);
       onNotice("브랜드 정보를 저장했습니다. 기존 연결 상품은 유지됩니다.","success");
       setEditing(undefined);setName("");setKorean("");setAliases("");setEvidence("");

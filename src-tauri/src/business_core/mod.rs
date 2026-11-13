@@ -4,6 +4,7 @@
 pub mod recognition;
 pub mod rules;
 pub mod output;
+pub mod catalog_clients;
 
 use serde_json::Value;
 
@@ -15,6 +16,7 @@ pub fn execute(domain: &str, operation: &str, payload: Value) -> Result<Value, S
         "recognition" => recognition::execute(operation, payload),
         "rules" => rules::execute(operation, payload),
         "output" => output::execute(operation, payload),
+        "catalog_clients" => catalog_clients::execute(operation, payload),
         _ => Err(format!("지원하지 않는 Rust 업무 영역입니다: {domain}")),
     }
 }

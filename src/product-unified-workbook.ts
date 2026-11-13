@@ -173,9 +173,12 @@ export function previewUnifiedProductRows(
   };
 }
 
-export async function previewUnifiedProductWorkbook(
-  state: State, file: File,
-): Promise<ProductSyncPreview> {
+/** ExcelJS file-format boundary. The source rows can feed the TS oracle or
+ * the native Rust preview without duplicating workbook parsing.
+ */
+export async function readUnifiedProductWorkbookRows(
+  file: File,
+): Promise<{ revision: number; rows: { row: number; cells: string[] }[] }> {
   if (!/\.xlsx$/i.test(file.name) || file.size <= 0 || file.size > MAX_BYTES) {
     throw Error("20MB 이하의 .xlsx 상품 전체 목록을 선택하세요.");
   }
@@ -209,7 +212,13 @@ export async function previewUnifiedProductWorkbook(
     }
     rows.push({ row: number, cells });
   }
-  return previewUnifiedProductRows(state, { revision, rows });
+  return { revision, rows };
+}
+
+export async function previewUnifiedProductWorkbook(
+  state: State, file: File,
+): Promise<ProductSyncPreview> {
+  return previewUnifiedProductRows(state, await readUnifiedProductWorkbookRows(file));
 }
 
 export const applyUnifiedProductWorkbook = applyProductSyncWorkbook;

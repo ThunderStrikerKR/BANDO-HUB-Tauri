@@ -1,9 +1,9 @@
 import { useRef, useState } from "react";
 import { confirmAction } from "./dialogs";
+import { previewNativeUnifiedProductWorkbook } from "./native-product-workbook";
+import { businessCoreCall } from "./tauri-bridge";
 import {
-  applyUnifiedProductWorkbook,
   exportUnifiedProductWorkbook,
-  previewUnifiedProductWorkbook,
 } from "./product-unified-workbook";
 import type { ProductSyncPreview } from "./product-sync-workbook";
 import type { NoticeSink } from "./shared/notices";
@@ -45,7 +45,7 @@ export function ProductSyncWorkbookTools({
       setApproved(false);
       setReview(undefined);
       const state = await window.bando!.load();
-      const result = await previewUnifiedProductWorkbook(state, file);
+      const result = await previewNativeUnifiedProductWorkbook(state, file);
       setReview(result);
       setFilename(file.name);
       setFilter("ALL");
@@ -58,7 +58,11 @@ export function ProductSyncWorkbookTools({
       "개를 반영할까요? Excel에서 누락된 상품은 그대로 유지합니다."
     ))) return;
     const state = await window.bando!.load();
-    const result = applyUnifiedProductWorkbook(state, review);
+    const result = await businessCoreCall<{
+      next: State;
+      createdProducts: number; updatedProducts: number;
+      createdOptions: number; updatedOptions: number;
+    }>("catalog_clients", "apply_product_workbook", { state, preview: review });
     await window.bando!.backup();
     await onSave(result.next);
     // The common save already applied the committed SQLite snapshot.

@@ -36,8 +36,12 @@ test("Client per-account preference is stored and affects outbound billing", () 
 test("Required sender information is validated at UI and Rust save boundary", () => {
   const manager = read("src/ClientManager.tsx");
   const rust = read("src-tauri/src/lib.rs");
-  assert.match(manager, /!edit\.address\?\.trim\(\)/);
-  assert.match(manager, /edit\.phone\?\.trim\(\) \|\| edit\.mobile\?\.trim\(\)/);
+  const native = read("src-tauri/src/business_core/catalog_clients.rs");
+  assert.match(manager, /"catalog_clients", "upsert_client"/);
+  assert.doesNotMatch(manager, /if \(!edit\.address\?\.trim\(\)\)/);
+  assert.match(native, /fn validate_client\(/);
+  assert.match(native, /!value_present\(client, "address"\)/);
+  assert.match(native, /!value_present\(client, "phone"\) && !value_present\(client, "mobile"\)/);
   assert.match(rust, /fn validate_clients\(/);
   assert.match(rust, /validate_clients\(&current, &state\)\?/);
   assert.match(rust, /validate_accounts\(&state\)\?/);

@@ -5,8 +5,16 @@ const read = (path) => readFileSync(new URL("../" + path, import.meta.url), "utf
 
 test("Registration UI is connected to the real preview and version-checked state save", () => {
   const ui = read("src/RegistrationManager.tsx");
-  assert.match(ui, /previewRegistrationWorkbook\(current, file\)/);
-  assert.match(ui, /prepareRegistrationCommit\(current, preview,/);
+  const previewAdapter=read("src/native-registration-workbook.ts");
+  const previewRust=read("src-tauri/src/business_core/catalog_clients/registration_preview.rs");
+  assert.match(ui, /previewNativeRegistrationWorkbook\(current, file\)/);
+  assert.match(previewAdapter, /"catalog_clients", "preview_registration_rows"/);
+  assert.match(previewRust, /fn matching_category\(/);
+  const native=read("src-tauri/src/business_core/catalog_clients/registration.rs");
+  assert.match(ui, /"catalog_clients", "prepare_registration_commit"/);
+  assert.match(native, /fn existing_matches\(/);
+  assert.match(native, /deletedProductKeys/);
+  assert.match(native, /registrationBatches/);
   assert.match(ui, /await onSave\(result\.next\)/);
   assert.match(ui, /await window\.bando!\.backup\(\)/);
   assert.ok(ui.indexOf("await window.bando!.backup()") < ui.indexOf("await onSave(result.next)"));

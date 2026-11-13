@@ -295,7 +295,13 @@ export function previewClientRows(
   return { revision, rows, missing: state.clients.filter((c) => !listed.has(c.id)).length };
 }
 
-export async function previewClientWorkbook(state: State, file: File): Promise<ClientWorkbookPreview> {
+/** ExcelJS validates worksheet structure and produces text cells only. The
+ * preview decisions can be evaluated by the original TS oracle or native Rust.
+ */
+export async function readClientWorkbookRows(state: State, file: File): Promise<{
+  sourceRevision: number;
+  cells: { row: number; cells: string[] }[];
+}> {
   if (!/\.xlsx$/i.test(file.name) || file.size > MAX_BYTES) {
     throw Error("20MB 이하의 .xlsx 거래처 파일을 선택하세요.");
   }
@@ -333,6 +339,12 @@ export async function previewClientWorkbook(state: State, file: File): Promise<C
       throw Error(i + "행: " + String(error instanceof Error ? error.message : error));
     }
   }
+  return { sourceRevision, cells };
+}
+
+/** Original TypeScript preview oracle retained for Rust parity comparisons. */
+export async function previewClientWorkbook(state: State, file: File): Promise<ClientWorkbookPreview> {
+  const { sourceRevision, cells } = await readClientWorkbookRows(state, file);
   return previewClientRows(state, sourceRevision, cells);
 }
 

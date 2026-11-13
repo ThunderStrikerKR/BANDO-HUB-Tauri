@@ -17,7 +17,8 @@ test("No model code based auto-family groups or prefilled color groups",async()=
   assert.match(ui,/그룹 생성/);
   assert.match(ui,/<h3>상품 추가<\/h3>/);
   assert.match(ui,/대표모델/);
-  assert.match(ui,/validateModelGroups/);
+  assert.match(ui,/"catalog_clients","validate_model_groups"/);
+  assert.doesNotMatch(ui,/validateModelGroups\(draft\)/);
   assert.match(ui,/await window.bando.backup\(\)/);
   assert.match(ui,/window.bando.patchSettings/);
   assert.doesNotMatch(read("src/parser.ts"),/baseModelCandidates|modelRepresentatives|modelGroup\(/);

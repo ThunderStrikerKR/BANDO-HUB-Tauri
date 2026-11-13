@@ -2,7 +2,9 @@ import { useState } from "react";
 import { sameValue } from "./shared/draft";
 import { requestEditorLeave, usePageLeaveGuard } from "./shared/page-leave";
 import { uid } from "./domain";
-import { aliasProblems, internalModel, saveAlias } from "./matching";
+import { internalModel } from "./matching";
+import { businessCoreCall } from "./tauri-bridge";
+import { useNativeCatalogQuery } from "./native-catalog-queries";
 import { ProductSearchDialog } from "./ProductSearchDialog";
 import type { NoticeSink } from "./shared/notices";
 import type { State } from "./types";
@@ -24,17 +26,25 @@ export function AliasManager({
     [editing, setEditing] = useState<string>();
   const [originalForm, setOriginalForm] = useState({ text: "", target: "", scope: "common", editing: undefined as string | undefined });
   const dirty = !sameValue({ text, target, scope, editing }, originalForm);
+  const { value: aliasChecks, error: aliasCheckError } =
+    useNativeCatalogQuery<Array<{id:string; problems:string[]}>>(
+      state,"alias_problems",{},[],[],
+    );
+  const aliasWarnings = new Map(aliasChecks.map(row => [row.id,row.problems]));
   const discard = () => {
     setText(originalForm.text);setTarget(originalForm.target);setScope(originalForm.scope);setEditing(originalForm.editing);
   };
   const saveEntry = async (): Promise<boolean> => {
     try {
-      await onSave(saveAlias(state, {
-        id: editing ?? uid(), text, productId: target,
-        variantId: state.products.find((p) => p.id === target)?.variants[0]?.id,
-        clientId: scope === "common" ? null : scope,
-        actor: state.settings.operatorName || "직원", createdAt: new Date().toISOString(),
-      }));
+      const { state: next } = await businessCoreCall<{state:State}>(
+        "catalog_clients","save_alias", {state,record:{
+          id: editing ?? uid(), text, productId: target,
+          variantId: state.products.find((p) => p.id === target)?.variants[0]?.id,
+          clientId: scope === "common" ? null : scope,
+          actor: state.settings.operatorName || "직원", createdAt: new Date().toISOString(),
+        }},
+      );
+      await onSave(next);
       setEditing(undefined);setText("");setTarget("");
       setOriginalForm({text:"",target:"",scope,editing:undefined});
       return true;
@@ -89,9 +99,10 @@ export function AliasManager({
           <Button variant="primary" onClick={() => void saveEntry()}>별칭 저장</Button>
         </div>
       </div>
+      {aliasCheckError && <p role="alert" className="warnings">{aliasCheckError}</p>}
       <div className="registry-list alias-list" role="list" aria-label="등록된 별칭">
         {state.aliases.map((a) => {
-          const problems = aliasProblems(a, state.aliases, state.products);
+          const problems = aliasWarnings.get(a.id) ?? [];
           return (
             <article className="registry-row" role="listitem" key={a.id}>
               <div className="registry-row-info">

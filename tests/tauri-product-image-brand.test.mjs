@@ -28,13 +28,16 @@ test("Image preprocessing cleans up temporary object URLs even on decoding failu
 test("Brands are validated for cross-brand aliases and evidence URLs before UI save", () => {
   const manager = read("src/Classification.tsx");
   const registry = read("src/product-registry.ts");
-  assert.match(manager, /validateBrands\(next,\s*state\)/);
+  const native = read("src-tauri/src/business_core/catalog_clients/brands.rs");
+  assert.match(manager, /"catalog_clients", "upsert_brand"/);
+  assert.doesNotMatch(manager, /validateBrands\(next,\s*state\)/);
   assert.match(manager, /await onSave\(next\)/);
-  assert.match(manager, /knownNames\.set\(registryKey\(value\),\s*value\)/);
+  assert.match(native, /fn registry_key\(/);
+  assert.match(native, /fn upsert_brand\(/);
+  assert.match(native, /브랜드 공식명, 한글명 또는 검색 별칭이 다른 브랜드와 중복됩니다/);
+  assert.match(native, /url\.scheme\(\)=="https"/);
   assert.match(registry, /export function validateBrands/);
   assert.match(registry, /evidence\.protocol !== "https:"/);
-  assert.match(registry, /brand\.name, brand\.korean, \.\.\.brand\.aliases/);
-  assert.match(registry, /brand\.id/);
 });
 
 test("Rust validates changed brands within the same SQLite save transaction", () => {
@@ -53,5 +56,9 @@ test("Image and brand fixes keep existing SQLite schema and product references",
   assert.match(rust, /CREATE TABLE IF NOT EXISTS product_index/);
   assert.match(manager, /imageOverride: "MANUAL"/);
   assert.match(manager, /imageOverride: "HIDDEN"/);
-  assert.match(manager, /validateProduct\(p, registeredProducts\(state\.products\)\)/);
+  const native = read("src-tauri/src/business_core/catalog_clients.rs");
+  assert.match(manager, /"catalog_clients", "upsert_product_from_editor"/);
+  assert.match(native, /fn validate_product\(/);
+  assert.match(native, /fn product_url_ok\(/);
+  assert.match(native, /normalized_color\(field\(v, "color"\)\)/);
 });

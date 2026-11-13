@@ -29,7 +29,9 @@ test("the approved fixed size, layout tokens and collapsed inline search are ret
   assert.match(styles, /\.order-item-edit-search\[hidden\][\s\S]*display: none/);
   assert.match(editor, /aria-expanded=\{searchOpen\}/);
   assert.match(editor, /setSearchOpen\(\(expanded\) => !expanded\)/);
-  assert.match(editor, /searchProducts\(state, query, client\.id\)/);
+  assert.match(editor, /"search_products"/);
+  assert.match(editor, /useNativeProductIds\(/);
+  assert.doesNotMatch(editor, /searchProducts\(state, query, client\.id\)/);
   assert.match(imported, /@import "\.\/order-item-editor\.css";/);
   assert.doesNotMatch(editor, /<ProductSearchDialog/);
 });
