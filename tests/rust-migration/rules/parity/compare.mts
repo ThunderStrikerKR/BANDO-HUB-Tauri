@@ -10,7 +10,7 @@
 import { spawnSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { resolvePrice, totals, parseOrder } from "../../../../src/domain.ts";
+import { resolvePrice, totals, parseOrder, repriceOrder } from "../../../../src/domain.ts";
 import {
   recommendShipping,
   editableShippingRule,
@@ -18,8 +18,10 @@ import {
   combinationCurrent,
   upgradeShipping,
 } from "../../../../src/shipping.ts";
-import { shipmentTotals, validateWorkflow, reconcileWorkflow, deleteOrder, workflowIssues, stageIssues, applyOrderRawEdit, migrateWorkflow, advanceGroup, undoGroup, setShipmentFreight, processGroup, confirmGroupPayment, recordPayment, restoreShipment, markStoreSent, recordChangeRequest, setGroupAccount, detachShipment, regroupShipment, completeDelivery } from "../../../../src/workflow.ts";
+import { shipmentTotals, validateWorkflow, reconcileWorkflow, deleteOrder, workflowIssues, stageIssues, applyOrderRawEdit, migrateWorkflow, advanceGroup, undoGroup, setShipmentFreight, processGroup, confirmGroupPayment, recordPayment, restoreShipment, markStoreSent, recordChangeRequest, setGroupAccount, detachShipment, regroupShipment, completeDelivery, groupContext, groupStep } from "../../../../src/workflow.ts";
 import { recordActualFreight } from "../../../../src/actual-freight.ts";
+import { dispatchState } from "../../../../src/factory-replies.ts";
+import { shouldRefreshUncommittedOrderPricing } from "../../../../src/orders/passive-pricing.ts";
 import { deleteGroup, restoreGroup } from "../../../../src/group-trash.ts";
 import { correctionStatus, requestCorrection, copiedCorrection, confirmCorrection, markFactoryDelivered, markCollected, reopenUnsentExport } from "../../../../src/corrections.ts";
 import { orderIssues, approveMissingQuantity, pendingIssue } from "../../../../src/validation.ts";
@@ -2927,6 +2929,100 @@ replyCase("recipient address change uses original parser",(_s,_o,p)=>{
       mobile:recipient.mobile,note:recipient.note}
   }];
 },true,false,true);
+
+
+// Final remaining standalone Rust rule boundaries. These test the original
+// exported TS functions rather than asserting a Rust-only expected state.
+function priceRefreshCase(name:string,mutate:(o:any,s:any)=>void,
+  explicitEdit=false,persisted=false){
+  const o:any=copy(order),s:any=copy(baseState);
+  mutate(o,s);
+  const persistedOrders:any[]=persisted?[{id:o.id}]:[];
+  add("passive price: "+name,"should_refresh_pricing",{
+    order:o,persistedOrders
+  },()=>({refresh:shouldRefreshUncommittedOrderPricing(o,persistedOrders)}));
+  add("reprice order: "+name,"reprice_order",{
+    order:o,client:s.clients[0],state:s,explicitEdit,persistedOrders
+  },()=>{
+    const allowed=!o.confirmedAt&&!o.pricesLocked&&
+      (explicitEdit||shouldRefreshUncommittedOrderPricing(o,persistedOrders));
+    return {order:allowed?repriceOrder(o,s.clients[0],s):o,refreshed:allowed};
+  });
+}
+priceRefreshCase("uncommitted unsaved price refresh",(o)=>{
+  o.recipients[0].items[0].unitPrice=1;
+});
+priceRefreshCase("persisted unconfirmed order must not passively refresh",(o)=>{
+  o.recipients[0].items[0].unitPrice=1;
+},false,true);
+priceRefreshCase("explicit staff edit of persisted order",(o)=>{
+  o.recipients[0].items[0].unitPrice=1;
+},true,true);
+priceRefreshCase("confirmed historical order never refreshes",(o)=>{
+  o.recipients[0].items[0].unitPrice=1;
+  o.confirmedAt=now;
+},true,true);
+priceRefreshCase("locked historical price never refreshes",(o)=>{
+  o.pricesLocked=true;o.recipients[0].items[0].unitPrice=1;
+},true,true);
+priceRefreshCase("deleted order cannot passively refresh",(o)=>{
+  o.deletedAt=now;
+},false,false);
+priceRefreshCase("unknown registered product retains previous value",(o)=>{
+  o.recipients[0].items[0].productId="missing-product";
+  o.recipients[0].items[0].unitPrice=12345;
+});
+priceRefreshCase("required model proposal refreshes variant URL",(o,s)=>{
+  o.recipients[0].items[0].modelProposal={required:true};
+  o.recipients[0].items[0].url="old-link";
+  s.products[0].variants[0].url="https://example.test/fake-variant";
+});
+function evalCase(name:string,change:(s:any)=>void,success=true){
+  const state:any=copy(baseState);change(state);
+  add("workflow evaluation: "+name,"evaluate_workflow",{
+    state,groupId:"group:o1"
+  },()=>{
+    const {shipments,group}=groupContext(state,"group:o1");
+    const step=groupStep(state,"group:o1");
+    const needsNotice=!!group.needsNotice;
+    const nextStep=needsNotice&&step>=2?3:step+1;
+    return {step,nextStep,issues:nextStep<=4?
+      stageIssues(state,"group:o1",nextStep):[],
+      shipmentsCount:shipments.length,needsNotice,
+      transferred:shipments.some((v:any)=>v.transferred)};
+  });
+  cases[cases.length-1].expectedOk=success;
+}
+evalCase("ordinary group step two",()=>{});
+evalCase("group notice pending",s=>{s.workflow.groups[0].needsNotice=true;});
+evalCase("group transferred status",s=>{s.workflow.shipments[0].transferred=true;});
+evalCase("group at fourth stage",s=>{s.workflow.shipments[0].step=4;});
+evalCase("deleted group not available",s=>{s.workflow.groups[0].deletedAt=now;},false);
+function dispatchCase(name:string,change:(s:any)=>void,orderId="o1"){
+  const state:any=copy(baseState);change(state);
+  add("dispatch state: "+name,"evaluate_dispatch_state",{
+    state,orderId
+  },()=>({status:dispatchState(state,orderId)}));
+}
+dispatchCase("not yet dispatched",()=>{});
+dispatchCase("tracking and actual both completed",s=>{
+  s.workflow.shipments[0].tracking={FACTORY:"888888888888"};
+  s.workflow.shipments[0].actualFreight={FACTORY:3000};
+});
+dispatchCase("tracking without verified actual",s=>{
+  s.workflow.shipments[0].tracking={FACTORY:"888888888888"};
+});
+dispatchCase("actual without tracking",s=>{
+  s.workflow.shipments[0].actualFreight={FACTORY:3000};
+});
+dispatchCase("unknown order is in progress",()=>{},"missing-order");
+dispatchCase("both origins must have tracking and actual",s=>{
+  const second=copy(s.orders[0].recipients[0].items[0]);
+  second.id="item-store";second.origin="STORE";
+  s.orders[0].recipients[0].items.push(second);
+  s.workflow.shipments[0].tracking={FACTORY:"888888888888",STORE:"777777777777"};
+  s.workflow.shipments[0].actualFreight={FACTORY:3000,STORE:2500};
+});
 
 function normalized(v:unknown):string {
   if(Array.isArray(v))return "["+v.map(normalized).join(",")+"]";
