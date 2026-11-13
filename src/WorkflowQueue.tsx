@@ -6,14 +6,13 @@ import { ManagementSearch } from "./ui/ManagementSearch";
 import { FactoryReplyImport } from "./FactoryReplyImport";
 import { ActualFreightField } from "./ActualFreightField";
 import { actualFreightOf } from "./actual-freight";
-import { nativeRecordActualFreight } from "./orders/native-rules";
+import { nativeApplyCorrectionAction, nativeRecordActualFreight } from "./orders/native-rules";
 import { requestPageLeave, usePageLeaveGuard } from "./shared/page-leave";
 import { createFactoryWorkbook, recordFactoryExportPrepared, type FactoryExportPreview } from "./factory-export";
 import { createStoreWorkbook, recordStoreExportPrepared, type StoreExportPreview } from "./store-export";
 import { confirmAction } from "./dialogs";
 import { businessCoreCall } from "./tauri-bridge";
 import { useState } from "react";
-import { markFactoryDelivered, reopenUnsentExport } from "./corrections";
 import { won } from "./domain";
 import { internalModel } from "./matching";
 import type { NoticeSink } from "./shared/notices";
@@ -229,7 +228,7 @@ export function WorkflowQueue({
                                 onClick={() =>
                                   void run(async () => {
                                     if (!(await confirmAction("이 발송 파일을 실제 공장에 전달했나요? 직원 확인 후에만 전달 완료로 표시합니다."))) return;
-                                    await onSave(markFactoryDelivered(state, q!.shipmentId));
+                                    await onSave(await nativeApplyCorrectionAction(state, "mark_factory_delivered", { shipmentId: q!.shipmentId }));
                                   })
                                 }
                               >
@@ -240,7 +239,7 @@ export function WorkflowQueue({
                                 onClick={() =>
                                   void run(async () => {
                                     if (!(await confirmAction("아직 공장에 전달하지 않은 출력본을 폐기하고 다시 작성할까요? 기존 출력 이력은 보존됩니다."))) return;
-                                    await onSave(reopenUnsentExport(state, q!.shipmentId));
+                                    await onSave(await nativeApplyCorrectionAction(state, "reopen_unsent_export", { shipmentId: q!.shipmentId }));
                                   })
                                 }
                               >
