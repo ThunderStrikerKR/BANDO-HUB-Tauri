@@ -51,6 +51,36 @@ function shape(row){
     })),
   };
 }
+// Independent extended audit, including UI-visible evidence and approval
+// guidance. Dynamic UUIDs are intentionally excluded; source offsets are not.
+function sources(value) {
+  return (value??[]).map(e=>({
+    field:e.field??null,text:e.text??null,start:e.start??null,end:e.end??null,
+  }));
+}
+function extendedRow(row) {
+  return {
+    addressKind:row.addressKind??null,
+    addressParts:row.addressParts??null,
+    confirmedFields:row.confirmedFields??[],
+    sources:sources(row.sources),
+    items:(row.items??[]).map(i=>({
+      defaulted:i.defaulted??null,
+      recognitionReason:i.recognitionReason??null,
+      sources:sources(i.sources),
+      productCandidates:(i.productCandidates??[]).map(c=>({
+        label:c.label??null,productId:c.productId??null,
+        variantId:c.variantId??null,start:c.start??null,end:c.end??null,
+      })),
+    })),
+  };
+}
+function evidence(value) {
+  return (value??[]).map(e=>({
+    kind:e.kind??null,text:e.text??null,start:e.start??null,end:e.end??null,
+    value:e.value??null,
+  }));
+}
 function differences(want,got,path="$"){
   if(Array.isArray(want)||Array.isArray(got)){
     if(!Array.isArray(want)||!Array.isArray(got))return [{path,ts:want,rust:got}];
@@ -87,25 +117,38 @@ function sourceFaults(raw,out){
   return faults;
 }
 test("all 20 order fixtures: TypeScript parseEvidence functional fields equal real Rust",()=>{
-  const failed=[],summary=[];
+  const failed=[],summary=[],extendedFailed=[];
   samples.forEach((sample,i)=>{
     const ts=parseEvidence(sample.raw,client,state);
     const run=results[i];
     const diffs=run.ok?differences(ts.recipients.map(shape),run.value.recipients.map(shape),
       "recipients"):[{path:"execution",ts:"success",rust:run}];
     const offsets=run.ok?sourceFaults(sample.raw,run.value):[];
+    const extra=run.ok?[
+      ...differences(ts.recipients.map(extendedRow),
+        run.value.recipients.map(extendedRow),"extended.recipients"),
+      ...differences(evidence(ts.candidates),evidence(run.value.candidates),
+        "extended.candidates"),
+    ]:[];
     const row={id:sample.id,label:sample.label,tsRecipients:ts.recipients.length,
       rustRecipients:run.ok?run.value.recipients.length:null,
       tsItems:ts.recipients.map(r=>r.items.length),
       rustItems:run.ok?run.value.recipients.map(r=>r.items.length):[],
-      fieldDifferences:diffs.length,offsetFaults:offsets.length};
+      fieldDifferences:diffs.length,extendedDifferences:extra.length,
+      offsetFaults:offsets.length};
     summary.push(row);
+    if(extra.length)extendedFailed.push({id:sample.id,details:extra.slice(0,18)});
     if(diffs.length||offsets.length)failed.push({
       ...row,differences:diffs.slice(0,35),offsets:offsets.slice(0,10),
     });
   });
   console.log("ORDER20_TS_RUST_SUMMARY "+JSON.stringify(summary));
   if(failed.length)console.error("ORDER20_TS_RUST_DIFF "+JSON.stringify(failed));
+  console.log("ORDER20_EXTENDED_SUMMARY "+JSON.stringify(extendedFailed.map(x=>({
+    id:x.id,count:summary.find(s=>s.id===x.id)?.extendedDifferences??0,
+  }))));
+  if(extendedFailed.length)console.error("ORDER20_EXTENDED_DIFF "+
+    JSON.stringify(extendedFailed));
   assert.equal(failed.length,0,
     failed.length+" of 20 orders differ from the TypeScript original");
 });
