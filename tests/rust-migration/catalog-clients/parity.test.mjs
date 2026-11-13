@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { tsImport } from "tsx/esm/api";
 
 const {validateProduct}=await tsImport("../../../src/domain.ts",import.meta.url);
-const {registeredProducts}=await tsImport("../../../src/product-models.ts",import.meta.url);
+const {registeredProducts,productKey}=await tsImport("../../../src/product-models.ts",import.meta.url);
 const {previewClientRows,applyClientWorkbook}=await tsImport("../../../src/client-workbook.ts",import.meta.url);
 const {applyProductSyncWorkbook}=await tsImport("../../../src/product-sync-workbook.ts",import.meta.url);
 const manifest=fileURLToPath(new URL("./Cargo.toml",import.meta.url));
@@ -161,6 +161,35 @@ function sampleApply(name,operation,state,preview,oracleFn) {
     older,{...approved,products:[replacement],rows:[{...approved.rows[0],status:"UPDATE"}],
       createdProducts:0,updatedProducts:1,createdOptions:0,updatedOptions:1},
     applyProductSyncWorkbook);
+}
+
+
+{
+  const at="2026-11-13T23:00:00+09:00";
+  const state=fixture();
+  const p=product();p.code="bd 709";p.saleUnit=true;
+  state.products=[p];
+  state.aliases=[{id:"a1",productId:"p-1",text:"보면대"},
+    {id:"a2",productId:"another",text:"기타"}];
+  state.deletedProductKeys=[];
+  const next=structuredClone(state);
+  next.products[0].deletedAt=at;
+  next.deletedProductKeys=[...new Set([...(next.deletedProductKeys??[]),productKey(p)])];
+  next.aliases=next.aliases.filter(alias=>alias.productId!==p.id);
+  candidates.push({operation:"archive_product",payload:{state,productId:p.id,at}});
+  original.push({name:"archived product preserves historical orders and aliases",
+    oracle:{ok:true,value:{state:next}}});
+}
+{
+  const at="2026-11-13T23:00:00+09:00";
+  const state=fixture();
+  state.clients=[{id:"c1",name:"예시악기",address:"서울 종로구",
+    phone:"02-1234-5678",tier:"wholesale",overrides:{"v1":8000}}];
+  const next=structuredClone(state);
+  next.clients[0].deletedAt=at;
+  candidates.push({operation:"archive_client",payload:{state,clientId:"c1",at}});
+  original.push({name:"archived client keeps historical orders and custom tier prices",
+    oracle:{ok:true,value:{state:next}}});
 }
 
 test("real TypeScript management rules match compiled Rust for product/client validity",()=>{
