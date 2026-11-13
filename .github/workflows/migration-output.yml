@@ -64,6 +64,20 @@ jobs:
       - name: Compare existing TypeScript price and freight with staged Rust rules
         run: node --test tests/rust-migration/rules/parity.test.mjs
 
+  order-save-ts-rust-parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install original TypeScript oracle
+        run: npm install --no-audit --no-fund --ignore-scripts
+      - name: Verify actual native save-order state transitions against TypeScript
+        run: node --test tests/rust-migration/rules/order-save-parity.test.mjs
+
   rules-comprehensive-parity:
     runs-on: ubuntu-latest
     timeout-minutes: 35
