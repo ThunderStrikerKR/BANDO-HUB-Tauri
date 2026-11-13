@@ -294,6 +294,46 @@ pub(super) fn shipping_action(payload: &Value) -> Result<Value, String> {
             set(&mut shipping["groups"][index],"current",next)?;
             Ok(json!({"shipping":shipping}))
         }
+        "save_product_rule" => {
+            // Port of ProductFreightPanel::writeRule for a standalone product.
+            // Older versions must remain intact even when the new group
+            // assignment later replaces which tariff is currently used.
+            let mut shipping=req(payload,"shipping")?.clone();
+            let product_id=required_str(payload,"productId")?;
+            let rule=req(payload,"rule")?;
+            let over_limit=field(rule,"maxBundle").as_f64().is_some_and(|max| {
+                field(rule,"fees").as_object().is_some_and(|fees| fees.iter().any(|(count,fee)| {
+                    fee.is_number() && count.parse::<f64>().is_ok_and(|qty|qty>max)
+                }))
+            });
+            if over_limit {
+                return Err("최대 묶음 수량을 초과하는 운임 구간을 삭제하거나 수량을 다시 설정하세요.".into());
+            }
+            if !field(&shipping,"productRules").is_object() {
+                set(&mut shipping,"productRules",json!({}))?;
+            }
+            if !field(&shipping,"productHistory").is_object() {
+                set(&mut shipping,"productHistory",json!({}))?;
+            }
+            let old=field(field(&shipping,"productRules"),product_id).clone();
+            if !old.is_null() {
+                if !field(&shipping["productHistory"],product_id).is_array() {
+                    set(&mut shipping["productHistory"],product_id,json!([]))?;
+                }
+                shipping["productHistory"][product_id].as_array_mut()
+                    .ok_or("상품 운임 변경 이력을 확인하세요.")?.push(old);
+            }
+            let mut next=rule.clone();
+            set(&mut next,"maxConfirmed",json!(!field(rule,"maxBundle").is_null()))?;
+            set(&mut next,"version",json!(required_str(payload,"versionId")?))?;
+            set(&mut next,"at",json!(required_str(payload,"now")?))?;
+            let object=next.as_object_mut().ok_or("운임 규칙 형식 오류")?;
+            for key in ["validFrom","validUntil","basis","packable"] {
+                object.remove(key);
+            }
+            set(&mut shipping["productRules"],product_id,next)?;
+            Ok(json!({"shipping":shipping}))
+        }
         "save_combination" => {
             let mut shipping=req(payload,"shipping")?.clone();
             let bundle=req(payload,"bundle")?;
