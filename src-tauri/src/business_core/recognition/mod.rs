@@ -796,12 +796,12 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
             if chosen.is_none() {
                 issues.push("제품명이 확인되지 않습니다.".into());
             }
-            if !unique {
-                issues.push(if hit.quantities.is_empty() {
-                    "수량 미기재 / 거래처 확인 필요".to_owned()
-                } else {
-                    "한 줄에 여러 상품과 수량 확인 필요".to_owned()
-                });
+            // order-evidence.ts::attach strips generic missing-quantity
+            // warnings from an inferred item but leaves ambiguity warnings
+            // ("여러 상품") intact. quantityConfirmed remains false, and
+            // the employee must still approve the quantity explicitly.
+            if !unique && !hit.quantities.is_empty() {
+                issues.push("한 줄에 여러 상품과 수량 확인 필요".to_owned());
             }
             let term = if hit.common {json!({
                 "kind":"COMMON_INHERIT",
