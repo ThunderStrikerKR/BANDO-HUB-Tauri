@@ -41,7 +41,9 @@ try{
   let ready=false;
   for(let n=0;n<120;n++){
     if(bootstrap.exitCode!==null)throw Error("Native baseline exited "+bootstrap.exitCode);
-    try{if((await fs.stat(baseline)).size>4096){ready=true;break;}}
+    // SQLite uses WAL mode: the main file may stay at 4096 bytes while
+    // the schema/data live in -wal until the process closes.
+    try{if((await fs.stat(baseline)).size>0){ready=true;break;}}
     catch{/* opening */}
     await sleep(300);
   }
