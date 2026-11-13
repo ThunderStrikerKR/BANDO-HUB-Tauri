@@ -1,9 +1,9 @@
 import { useRef, useState } from "react";
 import { confirmAction } from "./dialogs";
+import type { FactoryReplyPreview } from "./factory-reply-workbook";
 import {
-  applyFactoryReplyPreview, parseFactoryReplyWorkbook,
-  type FactoryReplyPreview,
-} from "./factory-reply-workbook";
+  nativeAnalyzeFactoryReply, nativeApplyFactoryReplyPreview,
+} from "./native-factory-reply";
 import type { NoticeSink } from "./shared/notices";
 import { useAsyncTask } from "./shared/useAsyncTask";
 import type { State } from "./types";
@@ -30,7 +30,7 @@ export function FactoryReplyImport({
       setFile(undefined);
       setAccepted(false);
       const current = await window.bando!.load();
-      const result = await parseFactoryReplyWorkbook(current, selected);
+      const result = await nativeAnalyzeFactoryReply(current, selected);
       setReview(result);
       setFile(selected);
     });
@@ -44,7 +44,7 @@ export function FactoryReplyImport({
       review.held + "건은 원래 값을 유지합니다."
     ))) return;
     const latest = await window.bando!.load();
-    const { next, applied, held } = applyFactoryReplyPreview(latest, review);
+    const { next, applied, held } = await nativeApplyFactoryReplyPreview(latest, review);
     const api = window.bando!;
     if (!api.archiveFactoryReply) throw Error("공장 회신 원본 보관 기능이 이식되지 않았습니다.");
     await api.backup();
