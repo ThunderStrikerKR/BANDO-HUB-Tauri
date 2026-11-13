@@ -1,6 +1,6 @@
 # TSBH Rust 이전 세션 1 — recognition 인계 기록
 
-**최신 판정 (2026-11-13): Rust 독립 CI 51/51 통과, 발주서 20/20 통과, 등록 상품 360건 전수 테스트 수행. 잘못된 활성 SKU 확정 0건. 중복 예외를 제외한 색상 불일치 15건은 정확한 원본 상품명 근거로 정정안을 작성하고, 메모리 내 정정 적용 후 15/15 SKU 및 variant 매칭 성공. 공용 seed 및 운영 SQLite 수정은 미실행. TypeScript 전체 필드 동등성 및 Windows/Tauri 통합은 미검증.**
+**최신 판정 (2026-11-13): TypeScript 및 Rust 실엔진 동일 입력 차등 비교 35건 실행, 상품 Item 전체 필드 1,478회 대조, 차이 219개 발견. 따라서 전 필드 기능 동등성 미완료. Rust 독립 CI 52/52 통과, 기존 발주서 20/20 통과, 360개 상품 전수 테스트 중 오확정 0개. 색상 정정 15개는 메모리상 검증만 완료, 공용 seed 및 운영 SQLite 미변경. Windows/Tauri 통합 미검증.**
 
 ## 저장소와 커밋
 - 저장소: ThunderStrikerKR/TSBH (Public 변경 없음)
@@ -322,3 +322,44 @@
 - **현재 공용 src-tauri/resources/state-seed.json 파일은 변경하지 않았다.** 이는 병렬 세션 2/3 및 3/3의 공유 자원을 손대지 않는 원래 작업 경계 때문이다.
 - 실제 상품 원본 정정(단일 variant.color + defaultColor 각 15개)은 데이터 변경 권한을 가진 통합 담당자가 적용한 후 전체 CI/앱 통합 테스트에서 검증해야 한다.
 - 사용자 승인으로 제외한 마이크물림쇠/마우스트레이 중복은 이번 색상 정정에 포함하지 않았다.
+
+
+## 2026-11-13: 실제 TypeScript/Rust 상품 매칭 전 필드 차등 비교 — 최신 판정
+
+### 실제 원본 실행과 동등성 판정
+
+- 검증 대상 소스: 513369276af3aeab8917f81d2f08f060ee78112d.
+- CI 실행 및 로그: https://github.com/ThunderStrikerKR/TSBH/actions/runs/43371988997
+- Rust 기존 회귀 및 차등 감사 실행: **52 passed / 0 failed**. 이는 테스트가 정상 실행된 결과이지 동등성 0건을 입증한 것이 아니다.
+- 테스트 코드: tests/rust-migration/recognition/src/differential.rs, tests/rust-migration/recognition/compare-ts-rust.mjs.
+- 실제 생산 TS src/parser.ts의 parseEvidence 함수를 tsx/esm/api로 직접 import하고, Rust src-tauri/src/business_core/recognition/mod.rs의 analyze_order를 동일 raw/client/state로 실행했다. TS 알고리즘 재구현이나 예상 결과 수기 대체를 하지 않았다.
+- 상태: 원본 seed를 복사해 기존 색상 정정 15건을 양쪽 엔진의 인메모리 상태에만 동일하게 적용했다. 실제 공용 seed 및 운영 SQLite는 변경하지 않았다.
+- 입력: 색상 정정 15개 상품의 상품명+수량을 포함한 주문과 원본 발주서 20건, 총 35건.
+- Item 모든 키, 누락 키, match, productCandidates, issues, sources까지 재귀 비교했다. 임의 생성 UUID/대상 ID만 정규화하고 필드 존재 여부는 비교했다.
+- 원본 TS가 앞에 추가 상품을 만든 경우는 상품 ID와 raw로 대응시키고 추가 항목을 별도로 기록했다. Rust 전용 match_products는 TS에 직접 대응하는 공개 진입점이 없고 비교 입력이 달라 동일 입력 차이 건수에서 제외했다.
+- **전체 219개 실제 필드 차이 JSON:** tests/rust-migration/recognition/ts-rust-product-differential-20261113.json. CI 로그 219건 전부 저장.
+
+### 결과
+
+- **35개 입력, 1,478개 하위 필드 비교, 차이 219개, 차이가 있는 입력 35개.**
+- 자주 발생한 차이: match.aliasId 39건, productCandidates.end 36건, productCandidates.label 36건, recognitionReason 36건, match.term 25건, productCandidates.start 17건. 단순한 undefined/null 구조 차이와 UI가 쓰는 상품 후보 범위/표시 차이가 섞여 있으므로 무조건 무시하지 않는다.
+- 상품 ID 확정의 실제 차이는 **1건:** BD 911R / 레드. 나머지 색상 정정 14개는 양쪽에서 동일한 상품 ID를 확정했다.
+- 원본 발주서 **19번과 20번**에서는 TS가 발주일자의 2026 또는 2026-11-03을 가짜 미등록 상품으로 추가하고 Rust는 추가하지 않는다. 실제 상품의 quantity는 TS null / 미확정, Rust 1 / 확정. 해당 표본의 원래 기대 수량은 1이다. TypeScript 원본의 잘못된 상품 생성을 Rust에서 다시 재현해서는 안 된다.
+- 기타 상품명/raw 범위: 원본 05/13번 표시명, 08/18/19번 원문 범위 등에서 출력 계약 차이가 있다.
+- 이 검사는 35개 지정 입력의 전 필드 비교이지, 가능한 모든 입력의 완전한 동등성 증명은 아니다.
+
+### BD 911R 불일치의 원인
+
+- 두 엔진 모두 등록 후보 bando-site-104를 검출한다. 교정된 variant.color와 defaultColor는 Red이다.
+- TS src/parser.ts에는 레드라는 색상 단어가 등록되어 있으나 src/domain.ts의 normalizeColor 색상 별칭에는 red 및 빨강만 있고 **레드 -> Red**가 빠져 있다.
+- 따라서 TS는 레드와 Red를 다르게 판단하여 productId=null, variantId=null, match.kind=UNKNOWN을 반환한다.
+- Rust norm_color는 레드 -> Red를 지원해 productId=bando-site-104와 variantId=bando-104-single로 연결한다.
+- 이 문제를 감추기 위해 Rust를 원본 버그대로 퇴행시키지 않는다. TypeScript 원본 소스가 공통 소유 파일이므로 세션 1에서는 수정하지 않았고, 데이터/통합 책임자와 조정이 필요하다.
+
+### 후속 처리
+
+1. 상품 후보 label/start/end, match.term, aliasId, recognitionReason의 undefined/null와 표현 계약을 원본 및 UI 소비 기준에 맞춰 대조 후 수정.
+2. 원본 19/20번의 날짜 가짜 상품과 Rust 수량 확정은 별도 의도적 개선/원본 버그 분류를 보존하고 통합 시 확인.
+3. 직원 확정값 보존, 재분석 및 추가 실발주서에 대한 동일 입력 전 필드 비교 확대.
+4. 현재 테스트는 불일치를 숨기지 않고 상세 로그에 남기는 **감사 테스트**이며 차이 0개를 강제하는 parity gate는 아니다. 전체 이식 완료로 보고 금지.
+5. 세션 2 가격/운임 및 세션 3 Tauri/React/Windows 연결, 공용 seed, 운영 SQLite, 원본 TS 파일은 수정하지 않았다. 마이크물림쇠/마우스트레이 중복은 사용자 승인대로 예외로 유지한다.
