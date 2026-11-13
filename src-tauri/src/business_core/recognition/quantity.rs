@@ -32,8 +32,13 @@ pub(crate) fn extract(text: &str) -> Vec<Quantity> {
         let whole = capture.get(0).expect("full match");
         let number = capture.get(2).or_else(|| capture.get(1)).expect("quantity number");
         // A model identifier must not be interpreted as a quantity.
-        if whole.start() > 0 && text[..whole.start()].chars().next_back() == Some('-') {
-            continue;
+        if whole.start() > 0 && text[..whole.start()].ends_with('-') {
+            let prefix = &text[..whole.start() - 1];
+            // A dash immediately after a closed option, e.g. "709(블랙)-1개",
+            // separates the quantity. "709-1개" and negative "-1개" do not.
+            if !matches!(prefix.chars().next_back(), Some(')') | Some(']')) {
+                continue;
+            }
         }
         let value = number.as_str().parse::<i64>().ok()
             .or_else(|| korean_number(number.as_str()));
@@ -78,6 +83,8 @@ mod tests {
     fn quantity_with_korean_and_case_insensitive_units() {
         assert_eq!(extract("709 민판 한개 / Cart-10 2EA").iter().map(|q| q.value).collect::<Vec<_>>(), vec![1, 2]);
         assert_eq!(extract("Desk TS-2 * 1EA")[0].value, 1);
+        assert_eq!(extract("709(블랙)-1개")[0].value, 1);
+        assert!(extract("709-1개").is_empty());
     }
     #[test]
     fn no_fabricated_quantity() {
