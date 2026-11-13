@@ -59,5 +59,7 @@ jobs:
         run: npm install --no-audit --no-fund --ignore-scripts
       - name: Compare TypeScript oracle with real Rust engine
         run: node --test tests/rust-migration/output/parity.test.mjs
+      - name: Compare real customer-facing payment text with Rust
+        run: node --test tests/rust-migration/output/payment-parity.test.mjs
       - name: Compare existing TypeScript price and freight with staged Rust rules
         run: node --test tests/rust-migration/rules/parity.test.mjs
