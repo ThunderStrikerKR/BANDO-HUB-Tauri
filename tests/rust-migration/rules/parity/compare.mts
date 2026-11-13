@@ -10,7 +10,7 @@
 import { spawnSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { resolvePrice, totals } from "../../../../src/domain.ts";
+import { resolvePrice, totals, parseOrder } from "../../../../src/domain.ts";
 import {
   recommendShipping,
   editableShippingRule,
@@ -18,7 +18,7 @@ import {
   combinationCurrent,
   upgradeShipping,
 } from "../../../../src/shipping.ts";
-import { shipmentTotals, validateWorkflow, reconcileWorkflow, deleteOrder, workflowIssues, stageIssues } from "../../../../src/workflow.ts";
+import { shipmentTotals, validateWorkflow, reconcileWorkflow, deleteOrder, workflowIssues, stageIssues, applyOrderRawEdit } from "../../../../src/workflow.ts";
 import { orderIssues, approveMissingQuantity, pendingIssue } from "../../../../src/validation.ts";
 
 const root=resolve(dirname(fileURLToPath(import.meta.url)),"../../../..");
@@ -605,6 +605,85 @@ wfCase("sender marked with full-width colon",s=>{
 wfCase("sender marker with malformed address",s=>{
   s.orders[0].raw="송하인: 테스트 발송자\n연락처: 010-2345-6789";
 });
+
+
+// The parser remains the original TypeScript authority for this test. We
+// inject the exact parsedRecipients it returned into the Rust workflow rule
+// and replay the same generated IDs and clock in original applyOrderRawEdit.
+function withIdCapture<T>(ids:string[],fn:()=>T):{result:T;used:number}{
+  const descriptor=Object.getOwnPropertyDescriptor(globalThis,"crypto");
+  let used=0;
+  Object.defineProperty(globalThis,"crypto",{
+    configurable:true,value:{randomUUID:()=>{
+      if(used>=ids.length)throw Error("Insufficient test UUIDs");
+      return ids[used++];
+    }}
+  });
+  try{return {result:frozenDate(fn),used};}
+  finally{
+    if(descriptor)Object.defineProperty(globalThis,"crypto",descriptor);
+    else delete (globalThis as any).crypto;
+  }
+}
+function rawCase(name:string,raw:string,mutate:(s:any)=>void=()=>{},
+  strictIdentity=false){
+  const state:any=copy(baseState);
+  // The source parser's normal app state has an alias list.
+  state.aliases=[];
+  mutate(state);
+  const generated=Array.from({length:120},(_,i)=>"source-raw-"+(i+1));
+  const orderRow=state.orders.find((o:any)=>o.id==="o1");
+  const party=state.clients.find((c:any)=>c.id===orderRow?.clientId)
+    ??orderRow?.clientSnapshot ??{
+      id:"",name:"",contact:"",identifiers:"",active:true,tier:"wholesale",
+      shippingFeeExcluded:false,payment:"PREPAID",overrides:{}
+    };
+  const prepared=raw.trim()&&orderRow&&raw!==orderRow.raw &&
+    !orderRow.deletedAt ? withIdCapture(generated,()=>
+      parseOrder(raw,party,state)) : {result:[],used:0};
+  const payload={
+    state,orderId:"o1",raw,actor:"검증직원",
+    now:actionNow,strictIdentity,
+    parsedRecipients:prepared.result,
+    eventIds:generated.slice(prepared.used)
+  };
+  add("raw edit: "+name,"apply_order_raw_edit",payload,
+    ()=>({state:deterministicIds(generated,()=>applyOrderRawEdit(
+      state,"o1",raw,"검증직원",strictIdentity))}));
+}
+rawCase("unchanged source is a no-op",order.raw);
+rawCase("empty raw rejected","");
+rawCase("blank raw rejected","  ");
+rawCase("previously deleted order blocked","새로운 발주",s=>{
+  s.orders[0].deletedAt=now;
+});
+rawCase("Excel exported recipient blocked","변경된 발주",s=>{
+  s.workflow.queue.push({id:"export-1",shipmentId:"shipment:o1:r1",
+    origin:"FACTORY",status:"EXPORTED",snapshot:{}});
+});
+rawCase("already delivered recipient blocked","변경된 발주",s=>{
+  s.workflow.shipments[0].delivery={at:now};
+});
+rawCase("raw text edit with existing recipient",
+  "받는분: 가상 수취인\n주소: 서울시 가상로 1\n연락처: 010-1234-5678\n상품: 가상 상품 2개");
+rawCase("strict identity does not reuse old recipient by index",
+  "새 수취인\n서울시 가상로 22\n010-2222-3333\n가상 상품 2개",
+  ()=>{},true);
+rawCase("queued Excel is cancelled on raw revision",
+  "가상 수취인\n서울시 가상로 1\n010-1234-5678\n가상 상품 2개",s=>{
+    s.workflow.queue.push({id:"queued-1",shipmentId:"shipment:o1:r1",
+      origin:"FACTORY",at:now,status:"QUEUED",snapshot:{}});
+  });
+rawCase("payer identity cannot silently change",
+  "새 수취인\n서울시 가상로 22\n010-2222-3333\n가상 상품 2개",s=>{
+    s.workflow.payments.push({id:"paid-1",dealerId:"dealer-1",amount:1000,
+      allocations:[{shipmentId:"shipment:o1:r1",amount:1000}]});
+  });
+rawCase("previously confirmed step requires rechecks",
+  "가상 수취인\n서울시 가상로 1\n010-1234-5678\n가상 상품 1개",s=>{
+    s.workflow.shipments[0].step=3;
+  });
+
 function normalized(v:unknown):string {
   if(Array.isArray(v))return "["+v.map(normalized).join(",")+"]";
   if(v&&typeof v==="object") {
