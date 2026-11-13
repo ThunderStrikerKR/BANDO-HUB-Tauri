@@ -62,11 +62,30 @@ pub(super) fn validate(state: &Value, before: Option<&Value>) -> Result<(),Strin
         }
     }
     for p in rows(field(w,"payments")) {
-        let allocation_total = rows(field(p,"allocations")).iter()
-            .map(|a| safe(field(a,"amount")))
-            .collect::<Option<Vec<_>>>().and_then(checked_sum);
-        if safe(field(p,"amount")).is_none() ||
-            allocation_total.is_none_or(|n|n > safe(field(p,"amount")).unwrap_or(0)) {
+        // TypeScript evaluates amount(payment.amount) first, then sum()
+        // before checking individual allocation validity. sum() accepts
+        // negative/decimal number inputs to the arithmetic step, but throws
+        // an independent "금액 합계를 확인하세요." when its result is not a
+        // nonnegative safe integer.
+        let Some(payment_amount)=safe(field(p,"amount")) else {
+            return Err("입금액 / 배분액 오류".into());
+        };
+        let mut total=0_f64;
+        for allocation in rows(field(p,"allocations")) {
+            let value=field(allocation,"amount");
+            let amount=match value {
+                Value::Number(n)=>n.as_f64().unwrap_or(f64::NAN),
+                Value::Null=>0.0,
+                Value::Bool(v)=>if *v{1.0}else{0.0},
+                _=>f64::NAN
+            };
+            total+=amount;
+        }
+        if !total.is_finite() || total<0.0 || total.fract()!=0.0 ||
+            total > super::MAX_SAFE as f64 {
+            return Err("금액 합계를 확인하세요.".into());
+        }
+        if total>payment_amount as f64 {
             return Err("입금액 / 배분액 오류".into());
         }
         for allocation in rows(field(p,"allocations")) {
