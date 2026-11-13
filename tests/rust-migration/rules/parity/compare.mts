@@ -163,7 +163,11 @@ function differentialPaths(a:unknown,b:unknown,path="$",limit=50):string[] {
   return changed;
 }
 function outcome(run:()=>unknown) {
-  try {return {ok:true,value:run()};}
+  try {
+    // The Rust entry point exchanges JSON, so normalize the original TS
+    // object across that same boundary (undefined object keys disappear).
+    return {ok:true,value:JSON.parse(JSON.stringify(run()))};
+  }
   catch(error) {return {ok:false,error:error instanceof Error?error.message:String(error)};}
 }
 const rustBinary=process.env.TSBH_RULES_BIN;
