@@ -3,6 +3,7 @@ import { AutomaticMessageTemplateManager } from "./AutomaticMessageTemplateManag
 import { ProvisionalProductNoticeManager } from "./ProvisionalProductNoticeManager";
 import { confirmAction } from "./dialogs";
 import { clientCandidates, uid } from "./domain";
+import { businessCoreCall } from "./tauri-bridge";
 import { TierBadge } from "./ManagementUI";
 import { ClientWorkbookTools } from "./ClientWorkbookTools";
 import { colorLabel, registeredProducts } from "./product-models";
@@ -87,16 +88,11 @@ export function ClientManager({
   const save = async (): Promise<boolean> => {
     if (!edit) return true;
     const result = await runSave(async () => {
-      if (!edit.name.trim()) throw Error("거래처명을 입력하세요.");
-      if (!edit.address?.trim()) throw Error("거래처 주소를 입력하세요.");
-      if (!(edit.phone?.trim() || edit.mobile?.trim()))
-        throw Error("거래처 전화번호 또는 휴대폰 번호를 입력하세요.");
-      if (edit.preferredAccountId && !state.settings.accounts.some((a) => a.id === edit.preferredAccountId))
-        throw Error("설정에 등록된 입금 계좌를 선택하세요.");
-      const next = clone(state),
-        index = next.clients.findIndex((c) => c.id === edit.id);
-      if (index >= 0) next.clients[index] = edit;
-      else next.clients.push(edit);
+      // Native Rust owns validation and the candidate mutation. The existing
+      // onSave callback remains the sole revision-checked SQLite commit.
+      const { state: next } = await businessCoreCall<{ state: State }>(
+        "catalog_clients", "upsert_client", { state, client: edit },
+      );
       await onSave(next);
       setEdit(undefined);
       setOriginalEdit(undefined);
