@@ -19,7 +19,7 @@ import { businessCoreCall } from "./tauri-bridge";
 import { addressParts } from "./parser";
 import { billingSnapshot } from "./replies";
 import { Field, clone } from "./ui";
-import { clientChangeIssue, orderGrandTotal, reconcileWorkflow, shipmentVat } from "./workflow";
+import { clientChangeIssue } from "./workflow";
 export function OrderDesk(props: OrderDeskProps) {
   const [changeRequest, setChangeRequest] = useState<string>();
   const {
@@ -50,7 +50,12 @@ export function OrderDesk(props: OrderDeskProps) {
     setItemEditing,
     itemEdit,
     activeShipment,
+    activeShipmentPreview,
     flowState,
+    flowReady,
+    flowSummaryReady,
+    flowSummaryError,
+    orderPreview,
     setProductSearch,
     activeGroupId,
     run,
@@ -487,10 +492,12 @@ export function OrderDesk(props: OrderDeskProps) {
                                   </td>
                                 </tr>
                               ))}
-                              {activeShipment?.recipientId === r.id && (
+                              {flowSummaryReady && activeShipmentPreview &&
+                                activeShipment?.recipientId === r.id && (
                                 <WorkflowFreightRows
                                   state={flowState}
                                   shipment={activeShipment}
+                                  freightCode={activeShipmentPreview.freightCode}
                                   activeKey={highlight}
                                   onFreight={(origin, value) =>
                                     recEdit(
@@ -560,10 +567,11 @@ export function OrderDesk(props: OrderDeskProps) {
                       </div>
                     )}
                   </div>
-                  {activeShipment && activeGroupId ? (
+                  {flowSummaryReady && activeShipmentPreview && activeShipment && activeGroupId ? (
                     <WorkflowFooter
                       state={flowState}
                       shipment={activeShipment}
+                      vatIncluded={activeShipmentPreview.vatIncluded}
                       groupId={activeGroupId}
                       onVat={(v) =>
                         recEdit(activeShipment.recipientId, (r) => (r.vatOverride = v), false)
@@ -572,31 +580,26 @@ export function OrderDesk(props: OrderDeskProps) {
                   ) : null}
                 </section>
               </div>
+              {flowSummaryError && (
+                <p role="alert">주문 미리보기 계산 오류: {flowSummaryError}</p>
+              )}
+              {!flowReady && !flowSummaryError && (
+                <p role="status" className="muted">주문 금액 및 업무 미리보기 계산 중</p>
+              )}
               <div className="order-grand-total">
                 총 주문 금액{" "}
                 <span className="shipment-count">
                   | 택배{" "}
-                  {flowState.workflow?.shipments.filter(
-                    (s) =>
-                      s.orderId === draft.id &&
-                      !s.legacyArchived &&
-                      !flowState.workflow?.groups.find((g) => g.id === s.groupId)?.deletedAt,
-                  ).length ?? 0}
+                  {flowSummaryReady ? orderPreview?.shipmentCount ?? 0 : "—"}
                   건 |
                 </span>
                 <b>
-                  {orderGrandTotal(flowState, draft.id) === null
-                    ? "—"
-                    : won(orderGrandTotal(flowState, draft.id))}
+                  {flowSummaryReady && orderPreview?.total !== null &&
+                  orderPreview?.total !== undefined ? won(orderPreview.total) : "—"}
                 </b>
                 <small>
                   (
-                  {draft.recipients.some((r) => shipmentVat(draft, r)) &&
-                  draft.recipients.some((r) => !shipmentVat(draft, r))
-                    ? "부가세 포함/별도"
-                    : draft.recipients.some((r) => shipmentVat(draft, r))
-                      ? "부가세 포함"
-                      : "부가세 별도"}
+                  {flowSummaryReady ? orderPreview?.vatLabel ?? "확인 필요" : "확인 필요"}
                   )
                 </small>
               </div>
