@@ -199,9 +199,18 @@ try:
 finally:
     con.close()
 '@
-    $value=& python -c $script $sqlite
-    if($LASTEXITCODE -ne 0){throw "SQLite separate-process read failed"}
-    return $value | ConvertFrom-Json
+    $python=(Get-Command python -ErrorAction SilentlyContinue)
+    if($null -eq $python) { throw "Python CLI not found on Windows runner" }
+    $value=& python -c $script $sqlite 2>&1
+    $exit=$LASTEXITCODE
+    if($exit -ne 0){
+      $diagnostics=($value|Out-String).Trim()
+      $report.sqliteFailureDiagnostics=@{exitCode=$exit;command=$python.Source;output=$diagnostics}
+      Store
+      throw "SQLite separate-process read failed, exit=$exit, output=$diagnostics"
+    }
+    try{return ($value|Out-String|ConvertFrom-Json)}
+    catch {throw "Invalid SQLite read JSON: $(($value|Out-String).Trim())"}
   }
   function FillEdit([string]$label,[string]$value){
     $all=Elements
