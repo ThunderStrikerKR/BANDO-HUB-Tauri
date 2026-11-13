@@ -59,6 +59,7 @@ fn complete_360_product_name_matching_audit() {
         names.entry(name.to_owned()).or_default().insert(id.to_owned());
     }
     let mut exact=0;
+    let mut redirected_successor=0;
     let mut unresolved_unique=Vec::new();
     let mut wrong_unique=Vec::new();
     let mut safely_ambiguous=0;
@@ -67,6 +68,20 @@ fn complete_360_product_name_matching_audit() {
         let name=p["name"].as_str().unwrap();
         let expected=p["id"].as_str().unwrap();
         let (actual,kind)=match_id(name,&state);
+        // Two older music-tray rows in the 360-entry seed are explicitly
+        // inactive/superseded. Recognizing their active replacement SKU is
+        // correct (not a cross-SKU false positive).
+        if p["active"]==false || !p["supersededBy"].is_null() {
+            if actual.as_deref()==p["supersededBy"].as_str() {
+                redirected_successor+=1;
+            } else {
+                wrong_unique.push(json!({
+                    "index":index,"name":name,"expectedSuccessor":p["supersededBy"],
+                    "got":actual,"match":kind,"status":"inactive-or-superseded"
+                }));
+            }
+            continue;
+        }
         let peers=&names[name];
         if peers.len()>1 {
             if let Some(chosen)=actual {
@@ -91,6 +106,7 @@ fn complete_360_product_name_matching_audit() {
     }
     println!("CATALOG_FULL_NAME_SUMMARY {}",json!({
         "checked":360,"distinctNames":names.len(),"exact":exact,
+        "redirectedSuperseded":redirected_successor,
         "unresolvedUnique":unresolved_unique.len(),
         "wrongUnique":wrong_unique.len(),
         "safelyAmbiguousDuplicate":safely_ambiguous,
@@ -99,6 +115,7 @@ fn complete_360_product_name_matching_audit() {
     for x in &wrong_unique {println!("CATALOG_WRONG {}",x);}
     for x in &unresolved_unique {println!("CATALOG_UNRESOLVED {}",x);}
     for x in &unsafe_duplicate {println!("CATALOG_UNSAFE_DUPLICATE {}",x);}
+    assert_eq!(redirected_successor,2,"seed contains exactly two superseded legacy products");
     assert!(wrong_unique.is_empty() && unsafe_duplicate.is_empty(),
         "unsafe full-name recognition: {} wrong products, {} arbitrarily selected duplicate names",
         wrong_unique.len(),unsafe_duplicate.len());
@@ -177,4 +194,20 @@ fn complete_distinct_model_and_color_matching_audit() {
         && outside_color.is_empty() && guessed_color.is_empty(),
         "wrong or speculative model-only/color match: {}, {}, {}, {}",
         outside.len(),guessed.len(),outside_color.len(),guessed_color.len());
+}
+
+
+#[test]
+fn registered_model_suffix_is_not_a_fabricated_color() {
+    let state=seed();
+    for (input,expected) in [
+        ("BD 700W / 와이드형 / 대형 접이식 상판","bando-site-327"),
+        ("BD 801C / 바퀴 포함","bando-site-57"),
+        ("BD 719B / 이동형 보면대","bando-site-19"),
+        ("BD 930BK / 일자형 마이크 스탠드","bando-site-96"),
+    ] {
+        let (actual,kind)=match_id(input,&state);
+        assert_eq!(actual.as_deref(),Some(expected),
+            "full registered code was mistaken for color abbreviation: {input}, {kind}");
+    }
 }
