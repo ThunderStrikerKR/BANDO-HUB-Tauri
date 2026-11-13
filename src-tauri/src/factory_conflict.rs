@@ -241,6 +241,23 @@ mod tests {
         db.execute("INSERT INTO app_state(id,payload) VALUES(1,?1)",[state.to_string()]).unwrap();
         (db,base,id)
     }
+    fn clean_temp_fixture(db: Connection, base: PathBuf) {
+        // Windows antivirus/indexers may briefly hold recently written XLSX
+        // bytes. Cleanup is not an assertion about the reply business rules.
+        drop(db);
+        for attempt in 0..8 {
+            match fs::remove_dir_all(&base) {
+                Ok(()) => return,
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => return,
+                Err(error) if attempt == 7 => {
+                    eprintln!("Temporary factory test directory cleanup deferred: {error}");
+                    return;
+                }
+                Err(_) => std::thread::sleep(std::time::Duration::from_millis(100)),
+            }
+        }
+    }
+
     #[test]
     fn correction_is_one_row_append_only_atomic_and_backed_up() {
         let (mut db,base,id)=fixture();
@@ -258,7 +275,7 @@ mod tests {
         assert_eq!(fs::read_dir(base.join("backups")).unwrap().count(),1);
         assert!(approve_factory_conflict_impl(&mut db,&base,&id,2,8).unwrap_err().contains("이미 정정"));
         assert_eq!(get_snapshot(&db).unwrap(),next);
-        fs::remove_dir_all(base).unwrap();
+        clean_temp_fixture(db, base);
     }
     #[test]
     fn rejects_stale_revision_tampered_source_and_tracking_reuse() {
@@ -274,6 +291,6 @@ mod tests {
         fs::write(base.join("factory-replies").join(format!("{}.xlsx",&id[14..])),b"PK\x03\x04modified").unwrap();
         assert!(approve_factory_conflict_impl(&mut db,&base,&id,2,7).unwrap_err().contains("변경"));
         assert_eq!(get_snapshot(&db).unwrap(),state);
-        fs::remove_dir_all(base).unwrap();
+        clean_temp_fixture(db, base);
     }
 }
