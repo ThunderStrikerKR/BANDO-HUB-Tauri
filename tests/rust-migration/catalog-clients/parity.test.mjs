@@ -7,7 +7,8 @@ import { tsImport } from "tsx/esm/api";
 
 const {validateProduct}=await tsImport("../../../src/domain.ts",import.meta.url);
 const {registeredProducts}=await tsImport("../../../src/product-models.ts",import.meta.url);
-const {previewClientRows}=await tsImport("../../../src/client-workbook.ts",import.meta.url);
+const {previewClientRows,applyClientWorkbook}=await tsImport("../../../src/client-workbook.ts",import.meta.url);
+const {applyProductSyncWorkbook}=await tsImport("../../../src/product-sync-workbook.ts",import.meta.url);
 const manifest=fileURLToPath(new URL("./Cargo.toml",import.meta.url));
 const root=fileURLToPath(new URL("../../../",import.meta.url));
 const fixture=()=>({
@@ -120,6 +121,48 @@ sampleClient("existing client changed with original account",(()=>{
     preferredAccountId:"account-1",overrides:{}}];
 });
 
+
+function sampleApply(name,operation,state,preview,oracleFn) {
+  let oracle;
+  try { oracle={ok:true,value:oracleFn(state,preview)}; }
+  catch(error) { oracle={ok:false,error:error instanceof Error?error.message:String(error)}; }
+  candidates.push({operation,payload:{state,preview}});
+  original.push({name,oracle});
+}
+{
+  const state=fixture();
+  const preview=previewClientRows(state,state.revision,[{row:2,cells:clientCells()}]);
+  sampleApply("add approved client Excel", "apply_client_workbook",state,preview,applyClientWorkbook);
+  sampleApply("reject stale client Excel", "apply_client_workbook",
+    {...state,revision:8},preview,applyClientWorkbook);
+  sampleApply("reject held client Excel", "apply_client_workbook",
+    state,{...preview,rows:[{...preview.rows[0],status:"HOLD"}]},applyClientWorkbook);
+}
+{
+  const state=fixture();
+  const approved={
+    revision:state.revision,products:[product()],rows:[{sheet:"상품 목록",
+      row:2,id:"p-1",name:"BD 709 타공",status:"ADD",changes:[],errors:[]}],
+    missingProducts:0,missingOptions:0,
+    createdProducts:1,updatedProducts:0,createdOptions:1,updatedOptions:0,
+  };
+  sampleApply("add approved product Excel", "apply_product_workbook",
+    state,approved,applyProductSyncWorkbook);
+  sampleApply("reject stale product Excel", "apply_product_workbook",
+    {...state,revision:8},approved,applyProductSyncWorkbook);
+  sampleApply("reject held product Excel", "apply_product_workbook",
+    state,{...approved,rows:[{...approved.rows[0],status:"HOLD"}]},applyProductSyncWorkbook);
+  // Existing products and immutable order snapshots are untouched when the
+  // approved workbook updates only a single product price.
+  const older=fixture();older.products=[product()];
+  const replacement=structuredClone(older.products[0]);
+  replacement.variants[0].retail=17000;
+  sampleApply("update price without rewriting historical orders", "apply_product_workbook",
+    older,{...approved,products:[replacement],rows:[{...approved.rows[0],status:"UPDATE"}],
+      createdProducts:0,updatedProducts:1,createdOptions:0,updatedOptions:1},
+    applyProductSyncWorkbook);
+}
+
 test("real TypeScript management rules match compiled Rust for product/client validity",()=>{
   const run=spawnSync("cargo",["run","--quiet","--manifest-path",manifest,
     "--bin","parity_runner"],{
@@ -133,8 +176,14 @@ test("real TypeScript management rules match compiled Rust for product/client va
     const {name,oracle}=original[i],rust=results[i];
     assert.equal(rust.ok,oracle.ok,
       name+": original TS = "+JSON.stringify(oracle)+", Rust = "+JSON.stringify(rust));
-    if(rust.ok) assert.equal(rust.value.valid,true,name);
+    if(rust.ok) {
+      if(candidates[i].operation.startsWith("validate_")) assert.equal(rust.value.valid,true,name);
+      else assert.deepEqual(rust.value,oracle.value,name);
+    }
     if(!rust.ok && /같은 상품명|상품 색상|상품 링크/.test(oracle.error??"")){
+      assert.equal(rust.error,oracle.error,name);
+    }
+    if(!rust.ok && candidates[i].operation.startsWith("apply_")){
       assert.equal(rust.error,oracle.error,name);
     }
   }
