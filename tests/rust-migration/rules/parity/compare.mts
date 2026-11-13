@@ -1470,6 +1470,38 @@ validationCase("invalid negative payment amount wins before aggregate error",unc
     ]});
 },false);
 
+
+validationCase("actualFreight explicit null requires insertion evidence",unchanged,s=>{
+  s.workflow.shipments[0].actualFreight={FACTORY:null};
+},false);
+validationCase("actualFreight removing explicit null is forbidden",s=>{
+  s.workflow.shipments[0].actualFreight={FACTORY:null};
+},s=>{
+  s.workflow.shipments[0].actualFreight={};
+},false);
+validationCase("actualFreight explicit null insertion with evidence permitted",unchanged,s=>{
+  s.workflow.shipments[0].actualFreight={FACTORY:null};
+  s.workflow.events.push({id:"null-freight-evidence",at:now,actor:"담당자",
+    action:"실제 출고 운임 입력",shipmentIds:["shipment:o1:r1"],
+    before:null,after:{origin:"FACTORY",amount:null}});
+},true);
+validationCase("actualFreight proof of legacy recipient fallback",s=>{
+  s.orders[0].recipients[0].actualFreight=3100;
+},s=>{
+  s.workflow.shipments[0].actualFreight={FACTORY:3500};
+  s.workflow.events.push({id:"legacy-freight-proof",at:now,actor:"담당자",
+    action:"실제 출고 운임 입력",shipmentIds:["shipment:o1:r1"],
+    before:3100,after:{origin:"FACTORY",amount:3500}});
+},true);
+validationCase("actualFreight incorrect old legacy fallback rejected",s=>{
+  s.orders[0].recipients[0].actualFreight=3100;
+},s=>{
+  s.workflow.shipments[0].actualFreight={FACTORY:3500};
+  s.workflow.events.push({id:"bad-legacy-freight-proof",at:now,actor:"담당자",
+    action:"실제 출고 운임 입력",shipmentIds:["shipment:o1:r1"],
+    before:null,after:{origin:"FACTORY",amount:3500}});
+},false);
+
 function normalized(v:unknown):string {
   if(Array.isArray(v))return "["+v.map(normalized).join(",")+"]";
   if(v&&typeof v==="object") {
