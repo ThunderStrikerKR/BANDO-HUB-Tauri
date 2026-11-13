@@ -389,3 +389,113 @@ test("Rust rename retains current rate and historical records",()=>{
   });
   assert.deepEqual(crudResults[2].value.shipping.groups[1],shipping.groups[1]);
 });
+// Replays the original ShippingManager exception-revision algorithm and uses
+// the ACTUAL TypeScript combinationVersions() function as its oracle.
+// Rust must retire the selected version, retain all unrelated history, and
+// recompute the exact version fingerprint against the original pre-save state.
+const exceptionShipping={
+  ...structuredClone(shipping),
+  productRules:{p2:{...productPrevious,version:"standalone-v3"}},
+  combinations:[
+    {
+      id:"combo-current",key:"FACTORY|p1@v1:2|p2@v2:1",
+      description:"혼합 포장",charge:8300,actual:5100,
+      observedCharge:4800,verifiedAt:"2026-11-02T00:00:00.000Z",
+      shipmentId:"ship-1",sampleCount:3,active:true,epoch:1,
+      versions:{"old-rule":"v0"},at:"2026-11-02T00:00:00.000Z",
+    },
+    {
+      id:"combo-archived",key:"STORE|p2@v2:1",
+      description:"매장 단독",charge:3200,actual:2500,
+      sampleCount:1,active:false,epoch:1,
+      versions:{"product:p2":"stale"},
+      at:"2026-10-01T00:00:00.000Z",
+    },
+  ],
+};
+const exceptionState={
+  products:[
+    {id:"p1",name:"상품 1",shippingGroupId:"g1"},
+    {id:"p2",name:"상품 2"},
+  ],
+  shipping:exceptionShipping,
+};
+const exceptionCases=[
+  ["verified mixed-group combination", "combo-current", 6900],
+  ["archived combination retains existing history", "combo-archived", 3300],
+  ["zero freight stays a valid integer", "combo-current", 0],
+];
+const exceptionRequests=exceptionCases.map(([,combinationId,charge],index)=>({
+  domain:"rules",operation:"apply_shipping_action",
+  payload:{
+    action:"revise_combination",shipping:exceptionShipping,
+    state:exceptionState,combinationId,charge,
+    newId:"revised-"+index,now,
+  },
+}));
+// Call the repository's actual TS function instead of copying its internal
+// group/product resolution into a second test-only implementation.
+const tsVersionsScript=String.raw`
+import fs from "node:fs";
+import { combinationVersions } from "./src/shipping.ts";
+const requests=JSON.parse(fs.readFileSync(0,"utf8"));
+process.stdout.write(JSON.stringify(requests.map(r=>
+  combinationVersions(
+    r.key,
+    r.state,
+  )
+)));
+`;
+const tsVersionRun=spawnSync(process.execPath,[
+  "--import","tsx","--input-type=module","-e",tsVersionsScript,
+],{
+  cwd:root,
+  input:JSON.stringify(exceptionRequests.map(r=>({
+    key:exceptionShipping.combinations.find(c=>c.id===r.payload.combinationId).key,
+    state:r.payload.state,
+  }))),
+  encoding:"utf8",timeout:900000,maxBuffer:64*1024*1024,
+});
+if(tsVersionRun.error)throw tsVersionRun.error;
+assert.equal(tsVersionRun.status,0,tsVersionRun.stderr);
+const tsVersions=JSON.parse(tsVersionRun.stdout);
+function originalExceptionRevision(payload,versions){
+  const next=structuredClone(payload.shipping);
+  const old=next.combinations.find(c=>c.id===payload.combinationId);
+  old.active=false;
+  // JSON serialization removes undefined fields supplied by the original
+  // TypeScript object spread before Tauri's SQLite JSON persistence.
+  next.combinations.push(JSON.parse(JSON.stringify({
+    ...old,
+    verifiedAt:undefined,shipmentId:undefined,sampleCount:0,
+    observedCharge:undefined,
+    id:payload.newId,charge:payload.charge,epoch:next.epoch,
+    versions,at:payload.now,active:true,
+  })));
+  return {shipping:next};
+}
+const exceptionRun=spawnSync("cargo",[
+  "run","--quiet","--manifest-path",cargo,
+  "--bin","reception_runner",
+],{
+  cwd:root,input:JSON.stringify(exceptionRequests),encoding:"utf8",
+  timeout:900000,maxBuffer:64*1024*1024,
+});
+if(exceptionRun.error)throw exceptionRun.error;
+assert.equal(exceptionRun.status,0,exceptionRun.stderr);
+const exceptionActual=JSON.parse(exceptionRun.stdout);
+assert.equal(exceptionActual.length,exceptionCases.length);
+for(let i=0;i<exceptionCases.length;i++){
+  const [name]=exceptionCases[i],payload=exceptionRequests[i].payload;
+  test("Rust exception freight revision: "+name,()=>{
+    assert.equal(exceptionActual[i].ok,true,JSON.stringify(exceptionActual[i].error));
+    assert.deepEqual(
+      exceptionActual[i].value,
+      originalExceptionRevision(payload,tsVersions[i]),
+    );
+    assert.equal(exceptionShipping.combinations.length,2);
+    assert.equal(exceptionShipping.combinations[0].active,true);
+    assert.equal(exceptionShipping.combinations[1].active,false);
+  });
+}
+
