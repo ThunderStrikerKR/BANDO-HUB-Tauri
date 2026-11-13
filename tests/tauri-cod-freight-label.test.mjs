@@ -19,7 +19,9 @@ test("freight label, amount and parenthesized freight terms appear in that order
 test("carrier collect is 착불, business credit remains 후불",()=>{
   assert.match(board,/nativeShipment\?\.freightCode === "020"[\s\S]*?\? "착불"/);
   const rust=source("src-tauri/src/business_core/rules/workflow_preview.rs");
-  assert.match(rust, /"freightCode": workflow::shipment_freight_code\(order, recipient\)/);
+  assert.match(rust, /let freight_code = workflow::shipment_freight_code\(order, recipient\)/);
+  assert.match(rust, /"freightCode": freight_code/);
+  assert.match(rust, /freight_code == "020" \|\| excluded/);
   assert.match(messages,/shipmentFreightCode\(order, r\)==="020" \? "착불"/);
   assert.match(board,/후불 출고 승인/);
   assert.doesNotMatch(row, /후불/);
