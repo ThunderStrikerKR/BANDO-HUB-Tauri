@@ -79,6 +79,46 @@ test("category change and deletion preserve edits if user declines or save fails
   assert.match(s,/if \(ok\) \{\s*setSelected\(current.parentId/);
 });
 
+test("committed saves never become failed saves solely because UI refresh failed",async()=>{
+  const module={exports:{}};
+  const transpiled=ts.transpileModule(src("shared/committed-state.ts"),{
+    compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022},
+  }).outputText;
+  vm.runInNewContext(transpiled,{module,exports:module.exports});
+  const refresh=module.exports.refreshAfterCommittedSave;
+  const committed={revision:18};
+  const messages=[];
+  const success=await refresh("모델군",committed,async(data)=>{
+    assert.equal(data,committed);
+  },(message,tone)=>messages.push({message,tone}));
+  assert.equal(success,true);
+  assert.equal(messages.length,0);
+  const failed=await refresh("모델군",committed,async()=>{
+    throw Error("screen refresh unavailable");
+  },(message,tone)=>messages.push({message,tone}));
+  assert.equal(failed,false);
+  assert.equal(messages.length,1);
+  assert.match(messages[0].message,/데이터는 저장됐지만 화면 갱신에 실패했습니다/);
+  assert.equal(messages[0].tone,"error");
+});
+
+test("template and notice record changes ask before switching away from a dirty editor",()=>{
+  const a=src("AutomaticMessageTemplateManager.tsx");
+  const n=src("ProvisionalProductNoticeManager.tsx");
+  assert.match(a,/requestEditorLeave\(leaveGuard,\(message\)=>onNotice/);
+  assert.match(n,/requestEditorLeave\(leaveGuard,\(message\)=>onNotice/);
+  assert.match(a,/onClick=\{\(\)=>void chooseTemplate\(id\)\}/);
+  assert.match(n,/onClick=\{\(\)=>void chooseProduct\(p.id\)\}/);
+  for(const component of [a,n,src("ColorGuidanceManager.tsx")])
+    assert.match(component,/refreshAfterCommittedSave/);
+});
+
+test("Escape in price editing cannot cancel a future independent Enter save",()=>{
+  const cell=src("PriceCell.tsx");
+  assert.doesNotMatch(cell,/cancelled\.current/);
+  assert.match(cell,/onBlur=\{\(\) => \{[^}]*if \(saving.current/);
+});
+
 test("model-group switching checks the saved editor baseline",()=>{
   const s=src("ColorGuidanceManager.tsx");
   assert.match(s,/requestEditorLeave\(leaveGuard,setStatus\)/);

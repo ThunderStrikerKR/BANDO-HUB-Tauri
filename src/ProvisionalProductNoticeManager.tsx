@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { HelpTooltip } from "./ui/HelpTooltip";
 import { usePendingChanges } from "./shared/pending-changes";
-import { usePageLeaveGuard } from "./shared/page-leave";
+import { requestEditorLeave, usePageLeaveGuard } from "./shared/page-leave";
+import { refreshAfterCommittedSave } from "./shared/committed-state";
 import { sameValue } from "./shared/draft";
 import { registeredProducts } from "./product-models";
 import { validateProvisionalProductNotices } from "./provisional-product-notices";
@@ -72,9 +73,9 @@ export function ProvisionalProductNoticeManager({
       );
       setBaseline(structuredClone(updated.settings.provisionalProductNotices ?? null));
       setDraft(structuredClone(updated.settings.provisionalProductNotices ?? {}));
-      await onRefresh(updated);
-      setStatus("상품별 잠정 선택 안내문을 저장했습니다.");
-      onNotice("상품별 잠정 선택 안내문을 저장했습니다.","success");
+      const refreshed = await refreshAfterCommittedSave("상품별 안내문",updated,onRefresh,onNotice);
+      setStatus(refreshed ? "상품별 잠정 선택 안내문을 저장했습니다." : "저장 완료 / 화면 갱신 확인 필요");
+      if (refreshed) onNotice("상품별 잠정 선택 안내문을 저장했습니다.","success");
       return true;
     } catch (error) {
       setStatus(String(error));
@@ -82,13 +83,20 @@ export function ProvisionalProductNoticeManager({
       return false;
     } finally {setBusy(false);}
   };
-  usePageLeaveGuard({
+  const leaveGuard = {
     label: "상품별 잠정 선택 안내문",
     hasChanges: () => dirty,
     busy: () => busy,
     save,
     discard: () => { setDraft(structuredClone(baseline??{})); setStatus(""); },
-  });
+  };
+  usePageLeaveGuard(leaveGuard);
+  const chooseProduct = async (id: string) => {
+    if (id === selected) return;
+    const leave = await requestEditorLeave(leaveGuard,(message)=>onNotice(message,"error"));
+    if (!leave.proceed) return;
+    setSelected(id);setStatus("");
+  };
   return <section className="family-admin-workspace" aria-label="잠정 상품 선택 안내">
     <aside className="family-list-panel">
       <header className="family-list-heading">
@@ -102,7 +110,7 @@ export function ProvisionalProductNoticeManager({
       <div className="family-list-scroll">
         {visible.map(p=><button type="button" key={p.id}
           className={"family-list-row"+(selected===p.id?" selected":"")}
-          onClick={()=>{setSelected(p.id);setStatus("");}}>
+          onClick={()=>void chooseProduct(p.id)}>
           <span><strong>{p.name}</strong><small>{draft[p.id] ? "안내문 등록됨" : "안내문 미등록"}</small></span>
         </button>)}
         {!visible.length && <p className="muted">{query.trim()

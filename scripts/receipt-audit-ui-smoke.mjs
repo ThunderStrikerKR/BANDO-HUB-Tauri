@@ -285,7 +285,7 @@ try {
   await ocrProgress.waitFor({ state: "detached" });
   let ocrReview = page.getByRole("dialog", { name: "OCR 문자 인식 검토" });
   await ocrReview.waitFor();
-  await ocrReview.getByRole("button", { name: "닫기" }).click();
+  await ocrReview.getByRole("button", { name: "닫기", exact: true }).click();
   await ocrReview.waitFor({ state: "detached" });
   await captureButton.click();
   ocrReview = page.getByRole("dialog", { name: "OCR 문자 인식 검토" });

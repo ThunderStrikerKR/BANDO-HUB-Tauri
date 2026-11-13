@@ -17,7 +17,6 @@ export function PriceCell({
     [status, setStatus] = useState(""),
     [error, setError] = useState("");
   const saving = useRef(false),
-    cancelled = useRef(false),
     expected = useRef(value),
     input = useRef<HTMLInputElement>(null);
   useEffect(() => {
@@ -25,10 +24,6 @@ export function PriceCell({
   }, [value, editing]);
   const save = async () => {
     if (!enabled || !editing) return;
-    if (cancelled.current) {
-      cancelled.current = false;
-      return;
-    }
     if (saving.current) return;
     const text = draft.replaceAll(",", "");
     if (
@@ -100,7 +95,6 @@ export function PriceCell({
             void save();
           }
           if (e.key === "Escape") {
-            cancelled.current = true;
             setDraft(value ? String(value) : "");
             setEditing(false);
             setError("");
