@@ -5,7 +5,7 @@ mod quantity;
 
 use regex::Regex;
 use serde_json::{json, Value};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 #[derive(Clone, Debug)]
 struct Evidence {
@@ -597,20 +597,35 @@ fn reanalyze(payload: &Value) -> Result<Value, String> {
     let prior = old.get("recipients").and_then(Value::as_array)
         .ok_or("order.recipients must be an array")?;
     let mut used=HashSet::<usize>::new();
+    let mut recipient_rewrites=HashMap::<String,String>::new();
+    let mut item_rewrites=HashMap::<String,String>::new();
     for row in &mut incoming {
         // Identity must be unique. Never silently transfer confirmations between
         // two recipients who happen to have the same name.
         let matching: Vec<usize> = prior.iter().enumerate().filter_map(|(index,r)|{
-            let names = r["name"].as_str().filter(|x|!x.is_empty())==
+            let old_sources=r["sources"].as_array();
+            let new_sources=row["sources"].as_array();
+            let same_evidence=old_sources.and_then(|old|new_sources.map(|fresh|
+                old.iter().any(|a|fresh.iter().any(|b|
+                    a["field"]==b["field"] && a["start"]==b["start"] &&
+                    a["end"]==b["end"] && a["text"]==b["text"] &&
+                    (a["field"]=="name" || a["field"]=="address")
+                ))
+            )).unwrap_or(false);
+            let names=r["name"].as_str().filter(|x|!x.is_empty())==
                 row["name"].as_str().filter(|x|!x.is_empty());
-            let address = r["address"].as_str().filter(|x|!x.is_empty())==
+            let address=r["address"].as_str().filter(|x|!x.is_empty())==
                 row["address"].as_str().filter(|x|!x.is_empty());
-            (names && address && !used.contains(&index)).then_some(index)
+            ((same_evidence || (names && address)) && !used.contains(&index))
+                .then_some(index)
         }).collect();
         if matching.len()!=1 { continue; }
         let index=matching[0];
         used.insert(index);
         let old_row=&prior[index];
+        if let (Some(from),Some(to))=(row["id"].as_str(),old_row["id"].as_str()) {
+            recipient_rewrites.insert(from.to_owned(),to.to_owned());
+        }
         row["id"]=old_row["id"].clone();
         for key in ["shippingCharges","freightCode","vatDefault","vatOverride","dispatchOrigin"] {
             if let Some(v)=old_row.get(key) {row[key]=v.clone();}
@@ -647,6 +662,9 @@ fn reanalyze(payload: &Value) -> Result<Value, String> {
                 let detected_issues=item["issues"].clone();
                 let new_sources=item["sources"].clone();
                 let new_id=previous["id"].clone();
+                if let (Some(from),Some(to))=(item["id"].as_str(),new_id.as_str()) {
+                    item_rewrites.insert(from.to_owned(),to.to_owned());
+                }
                 if previous["manuallyConfirmed"]==true {
                     *item=previous.clone();
                 }
@@ -677,14 +695,11 @@ fn reanalyze(payload: &Value) -> Result<Value, String> {
     // Candidate ownership has to refer to the same stable IDs as the rows.
     let mut candidates=analysis["candidates"].as_array().cloned().unwrap_or_default();
     for c in &mut candidates {
-        let old_recipient_id=c.get("recipientId").cloned();
-        for row in &incoming {
-            let anchor_id=row.pointer("/evidence/anchorId");
-            let _ = anchor_id; // anchor is retained for integration, not used to guess identity.
-            if let (Some(candidate_id),Some(evidence_id)) =
-                (old_recipient_id.as_ref(),row.get("id")) {
-                if candidate_id==evidence_id {break;}
-            }
+        if let Some(from)=c["recipientId"].as_str() {
+            if let Some(to)=recipient_rewrites.get(from){c["recipientId"]=json!(to);}
+        }
+        if let Some(from)=c["itemId"].as_str() {
+            if let Some(to)=item_rewrites.get(from){c["itemId"]=json!(to);}
         }
     }
     next["recipients"]=json!(incoming);
