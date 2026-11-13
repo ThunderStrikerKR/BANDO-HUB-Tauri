@@ -235,6 +235,12 @@ function checkOrderPreview(name, mutate = () => {}) {
     () => ({
       orderId,
       shipmentCount: rows.length,
+      lineAmounts: draft.recipients.flatMap((row) => row.items.map((item) => ({
+        recipientId: row.id,
+        itemId: item.id,
+        amount: item.unitPrice !== null && item.quantity !== null &&
+          item.productId && item.variantId ? item.unitPrice * item.quantity : null,
+      }))),
       total: orderGrandTotal(state, orderId),
       vatLabel,
     }));
