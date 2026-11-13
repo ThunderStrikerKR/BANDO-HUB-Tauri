@@ -254,9 +254,24 @@ fn validate_automatic_change(before: &Value, next: &Value, id: &str, name: &str)
         }
         let matched = new_shipments.iter().find(|s| s["id"] == shipment_id)
             .ok_or("반영 대상 배송 건을 찾을 수 없습니다.")?;
+        // The TS original leaves shipment.actualFreight.FACTORY absent when
+        // the current order recipient already carries the exact actual fee.
+        // Its effective value is still valid and must not be rewritten merely
+        // to satisfy this automatic-import guard.
+        let effective_actual = if let Some(saved) =
+            matched["actualFreight"].as_object().and_then(|m| m.get("FACTORY")) {
+            saved.as_u64()
+        } else {
+            next["orders"].as_array().and_then(|orders| orders.iter()
+                .find(|order| order["id"] == matched["orderId"]))
+                .and_then(|order| order["recipients"].as_array())
+                .and_then(|recipients| recipients.iter()
+                    .find(|recipient| recipient["id"] == matched["recipientId"]))
+                .and_then(|recipient| recipient["actualFreight"].as_u64())
+        };
         if matched["orderId"] != row["orderId"]
             || matched["tracking"]["FACTORY"] != tracking
-            || matched["actualFreight"]["FACTORY"] != actual {
+            || effective_actual != Some(actual) {
             return Err("운송장번호와 운임이 반영된 배송 건의 값이 다릅니다.".into());
         }
         let matching_ids: HashSet<&str> = before["workflow"]["queue"].as_array()
