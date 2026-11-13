@@ -7,7 +7,7 @@
 - 독점 브랜치: migration/01-recognition
 - 공통 기준: d5ea8ed20b8120b844437263c2eb2b8963559e8d
 - 선행 모델 선택 구현: 3f8e062e1e049b5297b0fd78a285dad7a679d6f5
-- 마지막 소스 수정 커밋: e11b27faaa31b695715674737ac17fcfcbb8c84f
+- 마지막 소스 수정 커밋: cbcbe87a0056ee4fef05a9f8f55f5a55c64a6c53
 - 마지막 **Rust 컴파일 검증 완료 커밋: 없음.**
 - 작업 경로는 사용자 지정 허용 경로로 제한. 기존 TS 및 공통 Rust/설정 파일은 미수정.
 
@@ -50,7 +50,7 @@
 - 수량을 찾지 못한 Rust 항목은 quantity=null, quantityConfirmed=false. TypeScript 일부 경로에서 미확정 잠정값 1을 두는 것과 표시값이 다를 수 있으나 임의 확정은 하지 않음.
 - Rust 항목의 unitPrice=null은 가격 엔진 미호출을 나타냄. 가격/운임은 세션 2, 적용과 통합은 세션 3 책임.
 - 새 임시 Recipient/Item ID는 recognition:recipient:번호 및 recognition:item:오프셋:번호 형식. TypeScript UUID와 다르므로 세션 3에서 요구사항 확인 필수.
-- analyze_order 근거는 UTF-16 전체 원문 오프셋, match_products의 evidence는 모델 내부 상대 UTF-8 바이트 오프셋. 통합 전에 통일 필요.
+- analyze_order 근거와 해당 상품 후보 오프셋은 UTF-16 전체 원문 기준. match_products의 evidence 및 후보 오프셋은 입력 text 내부의 UTF-16 상대 좌표로 변환하도록 수정했으나 실제 검증은 미완료.
 - 보존은 유일하게 연결되는 수취인의 동일 원문 근거, 상품의 동일 raw 기준으로 수행. 복수 후보가 있으면 확정값을 임의 이관하지 않음.
 - 분할 주소, 일부 비정형 OCR 표, 브랜드/옵션별 정책, 모든 원문 케이스의 동등성 검증은 미완료.
 - TS 감사의 18/19/20번 오류는 선행 정보이며 Rust에서 고쳐졌다고 확인한 사실이 아님.
