@@ -105,6 +105,7 @@ pub(super) fn project_order(payload: &Value) -> Result<Value, String> {
     let state = req(payload, "state")?;
     let order_id = super::required_str(payload, "orderId")?;
     let order = find_by_id(field(state, "orders"), order_id)
+        .or_else(|| payload.get("draft").filter(|draft| str_field(draft, "id") == order_id))
         .ok_or("주문 미리보기의 발주서를 확인하세요.")?;
     let groups = rows(field(field(state, "workflow"), "groups"));
     let ships = rows(field(field(state, "workflow"), "shipments")).iter()
