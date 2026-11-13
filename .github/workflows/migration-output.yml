@@ -3,13 +3,12 @@ on:
   push:
     branches:
       - migration/03-integration
-    paths:
-      - src-tauri/src/business_core/output/**
-      - tests/rust-migration/output/**
-      - .github/workflows/migration-output.yml
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: rust-output-migration03
+  cancel-in-progress: true
 jobs:
   output-rust:
     runs-on: ubuntu-latest
@@ -19,3 +18,28 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Compile and run independent Rust output tests
         run: cargo test --manifest-path tests/rust-migration/output/Cargo.toml
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install existing dependencies
+        run: npm install --no-audit --no-fund --ignore-scripts
+      - name: Verify TypeScript and production bundle
+        run: npm run build
+      - name: Existing frontend regressions
+        run: npm test
+  windows-native:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+      - name: Compile actual Tauri Rust and SQLite tests on Windows
+        run: cargo test --manifest-path src-tauri/Cargo.toml --lib
