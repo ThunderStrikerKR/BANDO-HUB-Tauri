@@ -317,8 +317,22 @@ test("report screens keep live read-only views while Excel export buttons are de
   const app=read("src/App.tsx");
   const daily=read("src/app/DailySettlement.tsx");
   const history=read("src/app/OrderHistory.tsx");
+  const model=read("src/app/useAppModel.ts");
+  const reportWorkbook=read("src/app/report-workbook.ts");
+  const historyFormat=read("src/app/history-format.ts");
+  const dateFormat=read("src/app/seoul-date.ts");
   const native=read("src-tauri/src/lib.rs");
   const bridge=read("src/tauri-bridge.ts");
+  assert.match(history, /"rules", "list_order_history_view"/);
+  assert.match(history, /from "\.\/history-format"/);
+  assert.match(daily, /from "\.\/history-format"/);
+  assert.match(model, /from "\.\/seoul-date"/);
+  assert.match(reportWorkbook, /from "\.\/seoul-date"/);
+  assert.doesNotMatch(model, /from "\.\/settlement-report"/);
+  assert.doesNotMatch(reportWorkbook, /from "\.\/settlement-report"/);
+  assert.doesNotMatch(historyFormat, /^import /m);
+  assert.doesNotMatch(dateFormat, /^import /m);
+
   assert.match(app,/<DailySettlement state=\{state\}/);
   assert.match(daily,/businessCoreCall<DailySettlementReport>\("output", "prepare_settlement"/);
   assert.match(daily, /"rules", "list_order_history"/);
