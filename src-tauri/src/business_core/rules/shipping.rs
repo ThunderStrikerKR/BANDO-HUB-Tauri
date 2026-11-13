@@ -147,7 +147,7 @@ pub(super) fn recommend(order: &Value, state: &Value) -> Result<Value, String> {
                 .max_by(|a,b| str_field(a,"at").cmp(str_field(b,"at")));
             let (recommendation,reason,source): (Option<i64>,String,&str) =
                 if items.iter().any(|i| !valid_item(i) ||
-                    field(i,"quantity").as_i64().is_none_or(|q| q < 0 || q > super::MAX_SAFE)) {
+                    field(i,"quantity").as_i64().is_none_or(|q| q > super::MAX_SAFE)) {
                     (None,"상품/옵션/수량 확인 필요".into(),"MANUAL")
                 } else if let Some(known) = known.filter(|_| !expired) {
                     (safe(field(known,"charge")),"현재 기준의 확인된 동일 조합".into(),"COMBINATION")
