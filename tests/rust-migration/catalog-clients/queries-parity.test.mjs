@@ -248,6 +248,10 @@ test("actual compiled Rust business reads and product editor equal original TS o
   trials.forEach((t,i)=>{
     const actualCase=actual[i];
     if(t.operation==="category_ids"&&actualCase.ok)actualCase.value.sort();
+    // The native decision is the selected links; match the original
+    // UI locale ordering at the same presentation boundary as the bridge.
+    if(t.operation==="official_links"&&actualCase.ok)
+      actualCase.value.sort((a,b)=>a.name.localeCompare(b.name,"ko"));
     try {
       if(t.operation==="upsert_product_from_editor"&&!t.oracle.ok)
         assert.equal(actualCase.ok,false);
