@@ -197,34 +197,56 @@ fn address_info(value: &str) -> (String, String, Value) {
     let status = if (road || lot) && !value.contains('#') && !value.contains('@') {
         "COMPLETE"
     } else { "INCOMPLETE" };
-    let province = Regex::new(r"^(?:서울특별시|서울|부산광역시|부산|대구광역시|대구|인천광역시|인천|광주광역시|광주|대전광역시|대전|울산광역시|울산|세종특별자치시|세종|경기도|경기|강원특별자치도|강원도|강원|충청북도|충청남도|전북특별자치도|전라북도|전라남도|경상북도|경상남도|제주특별자치도|제주도|제주|충북|충남|전북|전남|경북|경남)")
-        .expect("province").find(value).map(|m| m.as_str().to_owned());
+    // Literal port of src/parser.ts::addressParts: first remove a complete
+    // province token only when followed by a space/end. Search the remainder
+    // for city/district/town, then a road building or lot of that same town.
+    let province_pattern = Regex::new(
+        r"^(?:서울특별시|서울|부산광역시|부산|대구광역시|대구|인천광역시|인천|광주광역시|광주|대전광역시|대전|울산광역시|울산|세종특별자치시|세종|경기도|경기|강원특별자치도|강원도|강원|충청북도|충청남도|전북특별자치도|전라북도|전라남도|경상북도|경상남도|제주특별자치도|제주도|제주|충북|충남|전북|전남|경북|경남)"
+    ).expect("province");
+    let province_span = province_pattern.find(value).filter(|m|
+        value[m.end()..].chars().next().is_none_or(char::is_whitespace));
+    let rest = if let Some(p)=province_span {
+        &value[p.end()..]
+    } else {value}.trim();
     let mut parts = json!({});
-    if let Some(p) = province { parts["province"] = json!(p); }
+    if let Some(p)=province_span {parts["province"]=json!(p.as_str());}
+    let mut town_name: Option<String> = None;
     for (field, pattern) in [
         ("city", r"(?:^|\s)([가-힣]+(?:시|군))(?:\s|$)"),
         ("district", r"(?:^|\s)([가-힣]+구)(?:\s|$)"),
         ("town", r"(?:^|\s)([가-힣0-9]+(?:읍|면|동|리))(?:\s|$)"),
     ] {
-        if let Some(c)=Regex::new(pattern).expect("administrative component").captures(value) {
-            if let Some(m)=c.get(1){parts[field]=json!(m.as_str());}
+        if let Some(c)=Regex::new(pattern).expect("administrative component").captures(rest) {
+            if let Some(m)=c.get(1) {
+                parts[field]=json!(m.as_str());
+                if field=="town" {town_name=Some(m.as_str().to_owned());}
+            }
         }
     }
-    let road=Regex::new(r"([가-힣A-Za-z0-9.]+(?:대로|로|길))\s+(\d+(?:-\d+)?)")
-        .expect("road component").captures(value);
-    if let Some(m)=road {
-        parts["road"] = json!(&m[1]);
-        parts["building"] = json!(&m[2]);
-        if let Some(full)=m.get(0){
-            let detail=value[full.end()..].trim();
+    let road = Regex::new(r"([가-힣A-Za-z0-9·.]+(?:대로|로|길))\s+(\d+(?:-\d+)?)")
+        .expect("road component").captures(rest).and_then(|c| {
+            let m=c.get(0)?;
+            // JS negative lookahead: (?!\d|개|대)
+            if rest[m.end()..].chars().next().is_some_and(|ch|
+                ch.is_ascii_digit() || ch=='개' || ch=='대') {
+                None
+            } else {Some(c)}
+        });
+    if let Some(ref m)=road {
+        parts["road"]=json!(&m[1]);
+        parts["building"]=json!(&m[2]);
+        if let Some(full)=m.get(0) {
+            let detail=rest[full.end()..].trim();
             if !detail.is_empty(){parts["detail"]=json!(detail);}
         }
-    } else if let Some(m)=Regex::new(r"[동리읍면]\s+(?:산\s*)?(\d+(?:-\d+)?)")
-        .expect("lot number").captures(value) {
-        parts["building"]=json!(&m[1]);
-        if let Some(full)=m.get(0){
-            let detail=value[full.end()..].trim();
-            if !detail.is_empty(){parts["detail"]=json!(detail);}
+    } else if let Some(ref town)=town_name {
+        let pattern=format!(r"{}\s+(?:산\s*)?(\d+(?:-\d+)?)",regex::escape(town));
+        if let Some(m)=Regex::new(&pattern).expect("lot number").captures(rest) {
+            parts["building"]=json!(&m[1]);
+            if let Some(full)=m.get(0) {
+                let detail=rest[full.end()..].trim();
+                if !detail.is_empty(){parts["detail"]=json!(detail);}
+            }
         }
     }
     (kind.into(), status.into(), parts)
