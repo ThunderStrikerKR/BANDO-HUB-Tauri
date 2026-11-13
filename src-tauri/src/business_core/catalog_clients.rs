@@ -2,7 +2,9 @@
 //! XLSX byte parsing and React editor drafts remain UI concerns. A validated
 //! state transition is returned to the existing revision-checked SQLite saver.
 use serde_json::{json, Value};
+#[path = "catalog_clients/client_preview.rs"]
 mod client_preview;
+#[path = "catalog_clients/registration.rs"]
 mod registration;
 use unicode_normalization::UnicodeNormalization;
 use url::Url;
