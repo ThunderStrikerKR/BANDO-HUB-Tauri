@@ -5,8 +5,8 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { tsImport } from "tsx/esm/api";
 
-const { previewFactoryExport } = await tsImport("../../../src/factory-export.ts", import.meta.url);
-const { previewStoreExport } = await tsImport("../../../src/store-export.ts", import.meta.url);
+const { previewFactoryExport, recordFactoryExportPrepared } = await tsImport("../../../src/factory-export.ts", import.meta.url);
+const { previewStoreExport, recordStoreExportPrepared } = await tsImport("../../../src/store-export.ts", import.meta.url);
 const { dailySettlement } = await tsImport("../../../src/app/settlement-report.ts", import.meta.url);
 const { AUTOMATIC_MESSAGE_TEMPLATES, renderAutomaticTemplate, validateAutomaticMessageTemplates } =
   await tsImport("../../../src/automatic-message-templates.ts", import.meta.url);
@@ -104,6 +104,56 @@ for(const origin of ["FACTORY","STORE"]) {
   }
 }
 
+// XLSX Save As has completed; verify the full Rust ledger mutation against
+// the original TypeScript business reducer, including frozen snapshots.
+const exportNow="2026-11-13T12:13:14.000Z";
+function withExportClock(fn) {
+  const PreviousDate=globalThis.Date;
+  const previousCrypto=Object.getOwnPropertyDescriptor(globalThis,"crypto");
+  let cursor=0;
+  class FixedDate extends PreviousDate {
+    constructor(...args){super(args.length?args[0]:exportNow);}
+    static now(){return new PreviousDate(exportNow).getTime();}
+  }
+  Object.defineProperty(globalThis,"Date",{configurable:true,value:FixedDate});
+  Object.defineProperty(globalThis,"crypto",{configurable:true,value:{
+    randomUUID:()=>["export-rust-parity","event-rust-parity"][cursor++],
+  }});
+  try{return fn();}
+  finally{
+    Object.defineProperty(globalThis,"Date",{configurable:true,value:PreviousDate});
+    if(previousCrypto)Object.defineProperty(globalThis,"crypto",previousCrypto);
+    else delete globalThis.crypto;
+  }
+}
+for(const origin of ["FACTORY","STORE"]) {
+  const preview=origin==="FACTORY"?previewFactoryExport:previewStoreExport;
+  const finalized=origin==="FACTORY"?recordFactoryExportPrepared:recordStoreExportPrepared;
+  function saved(name,change=()=>{},savedPath="C:\\\\Output\\\\2026-11-13\\\\orders.xlsx") {
+    const state=base(origin);
+    state.settings={operatorName:"가상 직원"};
+    const before=preview(state,["queue-1"]);
+    change(state);
+    let current;
+    try{current=preview(state,["queue-1"]);}
+    catch{current=before;}
+    add("export finalization "+origin+": "+name,"finalize_export",{
+      state,origin,preview:before,savedPath,now:exportNow,
+      exportId:"export-rust-parity",eventId:"event-rust-parity",
+    },()=>withExportClock(()=>finalized(state,before,savedPath,current)));
+  }
+  saved("valid Windows path");
+  saved("valid forward-slash path",()=>{},"C:/Output/2026-11-13/orders.xlsx");
+  saved("empty saved filename",()=>{},"");
+  saved("invalid extension",()=>{},"C:/Output/orders.csv");
+  saved("changed state revision",state=>{state.revision++;});
+  saved("modified recipient after Save As",state=>{
+    state.workflow.queue[0].snapshot.recipient.name="변경된 수취인";
+  });
+  saved("modified confirmed item after Save As",state=>{
+    state.workflow.queue[0].snapshot.recipient.items[0].quantity=3;
+  });
+}
 const values={
   "수취인":"김민수","상품명":"BD 709","번호":"1","확인항목":"주소 확인",
   "색상":"블랙","수량":"2","금액":"5,000원","운임":"3,000원",
