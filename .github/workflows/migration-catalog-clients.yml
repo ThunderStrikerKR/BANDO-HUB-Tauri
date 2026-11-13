@@ -38,6 +38,10 @@ jobs:
         run: node --test tests/rust-migration/catalog-clients/category-parity.test.mjs
       - name: Compare native live client search catalog queries and product editor with original TS
         run: node --test tests/rust-migration/catalog-clients/queries-parity.test.mjs
+      - name: Verify alias save and model group rules against original TypeScript
+        run: node --test tests/rust-migration/catalog-clients/alias-model-parity.test.mjs
+      - name: Compare official Cafe24 HTML parser and guards against original DOMParser
+        run: node --test tests/rust-migration/catalog-clients/official-html-parity.test.mjs
       - name: Compare complete client workbook row previews with original TS
         run: node --test tests/rust-migration/catalog-clients/client-preview-parity.test.mjs
       - name: Compare product registration previews with original XLSX TS
