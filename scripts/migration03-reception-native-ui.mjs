@@ -26,10 +26,17 @@ try{
   await fs.access(baseline);
   throw Error("Refusing to use an existing baseline DB");
 }catch(e){if(e?.code!=="ENOENT")throw e;}
+console.log("CI_BASELINE_PATH",JSON.stringify({
+  expected:baseline,APPDATA:process.env.APPDATA,USERPROFILE:process.env.USERPROFILE,
+  root,exe,
+}));
 const bootstrap=spawn(exe,[],{
-  cwd:dirname(exe),windowsHide:false,stdio:"ignore",
+  cwd:dirname(exe),windowsHide:false,stdio:["ignore","pipe","pipe"],
   env:{...process.env,WEBVIEW2_USER_DATA_FOLDER:join(root,"bootstrap-webview2")},
 });
+let bootstrapOut="",bootstrapErr="";
+bootstrap.stdout?.on("data",part=>bootstrapOut+=part.toString());
+bootstrap.stderr?.on("data",part=>bootstrapErr+=part.toString());
 try{
   let ready=false;
   for(let n=0;n<120;n++){
@@ -37,6 +44,21 @@ try{
     try{if((await fs.stat(baseline)).size>4096){ready=true;break;}}
     catch{/* opening */}
     await sleep(300);
+  }
+  if(!ready){
+    console.error("NATIVE_BOOTSTRAP_DIAGNOSTICS",JSON.stringify({
+      expected:baseline,exitCode:bootstrap.exitCode,
+      stderr:bootstrapErr.slice(-5000),stdout:bootstrapOut.slice(-3000),
+    }));
+    try{
+      const report=execFileSync("pwsh.exe",[
+        "-NoProfile","-ExecutionPolicy","Bypass",
+        "-File",resolve("scripts/stage9-windows-desktop-probe.ps1"),
+        "-ProcessId",String(bootstrap.pid),"-OutDir",out,
+      ],{encoding:"utf8",timeout:30000});
+      await fs.writeFile(join(out,"native-bootstrap-probe.json"),report,"utf8");
+      console.log("NATIVE_BOOTSTRAP_PROBE",report.slice(0,3000));
+    }catch(error){console.error("NATIVE_BOOTSTRAP_PROBE_ERROR",String(error));}
   }
   assert.ok(ready,"Native Tauri did not initialize disposable CI baseline");
   await sleep(1700);
