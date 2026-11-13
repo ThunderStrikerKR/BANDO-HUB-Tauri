@@ -34,7 +34,7 @@ test("freight controls spread out without width changes between factory and stor
   assert.match(block(".items-freight-panel .freight-payment-code > select"), /width: 66px;/);
   assert.match(block(".items-freight-panel .freight-money > input"), /width: 84px;/);
   assert.match(block(".items-freight-panel .freight-line > .freight-inquiry"), /margin-left: auto;/);
-  assert.match(freight, /visibility: b\.origin === "FACTORY" \? "visible" : "hidden"/);
+  assert.match(freight, /visibility: origin === "FACTORY" \? "visible" : "hidden"/);
 });
 
 test("message link checkbox is right aligned and VAT is inset", () => {

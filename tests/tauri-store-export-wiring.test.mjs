@@ -29,7 +29,10 @@ test("a printed store workbook stays pending until a separately confirmed shipme
  const corrections=read("src/corrections.ts"),model=read("src/store-export.ts");
  assert.match(ui,/q!\.origin === "STORE"/);
  assert.match(ui,/매장 발송 확인/);
- assert.match(ui,/markStoreSent\(state, q!\.id\)/);
+ assert.match(ui,/nativeApplyWorkflowAction\(state, "mark_store_sent", \{ queueId: q!\.id \}\)/);
+ const native=read("src-tauri/src/business_core/rules/workflow.rs");
+ assert.match(native,/"mark_store_sent" =>/);
+ assert.match(native,/set\(&mut state\["workflow"\]\["queue"\]\[qi\],"fileOnly",json!\(false\)\)/);
  assert.ok(work.includes('!["QUEUED", "EXPORTED"].includes(q.status)'));
  assert.match(work,/q\.fileOnly = false/);
  assert.match(model,/entry\.status = "EXPORTED"/);

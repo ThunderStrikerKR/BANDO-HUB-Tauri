@@ -61,5 +61,5 @@ test("catalog names, prices, images, identity and existing quantity remain indep
   assert.match(editor, /quantityConfirmed: item\.quantityConfirmed/);
   assert.match(editor, /onError=\{\(\) => setInvalidImage\(usableImage\)\}/);
   assert.match(editor, /candidate\.id === item\.productId/);
-  assert.match(editor, /if \(locked \|\| !changed/);
+  assert.match(editor, /if \(pricePending \|\| locked \|\| !changed/);
 });

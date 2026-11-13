@@ -18,8 +18,8 @@ test("freight input stays 84px regardless of dispatch origin or inquiry visibili
 });
 test("factory-only inquiry remains a hidden layout placeholder for store dispatch", () => {
   assert.match(footer, /className="freight-inquiry"/);
-  assert.match(footer, /aria-hidden=\{b\.origin !== "FACTORY"\}/);
-  assert.match(footer, /visibility: b\.origin === "FACTORY" \? "visible" : "hidden"/);
+  assert.match(footer, /aria-hidden=\{origin !== "FACTORY"\}/);
+  assert.match(footer, /visibility: origin === "FACTORY" \? "visible" : "hidden"/);
   assert.doesNotMatch(footer, /\s+hidden=\{b\.origin !== "FACTORY"\}/);
   assert.match(css, /\.freight-line > \.freight-inquiry\s*\{[^}]*flex: 0 0 112px;/);
 });

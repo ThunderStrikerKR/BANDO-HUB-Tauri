@@ -20,7 +20,7 @@ test("leaving selected order with edits saves or discards before changing select
   assert.match(hub, /const persisted = state\.orders\.find/);
   assert.match(hub, /JSON\.stringify\(pending\) === JSON\.stringify\(persisted\)/);
   assert.match(hub, /choice === "save"/);
-  assert.match(hub, /await onSave\(reconcileWorkflow\(state, pending\)\)/);
+  assert.match(hub, /await onSave\(await nativeReconcileWorkflow\(state, pending\)\)/);
   assert.match(hub, /props\.onChange\(structuredClone\(persisted\)\)/);
   assert.match(hub, /delete next\[orderId\]/);
   assert.match(hub, /const leave = await leaveGuardRef\.current\(\)/);

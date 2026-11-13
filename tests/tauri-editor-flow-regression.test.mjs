@@ -56,10 +56,14 @@ test("both freight editors refuse a no-op before versioning or history writes",(
     const next=content.slice(start,start+190);
     assert.match(next,/if \(!editing \|\| !editingDirty\) return true;/);
     const portion=content.slice(start);
-    assert.ok(portion.indexOf("if (!editing || !editingDirty)") <
-      portion.indexOf("version: crypto.randomUUID()"));
-    assert.ok(portion.indexOf("if (!editing || !editingDirty)") <
-      portion.indexOf("history.push"));
+    const guard=portion.indexOf("if (!editing || !editingDirty)");
+    const nativeCall=portion.indexOf("businessCoreCall<");
+    assert.ok(guard>=0 && nativeCall>guard,
+      path+" must reject a no-op before calling native Rust");
+    assert.match(portion,/apply_shipping_action/,
+      path+" must save through the native Rust shipping rules");
+    assert.doesNotMatch(portion.slice(0,200),/history\.push/,
+      "The UI must not write version history before confirming an edit");
   }
 });
 
