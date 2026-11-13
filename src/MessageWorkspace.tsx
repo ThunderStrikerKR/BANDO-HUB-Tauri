@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { withGreeting } from "./automatic-message";
-import { nativeAutomaticMessage, type NativeAutomaticMessage } from "./native-automatic-message";
+
+import { nativeAutomaticMessage, nativeDecorateCopyText, type NativeAutomaticMessage } from "./native-automatic-message";
 import { nativeRecordMessageCopy } from "./native-message-audit";
 import { LinkedText, messageSpans } from "./LinkedText";
 import type { NoticeSink } from "./shared/notices";
@@ -88,7 +88,7 @@ export function MessageWorkspace({
     if (disabled || !gid) return;
     setBusy(true);
     try {
-      await window.bando!.copy(greeting ? withGreeting(text) : text);
+      await window.bando!.copy(await nativeDecorateCopyText(text, greeting));
       if (latest.current.id !== order.id || latest.current.raw !== order.raw) return;
       if (order.confirmedAt)
         await onSave(await nativeRecordMessageCopy(state, gid, request ? "REQUEST" : "PAYMENT", crypto.randomUUID(), automatic?.signature));
