@@ -2077,7 +2077,7 @@ function twoShipped(s:WfState,separate=false){
 function wfActionCase(
   name:string,action:string,
   mutate:(s:WfState)=>void,
-  params:(ids:string[])=>Record<string,unknown>,
+  params:(ids:string[],state:WfState)=>Record<string,unknown>,
   source:(s:WfState)=>unknown,
   expectOk:boolean
 ){
@@ -2088,7 +2088,7 @@ function wfActionCase(
   // Full State is always compared, adapter-only metadata is intentionally
   // stripped for parity. Error messages remain exact byte comparisons.
   add("workflow action: "+name,"apply_workflow_action",{
-    state,action,now:actionNow,actor:WFA,eventId:ids[0],...params(ids)
+    state,action,now:actionNow,actor:WFA,eventId:ids[0],...params(ids,state)
   },()=>({state:deterministicIds(ids,()=>source(state))}));
   cases[cases.length-1].expectedOk=expectOk;
 }
@@ -2207,6 +2207,140 @@ wfActionCase("complete delivered shipment","complete_delivery",
   ids=>({...actionProps(ids),eventId:ids[2],actual:{FACTORY:3500}}),
   s=>completeDelivery(s,WFS,{FACTORY:3500},WFA),true);
 wfActionCase("complete undelivered shipment refused","complete_delivery",()=>{},
+  ids=>({...actionProps(ids),actual:{FACTORY:3500}}),
+  s=>completeDelivery(s,WFS,{FACTORY:3500},WFA),false);
+
+
+// Additional source-driven state-transition cases. These are not simulated
+// by placing an arbitrary "step:3" marker: the source advanceGroup
+// transition produces valid notices/signatures/evidence for the next step.
+function preparedWorkflowStage(s:WfState,stage:number,payment:"PREPAID"|"POSTPAID"="POSTPAID"){
+  s.clients[0].payment=payment;
+  s.workflow.shipments[0].step=0;
+  const prepared=deterministicIds(
+    Array.from({length:100},(_,i)=>"advance-preparation-"+payment+"-"+i),
+    ()=>{
+      let next=reconcileWorkflow(s);
+      for(let i=0;i<stage;i++)next=advanceGroup(next,WFG,WFA);
+      return next;
+    }
+  );
+  Object.assign(s,prepared);
+}
+wfActionCase("advance valid stage one to two","advance_group",
+  s=>preparedWorkflowStage(s,1),
+  actionProps,
+  s=>advanceGroup(s,WFG,WFA),true);
+wfActionCase("advance valid stage two to account notice","advance_group",
+  s=>preparedWorkflowStage(s,2),
+  (ids,s)=>{
+    const expected=deterministicIds(ids,()=>advanceGroup(s,WFG,WFA));
+    return {...actionProps(ids),noticeId:ids[0],eventId:ids[1],
+      paymentMessage:expected.workflow.groups[0].notices.at(-1)?.message,
+      billingSignature:expected.workflow.shipments[0].billingSignature};
+  },
+  s=>advanceGroup(s,WFG,WFA),true);
+wfActionCase("advance valid postpaid approval","advance_group",
+  s=>preparedWorkflowStage(s,3),
+  actionProps,
+  s=>advanceGroup(s,WFG,WFA),true);
+wfActionCase("block direct prepaid approval without receipt","advance_group",
+  s=>preparedWorkflowStage(s,3,"PREPAID"),
+  actionProps,
+  s=>advanceGroup(s,WFG,WFA),false);
+wfActionCase("undo valid postpaid fourth step","undo_group",
+  s=>preparedWorkflowStage(s,4),
+  actionProps,
+  s=>undoGroup(s,WFG,WFA),true);
+wfActionCase("undo prepaid confirmed approval revokes confirmation","undo_group",
+  s=>{
+    preparedWorkflowStage(s,3,"PREPAID");
+    const confirmed=deterministicIds(
+      Array.from({length:80},(_,i)=>"prepaid-accepted-"+i),
+      ()=>confirmGroupPayment(s,WFG,WFA)
+    );
+    Object.assign(s,confirmed);
+  },
+  actionProps,
+  s=>undoGroup(s,WFG,WFA),true);
+wfActionCase("freight edit from previously notified stage","set_shipment_freight",
+  s=>preparedWorkflowStage(s,3),
+  ids=>({...actionProps(ids),origin:"FACTORY",value:4500}),
+  s=>setShipmentFreight(s,WFS,"FACTORY",4500,WFA),true);
+wfActionCase("change account after completed notice","set_group_account",
+  s=>preparedWorkflowStage(s,3),
+  ids=>({...actionProps(ids),accountId:"account-1"}),
+  s=>setGroupAccount(s,WFG,"account-1",WFA),true);
+wfActionCase("zero-change actual freight is no-op","record_actual_freight",
+  s=>{s.workflow.shipments[0].actualFreight={FACTORY:3500};},
+  ids=>({...actionProps(ids),origin:"FACTORY",value:3500}),
+  s=>recordActualFreight(s,WFS,"FACTORY",3500),true);
+wfActionCase("reject duplicate payment allocation targets","record_payment",()=>{},
+  ids=>({...actionProps(ids),paidAmount:2000,paidAt:actionNow,
+    allocations:[{shipmentId:WFS,amount:1000},{shipmentId:WFS,amount:1000}],
+    allocationIds:[ids[1],ids[2]]}),
+  s=>recordPayment(s,WFG,2000,[{shipmentId:WFS,amount:1000},{shipmentId:WFS,amount:1000}],actionNow,"",WFA),false);
+wfActionCase("reject overallocated payment","record_payment",()=>{},
+  ids=>({...actionProps(ids),paidAmount:1000,paidAt:actionNow,
+    allocations:[{shipmentId:WFS,amount:2000}]}),
+  s=>recordPayment(s,WFG,1000,[{shipmentId:WFS,amount:2000}],actionNow,"",WFA),false);
+wfActionCase("reject missing payment timestamp","record_payment",()=>{},
+  ids=>({...actionProps(ids),paidAmount:3000,paidAt:"",allocations:[]}),
+  s=>recordPayment(s,WFG,3000,[],"","",WFA),false);
+wfActionCase("restore after factory export forbidden","restore_shipment",
+  s=>{s.workflow.shipments[0].transferred=true;
+    s.workflow.queue=[{id:"excel:restore:export",shipmentId:WFS,origin:"FACTORY",
+      status:"EXPORTED",snapshot:{}}];},
+  actionProps,s=>restoreShipment(s,WFS,WFA),false);
+wfActionCase("store sent after legitimate Excel export","mark_store_sent",
+  s=>{s.workflow.queue=[{id:"excel:store:export",shipmentId:WFS,
+    origin:"STORE",status:"EXPORTED",exportId:"store-session",snapshot:{}}];
+    s.exports=[{id:"store-session",queueEntryIds:["excel:store:export"]}];},
+  ids=>({...actionProps(ids),queueId:"excel:store:export"}),
+  s=>markStoreSent(s,"excel:store:export",WFA),true);
+wfActionCase("store sent requires export ownership","mark_store_sent",
+  s=>{s.workflow.queue=[{id:"excel:store:orphan",shipmentId:WFS,
+    origin:"STORE",status:"EXPORTED",exportId:"missing-session",snapshot:{}}];},
+  ids=>({...actionProps(ids),queueId:"excel:store:orphan"}),
+  s=>markStoreSent(s,"excel:store:orphan",WFA),false);
+wfActionCase("missing change request shipment blocked","record_change_request",()=>{},
+  ids=>({...actionProps(ids),shipmentId:"missing-shipment",text:"주소 정정 요청"}),
+  s=>recordChangeRequest(s,"missing-shipment","주소 정정 요청",WFA),false);
+wfActionCase("split-group with notice retains notice accounting","detach_shipment",
+  s=>{twoShipped(s,false);
+    s.workflow.groups[0].notices=[{
+      id:"past-notice",at:now,actor:WFA,
+      shipmentIds:[WFS],amounts:{[WFS]:70400},total:70400,
+      account:copy(settings.accounts[0]),message:"기존 안내"
+    }];},
+  ids=>({...actionProps(ids),eventId:ids[1]}),
+  s=>detachShipment(s,WFS,WFA),true);
+wfActionCase("regroup requires explicit notice acknowledgment","regroup_shipment",
+  s=>{twoShipped(s,true);
+    s.workflow.groups[0].notices=[{id:"past-notice",at:now}];},
+  ids=>({...actionProps(ids),targetGroupId:"group:o1:other",ack:false}),
+  s=>regroupShipment(s,WFS,"group:o1:other",false,WFA),false);
+wfActionCase("approved group with active Excel is already processed","process_group",
+  s=>{s.workflow.shipments[0].step=4;
+    s.workflow.shipments[0].transferred=true;
+    s.workflow.queue=[{id:"excel:shipment:o1:r1:FACTORY",shipmentId:WFS,
+      origin:"FACTORY",status:"QUEUED",snapshot:{}}];},
+  actionProps,s=>processGroup(s,WFG,WFA),true);
+wfActionCase("completed shipment cannot be delivered twice","complete_delivery",
+  s=>{s.workflow.shipments[0].transferred=true;
+    s.workflow.shipments[0].delivery={at:now,actor:WFA,actual:{FACTORY:3500}};},
+  ids=>({...actionProps(ids),actual:{FACTORY:3500}}),
+  s=>completeDelivery(s,WFS,{FACTORY:3500},WFA),true);
+wfActionCase("reject delivery while factory file only","complete_delivery",
+  s=>{s.workflow.shipments[0].transferred=true;
+    s.workflow.queue=[{id:"excel:file-only",shipmentId:WFS,
+      origin:"FACTORY",status:"EXPORTED",fileOnly:true,snapshot:{}}];},
+  ids=>({...actionProps(ids),actual:{FACTORY:3500}}),
+  s=>completeDelivery(s,WFS,{FACTORY:3500},WFA),false);
+wfActionCase("reject delivery before factory handoff","complete_delivery",
+  s=>{s.workflow.shipments[0].transferred=true;
+    s.workflow.queue=[{id:"excel:queued",shipmentId:WFS,
+      origin:"FACTORY",status:"QUEUED",snapshot:{}}];},
   ids=>({...actionProps(ids),actual:{FACTORY:3500}}),
   s=>completeDelivery(s,WFS,{FACTORY:3500},WFA),false);
 
