@@ -124,6 +124,28 @@ export async function nativeApplyWorkflowAction(
   return result.state;
 }
 
+/** Execute the existing Rust correction reducer for already-exported freight.
+ * Caller performs the single revision-checked SQLite commit; no TS mutation
+ * fallback is allowed on a native error.
+ */
+export async function nativeApplyCorrectionAction(
+  state: State,
+  action: "request_correction" | "copied_correction" | "confirm_correction"
+    | "mark_factory_delivered" | "mark_collected" | "reopen_unsent_export",
+  args: { shipmentId?: string; requestId?: string; afterRecipient?: import("../types").Recipient },
+): Promise<State> {
+  const { state: updated } = await businessCoreCall<{ state: State }>(
+    "rules", "apply_correction_action", {
+      state, action, ...args, now: new Date().toISOString(),
+      ids: [crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID()],
+    },
+  );
+  await businessCoreCall<{ valid: boolean }>(
+    "rules", "validate_workflow", { state: updated, before: state },
+  );
+  return updated;
+}
+
 /** Soft deletion/restoration of a shipment group is also an audited Rust rule.
  * This keeps its event history and protects payment/exported groups.
  */
