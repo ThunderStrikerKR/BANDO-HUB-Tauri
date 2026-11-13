@@ -480,23 +480,19 @@ export function ShippingManager({
                   onNotice("같은 배송 그룹이 있습니다.");
                   return;
                 }
-                const next: ShippingState = structuredClone(shipping);
-                next.groups.push({
-                  id: crypto.randomUUID(),
-                  name: newName.trim(),
-                  current: {
-                    version: crypto.randomUUID(),
-                    at: new Date().toISOString(),
-                    fees: {},
-                    maxBundle: null,
-                    maxConfirmed: false,
-                    perItem: null,
-                    notes: "운임 확인 필요",
-                  },
-                  history: [],
-                });
-                if (await save({ ...state, shipping: next }, "새 배송 그룹을 등록했습니다."))
-                  setNewName("");
+                try {
+                  const { shipping: updated } = await businessCoreCall<{ shipping: ShippingState }>(
+                    "rules", "apply_shipping_action", {
+                      action: "create_group", shipping,
+                      groupId: crypto.randomUUID(), name: newName.trim(),
+                      versionId: crypto.randomUUID(), now: new Date().toISOString(),
+                    },
+                  );
+                  if (await save({ ...state, shipping: updated }, "새 배송 그룹을 등록했습니다."))
+                    setNewName("");
+                } catch (error) {
+                  onNotice(error instanceof Error ? error.message : String(error), "error");
+                }
               }}
             >
               배송 그룹 추가
@@ -536,9 +532,17 @@ export function ShippingManager({
                         onClick={async () => {
                           const name = await promptText("배송 그룹명", g.name);
                           if (!name?.trim()) return;
-                          const next = structuredClone(shipping);
-                          next.groups.find((x) => x.id === g.id)!.name = name.trim();
-                          void save({ ...state, shipping: next }, "배송 그룹명을 변경했습니다.");
+                          try {
+                            const { shipping: updated } = await businessCoreCall<{ shipping: ShippingState }>(
+                              "rules", "apply_shipping_action", {
+                                action: "rename_group", shipping,
+                                groupId: g.id, name: name.trim(),
+                              },
+                            );
+                            void save({ ...state, shipping: updated }, "배송 그룹명을 변경했습니다.");
+                          } catch (error) {
+                            onNotice(error instanceof Error ? error.message : String(error), "error");
+                          }
                         }}
                       >이름 수정</Button>
                       <Button size="compact"
