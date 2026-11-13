@@ -1215,6 +1215,235 @@ validationCase("old confirmed receipt raw is outside validateWorkflow",unchanged
   s.orders[0].raw="new confirmed raw";
 },true);
 
+
+// Invariant-focused before/after cases; require original TS success/failure
+// as a separate assertion so two erroneous implementations cannot both PASS.
+function historyConfirmation(){
+  return {id:"confirm-old",groupId:"group:o1",dealerId:"dealer-1",
+    shipmentIds:["shipment:o1:r1"],amount:100,
+    confirmedAt:now,actor:"기존 직원",
+    announcedAccount:copy(settings.accounts[0]),
+    amounts:{"shipment:o1:r1":100},
+    allocations:[{shipmentId:"shipment:o1:r1",amount:100}]};
+}
+validationCase("confirmation immutable baseline",s=>{
+  s.workflow.confirmations=[historyConfirmation()];
+},unchanged,true);
+validationCase("confirmation deletion before final approval",s=>{
+  s.workflow.confirmations=[historyConfirmation()];
+},s=>{s.workflow.confirmations=[];},true);
+validationCase("confirmation deletion after transferred shipment",s=>{
+  s.workflow.confirmations=[historyConfirmation()];
+  s.workflow.shipments[0].transferred=true;
+},s=>{s.workflow.confirmations=[];},false);
+validationCase("confirmation deletion after step four",s=>{
+  s.workflow.confirmations=[historyConfirmation()];
+  s.workflow.shipments[0].step=4;
+},s=>{s.workflow.confirmations=[];},false);
+validationCase("confirmation amount cannot change directly",s=>{
+  s.workflow.confirmations=[historyConfirmation()];
+},s=>{s.workflow.confirmations[0].amount=500;},false);
+validationCase("confirmation actor cannot change directly",s=>{
+  s.workflow.confirmations=[historyConfirmation()];
+},s=>{s.workflow.confirmations[0].actor="무단 변경";},false);
+validationCase("confirmation balance shape cannot change",s=>{
+  s.workflow.confirmations=[historyConfirmation()];
+},s=>{s.workflow.confirmations[0].amounts={"shipment:o1:r1":101};},false);
+validationCase("valid partial confirmation cancellation",s=>{
+  const row=copy(s.orders[0].recipients[0]);
+  row.id="r2";row.name="두번째 수취인";row.items[0].id="item2";
+  s.orders[0].recipients.push(row);
+  const shipment=copy(s.workflow.shipments[0]);
+  shipment.id="shipment:o1:r2";shipment.recipientId="r2";
+  s.workflow.shipments.push(shipment);
+  const confirmation=historyConfirmation();
+  confirmation.shipmentIds=["shipment:o1:r1","shipment:o1:r2"];
+  confirmation.amounts={"shipment:o1:r1":100,"shipment:o1:r2":200};
+  confirmation.allocations=[
+    {shipmentId:"shipment:o1:r1",amount:100},
+    {shipmentId:"shipment:o1:r2",amount:200}
+  ];
+  confirmation.amount=300;
+  s.workflow.confirmations=[confirmation];
+},s=>{
+  const c=s.workflow.confirmations[0];
+  c.shipmentIds=["shipment:o1:r1"];
+  c.allocations=[{shipmentId:"shipment:o1:r1",amount:100}];
+  c.amounts={"shipment:o1:r1":100};c.amount=100;
+},true);
+validationCase("partial confirmation cancellation forbidden for transferred removed ship",s=>{
+  const row=copy(s.orders[0].recipients[0]);
+  row.id="r2";row.name="두번째 수취인";row.items[0].id="item2";
+  s.orders[0].recipients.push(row);
+  const shipment=copy(s.workflow.shipments[0]);
+  shipment.id="shipment:o1:r2";shipment.recipientId="r2";
+  shipment.transferred=true;
+  s.workflow.shipments.push(shipment);
+  const confirmation=historyConfirmation();
+  confirmation.shipmentIds=["shipment:o1:r1","shipment:o1:r2"];
+  confirmation.amounts={"shipment:o1:r1":100,"shipment:o1:r2":200};
+  confirmation.allocations=[
+    {shipmentId:"shipment:o1:r1",amount:100},
+    {shipmentId:"shipment:o1:r2",amount:200}
+  ];
+  confirmation.amount=300;
+  s.workflow.confirmations=[confirmation];
+},s=>{
+  const c=s.workflow.confirmations[0];
+  c.shipmentIds=["shipment:o1:r1"];
+  c.allocations=[{shipmentId:"shipment:o1:r1",amount:100}];
+  c.amounts={"shipment:o1:r1":100};c.amount=100;
+},false);
+validationCase("all existing confirmation IDs may coexist with new",s=>{
+  s.workflow.confirmations=[historyConfirmation()];
+},s=>{
+  const c=historyConfirmation();c.id="confirm-added";
+  s.workflow.confirmations.push(c);
+},true);
+validationCase("double actual freight invalid values prefer actualFreight",unchanged,s=>{
+  s.workflow.shipments[0].actualFreight={FACTORY:-1};
+  s.workflow.shipments[0].charges={FACTORY:-1};
+},false);
+validationCase("double invalid retail record prefer retail guard",unchanged,s=>{
+  s.orders[0].orderType="RETAIL";
+  s.workflow.groups[0].sourceId="bad-link";
+  s.workflow.shipments[0].transferred=false;
+},false);
+validationCase("old confirmation change preferred before history deletion",s=>{
+  s.workflow.confirmations=[historyConfirmation()];
+  s.workflow.events=[{id:"prior-event",action:"OTHER",shipmentIds:[]}];
+},s=>{
+  s.workflow.confirmations[0].amount=999;
+  s.workflow.events=[];
+},false);
+validationCase("actual freight audit valid with old field absent",unchanged,s=>{
+  s.workflow.shipments[0].actualFreight={FACTORY:3210};
+  s.workflow.events.push({
+    id:"freight-evidence-1",at:now,actor:"직원",
+    action:"실제 출고 운임 입력",shipmentIds:["shipment:o1:r1"],
+    before:null,after:{origin:"FACTORY",amount:3210}
+  });
+},true);
+validationCase("actual freight change without evidence is blocked",unchanged,s=>{
+  s.workflow.shipments[0].actualFreight={FACTORY:3210};
+},false);
+validationCase("actual freight audit wrong old amount blocked",unchanged,s=>{
+  s.workflow.shipments[0].actualFreight={FACTORY:3210};
+  s.workflow.events.push({
+    id:"freight-evidence-2",at:now,actor:"직원",
+    action:"실제 출고 운임 입력",shipmentIds:["shipment:o1:r1"],
+    before:5000,after:{origin:"FACTORY",amount:3210}
+  });
+},false);
+validationCase("actual freight audit wrong origin blocked",unchanged,s=>{
+  s.workflow.shipments[0].actualFreight={FACTORY:3210};
+  s.workflow.events.push({
+    id:"freight-evidence-3",at:now,actor:"직원",
+    action:"실제 출고 운임 입력",shipmentIds:["shipment:o1:r1"],
+    before:null,after:{origin:"STORE",amount:3210}
+  });
+},false);
+validationCase("old actualFreight edited with proof",s=>{
+  s.workflow.shipments[0].actualFreight={FACTORY:5000};
+},s=>{
+  s.workflow.shipments[0].actualFreight.FACTORY=4000;
+  s.workflow.events.push({
+    id:"freight-evidence-4",at:now,actor:"직원",
+    action:"실제 출고 운임 입력",shipmentIds:["shipment:o1:r1"],
+    before:5000,after:{origin:"FACTORY",amount:4000}
+  });
+},true);
+validationCase("proof event cannot be reused from old history",s=>{
+  s.workflow.events.push({
+    id:"freight-evidence-5",at:now,actor:"직원",
+    action:"실제 출고 운임 입력",shipmentIds:["shipment:o1:r1"],
+    before:null,after:{origin:"FACTORY",amount:3210}
+  });
+},s=>{s.workflow.shipments[0].actualFreight={FACTORY:3210};},false);
+function oldExport(status:string="EXPORTED"){
+  return {id:"export-1",shipmentId:"shipment:o1:r1",origin:"FACTORY",
+    at:now,actor:"기존 직원",status,fileOnly:true,
+    snapshot:{recipient:copy(recipient),sender:copy(client),
+      total:70000,vat:6000,subtotal:60000,shipping:4000}};
+}
+validationCase("historical exported file metadata no-op",s=>{
+  s.workflow.queue=[oldExport()];
+},unchanged,true);
+validationCase("exported file cannot be edited without staff confirmation",s=>{
+  s.workflow.queue=[oldExport()];
+},s=>{
+  s.workflow.queue[0].fileOnly=false;
+  s.workflow.queue[0].factoryDeliveredAt=now;
+},false);
+validationCase("exported file staff handoff metadata allowed",s=>{
+  s.workflow.queue=[oldExport()];
+},s=>{
+  s.workflow.queue[0].fileOnly=false;
+  s.workflow.queue[0].factoryDeliveredAt=now;
+  s.workflow.events.push({id:"handoff-staff",at:now,actor:"확인 직원",
+    action:"공장 전달 직원 확인",shipmentIds:["shipment:o1:r1"]});
+},true);
+validationCase("exported file changed snapshot still blocked",s=>{
+  s.workflow.queue=[oldExport()];
+},s=>{
+  s.workflow.queue[0].fileOnly=false;
+  s.workflow.queue[0].factoryDeliveredAt=now;
+  s.workflow.queue[0].snapshot.total=8999;
+  s.workflow.events.push({id:"handoff-staff",at:now,actor:"확인 직원",
+    action:"공장 전달 직원 확인",shipmentIds:["shipment:o1:r1"]});
+},false);
+validationCase("printed file pre-delivery disposal with source snapshot",s=>{
+  s.workflow.queue=[oldExport()];
+  s.exports=[{id:"export-session",snapshots:[
+    {id:"export-1",snapshot:copy(s.workflow.queue[0].snapshot)}
+  ]}];
+},s=>{
+  s.workflow.queue[0].status="CANCELLED";
+  s.workflow.events.push({id:"dispose-old",at:now,actor:"직원",
+    action:"전달 전 출력본 폐기 / 재작성",shipmentIds:["shipment:o1:r1"]});
+},true);
+validationCase("printed file disposal without source snapshot refused",s=>{
+  s.workflow.queue=[oldExport()];
+  s.exports=[];
+},s=>{
+  s.workflow.queue[0].status="CANCELLED";
+  s.workflow.events.push({id:"dispose-old",at:now,actor:"직원",
+    action:"전달 전 출력본 폐기 / 재작성",shipmentIds:["shipment:o1:r1"]});
+},false);
+validationCase("printed file disposal refused if actually handed to carrier",s=>{
+  s.workflow.queue=[oldExport()];
+  s.workflow.queue[0].factoryDeliveredAt=now;
+  s.exports=[{id:"export-session",snapshots:[
+    {id:"export-1",snapshot:copy(s.workflow.queue[0].snapshot)}
+  ]}];
+},s=>{
+  s.workflow.queue[0].status="CANCELLED";
+  s.workflow.events.push({id:"dispose-old",at:now,actor:"직원",
+    action:"전달 전 출력본 폐기 / 재작성",shipmentIds:["shipment:o1:r1"]});
+},false);
+validationCase("STORE_SENT completed record cannot be un-sent",s=>{
+  s.workflow.queue=[oldExport("STORE_SENT")];
+},s=>{s.workflow.queue[0].status="CANCELLED";},false);
+validationCase("old confirmed notice cannot be removed with group",s=>{
+  s.workflow.groups[0].notices=[{id:"notice-old",at:now,amount:100}];
+},s=>{s.workflow.groups=[];},false);
+validationCase("multiple valid allocation entries sum exactly",unchanged,s=>{
+  s.workflow.payments.push({id:"money-1",dealerId:"dealer-1",
+    amount:100,allocations:[
+      {shipmentId:"shipment:o1:r1",amount:30},
+      {shipmentId:"shipment:o1:r1",amount:70}
+    ]});
+},true);
+validationCase("unsafe payment total is rejected",unchanged,s=>{
+  s.workflow.payments.push({id:"money-1",dealerId:"dealer-1",
+    amount:9007199254740992,
+    allocations:[{shipmentId:"shipment:o1:r1",amount:1}]});
+},false);
+validationCase("decimal payment allocation rejected",unchanged,s=>{
+  s.workflow.payments.push({id:"money-1",dealerId:"dealer-1",
+    amount:100,allocations:[{shipmentId:"shipment:o1:r1",amount:2.5}]});
+},false);
+
 function normalized(v:unknown):string {
   if(Array.isArray(v))return "["+v.map(normalized).join(",")+"]";
   if(v&&typeof v==="object") {
