@@ -1,0 +1,68 @@
+name: Order history and settlement Rust verification
+
+on:
+  push:
+    branches:
+      - migration/06-history-settlement
+  pull_request:
+    branches:
+      - migration/03-integration
+    paths:
+      - 'src/app/OrderHistory.tsx'
+      - 'src/app/DailySettlement.tsx'
+      - 'src-tauri/src/business_core/rules/history.rs'
+      - 'src-tauri/src/business_core/rules/mod.rs'
+      - 'tests/rust-migration/rules/history-parity.test.mjs'
+      - 'tests/rust-migration/rules/Cargo.toml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-history-settlement-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  history-ts-rust-parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install TypeScript oracle and workflow dependencies
+        run: npm install --no-audit --no-fund --ignore-scripts
+      - name: Verify real TS history, Rust history and Rust settlement together
+        run: node --test tests/rust-migration/rules/history-parity.test.mjs
+      - name: Verify original TypeScript settlement oracle still passes
+        run: node --test tests/tauri-settlement-order-history.test.mjs
+
+  frontend-and-bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install project dependencies
+        run: npm install --no-audit --no-fund --ignore-scripts
+      - name: Verify production TypeScript and Vite bundle
+        run: npm run build
+      - name: Verify all frontend regression tests
+        run: npm test
+
+  windows-history-rust:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+      - name: Verify actual Windows Tauri Rust history rules
+        run: cargo test --manifest-path src-tauri/Cargo.toml --lib business_core::rules::history::tests:: -- --test-threads=1
