@@ -1,0 +1,57 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { readFileSync } from "node:fs";
+
+const read = (path) => readFileSync(new URL("../" + path, import.meta.url), "utf8");
+
+test("shared beginner help shows purpose, usage steps and results above dialogs", () => {
+  const help = read("src/ui/HelpTooltip.tsx");
+  const styles = read("src/styles/help-tooltip.css");
+  assert.match(help, /purpose: string/);
+  assert.match(help, /steps\?: string\[\]/);
+  assert.match(help, /언제 사용하나요\?/);
+  assert.match(help, /사용 방법/);
+  assert.match(help, /사용하면 어떻게 되나요\?/);
+  assert.match(help, /role="tooltip"/);
+  assert.match(help, /popover="manual"/);
+  assert.match(help, /help\.showPopover\(\)/);
+  assert.match(help, /tabIndex=\{-1\}/);
+  assert.doesNotMatch(help, /onFocus=/);
+  assert.doesNotMatch(help, /onBlur=/);
+  assert.match(help, /onMouseEnter=\{previewOnHover\}/);
+  assert.match(help, /onMouseLeave=\{leaveTrigger\}/);
+  assert.match(help, /\}, 500\)/);
+  assert.match(help, /event\.detail === 0/);
+  assert.match(help, /pinned\.current = true/);
+  assert.match(help, /document\.addEventListener\("keydown", keyboardAction, true\)/);
+  assert.match(help, /document\.addEventListener\("pointerdown", outsidePointer, true\)/);
+  assert.match(styles, /max-height: min\(70dvh, 500px\)/);
+});
+
+test("client editor separates identity, sender and trade terms with a persistent footer", () => {
+  const client = read("src/ClientManager.tsx");
+  const styles = read("src/styles/client-editor.css");
+  for (const heading of ["거래처 식별", "발송인 정보", "거래 조건"]) {
+    assert.ok(client.includes("<h3>" + heading + "</h3>"));
+  }
+  assert.match(client, /className="client-editor-body"/);
+  assert.match(client, /className="client-editor-footer"/);
+  assert.match(client, /requestPageLeave\(\(message\) => onNotice\(message, "error"\)\)/);
+  assert.match(client, /usePageLeaveGuard\(\{/);
+  assert.match(client, /state\.clients\.some\(\(c\) => c\.id === edit\.id\) \? "변경사항 저장" : "거래처 등록"/);
+  assert.match(styles, /\.client-editor-body\s*\{[^}]*overflow: auto;/s);
+  assert.match(styles, /\.client-editor-footer\s*\{[^}]*flex: none;/s);
+});
+
+test("product and shipping managers prioritize operations and retain critical warnings", () => {
+  const product = read("src/ProductManager.tsx");
+  const shipping = read("src/ShippingManager.tsx");
+  const freight = read("src/ProductFreightPanel.tsx");
+  assert.match(product, /excelOpen && <section className="card product-excel-panel">/);
+  assert.match(product, /<Field label="상품명" help=\{\{/);
+  assert.match(product, /<Field label="상품설명" help=\{\{/);
+  assert.match(shipping, /className="shipping-basis-settings"/);
+  assert.match(shipping, /className="shipping-savebar"/);
+  assert.match(freight, /className="warnings"/);
+  assert.match(freight, /확인되지 않은 배송비는 자동으로 추측해 계산하지 않습니다/);
+});

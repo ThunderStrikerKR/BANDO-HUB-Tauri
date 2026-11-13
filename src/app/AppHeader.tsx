@@ -6,6 +6,8 @@ export function AppHeader({
   busy,
   onNavigate,
   onDock,
+  onDockMode,
+  onDockStop,
   onWindow,
   onNotifications,
   notificationCount = 0,
@@ -15,12 +17,15 @@ export function AppHeader({
   busy: boolean;
   onNavigate: (page: PageId) => void;
   onDock: () => void;
+  onDockMode: (mode: "OVERLAP" | "STACK") => void;
+  onDockStop: () => void;
   onNotifications?: () => void;
   notificationCount?: number;
   onWindow: (action: "minimize" | "maximize" | "close") => void;
 }) {
   return (
     <header
+      data-tauri-drag-region
       className="app-header"
       onDoubleClick={(event) => {
         if (event.target === event.currentTarget) onWindow("maximize");
@@ -30,7 +35,7 @@ export function AppHeader({
         <img src="./branding/bando-symbol.svg" alt="반도 로고" />
         <span>BANDO HUB{window.bando?.isTestWorkspace ? " / 테스트" : ""}</span>
       </button>
-      <nav aria-label="업무 메뉴">
+      <nav data-tauri-drag-region aria-label="업무 메뉴">
         {navigation.map((item) => (
           <button
             className={page === item.id ? "current" : ""}
@@ -48,25 +53,23 @@ export function AppHeader({
             회신 알림{notificationCount ? ` (${notificationCount})` : ""}
           </button>
         )}
-        <button
-          disabled={busy || window.bando?.isTestWorkspace}
-          onClick={onDock}
-          title={
-            window.bando?.isTestWorkspace ? "Tauri v0.0.2에서 카카오톡 창 도킹은 아직 지원하지 않습니다." : dock.mode === "OVERLAP"
-              ? "다음: 나누어 보기"
-              : dock.mode === "STACK"
-                ? "다음: 카카오톡 원래 위치"
-                : "카카오톡을 왼쪽에 겹쳐 배치"
-          }
-        >
-          {busy
-            ? "배치 중…"
-            : dock.mode === "OVERLAP"
-              ? "카카오톡 / 겹쳐 보기"
-              : dock.mode === "STACK"
-                ? "카카오톡 / 나누어 보기"
-                : "카카오톡 함께 보기"}
-        </button>
+        {!dock.active ? (
+          <button disabled={busy} onClick={onDock} title="카카오톡 기본창과 대화창 연결">
+            {busy ? "연결 중…" : "카카오톡 함께 보기"}
+          </button>
+        ) : (
+          <div className="kakao-view-modes" role="group" aria-label="카카오톡 보기 방식">
+            <button disabled={busy} aria-pressed={dock.mode === "OVERLAP"}
+              className={dock.mode === "OVERLAP" ? "current" : undefined}
+              onClick={() => onDockMode("OVERLAP")}>함께 보기</button>
+            <button disabled={busy} aria-pressed={dock.mode === "STACK"}
+              className={dock.mode === "STACK" ? "current" : undefined}
+              onClick={() => onDockMode("STACK")}>나누어 보기</button>
+            <button disabled={busy} onClick={onDockStop}
+              title="카카오톡 연결 해제 및 모든 창 원래 위치 복원"
+              aria-label="카카오톡 연결 해제">연결 해제</button>
+          </div>
+        )}
       </div>
       <div className="window-controls">
         {(["minimize", "maximize", "close"] as const).map((action, index) => (

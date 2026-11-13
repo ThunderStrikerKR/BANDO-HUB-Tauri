@@ -1,11 +1,17 @@
+import { HelpTooltip } from "./ui/HelpTooltip";
+import { ManagementSearch } from "./ui/ManagementSearch";
+import { EmptyState } from "./ui/PageHeading";
+import { ManagementTable } from "./ui/ManagementTable";
+import { ShippingFeeRanges } from "./ShippingFeeRanges";
 import { useState } from "react";
 import { confirmAction } from "./dialogs";
-import { won } from "./domain";
 import { registeredProducts, sortProducts } from "./product-models";
 import type { NoticeSink } from "./shared/notices";
 import { useAsyncTask } from "./shared/useAsyncTask";
+import { sameFreightEditor } from "./shared/meaningful-changes";
+import { requestEditorLeave, usePageLeaveGuard } from "./shared/page-leave";
+
 import {
-  bundleCounts,
   editableShippingRule,
   effectiveShippingRule,
   emptyProductRule,
@@ -32,6 +38,7 @@ export function ProductFreightPanel({
       rule: ShippingRule;
       name: string;
     }>();
+  const [initialRule, setInitialRule] = useState<ShippingRule>();
   const rows = sortProducts(
     registeredProducts(state.products).filter(
       (p) => p.catalog !== "DEMO" && !p.variants.some((v) => v.source === "DEMO"),
@@ -51,16 +58,26 @@ export function ProductFreightPanel({
         onNotice(message, "success");
       })
     ).ok;
-  const writeRule = async () => {
-    if (!editing) return;
+  const writeRule = async (): Promise<boolean> => {
+    if (!editing || !editingDirty) return true;
     const next = clone(state),
       shipping = next.shipping!;
+    if (Object.entries(editing.rule.fees).some(([count, amount]) =>
+      typeof amount === "number" && editing.rule.maxBundle !== null &&
+      Number(count) > editing.rule.maxBundle)) {
+      onNotice("최대 묶음 수량을 초과하는 운임 구간을 삭제하거나 수량을 다시 설정하세요.", "error");
+      return false;
+    }
     const value = {
       ...editing.rule,
       maxConfirmed: editing.rule.maxBundle !== null,
       version: crypto.randomUUID(),
       at: new Date().toISOString(),
     };
+    delete value.validFrom;
+    delete value.validUntil;
+    delete value.basis;
+    delete value.packable;
     if (editing.groupId) {
       const group = shipping.groups.find((g) => g.id === editing.groupId)!;
       group.history.push(group.current);
@@ -76,22 +93,39 @@ export function ProductFreightPanel({
         ];
       shipping.productRules[editing.productId] = value;
     }
-    if (await save(next, "최대 묶음 수량과 운임을 저장했습니다. 이전 기준은 이력으로 보존합니다."))
-      setEditing(undefined);
+    const ok = await save(next, "최대 묶음 수량과 운임을 저장했습니다. 이전 기준은 이력으로 보존합니다.");
+    if (ok) { setEditing(undefined);setInitialRule(undefined); }
+    return ok;
+  };
+  const editingDirty = !!editing && !!initialRule && !sameFreightEditor(editing.rule, initialRule);
+  usePageLeaveGuard({
+    label: "상품별 운임",
+    hasChanges: () => editingDirty,
+    busy: () => busy,
+    save: writeRule,
+    discard: () => {setEditing(undefined);setInitialRule(undefined);},
+  });
+  const closeEditing = async () => {
+    if (!editing || busy) return;
+    if (editingDirty) {
+      const leave = await requestEditorLeave({
+        label: "상품별 운임",
+        hasChanges: () => editingDirty,
+        save: writeRule,
+        discard: () => { setEditing(undefined); setInitialRule(undefined); },
+      }, (message) => onNotice(message, "error"));
+      if (!leave.proceed) return;
+    }
+    setEditing(undefined);
+    setInitialRule(undefined);
   };
   return (
     <>
-      <section className="shipping-card">
-        <div className="shipping-tools">
-          <div className="shipping-search">
-            <span>⌕</span>
-            <input
-              aria-label="상품별 운임 검색"
-              placeholder="모델명 / 상품명 검색"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
+      <section className="shipping-card shipping-product-list">
+        <div className="shipping-tools management-search-toolbar">
+          <ManagementSearch label="상품별 운임 검색"
+            placeholder="모델명 / 상품명 검색"
+            value={search} onChange={setSearch}/>
           <label className="check">
             <input
               type="checkbox"
@@ -158,18 +192,19 @@ export function ProductFreightPanel({
           >
             상품별 기준으로 복사
           </button>
-          <small>운임은 실제 확인된 값만 입력합니다.</small>
+          <HelpTooltip title="상품별 운임" purpose="이 상품을 포장해 보낼 때의 배송비를 등록합니다." when="상품별 기본 배송비와 합포장 수량을 확인했을 때 사용합니다." steps={["배송비를 수정할 상품을 찾습니다.", "설정 버튼을 누릅니다.", "확인된 합포장 수량과 배송비를 입력합니다.", "기본 운임 저장을 눌러 적용합니다."]} result="새 주문에서 해당 상품의 운임 기준을 참고할 수 있습니다." caution="확인되지 않은 운임은 임의로 입력하지 않습니다." />
         </div>
-        <div className="shipping-table-scroll">
-          <table>
+        <div className={"shipping-table-scroll" + (!rows.length ? " shipping-list-empty" : "")}>
+          <ManagementTable>
             <thead>
               <tr>
                 <th />
-                <th>상품 / 적용 기준</th>
+                <th>상품명</th>
+                <th>동급 배송그룹</th>
                 <th>최대 묶음 수량</th>
-                {[1, 2, 3, 4, 5, 6].map((n) => (
-                  <th key={n}>{n}개 운임</th>
-                ))}
+                <th>운임 등록 상태</th>
+                <th>합포장</th>
+                <th>최근 수정</th>
                 <th>설정</th>
               </tr>
             </thead>
@@ -192,39 +227,36 @@ export function ProductFreightPanel({
                         }
                       />
                     </td>
+                    <td className="shipping-product-name" title={p.name}>
+                      <strong>{p.name}</strong>
+                    </td>
+                    <td>{group ? group.name : "미소속"}</td>
+                    <td>{rule?.maxConfirmed && rule.maxBundle ? rule.maxBundle + "개" : "확인 필요"}</td>
                     <td>
-                      <b>{p.name}</b>
-                      <small>
-                        {group
-                          ? "동급 그룹 / " + group.name
-                          : rule
-                            ? "상품별 개별 기준"
-                            : "기준 미등록"}
-                      </small>
+                      {rule && (typeof rule.perItem === "number" ||
+                        Object.values(rule.fees).some((amount) => typeof amount === "number"))
+                        ? "등록"
+                        : "미등록"}
                     </td>
                     <td>
-                      {rule?.maxBundle ? rule.maxBundle + "개" : "확인 필요"}
-                      {rule?.maxBundle && !rule.maxConfirmed && <small>잠정 / 확인 필요</small>}
+                      {!rule?.maxConfirmed || !rule.maxBundle
+                        ? "확인 필요" : rule.maxBundle === 1 ? "개별 포장" : "합포장 가능"}
                     </td>
-                    {[1, 2, 3, 4, 5, 6].map((n) => (
-                      <td key={n}>
-                        {won(
-                          rule?.perItem !== null && rule?.perItem !== undefined
-                            ? rule.perItem * n
-                            : (rule?.fees[n] ?? null),
-                        )}
-                      </td>
-                    ))}
+                    <td>{rule?.at ? new Date(rule.at).toLocaleDateString("ko-KR") : "-"}</td>
                     <td>
                       <button
-                        onClick={() =>
+                        onClick={() => {
+                          // A missing rule has a generated version ID. Create it
+                          // once so an untouched editor is not falsely dirty.
+                          const initial = editableShippingRule(rule ?? emptyProductRule());
+                          setInitialRule(clone(initial));
                           setEditing({
                             productId: p.id,
                             groupId: group?.id,
                             name: group ? group.name + " / 공통 기준" : p.name,
-                            rule: editableShippingRule(rule ?? emptyProductRule()),
-                          })
-                        }
+                            rule: initial,
+                          });
+                        }}
                       >
                         {group ? "그룹 기준 편집" : "기본 운임 설정"}
                       </button>
@@ -264,22 +296,18 @@ export function ProductFreightPanel({
                 );
               })}
             </tbody>
-          </table>
+          </ManagementTable>
+          {!rows.length && <EmptyState compact title={search || onlyMissing ? "조건에 맞는 상품이 없습니다." : "등록된 상품이 없습니다."} />}
         </div>
-        <footer className="shipping-savebar">
-          <span>
-            같은 모델은 수량을 합산하고, 동급 그룹으로 지정한 다른 모델도 같은 묶음 기준을
-            사용합니다.
-          </span>
-          <span>수취인 / 출고지가 다르면 별도로 계산합니다.</span>
-        </footer>
+
       </section>
       {editing && (
         <Modal
           draft={editing}
+          dirty={editingDirty}
           busy={busy}
           title={editing.name + " 운임 설정"}
-          onClose={() => setEditing(undefined)}
+          onClose={() => void closeEditing()}
         >
           {editing.groupId && (
             <p className="warnings">
@@ -310,88 +338,12 @@ export function ProductFreightPanel({
             </Field>
           </div>
           {!editing.rule.maxBundle && <p className="muted">최대 묶음 수량을 먼저 선택하세요.</p>}
-          <div className="rate-inputs">
-            {bundleCounts(editing.rule.maxBundle).map((n) => (
-              <Field key={n} label={n + "개 묶음 운임"}>
-                <MoneyInput
-                  label={n + "개 묶음 운임"}
-                  value={editing.rule.fees[n] ?? null}
-                  onChange={(v) =>
-                    setEditing({
-                      ...editing,
-                      rule: {
-                        ...editing.rule,
-                        fees: { ...editing.rule.fees, [n]: v },
-                      },
-                    })
-                  }
-                />
-              </Field>
-            ))}
-          </div>
-          <div className="form-row">
-            <Field label="운임 적용 시작일">
-              <input
-                type="date"
-                value={editing.rule.validFrom ?? ""}
-                onChange={(e) =>
-                  setEditing({
-                    ...editing,
-                    rule: {
-                      ...editing.rule,
-                      validFrom: e.target.value || undefined,
-                    },
-                  })
-                }
-              />
-            </Field>
-            <Field label="운임 적용 종료일">
-              <input
-                type="date"
-                value={editing.rule.validUntil ?? ""}
-                onChange={(e) =>
-                  setEditing({
-                    ...editing,
-                    rule: {
-                      ...editing.rule,
-                      validUntil: e.target.value || undefined,
-                    },
-                  })
-                }
-              />
-            </Field>
-          </div>
-          <Field label="운임 적용 기준">
+          <ShippingFeeRanges key={editing.productId + ":" + (editing.groupId ?? "")}
+            rule={editing.rule}
+            onChange={(rule) => setEditing({ ...editing, rule })} />
+          <Field label="직원 참고 메모">
             <input
-              value={editing.rule.basis ?? ""}
-              onChange={(e) =>
-                setEditing({
-                  ...editing,
-                  rule: { ...editing.rule, basis: e.target.value },
-                })
-              }
-            />
-          </Field>
-          <Field label="실제 합포장 가능 여부">
-            <select
-              value={editing.rule.packable == null ? "" : String(editing.rule.packable)}
-              onChange={(e) =>
-                setEditing({
-                  ...editing,
-                  rule: {
-                    ...editing.rule,
-                    packable: e.target.value === "" ? null : e.target.value === "true",
-                  },
-                })
-              }
-            >
-              <option value="">확인 필요</option>
-              <option value="true">가능</option>
-              <option value="false">불가</option>
-            </select>
-          </Field>
-          <Field label="비고">
-            <input
+              placeholder="포장할 때 직원이 참고할 사항 (선택)"
               value={editing.rule.notes}
               onChange={(e) =>
                 setEditing({
@@ -401,13 +353,14 @@ export function ProductFreightPanel({
               }
             />
           </Field>
-          <p className="muted">
-            최대 수량을 넘는 주문은 미확정 운임을 임의 계산하지 않습니다. 직원이 확인한 조합 운임을
-            따로 저장해 재사용할 수 있습니다.
-          </p>
-          <button className="primary" disabled={busy} onClick={() => void writeRule()}>
-            기본 운임 저장
-          </button>
+          <HelpTooltip title="최대 합포장 수량 초과" purpose="한 상자에 넣을 수 있는 최대 수량을 넘을 때 배송비를 어떻게 처리하는지 알려줍니다." when="주문 수량이 등록한 합포장 수량보다 많을 때 확인합니다." steps={["실제로 포장 가능한 조합을 확인합니다.", "확인된 조합의 운임을 따로 등록합니다.", "등록된 운임을 사용합니다."]} result="확인된 조합 운임을 다음 주문에서도 참고할 수 있습니다." caution="확인되지 않은 배송비는 자동으로 추측해 계산하지 않습니다." />
+          <div className="actions">
+            <button type="button" disabled={busy} onClick={() => void closeEditing()}>닫기</button>
+            <button type="button" className="primary" disabled={busy || !editingDirty}
+              onClick={() => void writeRule()}>
+              기본 운임 저장
+            </button>
+          </div>
         </Modal>
       )}
     </>

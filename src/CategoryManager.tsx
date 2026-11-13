@@ -1,7 +1,9 @@
 import { useMemo, useState } from "react";
+import { requestEditorLeave, requestPageLeave, usePageLeaveGuard } from "./shared/page-leave";
 import { categoryPath, categoryProducts, changeCategory, deleteCategory, descendants } from "./category-tree";
 import { CATALOG_ROOTS, catalogFromCategory, isCatalogRoot, withCatalogRoots } from "./category-roots";
 import { Modal } from "./ui";
+import { ManagementSearch } from "./ui/ManagementSearch";
 import type { Category, State } from "./types";
 import type { NoticeSink } from "./shared/notices";
 
@@ -10,11 +12,13 @@ export function CategoryManager({
   onSave,
   onNotice,
   query = "",
+  onQueryChange,
 }: {
   state: State;
   onSave: (s: State) => Promise<void>;
   onNotice: NoticeSink;
   query?: string;
+  onQueryChange: (query: string) => void;
 }) {
   const cats = useMemo(() => withCatalogRoots(state.categories), [state.categories]);
   const [selected, setSelected] = useState<string>(CATALOG_ROOTS[0].id);
@@ -45,21 +49,107 @@ export function CategoryManager({
     [...descendants(cats, c.id)].some((id) =>
       cats.find((item) => item.id === id)?.name.toLocaleLowerCase().includes(q),
     );
-  const select = (c: Category) => {
+  const select = async (c: Category): Promise<boolean> => {
+    if (selected === c.id) return true;
+    const leave = await requestEditorLeave({
+      label: "카테고리",
+      hasChanges: () => hasUnsaved,
+      busy: () => busy,
+      save: saveChanges,
+      discard,
+    }, (message) => onNotice(message, "error"));
+    if (!leave.proceed) return false;
+    setEditorOpen(false);
     setSelected(c.id);
     setName(c.name);
+    return true;
   };
-  const save = async (next: State, success: string) => {
+  const save = async (next: State, success: string): Promise<boolean> => {
     setBusy(true);
     try {
       await onSave(next);
       onNotice(success, "success");
       setOperation(null);
+      return true;
     } catch (error) {
       onNotice(String(error), "error");
+      return false;
     } finally {
       setBusy(false);
     }
+  };
+  const renameDirty = !!current && editorOpen && !isCatalogRoot(current.id) &&
+    name.trim() !== current.name.trim();
+  const operationDirty = !!current && (
+    (operation === "add" && !!newName.trim()) ||
+    (operation === "move" && !!target && target !== (current.parentId ?? CATALOG_ROOTS[0].id))
+  );
+  const hasUnsaved = renameDirty || operationDirty;
+  const saveChanges = async (): Promise<boolean> => {
+    if (!current || !hasUnsaved) return true;
+    const base = { ...state, categories: withCatalogRoots(state.categories) };
+    try {
+      if (operation === "add") {
+        if (!newName.trim() || (directCount(current.id) > 0 && !transferConfirmed)) {
+          onNotice("분류 이름과 상품 이전 확인을 완료해 주세요.", "error");
+          return false;
+        }
+        return save(changeCategory(base, crypto.randomUUID(), newName, current.id,
+          transferConfirmed && children(current.id).length === 0), "하위 분류를 추가했습니다.");
+      }
+      if (operation === "move") {
+        const destinationCatalog = catalogFromCategory(base.categories, target);
+        const linked = categoryProducts(state, current.id);
+        if (destinationCatalog && linked.some((p) =>
+          p.catalog && p.catalog !== "DEMO" && p.catalog !== destinationCatalog))
+          throw Error("분류 소속이 다른 상품이 있습니다. 상품 연결을 먼저 확인하세요.");
+        return save(changeCategory(base, current.id, current.name, target), "분류 위치를 변경했습니다.");
+      }
+      if (renameDirty)
+        return save(changeCategory(base, current.id, name.trim(), current.parentId), "분류 이름을 변경했습니다.");
+      return true;
+    } catch (error) {
+      onNotice(String(error), "error");
+      return false;
+    }
+  };
+  const discard = () => {
+    setOperation(null);setEditorOpen(false);setName(current?.name ?? "");
+    setNewName("");setTransferConfirmed(false);setTarget("");
+  };
+  usePageLeaveGuard({
+    label: "카테고리",
+    hasChanges: () => hasUnsaved,
+    busy: () => busy,
+    save: saveChanges,
+    discard,
+  });
+  const closeEditor = async () => {
+    if (renameDirty) {
+      const leave = await requestEditorLeave({
+        label: "카테고리 이름",
+        hasChanges: () => renameDirty,
+        save: async () => current ? save(
+          changeCategory({ ...state, categories: withCatalogRoots(state.categories) },
+            current.id, name.trim(), current.parentId),
+          "분류 이름을 변경했습니다.") : true,
+        discard: () => setName(current?.name ?? ""),
+      }, (message) => onNotice(message, "error"));
+      if (!leave.proceed) return;
+    }
+    setEditorOpen(false);
+  };
+  const closeOperation = async () => {
+    if (operationDirty) {
+      const leave = await requestEditorLeave({
+        label: "카테고리 작업",
+        hasChanges: () => operationDirty,
+        save: saveChanges,
+        discard: () => { setNewName(""); setTarget(""); setTransferConfirmed(false); },
+      }, (message) => onNotice(message, "error"));
+      if (!leave.proceed) return;
+    }
+    setOperation(null);
   };
   const begin = (kind: "add" | "move" | "delete") => {
     if (!current || (kind !== "add" && isCatalogRoot(current.id))) return;
@@ -83,12 +173,12 @@ export function CategoryManager({
           className={"catalog-map-row" + (selected === c.id ? " selected" : "") + (isCatalogRoot(c.id) ? " root" : "")}
           style={{ paddingLeft: 17 + depth * 24 }}
           aria-label={`${c.name}, 하위 포함 상품 ${categoryCount(c.id)}개`}
-          onClick={() => {
-            select(c);
+          onClick={() => void (async () => {
+            if (!(await select(c))) return;
             if (branches.length && !q) {
               setExpanded((old) => old.includes(c.id) ? old.filter((id) => id !== c.id) : [...old, c.id]);
             }
-          }}
+          })()}
         >
           <span className="catalog-map-indicator" aria-hidden="true">{branches.length ? (open ? "⌄" : "›") : ""}</span>
           <span className="catalog-map-name">{c.name}</span>
@@ -124,6 +214,10 @@ export function CategoryManager({
               <button className="primary" onClick={() => begin("add")} disabled={!current || busy}>+ 하위 분류 추가</button>
             </div>
           </div>
+          <div className="management-search-toolbar">
+            <ManagementSearch label="상품 검색" placeholder="카테고리 이름 또는 전체 경로 검색"
+              value={query} onChange={onQueryChange}/>
+          </div>
           {current && <p className="catalog-map-selection">선택: {parentName(current.id)}</p>}
         </header>
         <div className="catalog-tree-scroll" role="tree" aria-label="카테고리 트리">
@@ -140,14 +234,14 @@ export function CategoryManager({
         </div>
       </section>
       {editorOpen && <div className="catalog-map-editor-layer" role="presentation" onMouseDown={(event) => {
-        if (event.target === event.currentTarget) setEditorOpen(false);
+        if (event.target === event.currentTarget) void closeEditor();
       }}>
       <section className="catalog-detail-panel">
         {current ? (
           <>
             <header className="catalog-detail-heading">
               <div><h2>{current.name}</h2><p>{parentName(current.id)}</p></div>
-              <button type="button" aria-label="편집 창 닫기" onClick={() => setEditorOpen(false)}>닫기 ×</button>
+              <button type="button" aria-label="편집 창 닫기" onClick={() => void closeEditor()}>닫기 ×</button>
             </header>
             <div className="catalog-detail-scroll">
               <div className="catalog-stats">
@@ -201,7 +295,7 @@ export function CategoryManager({
                       current.parentId,
                     ),
                     "분류 이름을 변경했습니다.",
-                  )
+                  ).then((ok) => { if (ok) setEditorOpen(false); })
                 }
               >
                 변경사항 저장
@@ -215,7 +309,7 @@ export function CategoryManager({
         <Modal
           className="category-operation-dialog"
           title={operation === "add" ? "하위 카테고리 추가" : operation === "move" ? "상위 카테고리 변경" : "분류 삭제 확인"}
-          onClose={() => setOperation(null)}
+          onClose={() => void closeOperation()}
           busy={busy}
         >
           <div className="category-operation-body">
@@ -245,7 +339,7 @@ export function CategoryManager({
               </>
             ) : <p>{current.name} 분류를 삭제할까요? 상품과 하위 분류가 없어야 삭제할 수 있습니다.</p>}
             <div className="catalog-operation-actions">
-              <button onClick={() => setOperation(null)}>취소</button>
+              <button onClick={() => void closeOperation()}>취소</button>
               <button
                 className={operation === "delete" ? "danger" : "primary"}
                 disabled={busy || (operation === "add" && (!newName.trim() || (directCount(current.id) > 0 && !transferConfirmed))) || (operation === "move" && !target)}
@@ -267,9 +361,11 @@ export function CategoryManager({
                     } catch (error) { onNotice(String(error), "error"); }
                   } else {
                     void (async () => {
-                      await save(deleteCategory(base, current.id), "빈 분류를 삭제했습니다.");
-                      setSelected(current.parentId ?? CATALOG_ROOTS[0].id);
-                      setEditorOpen(false);
+                      const ok = await save(deleteCategory(base, current.id), "빈 분류를 삭제했습니다.");
+                      if (ok) {
+                        setSelected(current.parentId ?? CATALOG_ROOTS[0].id);
+                        setEditorOpen(false);
+                      }
                     })();
                   }
                 }}

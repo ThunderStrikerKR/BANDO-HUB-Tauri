@@ -1,11 +1,13 @@
 import { customerModel } from "./matching.js";
-import type { Order, ValidationIssue } from "./types.js";
+import { renderAutomaticTemplate } from "./automatic-message-templates.js";
+import type { Order, Settings, ValidationIssue } from "./types.js";
 
 /** Only outgoing copy is grouped; original validation records remain independent. */
 export function groupedCustomerQuestions(
   order: Order,
   issues: ValidationIssue[],
   additional = order.additionalQuestions ?? [],
+  settings?: Settings,
 ) {
   const questions: string[] = [];
   for (const row of order.recipients) {
@@ -14,7 +16,26 @@ export function groupedCustomerQuestions(
     for (const issue of issues.filter(
       (issue) => issue.recipientId === row.id && issue.severity === "ACTION",
     )) {
-      if (issue.kind === "NAME") labels.add("수취인 성함");
+      const customKey = issue.kind === "NAME" ? "recipientName"
+        : issue.kind === "ADDRESS" ? (row.address.trim() ? "addressDetail" : "addressMissing")
+        : issue.kind === "CONTACT" ? "contactMissing"
+        : ["QUANTITY_MISSING","QUANTITY_INVALID"].includes(issue.kind) ? "quantityMissing"
+        : ["MODEL","MODEL_CHOICE","ALIAS_CONFLICT","CATEGORY_CONFLICT","OPTION","ITEM"]
+          .includes(issue.kind) ? "modelMissing"
+        : null;
+      if (settings && customKey && settings.automaticMessageTemplates?.[customKey]) {
+        const item = row.items.find(item=>item.id===issue.itemId);
+        const rendered=renderAutomaticTemplate(settings,customKey as
+          "recipientName"|"addressMissing"|"addressDetail"|"contactMissing"|"quantityMissing"|
+          "modelMissing",{
+          수취인:row.name || "수취인",상품명:customerModel(item?.name || "상품"),
+        });
+        const prefix=row.name ? row.name+"님" : "";
+        messages.add(prefix && rendered.startsWith(prefix)
+          ? rendered.slice(prefix.length).trim().replace(/^[,\s]+/,"")
+          : rendered);
+      }
+      else if (issue.kind === "NAME") labels.add("수취인 성함");
       else if (issue.kind === "ADDRESS")
         labels.add(row.address.trim() ? "상세주소" : "배송지 주소");
       else if (issue.kind === "CONTACT") labels.add("연락처");

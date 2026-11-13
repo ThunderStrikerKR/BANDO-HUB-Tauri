@@ -1,5 +1,7 @@
-import { itemFromProduct, orderClient, uid } from "./domain.js";
+import { itemFromProduct, normalizeColor, orderClient, uid } from "./domain.js";
 import { aliasProblems, saveAlias } from "./matching.js";
+import { validateColorGroupProducts } from "./color-guidance.js";
+import { validateModelGroupProducts } from "./model-groups.js";
 import type { Order, State } from "./types.js";
 export function resolveProduct(
   state: State,
@@ -10,6 +12,7 @@ export function resolveProduct(
   scope: "once" | "client" | "common",
   needsCustomer: boolean,
   variantId?: string,
+  defaultColorGroupId?: string,
 ) {
   let next = structuredClone(state);
   const o = structuredClone(order),
@@ -30,12 +33,37 @@ export function resolveProduct(
   };
   const v = variantId ? p.variants.find((v) => v.id === variantId) : p.variants[0];
   if (!v) throw Error("실제 상품 옵션을 선택하세요.");
+  let appliedDefaultColor: {groupId:string;color:string} | undefined;
+  let appliedRepresentativeModel: {groupId:string;productId:string;productName:string} | undefined;
+  if (defaultColorGroupId) {
+    const group = next.settings.colorGuidanceGroups?.[defaultColorGroupId];
+    if (!group || !group.productIds.includes(p.id)) {
+      throw Error("대표모델 그룹과 선택 상품이 일치하지 않습니다.");
+    }
+    if (group.representativeProductId !== undefined) {
+      validateModelGroupProducts(next,group.productIds,group.representativeProductId);
+      if (group.representativeProductId !== p.id || p.variants.length !== 1 ||
+          p.variants[0].id !== v.id) {
+        throw Error("지정한 대표모델과 실제 선택 상품이 일치하지 않습니다.");
+      }
+      appliedRepresentativeModel = {groupId:defaultColorGroupId,productId:p.id,productName:p.name};
+    } else {
+      // Old already-approved color groups remain readable for historical orders.
+      if (!group.representativeColor ||
+          normalizeColor(group.representativeColor) !== normalizeColor(v.color) ||
+          (i.color && !["색상 미표기", "단일"].includes(i.color))) {
+        throw Error("기존 기본색상과 선택 상품이 일치하지 않습니다.");
+      }
+      validateColorGroupProducts(next,group.productIds,group.representativeColor);
+      appliedDefaultColor = {groupId:defaultColorGroupId,color:v.color};
+    }
+  }
   delete i.pendingAlias;
   const chosen = itemFromProduct(p, c, v.color, i.quantity);
   Object.assign(i, chosen, old, {
     manuallyConfirmed: true,
     temporary: false,
-    match: { kind: "CODE", term: p.code, productIds: [p.id] },
+    match: { kind: "NAME", term: p.name, productIds: [p.id] },
   });
   i.selectionEvidence = {
     expression:
@@ -44,6 +72,10 @@ export function resolveProduct(
     productId: p.id,
     variantId: v.id,
   };
+  if (appliedDefaultColor) i.appliedDefaultColor = appliedDefaultColor;
+  else delete i.appliedDefaultColor;
+  if (appliedRepresentativeModel) i.appliedRepresentativeModel = appliedRepresentativeModel;
+  else delete i.appliedRepresentativeModel;
   if (r.dispatchOrigin) i.origin = r.dispatchOrigin;
   if (changedProduct) delete i.quantityApproval;
   if (needsCustomer) {

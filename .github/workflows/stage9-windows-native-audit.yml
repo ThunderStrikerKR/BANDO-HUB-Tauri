@@ -1,0 +1,78 @@
+name: Stage 9 real Windows EXE UI audit
+on:
+  push:
+    branches:
+      - feature/tauri-product-bulk-registration
+    paths:
+      - scripts/stage9-windows-native-audit.mjs
+      - scripts/stage9-windows-uia-audit.ps1
+      - scripts/stage9-windows-desktop-probe.ps1
+      - .github/workflows/stage9-windows-native-audit.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  # Webhook delivery can be out of order. An older revision must not cancel
+  # a newer Windows audit before its screenshot evidence is uploaded.
+  group: stage9-windows-native-${{ github.ref_name }}-${{ github.sha }}
+  cancel-in-progress: true
+jobs:
+  native-webview2-evidence:
+    name: Real Tauri EXE WebView2 screen evidence
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      # Stage 8 published this exact release binary at commit d442587c.
+      # Only stage9 audit scripts and workflows changed after that commit.
+      # This source artifact expires 2026-11-18. Do not silently use
+      # a stale or different binary if it becomes unavailable.
+      - name: Download stage8-verified portable Windows distribution
+        uses: actions/download-artifact@v4
+        with:
+          name: BANDO-HUB-Tauri-v0.0.4-Windows-portable-OCR
+          path: stage9-exe
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 43064632955
+      - name: Extract verified portable ZIP and identify EXE
+        shell: pwsh
+        run: |
+          Expand-Archive -LiteralPath "stage9-exe/BANDO-HUB-portable.zip" -DestinationPath "stage9-exe/unpacked" -Force
+          $exe="stage9-exe/unpacked/bando_hub.exe"
+          if (!(Test-Path $exe)) { throw "Verified stage8 portable EXE is missing" }
+          Write-Host "Audit binary: $((Get-Item $exe).Length) bytes"
+      - name: Install Playwright client without a browser emulator
+        run: npm install --no-save --no-package-lock --no-audit --no-fund playwright@1.55.1
+      # WebView2 ignored the process-level debug env flag on the previous
+      # hosted runner. Test Microsoft Edge's documented per-EXE registry policy
+      # only on this disposable Windows CI VM; remove it even after a failure.
+      - name: Allow loopback CDP for the isolated test EXE
+        shell: pwsh
+        run: |
+          $path="HKCU:\Software\Policies\Microsoft\Edge\WebView2\AdditionalBrowserArguments"
+          New-Item -Path $path -Force | Out-Null
+          New-ItemProperty -Path $path -Name "bando_hub.exe" -Value "--remote-debugging-port=19649 --remote-debugging-address=127.0.0.1" -PropertyType String -Force | Out-Null
+      - name: Launch actual Windows portable EXE and capture WebView2 screens
+        env:
+          BANDO_STAGE9_EXE: ${{ github.workspace }}\\stage9-exe\\unpacked\\bando_hub.exe
+          BANDO_STAGE9_OUT: stage9-native-evidence
+          BANDO_STAGE9_BINARY_COMMIT: d442587c0049373aa9b234c7edba42648dd21dc8
+        run: node scripts/stage9-windows-native-audit.mjs
+      - name: Remove temporary WebView2 debugger policy
+        if: always()
+        shell: pwsh
+        run: |
+          $path="HKCU:\Software\Policies\Microsoft\Edge\WebView2\AdditionalBrowserArguments"
+          Remove-ItemProperty -Path $path -Name "bando_hub.exe" -ErrorAction SilentlyContinue
+      - name: Preserve native screenshots and diagnostics even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: BANDO-HUB-stage9-native-Windows-screen-audit
+          path: stage9-native-evidence/
+          if-no-files-found: warn
+          retention-days: 14

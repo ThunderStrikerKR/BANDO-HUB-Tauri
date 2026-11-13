@@ -1,4 +1,3 @@
-import { pauseModalLayer } from "./ui";
 let pending = false;
 function ask(
   message: string,
@@ -8,7 +7,6 @@ function ask(
   if (pending) return Promise.resolve(null);
   pending = true;
   const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-  const resumeModal = pauseModalLayer();
   const dialog = document.createElement("dialog");
   dialog.className = "app-action-dialog";
   dialog.setAttribute("aria-label", value === undefined ? "작업 확인" : "값 입력");
@@ -48,7 +46,6 @@ function ask(
       dialog.close();
       dialog.remove();
       pending = false;
-      resumeModal();
       if (previous?.isConnected) previous.focus({ preventScroll: true });
       resolve(result);
     };
@@ -80,4 +77,65 @@ export async function confirmAction(message: string, labels?: { cancel: string; 
 }
 export function promptText(message: string, initial = "") {
   return ask(message, initial);
+}
+
+/**
+ * Three-choice confirmation for leaving an order with unsaved manual edits.
+ * Closing the dialog or pressing Escape always keeps the user on the editor.
+ */
+export type SaveChangesChoice = "save" | "discard" | "cancel";
+export function askSaveChanges(message = "변경사항이 저장되지 않았습니다. 어떻게 할까요?"): Promise<SaveChangesChoice> {
+  if (pending) return Promise.resolve("cancel");
+  pending = true;
+  const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  const dialog = document.createElement("dialog");
+  dialog.className = "app-action-dialog";
+  dialog.setAttribute("aria-label", "변경사항 저장");
+  const form = document.createElement("form");
+  const heading = document.createElement("h2");
+  heading.textContent = "변경사항 저장";
+  const description = document.createElement("p");
+  description.textContent = message;
+  const actions = document.createElement("div");
+  actions.className = "dialog-actions";
+  const cancel = document.createElement("button");
+  const discard = document.createElement("button");
+  const save = document.createElement("button");
+  cancel.type = discard.type = save.type = "button";
+  cancel.textContent = "취소";
+  discard.textContent = "저장 안 함";
+  save.textContent = "저장";
+  save.className = "primary";
+  actions.append(cancel, discard, save);
+  form.append(heading, description, actions);
+  dialog.append(form);
+  document.body.append(dialog);
+  return new Promise((resolve) => {
+    let complete = false;
+    const finish = (choice: SaveChangesChoice) => {
+      if (complete) return;
+      complete = true;
+      dialog.close();
+      dialog.remove();
+      pending = false;
+      if (previous?.isConnected) previous.focus({ preventScroll: true });
+      resolve(choice);
+    };
+    cancel.onclick = () => finish("cancel");
+    discard.onclick = () => finish("discard");
+    save.onclick = () => finish("save");
+    dialog.oncancel = (event) => {
+      event.preventDefault();
+      finish("cancel");
+    };
+    dialog.onclose = () => {
+      if (!complete) finish("cancel");
+    };
+    try {
+      dialog.showModal();
+      cancel.focus();
+    } catch {
+      finish("cancel");
+    }
+  });
 }

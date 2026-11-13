@@ -6,8 +6,10 @@ const read = (file) => readFileSync(new URL('../' + file, import.meta.url), 'utf
 test('product price workbook preserves hidden product and variant identity', () => {
   const code = read('src/product-price-xlsx.ts');
   assert.match(code, /__상품ID/);
-  assert.match(code, /__옵션ID/);
-  assert.match(code, /normalizeCode\(data\[8\]\)/);
+  assert.match(code, /__가격기록ID/);
+  assert.match(code, /data\[8\] === \(v\.option/);
+  assert.match(code, /LEGACY_PRICE_HEADERS/);
+  assert.doesNotMatch(code, /normalizeCode\(data\[8\]\)/);
   assert.match(code, /productMappings\?\.\[values\[6\] \+ "\|" \+ values\[7\]\]/);
   assert.match(code, /sheet\.columns\.forEach/);
 });
@@ -37,7 +39,7 @@ test('Tauri uses a controlled native XLSX write instead of opening arbitrary pat
   const rust = read('src-tauri/src/lib.rs');
   assert.match(rust, /fn save_product_workbook/);
   assert.match(rust, /\.create_new\(true\)/);
-  assert.match(rust, /save_product_workbook\s*\n\s*\]/);
+  assert.match(rust, /save_product_workbook,\s*save_registration_workbook/);
   assert.doesNotMatch(rust, /fn save_product_workbook\([^)]*filename:/);
 });
 test('Category map is a full-width interactive tree with on-demand editor', () => {

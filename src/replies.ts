@@ -1,6 +1,7 @@
-import { normalizeCode, normalizeColor, orderClient, resolvePrice, totals, uid } from "./domain.js";
+import { normalizeColor, orderClient, resolvePrice, totals, uid } from "./domain.js";
 import { addressInfo, addressParts, parseSmart, quantities } from "./parser.js";
 import { colorLabel, registeredProducts } from "./product-models.js";
+import { productModelNames, registeredNameCandidates } from "./product-name-match.js";
 import { recommendShipping } from "./shipping.js";
 import type { BillingSnapshot, Item, Order, ReplyChange, ReplyPreview, State } from "./types.js";
 export function billingSnapshot(o: Order, state: State, reason: string): BillingSnapshot {
@@ -95,21 +96,7 @@ export function proposeReply(
     };
   const quantity = qty[0]?.value;
   if (quantity !== undefined && quantity < 1) warnings.push("수량은 1 이상이어야 합니다.");
-  let candidates = registeredProducts(state.products).filter((p) => {
-    const code = normalizeCode(p.code);
-    const normalized = itemRaw.toUpperCase().replace(/\bBD\s*/g, "BD");
-    const index = normalized.indexOf(code);
-    const bare = code.replace(/^BD/, "");
-    const exact = (token: string) => {
-      const i = normalized.indexOf(token);
-      return (
-        i >= 0 &&
-        !/[A-Z0-9-]/.test(normalized[i - 1] ?? "") &&
-        !/[A-Z0-9-]/.test(normalized[i + token.length] ?? "")
-      );
-    };
-    return (index >= 0 && exact(code)) || (/^\d{3}/.test(bare) && exact(bare));
-  });
+  let candidates = registeredNameCandidates(registeredProducts(state.products), itemRaw);
   if (
     /핑크|pink|노랑|노란|yellow|옐로우|초록|녹색|green|베이지|beige|보라|purple|퍼플|주황|orange/i.test(
       itemRaw,
@@ -121,8 +108,9 @@ export function proposeReply(
     modelTokens.some(
       (token) =>
         !registeredProducts(state.products).some(
-          (p) =>
-            normalizeCode(p.code).replace(/^BD/, "") === normalizeCode(token).replace(/^BD/, ""),
+          (p) => productModelNames(p).some(name =>
+            name.toUpperCase().replace(/^BD\s*/, "").replace(/\s/g,"") ===
+              token.toUpperCase().replace(/^BD\s*/, "").replace(/\s/g,"")),
         ),
     )
   )

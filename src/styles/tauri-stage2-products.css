@@ -36,8 +36,7 @@
   background: #3b3b3b;
 }
 .app-modal-layer.product-detail-dialog .product-detail-image-column > small,
-.app-modal-layer.product-detail-dialog .product-detail-money span,
-.app-modal-layer.product-detail-dialog .product-detail-multi-note { color: #a9a9a9; }
+.app-modal-layer.product-detail-dialog .product-detail-money span { color: #a9a9a9; }
 .app-modal-layer.product-detail-dialog .product-detail-fieldline > label,
 .app-modal-layer.product-detail-dialog .product-detail-wide-fields .field-label,
 .app-modal-layer.product-detail-dialog .product-detail-advanced summary { color: #d5d5d5; }
@@ -164,4 +163,216 @@
   .app-modal-layer.product-detail-dialog .product-detail-wide-fields,
   .app-modal-layer.product-detail-dialog .product-detail-advanced { min-width: 0; }
   .catalog-admin-workspace .catalog-panel-titleline { align-items: flex-start; flex-direction: column; }
+}
+
+
+/* Product SKU conversion keeps the existing neutral BANDO HUB dark theme. */
+.sku-split-list {
+  display: grid;
+  gap: 6px;
+  max-height: 260px;
+  overflow-y: auto;
+  margin: 12px 0;
+  padding: 5px;
+  border: 1px solid #3f3f3f;
+  border-radius: 7px;
+}
+.sku-split-list-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 45px;
+  padding: 7px 12px;
+  background: #292929;
+  border: 1px solid #3a3a3a;
+  border-radius: 6px;
+}
+.sku-split-list-row span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sku-split-list-row small { color: #b1b1b1; margin-left: 8px; }
+.sku-split-list-row button { flex-shrink: 0; }
+.sku-split-preview { padding: 14px; border: 1px solid #505050; border-radius: 7px; }
+.sku-split-preview .bulk-diff { max-height: 340px; overflow-y: auto; }
+.sku-split-preview td:first-child { overflow-wrap: anywhere; }
+@media (max-width: 780px) {
+  .sku-split-list-row { align-items: flex-start; flex-wrap: wrap; }
+  .sku-split-list-row span { white-space: normal; }
+}
+
+.catalog-price-sync-review { max-height: 420px; overflow: auto; border: 1px solid #464646; border-radius: 6px; }
+
+
+/* In-house products have manually assigned sale options with no external listing. */
+.product-manual-variants {
+  display: grid;
+  gap: 12px;
+  margin: 14px 0;
+  padding: 14px;
+  background: #262626;
+  border: 1px solid #454545;
+  border-radius: 7px;
+}
+.product-manual-variants-heading,
+.product-manual-variant-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.product-manual-variant-row {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #454545;
+  background: #222;
+  border-radius: 6px;
+}
+.product-manual-variant-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 14px;
+}
+.product-manual-variant-fields input { width: 100%; min-width: 0; }
+@media (max-width: 680px) {
+  .product-manual-variant-fields { grid-template-columns: minmax(0, 1fr); }
+}
+
+
+/* Client Excel reconciliation: review large lists without growing the dialog. */
+.client-workbook-tools .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.client-workbook-preview {
+  max-height: min(430px, 50dvh);
+  overflow: auto;
+  margin: 12px 0;
+  border: 1px solid #454545;
+  border-radius: 6px;
+}
+.client-workbook-preview table { min-width: 680px; }
+.client-workbook-preview thead { position: sticky; top: 0; z-index: 1; background: #252525; }
+.client-workbook-preview td:last-child { max-width: 460px; overflow-wrap: anywhere; }
+
+
+/* Factory reply import and review use the same compact neutral dark workspace. */
+.factory-reply-import { display: grid; gap: 9px; margin: 12px 0; }
+.factory-reply-import .section-title { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; }
+.factory-reply-review { max-height: min(440px, 48dvh); overflow: auto; border: 1px solid #484848; border-radius: 6px; }
+.factory-reply-review table { min-width: 700px; }
+.factory-reply-review thead { position: sticky; top: 0; background: #242424; z-index: 1; }
+.factory-reply-review td { overflow-wrap: anywhere; }
+.factory-reply-history-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 9px 4px; border-bottom: 1px solid #444; }
+.factory-reply-history-row:last-child { border-bottom: none; }
+.factory-reply-history-row button { margin-left: auto; }
+
+
+/* Read-only date-based financial report: billing, cash receipts and freight stay separate. */
+.daily-settlement .settlement-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 12px 0;
+}
+.daily-settlement .settlement-kpis > div {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #444;
+  border-radius: 7px;
+  background: #252525;
+}
+.daily-settlement .settlement-kpis strong { font-size: 19px; overflow-wrap: anywhere; }
+.daily-settlement .settlement-kpis small { color: #bdbdbd; }
+.daily-settlement .settlement-breakdown {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 14px 0;
+}
+.daily-settlement .settlement-breakdown span {
+  display: flex; flex-direction: column; gap: 5px;
+  border-bottom: 1px solid #414141; padding-bottom: 9px;
+}
+.daily-settlement .settlement-breakdown b { overflow-wrap: anywhere; }
+.daily-settlement .settlement-scroll { max-height: 360px; overflow: auto; }
+.daily-settlement .settlement-scroll table { min-width: 900px; }
+.daily-settlement .settlement-scroll thead { position: sticky; top: 0; z-index: 1; background: #252525; }
+@media (max-width: 880px) {
+  .daily-settlement .settlement-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .daily-settlement .settlement-breakdown { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* Registry editors share the same form, title and list rhythm. The legacy
+   .card h2 margin is intended for standalone cards, not these workspaces. */
+.app-v03 .management-container :is(.alias-manager, .registry-brand-manager) > h2 {
+  margin: 0;
+}
+.app-v03 .management-container :is(.alias-manager, .registry-brand-manager) > p {
+  margin: 8px 0 0;
+}
+.app-v03 .management-container .registry-edit-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+  align-items: end;
+  gap: 12px 14px;
+  margin: 14px 0 16px;
+}
+.app-v03 .management-container .registry-edit-form > .field {
+  margin: 0;
+  min-width: 0;
+}
+.registry-edit-form > .field :is(input, select) { width: 100%; min-width: 0; }
+.registry-edit-actions {
+  display: flex;
+  align-items: end;
+  justify-content: flex-end;
+  gap: 8px;
+  min-height: var(--control-height);
+}
+.registry-linked-product { display: grid; align-content: end; gap: 6px; min-width: 0; }
+.registry-input-label {
+  color: var(--text-secondary);
+  font-size: calc(13px * var(--ui-scale, 1));
+  font-weight: 600;
+  line-height: 1.35;
+}
+.registry-linked-product > .ui-button { overflow: hidden; text-overflow: ellipsis; }
+.registry-list { display: grid; border-top: 1px solid var(--border-default); }
+.registry-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-default);
+}
+.registry-row-info {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+}
+.registry-row-info strong { font-size: calc(13px * var(--ui-scale, 1)); }
+.registry-row-meta {
+  color: var(--text-secondary);
+  font-size: calc(12px * var(--ui-scale, 1));
+}
+.registry-row-info .warnings { flex-basis: 100%; margin: 0; }
+.app-v03 .management-container .registry-row > .ui-button {
+  flex: none;
+  align-self: center;
+  height: var(--control-compact);
+  min-height: var(--control-compact);
+  padding: 6px 10px;
 }

@@ -1,4 +1,3 @@
-import { baseModelCandidates, modelGroup, representative } from "./model-families.js";
 import {
   itemFromProduct,
   normalizeCode,
@@ -10,7 +9,8 @@ import {
 import { broadCategory, categoryKind } from "./matching.js";
 import { colorLabel, registeredProducts } from "./product-models.js";
 import { brandTerms } from "./product-registry.js";
-import { productFamily, representativeProducts } from "./product-search.js";
+import { productFamily } from "./product-search.js";
+import { productModelNames, productNameEvidence, registeredNameCandidates, scoreStandTop, verifiedScoreStandBases } from "./product-name-match.js";
 import { analyzeEvidence, matchingRecipient, rebindEvidence } from "./order-evidence.js";
 import type { Client, Item, Recipient, State } from "./types.js";
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -43,7 +43,7 @@ export const quantityWords: Record<string, number> = {
 export function quantities(text: string) {
   const result: { value: number; start: number; end: number; text: string }[] = [];
   const pattern =
-    /(\d+|다섯|여섯|일곱|여덟|아홉|하나|둘|셋|넷|한|두|세|네|열|일|이|삼|사|오|육|칠|팔|구|십)\s*(?:개|대|세트|ea|pcs)(?![A-Za-z])|[x×*]\s*(\d+)(?!\d)/gi;
+    /(\d+|다섯|여섯|일곱|여덟|아홉|하나|둘|셋|넷|한|두|세|네|열|일|이|삼|사|오|육|칠|팔|구|십)\s*(?:개|대|세트|ea|pcs)(?![A-Za-z])|[x×*]\s*(\d+)(?!\d|\s*(?:cm|mm)\b)/gi;
   for (const m of text.matchAll(pattern))
     result.push({
       value: m[2] ? Number(m[2]) : /^\d+$/.test(m[1]) ? Number(m[1]) : quantityWords[m[1]],
@@ -110,11 +110,7 @@ function logicalLines(raw: string, state: State) {
       continue;
     }
     const known = registeredProducts(state.products)
-      .flatMap((p) =>
-        [p.code, ...(/^BD\s*\d/i.test(p.code) ? [p.code.replace(/^BD\s*/i, "")] : [])].map((c) =>
-          codeRegex(c).exec(line),
-        ),
-      )
+      .flatMap(p => productModelNames(p).map(name => codeRegex(name).exec(line)))
       .filter((x): x is RegExpExecArray => !!x);
     const unknown = [...line.matchAll(/(?:BD\s*)?\d{3}[A-Za-z0-9-]*/gi)];
     const candidates = [...known, ...unknown]
@@ -226,11 +222,7 @@ export function modelColorHint(line: string) {
 }
 function registeredColorHint(line: string, products: State["products"]) {
   for (const p of products)
-    for (const code of [
-      p.code,
-      ...(p.manufacturerCode ? [p.manufacturerCode] : []),
-      ...(p.modelCodes ?? []),
-    ]) {
+    for (const code of productModelNames(p)) {
       const bare = normalizeCode(code).replace(/^BD/, "");
       if (!bare) continue;
       const pattern = new RegExp(
@@ -271,9 +263,7 @@ export function recommendModels(value: string, state: State) {
       p,
       score: Math.min(
         ...[
-          p.code,
-          ...(p.manufacturerCode ? [p.manufacturerCode] : []),
-          ...(p.modelCodes ?? []),
+          ...productModelNames(p),
         ].map((c) => distance(term, normalizeCode(c).replace(/^BD/, ""))),
       ),
     }))
@@ -284,8 +274,14 @@ export function recommendModels(value: string, state: State) {
 }
 const person = (s: string) =>
   /^[가-힣]{2,5}(?:님)?$/.test(s) &&
-  !/^(?:주소|배송지|배송주소|받는곳|보내는곳|연락처|전화번호|사무실|행정실)$/.test(s) &&
-  !/(?:시|군|구|동|읍|면|리|로|길|층|호|아파트|빌라|센터|상가|주세요|감사해요|보내세요)$/.test(s);
+  !/^(?:주소|배송지|배송주소|받는곳|보내는곳|연락처|전화번호|사무실|행정실|반도|반도스탠드|민판|무타공|비타공|한개|두개|세개)$/.test(s) &&
+  // A destination institution at the end of an address is not an additional
+  // recipient. Keep it inside the address. Explicit standalone institutions
+  // are still recognized separately in order-evidence.ts.
+  // Single-syllable endings such as 호, 길, 리, 로 can occur in real
+  // personal names. Filter complete institutional/boilerplate endings, not
+  // surname/given-name syllables or an arbitrary name length alone.
+  !/(?:아파트|빌라|센터|상가|학교|교회|성당|병원|학원|월드|도서관|회관|지원청|주세요|감사해요|보내세요)$/.test(s);
 function parseLegacy(raw: string, selectedClient: Client | undefined, state: State): Recipient[] {
   const client = selectedClient ?? unassignedClient;
   const result: Recipient[] = [];
@@ -418,9 +414,7 @@ function parseLegacy(raw: string, selectedClient: Client | undefined, state: Sta
             !labelled &&
             (registeredProducts(state.products).some((p) =>
               [
-                p.code,
-                ...(p.manufacturerCode ? [p.manufacturerCode] : []),
-                ...(p.modelCodes ?? []),
+                ...productModelNames(p),
               ].some((code) => normalizeCode(code).replace(/^BD/, "") === key),
             ) ||
               state.aliases.some(
@@ -459,17 +453,11 @@ function parseLegacy(raw: string, selectedClient: Client | undefined, state: Sta
       )
         create();
       const r = current ?? create();
-      let value = remainder.slice(found.index).trim();
-      const embedded = value.match(
-        /(?:[가-힣]+(?:시|군|구))\s+([가-힣]{2,5})\s+(?=[가-힣0-9·.]+(?:동|읍|면|리|로|길))/,
-      );
-      if (embedded && person(embedded[1])) {
-        const at = remainder.indexOf(embedded[1], found.index);
-        assign(r, "name", embedded[1], offset + at, offset + at + embedded[1].length);
-        value =
-          value.slice(0, value.indexOf(embedded[1])) +
-          value.slice(value.indexOf(embedded[1]) + embedded[1].length).trimStart();
-      }
+      // A delivery address is authoritative once recognized. Do not pull
+      // name-shaped words from the middle or tail of an address: district,
+      // building and institution names belong to the address until an
+      // explicit name field or an independent recipient line says otherwise.
+      const value = remainder.slice(found.index).trim();
       let before = addressPrefix
         ? ""
         : remainder
@@ -477,14 +465,16 @@ function parseLegacy(raw: string, selectedClient: Client | undefined, state: Sta
             .trim()
             .replace(/[:：,]/g, " ")
             .trim();
-      const last = value.match(/\s+([가-힣]{2,5}(?:님)?)\s*$/);
-      if (last && person(last[1])) {
-        const name = last[1].replace(/님$/, "");
-        const at = remainder.lastIndexOf(last[1]);
-        assign(r, "name", name, offset + at, offset + at + name.length);
-        value = value.slice(0, last.index).trim();
-      }
-      for (const n of before.split(/[,/\s]+/).filter(person)) {
+      // In a combined one-line order, never treat "반도", "민판" or
+      // quantity words as names. After an item quantity, only the final
+      // explicit person token before the address can be the recipient.
+      const afterQuantity = before.match(
+        /(?:\d+|한|두|세|네)\s*(?:개|대|ea|pcs)\s+([가-힣]{2,5})(?:님)?\s*$/i,
+      );
+      const possibleNames = afterQuantity
+        ? [afterQuantity[1]]
+        : before.split(/[,/\s]+/).filter(person);
+      for (const n of possibleNames.filter(person)) {
         const at = remainder.indexOf(n);
         assign(r, "name", n.replace(/님$/, ""), offset + at, offset + at + n.length);
       }
@@ -492,21 +482,6 @@ function parseLegacy(raw: string, selectedClient: Client | undefined, state: Sta
         at = literalAt >= 0 ? literalAt : found.index;
       const addressEnd = literalAt >= 0 ? at + value.length : remainder.trimEnd().length;
       assign(r, "address", value, offset + at, offset + addressEnd);
-      if (embedded && person(embedded[1])) {
-        const nameAt = remainder.indexOf(embedded[1], found.index);
-        const span = r.sources!.pop()!;
-        for (const [start, end] of [
-          [at, nameAt],
-          [nameAt + embedded[1].length, addressEnd],
-        ])
-          if (end > start)
-            r.sources!.push({
-              ...span,
-              start: offset + start,
-              end: offset + end,
-              text: raw.slice(offset + start, offset + end),
-            });
-      }
       const info = addressInfo(value);
       r.addressKind = info.kind;
       r.addressParts = addressParts(value);
@@ -529,11 +504,7 @@ function parseLegacy(raw: string, selectedClient: Client | undefined, state: Sta
           ].some((term) => codeRegex(term).test(line)),
       )
       .sort((a, b) => Number(!!b.clientId) - Number(!!a.clientId) || b.text.length - a.text.length);
-    let choices = ps.filter((p) =>
-      [p.code, ...(p.manufacturerCode ? [p.manufacturerCode] : []), ...(p.modelCodes ?? [])]
-        .flatMap((c) => (/^BD\s*\d/i.test(c) ? [c, c.replace(/^BD\s*/i, "")] : [c]))
-        .some((c) => codeRegex(c).test(line)),
-    );
+    let choices = registeredNameCandidates(ps, line);
     const brandMatches = ps.filter((p) =>
       brandTerms(state, p).some((b) => line.toLowerCase().includes(b.toLowerCase())),
     );
@@ -552,10 +523,8 @@ function parseLegacy(raw: string, selectedClient: Client | undefined, state: Sta
           (t) => t && line.toLowerCase().includes(t.toLowerCase()),
         ),
       ) ?? false;
-    const familySuggestions =
-      !choices.length && !aliases.length ? baseModelCandidates(line, state) : [];
     const family = productFamily(line),
-      generic = !!family && !choices.length && !aliases.length && !familySuggestions.length;
+      generic = !!family && !choices.length && !aliases.length;
     const qs = quantities(line),
       unknownModel = line.match(/(?:BD\s*)?\d{3}[A-Za-z0-9-]*/i);
     if (!qs.length && choices.length) {
@@ -563,7 +532,7 @@ function parseLegacy(raw: string, selectedClient: Client | undefined, state: Sta
       if (tail) {
         const prefix = line.slice(0, tail.index),
           matched = choices
-            .flatMap((p) => [p.code, ...(p.modelCodes ?? [])])
+            .flatMap((p) => productModelNames(p))
             .map((code) => codeRegex(code).exec(prefix))
             .find(Boolean);
         if (
@@ -597,8 +566,7 @@ function parseLegacy(raw: string, selectedClient: Client | undefined, state: Sta
       !qs.length &&
       !unknownModel &&
       !generic &&
-      !knownBrandText &&
-      !familySuggestions.length
+      !knownBrandText
     ) {
       if (person(remainder.trim())) {
         if (
@@ -662,8 +630,6 @@ function parseLegacy(raw: string, selectedClient: Client | undefined, state: Sta
       }
     }
 
-    const baseCandidates = familySuggestions;
-    if (baseCandidates.length) choices = baseCandidates;
     let brandedCategory = false;
     if (!choices.length && !aliases.length && knownBrandText) {
       choices = ps.filter((p) =>
@@ -678,14 +644,14 @@ function parseLegacy(raw: string, selectedClient: Client | undefined, state: Sta
     const protectedCode =
       hint &&
       choices.some((p) =>
-        [p.code, ...(p.manufacturerCode ? [p.manufacturerCode] : []), ...(p.modelCodes ?? [])].some(
+        productModelNames(p).some(
           (code) => bare(code) === bare(hint.term),
         ),
       );
     if (hint && !protectedCode) {
       explicit = hint.color;
       choices = ps.filter((p) =>
-        [p.code, ...(p.manufacturerCode ? [p.manufacturerCode] : []), ...(p.modelCodes ?? [])].some(
+        productModelNames(p).some(
           (code) => bare(code) === bare(hint.base),
         ),
       );
@@ -695,27 +661,31 @@ function parseLegacy(raw: string, selectedClient: Client | undefined, state: Sta
     if (explicit && ["대형", "소형"].includes(explicit)) explicit = undefined;
     const q = qs.length === 1 ? qs[0].value : qs.length ? null : 1;
     const confirmed = qs.length === 1;
-    const optionProof = [...line.matchAll(/[AB]\s*타입|\d+(?:\.\d+)?\s*cm/gi)].map((m) =>
-      m[0].replace(/\s/g, "").toLowerCase(),
-    );
-    if (optionProof.length) {
-      const proven = choices.filter((p) =>
-        optionProof.every((token) =>
-          p.variants.some((v) => (v.option ?? "").replace(/\s/g, "").toLowerCase().includes(token)),
-        ),
-      );
-      if (proven.length) choices = proven;
+    // A product's full registered name, not a nested sale option, identifies its
+    // configuration. Keep "미포함" distinct from the substring "포함".
+    const qualifiers = (value: string) =>
+      [...new Set((value.replace(/\s+/g, "").toLowerCase()
+        .match(/(?:가방|바퀴)(?:미포함|포함|미장착|장착)|[ab]타입|민판|무타공상판|무타공|비타공상판|타공상판|\d+(?:\.\d+)?cm/g) ?? [])
+        .map(token => /^(?:민판|무타공)/.test(token) ? "비타공상판" : token))];
+    const configurationProof = qualifiers(line);
+    const verifiedScoreBases = verifiedScoreStandBases(ps);
+    const qualifies = (candidate: State["products"][number]) => {
+      const named = qualifiers(candidate.name);
+      const top = scoreStandTop(candidate, verifiedScoreBases);
+      if (top === "UNPERFORATED") named.push("비타공상판");
+      if (top === "PERFORATED") named.push("타공상판");
+      return configurationProof.every(token => named.includes(token));
+    };
+    if (configurationProof.length) {
+      // Each option must belong to this candidate, not merely to a sibling.
+      choices = choices.filter(qualifies);
     }
-    choices.sort(
-      (a, b) =>
-        Number(representative(state, modelGroup(state, b).id)?.id === b.id) -
-        Number(representative(state, modelGroup(state, a).id)?.id === a.id),
-    );
     const codeChoices = choices.slice();
     const alias = aliases[0];
     if (!choices.length && alias) {
       const p = ps.find((p) => p.id === alias.productId);
-      if (p) choices = [p];
+      // A saved alias must never bypass a contradictory top/option proof.
+      if (p && qualifies(p)) choices = [p];
     }
     const filtered = explicit
       ? choices.filter((p) =>
@@ -723,18 +693,8 @@ function parseLegacy(raw: string, selectedClient: Client | undefined, state: Sta
         )
       : choices;
     let p = filtered.length === 1 ? filtered[0] : undefined;
-    if (!p && !explicit && !choices.some((p) => p.catalog === "BANDOMALL")) {
-      p = choices.find((p) => p.id === alias?.productId);
-      if (!p) {
-        const preferred = choices.filter(
-          (candidate) =>
-            representative(state, modelGroup(state, candidate).id)?.id === candidate.id,
-        );
-        const defaults = choices.filter((candidate) => candidate.isDefaultSale);
-        if (preferred.length === 1) p = preferred[0];
-        else if (defaults.length === 1) p = defaults[0];
-      }
-    }
+    if (!p && !explicit && alias)
+      p = choices.find(candidate => candidate.id === alias.productId);
     const exact = explicit
         ? codeChoices.filter((p) =>
             p.variants.some((v) => normalizeColor(v.color) === normalizeColor(explicit!)),
@@ -762,27 +722,17 @@ function parseLegacy(raw: string, selectedClient: Client | undefined, state: Sta
       choices = exact;
     }
     if (generic && !conflict) {
+      // A broad category is insufficient evidence for any specific product.
       p = undefined;
-      choices = representativeProducts(state, line, client.id);
-    } else if (!p && !choices.length)
-      choices = recommendModels(
-        unknownModel?.[0] ?? line.replace(/\s*\d+\s*(개|대).*$/, ""),
-        state,
-      );
-    const ambiguousOptions =
-      !explicit &&
-      !alias &&
-      (baseCandidates.length > 0 ||
-        (choices.length > 1 &&
-          choices.some(
-            (candidate) => !!state.settings.modelRepresentatives?.[modelGroup(state, candidate).id],
-          )));
+      choices = [];
+    }
+    const ambiguousOptions = !explicit && !alias && choices.length > 1;
     if (ambiguousOptions) p = undefined;
     if (brandedCategory) p = undefined;
     let item: Item;
     if (p) {
       item = itemFromProduct(p, client, explicit, q);
-      if (!explicit && p.saleUnit) {
+      if (!explicit && p.saleUnit && !p.requiresOption && p.variants.length === 1) {
         const v = p.variants[0];
         item.variantId = v.id;
         item.color = v.color;
@@ -804,14 +754,14 @@ function parseLegacy(raw: string, selectedClient: Client | undefined, state: Sta
         origin: "FACTORY",
         defaulted: false,
         recognitionReason: generic
-          ? "상품 종류는 인식했으나 모델명이 없습니다. 등록된 대표모델을 검토하세요."
+          ? "상품 종류는 인식했지만 모델명은 확정되지 않았습니다. 실제 상품을 선택하세요."
           : "등록된 모델명 또는 별칭과 일치하지 않습니다.",
         issues: ["제품명이 확인되지 않습니다."],
         url: "",
       };
     if (ambiguousOptions)
       item.recognitionReason =
-        "기본 모델을 인식했습니다. 대표모델을 우선 추천하며 실제 SKU를 확인하세요.";
+        "여러 독립 상품 후보가 있습니다. 실제 상품과 색상을 확인하세요.";
     else if (!p && choices.length > 1 && !generic)
       item.recognitionReason = "등록된 모델명에 여러 SKU/옵션이 있습니다. 실제 SKU를 확인하세요.";
     item.match = {
@@ -823,7 +773,7 @@ function parseLegacy(raw: string, selectedClient: Client | undefined, state: Sta
             ? "CATEGORY"
             : p
               ? exact.length
-                ? "CODE"
+                ? "NAME"
                 : alias?.clientId
                   ? "CLIENT_ALIAS"
                   : "COMMON_ALIAS"
@@ -846,7 +796,8 @@ function parseLegacy(raw: string, selectedClient: Client | undefined, state: Sta
       item.issues = ["상품 종류와 모델이 상충합니다."];
       item.recognitionReason = "모델 코드와 상품 종류의 일치 여부를 직원이 확인해야 합니다.";
     }
-    if (p && alias?.productId === p.id && alias.variantId) {
+    if (p && !p.requiresOption && p.variants.length === 1 &&
+        alias?.productId === p.id && alias.variantId) {
       const v = p.variants.find((v) => v.id === alias.variantId);
       if (v) {
         item.variantId = v.id;
@@ -870,12 +821,9 @@ function parseLegacy(raw: string, selectedClient: Client | undefined, state: Sta
       productId: p.id,
       variantId: p.variants[0]?.id,
     }));
-    const productTerm =
-      (p ?? choices[0])
-        ? [...[(p ?? choices[0]).code, (p ?? choices[0]).code.replace(/^BD\s*/i, "")]]
-            .map((code) => codeRegex(code).exec(line))
-            .find(Boolean)
-        : unknownModel;
+    const productTerm = (p ?? choices[0])
+      ? productNameEvidence(line, p ?? choices[0])
+      : unknownModel;
     const productAt = productTerm?.index ?? 0;
     item.sources = [
       {

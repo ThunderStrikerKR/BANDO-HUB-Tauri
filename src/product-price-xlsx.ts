@@ -1,14 +1,15 @@
 import type ExcelJS from "exceljs";
-import { normalizeCode } from "./domain";
 import { registeredProducts, saleOption, sortProducts, variantLabel } from "./product-models";
 import type { BulkPreview, Product, State, Variant } from "./types";
 
 // The hidden identifiers intentionally match the legacy Electron price workbook.
 // Never use row order, an editable name, or a model code as the sole record key.
 export const PRICE_HEADERS = [
-  "상품명", "부제", "색상/옵션", "도매가", "반도매가", "소매가",
-  "__상품ID", "__옵션ID", "__모델코드", "__옵션원본", "__색상ID",
+  "상품명", "상품설명", "상품 색상", "도매가", "반도매가", "소매가",
+  "__상품ID", "__가격기록ID", "__외부구성원본", "__색상ID",
 ] as const;
+const LEGACY_PRICE_HEADERS = [...PRICE_HEADERS.slice(0,8),
+  "__모델코드", ...PRICE_HEADERS.slice(8)] as const;
 
 export async function exportPriceWorkbook(state: State): Promise<number[]> {
   const excelJs = (await import("exceljs")).default;
@@ -19,15 +20,15 @@ export async function exportPriceWorkbook(state: State): Promise<number[]> {
     for (const v of p.variants) {
       sheet.addRow([
         p.name, p.subtitle ?? "", saleOption(p, v), v.wholesale, v.semi, v.retail,
-        p.id, v.id, p.code, v.option ?? "", v.color,
+        p.id, v.id, v.option ?? "", v.color,
       ]);
     }
   }
   sheet.views = [{ state: "frozen", ySplit: 1 }];
-  sheet.autoFilter = { from: "A1", to: "K1" };
+  sheet.autoFilter = { from: "A1", to: "J1" };
   sheet.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
   sheet.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF303030" } };
-  const widths = [27, 36, 28, 17, 17, 17, 23, 23, 21, 24, 20];
+  const widths = [27, 36, 28, 17, 17, 17, 23, 23, 24, 20];
   sheet.columns.forEach((column, i) => {
     column.width = widths[i];
     column.hidden = i >= 6;
@@ -60,8 +61,7 @@ function rowMatches(p: Product, v: Variant, data: string[]): boolean {
   return data[0] === p.name &&
     data[1] === (p.subtitle ?? "") &&
     (data[2] === saleOption(p, v) || data[2] === variantLabel(v)) &&
-    normalizeCode(data[8]) === normalizeCode(p.code) &&
-    data[9] === (v.option ?? "") && data[10] === v.color;
+    data[8] === (v.option ?? "") && data[9] === v.color;
 }
 
 export async function previewPriceWorkbook(state: State, file: File): Promise<BulkPreview> {
@@ -72,11 +72,12 @@ export async function previewPriceWorkbook(state: State, file: File): Promise<Bu
   await wb.xlsx.load(new Uint8Array(await file.arrayBuffer()) as unknown as Parameters<typeof wb.xlsx.load>[0]);
   const sheet = wb.worksheets[0];
   if (!sheet) throw Error("엑셀 시트가 없습니다.");
-  PRICE_HEADERS.forEach((header, index) => {
-    if (text(sheet.getRow(1).getCell(index + 1).value) !== header) {
-      throw Error("반도허브에서 내려받은 가격표 양식과 열이 다릅니다: " + header);
-    }
-  });
+  const matches=(headers:readonly string[]) =>
+    headers.every((header,index)=>text(sheet.getRow(1).getCell(index+1).value)===header) &&
+    !text(sheet.getRow(1).getCell(headers.length+1).value);
+  const headers=matches(PRICE_HEADERS)?PRICE_HEADERS:
+    matches(LEGACY_PRICE_HEADERS)?LEGACY_PRICE_HEADERS:undefined;
+  if (!headers) throw Error("반도허브에서 내려받은 가격표 양식과 열이 다릅니다.");
   if (sheet.rowCount > 20001) throw Error("한 번에 최대 2만 행까지 검증할 수 있습니다.");
   const products = structuredClone(state.products);
   const changes: BulkPreview["changes"] = [];
@@ -84,8 +85,10 @@ export async function previewPriceWorkbook(state: State, file: File): Promise<Bu
   const seen = new Set<string>();
   for (let rowIndex = 2; rowIndex <= sheet.rowCount; rowIndex++) {
     const row = sheet.getRow(rowIndex);
-    const cells = PRICE_HEADERS.map((_, i) => row.getCell(i + 1));
-    const values = cells.map((cell) => text(cell.value));
+    const cells = headers.map((_, i) => row.getCell(i + 1));
+    const rawValues = cells.map((cell) => text(cell.value));
+    const values = headers === LEGACY_PRICE_HEADERS
+      ? [...rawValues.slice(0,8),...rawValues.slice(9)] : rawValues;
     if (!values.some(Boolean)) continue;
     const issue = (message: string) => errors.push(`${rowIndex}행: ${message}`);
     if (cells.some((cell) => cell.isMerged || (cell.value && typeof cell.value === "object" && "formula" in cell.value))) {
@@ -94,12 +97,12 @@ export async function previewPriceWorkbook(state: State, file: File): Promise<Bu
     }
     const id = state.productMappings?.[values[6] + "|" + values[7]] ?? values[6];
     const key = id + "|" + values[7];
-    if (seen.has(key)) { issue("상품과 옵션 ID가 중복된 행입니다."); continue; }
+    if (seen.has(key)) { issue("상품과 가격기록 ID가 중복된 행입니다."); continue; }
     seen.add(key);
     const product = registeredProducts(products).find((p) => p.id === id);
     const variant = product?.variants.find((v) => v.id === values[7]);
     if (!product || !variant || !rowMatches(product, variant, values)) {
-      issue("상품명, 모델, 옵션 또는 숨김 식별자가 현재 데이터와 일치하지 않습니다. 최신 가격표를 다시 내려받으세요.");
+      issue("상품명 또는 숨김 상품/가격 ID가 현재 데이터와 일치하지 않습니다. 최신 가격표를 다시 내려받으세요.");
       continue;
     }
     (["wholesale", "semi", "retail"] as const).forEach((tier, index) => {

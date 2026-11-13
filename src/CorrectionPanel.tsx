@@ -1,5 +1,7 @@
 import { validDeliveryAddress } from "./delivery-requirements";
 import { useState } from "react";
+import { sameValue } from "./shared/draft";
+import { confirmDiscardDraft } from "./shared/editor-flow";
 import {
   confirmCorrection,
   copiedCorrection,
@@ -33,6 +35,8 @@ export function CorrectionPanel({
     ctx = shipmentContext(state, ship),
     [after, setAfter] = useState<Recipient>(() => structuredClone(ctx.recipient)),
     [search, setSearch] = useState<string>();
+  const changed = !sameValue(after, ctx.recipient);
+  const closeDraft = () => void confirmDiscardDraft("공장 전달 후 정정 요청", changed, onClose, busy);
   const requests = state.workflow!.changeRequests.filter((r) => r.shipmentId === sid);
   const setProduct = (p: Product) => {
     const c = ctx.client;
@@ -55,7 +59,7 @@ export function CorrectionPanel({
   };
   return (
     <>
-      <Modal draft={after} busy={busy} title="공장 전달 후 정정 요청" onClose={onClose}>
+      <Modal draft={after} busy={busy} title="공장 전달 후 정정 요청" onClose={closeDraft}>
         <p>
           배송 ID {sid} / 원본 전달 스냅샷과 입금 이력은 보존합니다. 새 출고 주문을 만들지 않습니다.
         </p>
@@ -135,7 +139,10 @@ export function CorrectionPanel({
             ))}
             <button
               disabled={busy}
-              onClick={() => void run(() => onSave(requestCorrection(state, sid, after)))}
+              onClick={() => void (async () => {
+                const result = await run(() => onSave(requestCorrection(state, sid, after)));
+                if (result.ok) onClose();
+              })()}
             >
               정정 요청 등록
             </button>

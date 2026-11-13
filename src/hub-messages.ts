@@ -1,7 +1,11 @@
-import { messages, orderClient, totals, unassignedClient, validProductUrl, won } from "./domain.js";
+import { messages, orderClient, recommendAccount, totals, unassignedClient, validProductUrl, won } from "./domain.js";
+import { renderAutomaticTemplate } from "./automatic-message-templates.js";
 import { groupedCustomerQuestions } from "./customer-questions.js";
 import { customerModel } from "./matching.js";
 import { colorLabel } from "./product-models.js";
+import { appliedDefaultColorNotice } from "./color-guidance.js";
+import { appliedRepresentativeModelNotice } from "./model-groups.js";
+import { provisionalProductNotice } from "./provisional-product-notices.js";
 import type { Order, Price, State, ValidationIssue } from "./types.js";
 import { orderIssues } from "./validation.js";
 import {
@@ -45,7 +49,9 @@ export function hubMessages(
     };
     if (issue.kind === "MODEL_CONFIRM" && item) {
       if (validProductUrl(item.url))
-        block.customer = customerModel(item.name) + " 상품으로 보내드리면 될까요?\n" + item.url;
+        block.customer = renderAutomaticTemplate(state.settings,"modelConfirm",{
+          상품명:customerModel(item.name),
+        }) + "\n" + item.url;
       else {
         block.title = "상품 링크 등록 필요";
         optionsIssues.push("추천 상품의 실제 링크를 등록하세요.");
@@ -54,7 +60,8 @@ export function hubMessages(
     blocks.push(block);
   }
   customer.push(
-    ...groupedCustomerQuestions({ ...order, recipients }, blocks as ValidationIssue[]).map(
+    ...groupedCustomerQuestions({ ...order, recipients }, blocks as ValidationIssue[],
+      order.additionalQuestions ?? [], state.settings).map(
       (question, index) => `${index + 1}. ${question}`,
     ),
   );
@@ -94,60 +101,70 @@ export function hubMessages(
     amounts.length && amounts.every((a) => a[field] !== null)
       ? amounts.reduce((n, a) => n + a[field]!, 0)
       : null;
-  const parts = ["안녕하세요.", ""];
+  const parts = [renderAutomaticTemplate(state.settings,"paymentGreeting"), ""];
   for (const [index, r] of recipients.entries()) {
     if (r.name.trim()) parts.push(r.name + "님");
     for (const i of r.items) {
       const product = state.products.find((p) => p.id === i.productId);
       const color =
         product?.colorStatus === "NOT_REQUIRED" || !i.color ? "" : " (" + colorLabel(i.color) + ")";
-      parts.push(
-        `${customerModel(i.name)}${color} * ${i.quantity ?? "?"}개 : ${i.unitPrice !== null && i.quantity !== null ? won(i.unitPrice * i.quantity) : !client.id ? "거래처 선택 후 단가 적용" : "판매가 확인 필요"}`,
-      );
+      parts.push(renderAutomaticTemplate(state.settings,"paymentItem",{
+        상품명:customerModel(i.name)+color,
+        수량:String(i.quantity??"?"),
+        금액:i.unitPrice !== null && i.quantity !== null
+          ? won(i.unitPrice * i.quantity)
+          : !client.id ? "거래처 선택 후 단가 적용" : "판매가 확인 필요",
+      }));
+      const notice = appliedDefaultColorNotice(i,state.settings);
+      if (notice) parts.push(notice);
     }
-    parts.push(
-      shipmentFreightCode(order, r) === "020"
-        ? "운임 : 후불"
-        : "운임 : " + won(amounts[index].shipping),
-    );
-    if (shipmentVat(order, r)) parts.push("부가세 : " + won(amounts[index].vat));
-    if (links.payment)
-      for (const line of [
-        ...new Set(
-          r.items.filter((i) => i.url && validProductUrl(i.url)).map((i) => i.name + "\n" + i.url),
-        ),
-      ])
-        parts.push(line);
+    parts.push(renderAutomaticTemplate(state.settings,"paymentFreight",{
+      운임:shipmentFreightCode(order, r)==="020" ? "착불" : won(amounts[index].shipping),
+    }));
+    if (shipmentVat(order, r))
+      parts.push(renderAutomaticTemplate(state.settings,"paymentVat",{부가세:won(amounts[index].vat)}));
     for (const i of r.items)
       if (i.quantityApproval?.quantity === 1 && i.quantity === 1 && i.quantityConfirmed === false)
-        parts.push(
-          (r.name || "수취인") +
-            "님 " +
-            customerModel(i.name) +
-            " 상품은 수량을 1개로 보내드리겠습니다.",
-        );
+        parts.push(renderAutomaticTemplate(state.settings,"quantityOne",{
+          수취인:r.name || "수취인",상품명:customerModel(i.name),
+        }));
     parts.push("");
   }
   const vats = recipients.map((r) => shipmentVat(order, r)),
     mixed = vats.some(Boolean) && vats.some((v) => !v);
-  parts.push(
-    "합계 : " +
-      (sum("total") === null ? "금액 확인 필요" : won(sum("total"))) +
-      " 입니다." +
-      (mixed ? " (배송 건별 부가세 적용)" : vats.some(Boolean) ? "" : " (부가세 별도)"),
-  );
-  const account = groupId ? groupAccount(state, groupId) : undefined;
-  const accountLine = account
-    ? `${account.bank} ${account.number} ${account.holder} 입니다.`
-    : (generated.payment
-        .split("\n")
-        .find((line) => line.endsWith(" 입니다.") && !line.startsWith("합계")) ??
-      "[입금 계좌 등록 필요]");
+  parts.push(renderAutomaticTemplate(state.settings,"paymentTotal",{
+    합계:sum("total")===null ? "금액 확인 필요" : won(sum("total")),
+  })+(mixed ? " (부가세 포함/별도)" : vats.some(Boolean) ? " (부가세 포함)" : " (부가세 별도)"));
+  const account = (groupId ? groupAccount(state, groupId) : undefined)
+    ?? recommendAccount(order,state.settings,state.products,client);
+  const accountLine = account?.bank && account.number && account.holder
+    ? renderAutomaticTemplate(state.settings,"paymentAccount",{
+        은행명:account.bank,계좌번호:account.number,예금주:account.holder,
+      })
+    : "[입금 계좌 등록 필요]";
   parts.push("", accountLine);
+  // The complete financial breakdown comes first. Employee-authored guidance
+  // appears after the bank account, directly before independently chosen links.
+  const provisionalNotices = recipients.flatMap(r =>
+    r.items.flatMap(i => [
+      appliedRepresentativeModelNotice(i,state.settings),
+      provisionalProductNotice(i,state),
+    ].filter(Boolean)));
+  const paymentLinks = links.payment
+    ? [...new Set(recipients.flatMap(r =>
+        r.items.filter(i => i.url && validProductUrl(i.url))
+          .map(i => i.name + "\n" + i.url)))]
+    : [];
+  if (provisionalNotices.length) parts.push("", ...provisionalNotices);
+  if (paymentLinks.length) parts.push("", ...paymentLinks);
   const paymentIssues = generated.paymentIssues.filter(
     (i) => !(amounts.every((a) => a.shipping !== null) && i === "운임 확인 필요"),
   );
   if (amounts.some((a) => a.shipping === null)) paymentIssues.push("배송 건별 운임 확인 필요");
+  const colorNotices = recipients.flatMap(r => r.items.flatMap(i=>[
+    appliedDefaultColorNotice(i,state.settings),
+    appliedRepresentativeModelNotice(i,state.settings),
+  ])).filter(Boolean);
   const optionLinks = links.options
     ? recipients
         .flatMap((r) => [
@@ -165,7 +182,11 @@ export function hubMessages(
     blocks,
     payment: parts.join("\n"),
     options:
-      (customer.length ? customer.join("\n") : "주문 내용 확인 부탁드립니다.") +
+      (customer.length || colorNotices.length
+        ? [...customer, ...colorNotices].join("\n")
+        : renderAutomaticTemplate(state.settings,"optionsIntro")) +
+      (state.settings.automaticMessageTemplates?.optionsClosing
+        ? "\n\n" + renderAutomaticTemplate(state.settings,"optionsClosing") : "") +
       (optionLinks ? "\n\n" + optionLinks : ""),
     paymentIssues: [...new Set(paymentIssues)],
     customerCount: customer.length,

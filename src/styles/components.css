@@ -3,8 +3,7 @@
 .app-modal-layer {
   color: var(--text-primary);
 }
-.app-v03 .management-container :is(h1, h2),
-.app-modal-layer .modal > header h2 {
+.app-v03 .management-container :is(h1, h2) {
   font-family: var(--font-heading);
   font-weight: 650;
   line-height: 1.35;
@@ -12,7 +11,6 @@
   letter-spacing: 0;
 }
 .app-v03 .management-container h3 {
-  font-size: calc(16px * var(--ui-scale, 1));
   line-height: 1.4;
   margin: 12px 0;
 }
@@ -32,6 +30,11 @@
   transition:
     background-color 100ms,
     border-color 100ms;
+}
+/* Modal action font is a role-specific token; helper icon buttons can still
+   use their own small variant in the feature that owns them. */
+.app-modal-layer button {
+  font-size: var(--modal-action-size);
 }
 .app-v03 .management-container :is(input:not([type="checkbox"]):not([type="radio"]), select),
 .app-modal-layer :is(input:not([type="checkbox"]):not([type="radio"]), select) {
@@ -80,10 +83,11 @@
   display: grid;
   gap: 6px;
 }
-.field > .field-label {
-  font-size: calc(13px * var(--ui-scale, 1));
+.field > .field-label,
+.field > label {
+  font-size: var(--field-label-size);
   font-weight: 600;
-  color: var(--text-secondary);
+  color: var(--field-label-color);
   line-height: 1.35;
   min-width: 0;
 }
@@ -130,11 +134,11 @@
   border-radius: var(--radius-panel);
   border-color: var(--border-default);
 }
-.app-v03 .management-container table {
+.app-v03 .management-container table:not(.management-data-table) {
   width: 100%;
   border-collapse: collapse;
 }
-.app-v03 .management-container th {
+.app-v03 .management-container table:not(.management-data-table) th {
   font-size: 13px;
   font-weight: 600;
   line-height: 1.4;
@@ -143,7 +147,7 @@
   padding: 11px 12px;
   background: #242424;
 }
-.app-v03 .management-container td {
+.app-v03 .management-container table:not(.management-data-table) td {
   padding: 10px 12px;
   line-height: 1.45;
   vertical-align: middle;
@@ -191,6 +195,19 @@
 .empty-state button {
   margin-top: 6px;
 }
+/* Management lists should not reserve the height of a full-page empty state. */
+.empty-state-compact {
+  min-height: 0;
+  justify-items: start;
+  justify-content: start;
+  gap: 4px;
+  padding: 12px 14px;
+  text-align: left;
+  font-size: calc(13px * var(--ui-scale, 1));
+  line-height: 1.4;
+}
+.empty-state-compact p { font-size: inherit; line-height: inherit; }
+.empty-state-compact small { font-size: calc(12px * var(--ui-scale, 1)); }
 .form-error {
   padding: 12px;
   margin: 0 0 16px;
@@ -298,8 +315,8 @@
   .settings-layout {
     grid-template-columns: minmax(0, 1fr);
   }
-  .app-v03 .management-container td,
-  .app-v03 .management-container th {
+  .app-v03 .management-container table:not(.management-data-table) td,
+  .app-v03 .management-container table:not(.management-data-table) th {
     padding: 9px 8px;
   }
 }
@@ -356,4 +373,52 @@
   flex: none;
   white-space: nowrap;
   margin: 0;
+}
+
+/* Categorized settings navigation */
+.settings-tab-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 0 12px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border-default);
+}
+.app-v03 .management-container .settings-tab-list .settings-tab {
+  height: auto;
+  min-height: var(--control-compact);
+  padding: 8px 14px;
+  background: var(--surface-panel);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-default);
+}
+.app-v03 .management-container .settings-tab-list .settings-tab[aria-selected="true"] {
+  background: #404040;
+  color: var(--text-primary);
+  border-color: var(--border-focus);
+}
+.settings-tab-panels,
+.settings-tab-panels .settings-layout-single {
+  min-width: 0;
+}
+.settings-tab-panels .settings-layout-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+.settings-tab-panels .settings-support {
+  max-width: 1000px;
+}
+.settings-unsaved-modal .actions {
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+/* Shared top-of-page order: heading/actions, search, then subnavigation. */
+.app-v03 .management-container .fixed-manager > .page-heading { margin-bottom: 10px; }
+.app-v03 .management-container .fixed-manager > .management-search { margin: 0 0 10px; }
+.app-v03 .management-container .fixed-manager > .product-subnav { margin-bottom: 10px; }
+.app-v03 .management-container .product-list-subheading { display: flex; align-items: center; gap: 9px; margin: 0 0 11px; }
+.app-v03 .management-container .product-list-subheading h2 { margin: 0; }
+.app-v03 .management-container .excel-workspace > .page-heading { margin-bottom: 10px; }
+.app-v03 .management-container .excel-workspace > input[aria-label="엑셀 목록 검색"] {
+  box-sizing: border-box; display: block; width: 100%; min-width: 0; margin: 0 0 10px;
 }

@@ -1,0 +1,222 @@
+/* Product correction uses the shared native Modal and its global
+   KakaoTalk-aware centering, focus, Escape and save-change handling. */
+.app-modal-layer.order-item-editor-modal {
+  width: min(756px, max(0px, calc(100vw - var(--kakao-reserved-width, 0px) - var(--modal-viewport-gutter))));
+  height: min(566px, calc(100dvh - var(--modal-viewport-gutter)));
+}
+.app-modal-layer.order-item-editor-modal > .modal {
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+}
+.app-modal-layer.order-item-editor-modal .modal > header {
+  flex: 0 0 auto;
+  min-height: 56px;
+  padding: 12px 18px;
+  margin: 0;
+  border-bottom: 1px solid #444;
+}
+.app-modal-layer.order-item-editor-modal .modal-fields {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  overflow: hidden;
+}
+.order-item-edit-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  gap: 12px;
+  min-height: 0;
+  padding: var(--modal-panel-padding);
+}
+.order-item-edit-product {
+  display: grid;
+  grid-template-columns: 166px minmax(0, 1fr);
+  gap: 16px;
+  flex: 0 0 auto;
+  min-height: 183px;
+}
+.order-item-edit-photo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 166px;
+  height: 183px;
+  overflow: hidden;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  background: var(--surface-input);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.order-item-edit-photo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.order-item-edit-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  font-size: var(--modal-body-size);
+}
+.order-item-edit-fields > div {
+  min-width: 0;
+}
+.order-item-edit-label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: var(--field-label-size);
+  font-weight: 600;
+  color: var(--field-label-color);
+}
+.order-item-edit-name {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: var(--modal-action-size);
+  line-height: 1.5;
+}
+.order-item-edit-price {
+  display: block;
+  font-size: var(--modal-action-size);
+  font-variant-numeric: tabular-nums;
+}
+.order-item-edit-toggle {
+  flex: 0 0 auto;
+  width: 100%;
+}
+.order-item-edit-search {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  border-top: 1px solid #444;
+  padding-top: 10px;
+}
+.order-item-edit-search[hidden] {
+  display: none;
+}
+.order-item-edit-search input {
+  box-sizing: border-box;
+  width: 100%;
+  height: var(--control-height);
+  min-height: var(--control-height);
+  flex: 0 0 auto;
+  padding: 7px 10px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  background: var(--surface-input);
+  color: var(--text-primary);
+  font: 400 calc(14px * var(--ui-scale, 1))/1.4 var(--font-body);
+}
+.order-item-edit-results {
+  min-height: 0;
+  flex: 1 1 auto;
+  margin-top: 8px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-top: 1px solid #444;
+}
+.app-modal-layer.order-item-editor-modal .order-item-edit-candidate {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) minmax(78px, auto);
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  min-height: 54px;
+  padding: 8px 6px;
+  border: 0;
+  border-bottom: 1px solid #424242;
+  border-radius: 0;
+  background: transparent;
+  text-align: left;
+  white-space: normal;
+}
+.app-modal-layer.order-item-editor-modal .order-item-edit-candidate.selected {
+  background: var(--surface-hover);
+}
+.order-item-edit-radio {
+  display: block;
+  width: 16px;
+  height: 16px;
+  border: 1px solid #999;
+  border-radius: 50%;
+}
+.order-item-edit-candidate.selected .order-item-edit-radio {
+  border: 5px solid #e5e5e5;
+}
+.order-item-edit-candidate-text {
+  min-width: 0;
+}
+.order-item-edit-candidate-text strong {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: var(--modal-body-size);
+  font-weight: 600;
+  line-height: 1.45;
+}
+.order-item-edit-candidate-text small {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.4;
+}
+.order-item-edit-candidate-price {
+  font-size: var(--modal-body-size);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.order-item-edit-empty,
+.order-item-edit-error {
+  margin: 0;
+  padding: 12px 4px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+.order-item-edit-error {
+  color: var(--tone-error);
+  text-align: left;
+}
+.order-item-edit-footer {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-height: 57px;
+  padding: 10px 18px;
+  border-top: 1px solid #444;
+}
+.order-item-edit-footer button {
+  min-height: var(--control-compact);
+  padding: 6px 10px;
+}
+.order-item-edit-footer button.primary {
+  background: #eee;
+  border-color: #eee;
+  color: #181818;
+}
+.order-item-edit-footer button.danger {
+  color: var(--tone-error);
+}
+@media (max-width: 840px) {
+  .order-item-edit-product {
+    grid-template-columns: 130px minmax(0, 1fr);
+  }
+  .order-item-edit-photo {
+    width: 130px;
+    height: 183px;
+  }
+}

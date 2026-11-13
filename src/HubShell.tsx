@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { validPanels } from "./HubPanels";
 import type { DockStatus } from "./types";
 import { useViewportScale } from "./shared/useViewportScale";
@@ -24,9 +25,11 @@ export function HubShell({
     mainMinimum = 832 * viewportScale;
   const [live, setLive] = useState<number[]>(),
     region = useRef<HTMLDivElement>(null),
-    drag = useRef<{ x: number; width: number; r: number[] } | undefined>(undefined);
+    drag = useRef<{ x: number; width: number; r: number[] } | undefined>(undefined),
+    lastDragged = useRef<number[] | undefined>(undefined);
   const r = live ?? validPanels(ratios),
-    total = r.reduce((a, b) => a + b, 0);
+    total = r.reduce((a, b) => a + b, 0),
+    paneWidth = r[0]; // Both native layouts use this same Kakao panel.
   useLayoutEffect(() => {
     const el = region.current;
     if (!el) return;
@@ -35,7 +38,9 @@ export function HubShell({
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
         const b = el.getBoundingClientRect();
-        document.documentElement.style.setProperty("--kakao-reserved-width", b.right + 6 + "px");
+        document.documentElement.style.setProperty(
+          "--kakao-reserved-width", b.right + 6 + "px",
+        );
         void window.bando
           ?.dockRegion({ x: b.x, y: b.y, width: b.width, height: b.height })
           .catch(() => {});
@@ -44,11 +49,38 @@ export function HubShell({
     const observer = new ResizeObserver(send);
     observer.observe(el);
     window.addEventListener("resize", send);
+    window.addEventListener("focus", send);
+    document.addEventListener("visibilitychange", send);
+    // A position-only move does not trigger ResizeObserver or DOM resize.
+    // Attach native window events so multi-monitor, DPI and focus changes
+    // re-align the external top-level KakaoTalk window immediately.
+    const unlisten: Array<() => void> = [];
+    let disposed = false;
+    try {
+      const current = getCurrentWindow();
+      for (const subscription of [
+        current.onMoved(send),
+        current.onResized(send),
+        current.onScaleChanged(send),
+        current.onFocusChanged(send),
+      ]) {
+        void subscription.then((off) => {
+          if (disposed) off();
+          else unlisten.push(off);
+        }).catch(() => {});
+      }
+    } catch {
+      // Browser-only UI test: native window events are unavailable.
+    }
     send();
     return () => {
+      disposed = true;
+      unlisten.forEach((off) => off());
       cancelAnimationFrame(frame);
       observer.disconnect();
       window.removeEventListener("resize", send);
+      window.removeEventListener("focus", send);
+      document.removeEventListener("visibilitychange", send);
     };
   }, []);
   return (
@@ -56,14 +88,14 @@ export function HubShell({
       <div
         className="hub-shell"
         style={{
-          gridTemplateColumns: `minmax(${kakaoMinimum}px,${r[0]}fr) 6px minmax(${mainMinimum}px,${total - r[0]}fr)`,
+          gridTemplateColumns: `minmax(${kakaoMinimum}px,${paneWidth}fr) 6px minmax(${mainMinimum}px,${total - r[0]}fr)`,
         }}
       >
         <aside className="hub-panel-slot hub-slot-0 hub-kakao-slot">
           <div ref={region} className="kakao-native-region">
             {!dock.active && (
-              <button className="kakao-connect" disabled={busy || window.bando?.isTestWorkspace} onClick={onConnect}>
-                {window.bando?.isTestWorkspace ? "카카오톡 창 연결은 후속 버전에서 지원" : busy ? "연결 중…" : "카카오톡 연결"}
+              <button className="kakao-connect" disabled={busy} onClick={onConnect}>
+                {busy ? "연결 중…" : "카카오톡 연결"}
               </button>
             )}
           </div>
@@ -87,6 +119,7 @@ export function HubShell({
           }}
           onPointerDown={(e) => {
             if (e.button !== 0) return;
+            lastDragged.current = undefined;
             drag.current = {
               x: e.clientX,
               width: e.currentTarget.parentElement!.getBoundingClientRect().width - 6,
@@ -104,18 +137,30 @@ export function HubShell({
               ),
               first = (left / d.width) * sum,
               rest = sum - d.r[0];
-            setLive([first, ...d.r.slice(1).map((n) => (n / rest) * (sum - first))]);
+            const next = [first, ...d.r.slice(1).map((n) => (n / rest) * (sum - first))];
+            lastDragged.current = next;
+            setLive(next);
           }}
           onPointerUp={() => {
             if (!drag.current) return;
             const previous = drag.current.r;
             drag.current = undefined;
-            if (live && JSON.stringify(live) !== JSON.stringify(previous)) onSave(live);
+            const next = lastDragged.current;
+            lastDragged.current = undefined;
+            if (next && JSON.stringify(next) !== JSON.stringify(previous)) onSave(next);
             setLive(undefined);
           }}
           onPointerCancel={() => {
             drag.current = undefined;
+            lastDragged.current = undefined;
             setLive(undefined);
+          }}
+          onLostPointerCapture={() => {
+            if (drag.current) {
+              drag.current = undefined;
+              lastDragged.current = undefined;
+              setLive(undefined);
+            }
           }}
         />
         <div className="hub-main-content">{children}</div>

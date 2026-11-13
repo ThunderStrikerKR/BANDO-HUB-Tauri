@@ -3,9 +3,8 @@
   margin: 0 auto;
 }
 .shipping-version {
-  background: #2f2f2f;
+  /* Palette is owned by theme.css. */
   border: 1px solid #575757;
-  color: #cacaca;
   padding: 8px 12px;
   border-radius: 6px;
   font-size: 11px;
@@ -13,14 +12,13 @@
 .shipping-stats {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 15px;
-  margin-bottom: 26px;
+  gap: 10px;
+  margin-bottom: 14px;
 }
 .shipping-stats article {
-  background: #212121;
   border: 1px solid #3b3b3b;
   border-radius: 9px;
-  padding: 18px 21px;
+  padding: 11px 14px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -30,9 +28,8 @@
   color: #ababab;
 }
 .shipping-stats b {
-  font-size: 26px;
+  font-size: 22px;
   font-weight: 650;
-  color: #e5e5e5;
 }
 .shipping-stats b small {
   font-size: 11px;
@@ -49,15 +46,14 @@
 }
 .shipping-tabs {
   display: flex;
-  gap: 22px;
+  gap: 16px;
   border-bottom: 1px solid #3f3f3f;
-  margin-bottom: 19px;
+  margin-bottom: 12px;
 }
 .shipping-tabs button {
   border: 0;
   border-radius: 0;
   background: none;
-  font-size: 12px;
   color: #989898;
   padding: 12px 3px;
   border-bottom: 2px solid transparent;
@@ -69,7 +65,6 @@
 .shipping-card {
   border: 1px solid #3c3c3c;
   border-radius: 9px;
-  background: #1f1f1f;
   overflow: hidden;
 }
 .shipping-tools {
@@ -91,7 +86,7 @@
 }
 .shipping-search input {
   padding-left: 38px !important;
-  background: #191919 !important;
+  background: var(--surface-input);
 }
 .shipping-tools > select {
   max-width: 230px;
@@ -101,7 +96,6 @@
   display: flex;
   align-items: center;
   gap: 13px;
-  background: #292929;
   border-top: 1px solid #3f3f3f;
   border-bottom: 1px solid #3f3f3f;
 }
@@ -124,8 +118,6 @@
 }
 .shipping-bulk small {
   margin-left: auto;
-  font-size: 10px;
-  color: #979797;
 }
 .bulk-divider {
   height: 22px;
@@ -133,11 +125,15 @@
   margin: 0 5px;
 }
 .shipping-table-scroll {
-  max-height: calc(100vh - 450px);
+  /* theme.css owns the populated-list maximum height. */
   min-height: 260px;
   overflow: auto;
 }
-.shipping-card table {
+.shipping-table-scroll.shipping-list-empty {
+  min-height: 0;
+  max-height: none;
+}
+.shipping-card table:not(.management-data-table) {
   font-size: 12px;
 }
 .shipping-card thead {
@@ -145,31 +141,45 @@
   top: 0;
   z-index: 2;
 }
-.shipping-card th {
+.shipping-card table:not(.management-data-table) th {
   background: #1e1e1e;
   color: #a2a2a2;
   font-size: 10px;
   letter-spacing: 0.2px;
   padding: 13px 18px;
 }
-.shipping-card td {
+.shipping-card table:not(.management-data-table) td {
   padding: 15px 18px;
   border-color: #383838;
 }
-.shipping-card td:first-child,
-.shipping-card th:first-child {
+.shipping-product-list td:first-child,
+.shipping-product-list th:first-child,
+.shipping-assignment-list td:first-child,
+.shipping-assignment-list th:first-child {
   width: 42px;
 }
-.shipping-card td strong {
+/* Assignment selectors are editing controls, but share the compact table row rhythm. */
+.app-v03 .management-container .shipping-assignment-list table.management-data-table tbody td {
+  padding-top: 3px;
+  padding-bottom: 3px;
+}
+.app-v03 .management-container .shipping-assignment-list table.management-data-table tbody td select {
+  min-width: 170px;
+  height: var(--control-compact);
+  min-height: var(--control-compact);
+  padding: 4px 8px;
+  font-size: calc(13px * var(--ui-scale, 1));
+}
+.shipping-card table:not(.management-data-table) td strong {
   font-size: 13px;
   color: #e8e8e8;
 }
-.shipping-card td small {
+.shipping-card table:not(.management-data-table) td small {
   font-size: 10px;
   color: #959595;
   max-width: 420px;
 }
-.shipping-card td select {
+.shipping-card table:not(.management-data-table) td select {
   min-width: 170px;
   padding: 8px 10px;
   font-size: 11px;
@@ -206,7 +216,6 @@
   align-items: center;
   justify-content: space-between;
   padding: 17px 21px;
-  background: #262626;
   border-top: 1px solid #454545;
   gap: 16px;
 }
@@ -226,6 +235,8 @@
   padding: 10px 14px;
 }
 .shipping-rates {
+  /* Use the shared table cell rule with the compact rate-row rhythm. */
+  --manage-cell-y: 3px;
   padding: 22px;
   overflow: auto;
 }
@@ -234,16 +245,32 @@
 }
 .shipping-rates .new-group {
   display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
   gap: 10px;
-  margin: 20px 0;
+  margin: 14px 0 16px;
 }
-.shipping-rates .new-group input {
-  max-width: 300px;
+.app-v03 .management-container .shipping-rates .new-group > .field {
+  flex: 1 1 240px;
+  max-width: 360px;
+  margin: 0;
 }
-.shipping-rates td button {
-  font-size: 10px;
-  padding: 7px;
-  margin: 2px;
+.shipping-rates .new-group > .ui-button {
+  flex: none;
+  align-self: flex-end;
+}
+.shipping-rates .shipping-group-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.app-v03 .management-container .shipping-group-actions .ui-button {
+  height: var(--control-compact);
+  min-height: var(--control-compact);
+  padding: 5px 9px;
+  margin: 0;
+  font-size: calc(12px * var(--ui-scale, 1));
 }
 .rate-inputs {
   display: grid;
@@ -270,8 +297,8 @@
   .shipping-bulk small {
     display: none;
   }
-  .shipping-card th,
-  .shipping-card td {
+  .shipping-card table:not(.management-data-table) th,
+  .shipping-card table:not(.management-data-table) td {
     padding-left: 12px;
     padding-right: 12px;
   }
@@ -304,3 +331,49 @@
     font-size: 22px;
   }
 }
+
+.shipping-heading-help,
+.shipping-rates-title,
+.shipping-basis-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.shipping-rates-title { margin: 0; }
+.shipping-basis-settings { align-self: center; }
+.shipping-basis-settings > summary { cursor: pointer; font-size: 12px; color: #ddd; }
+.shipping-basis-actions {
+  padding: 10px;
+  border: 1px solid #535353;
+  border-radius: 6px;
+  margin-top: 8px;
+  background: #292929;
+}
+
+/* Dense single-line product names and descriptions; status has its own column. */
+.shipping-product-inline { display: flex; align-items: center; min-width: 0; gap: 8px; white-space: nowrap; overflow: hidden; }
+.shipping-product-inline > strong { flex: none; white-space: nowrap; }
+.shipping-product-description { display: inline-block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #a9a9a9; }
+.shipping-product-name { max-width: 500px; }
+.shipping-product-name > strong { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.shipping-card table:not(.management-data-table) th, .shipping-card table:not(.management-data-table) td { padding-top: 9px; padding-bottom: 9px; }
+.shipping-card table:not(.management-data-table) td button { margin-right: 7px; }
+
+/* Explicitly chosen fee intervals, independent of maximum-bundle changes. */
+.shipping-fee-ranges { margin: 14px 0; padding: 12px 0; border-top: 1px solid #474747; border-bottom: 1px solid #474747; }
+.shipping-fee-heading { display: flex; align-items: baseline; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
+.shipping-fee-heading strong { font-size: 13px; color: #ededed; }
+.shipping-fee-heading span { font-size: 11px; color: #aaa; }
+.shipping-fee-entry-list { display: grid; gap: 7px; }
+.shipping-fee-entry { display: grid; grid-template-columns: 90px minmax(120px, 1fr) auto; gap: 9px; align-items: center; }
+.shipping-fee-entry > label { font-size: 12px; color: #ccc; }
+.shipping-fee-entry .money-input { width: 100%; margin: 0; }
+.shipping-fee-entry button, .shipping-fee-add button { padding: 7px 12px; white-space: nowrap; }
+.shipping-fee-add { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 9px; }
+.shipping-fee-add select { flex: 1 1 150px; max-width: 280px; }
+.shipping-fee-ranges .muted { margin: 6px 0 0; font-size: 11px; }
+
+.shipping-group-notes { max-width: 280px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #b8b8b8; }
+
+/* Compact summary and tab spacing are defined with their base layout above. */

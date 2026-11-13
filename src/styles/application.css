@@ -10,12 +10,8 @@
 .app-header {
   display: flex;
   align-items: center;
-  gap: 20px;
   padding: 0 20px;
-  height: 66px;
   flex-shrink: 0;
-  background: #1f1f1f;
-  border-bottom: 1px solid #3c3c3c;
 }
 .app-header .wordmark {
   border: 0;
@@ -37,7 +33,6 @@
 }
 .app-header nav {
   display: flex;
-  gap: 3px;
   flex: 1;
   height: 100%;
   align-items: center;
@@ -45,14 +40,8 @@
 .app-header nav button {
   background: transparent;
   border: 0;
-  padding: 12px 14px;
   border-radius: 5px;
-  color: #a5a5a5;
   white-space: nowrap;
-}
-.app-header nav button.current {
-  background: #393939;
-  color: #d5d5d5;
 }
 .app-header nav em {
   font-size: 10px;
@@ -65,7 +54,6 @@
   white-space: nowrap;
 }
 .header-actions button {
-  font-size: 11px;
   padding: 9px;
 }
 .app-notice {
@@ -126,10 +114,6 @@
 .pane-heading small {
   font-size: 10px;
   color: #9e9e9e;
-}
-.pane-heading button {
-  padding: 6px 8px;
-  font-size: 10px;
 }
 .source-top {
   padding: 14px 14px 0;
@@ -193,10 +177,6 @@
   border-bottom: 1px solid #3b3b3b;
   flex-shrink: 0;
 }
-.review-toolbar button {
-  font-size: 11px;
-  padding: 7px 10px;
-}
 .review-toolbar small {
   font-size: 10px;
   color: #a2a2a2;
@@ -232,9 +212,6 @@
   padding: 8px;
   min-width: 0;
 }
-.recipient-review .field > .field-label {
-  font-size: 10px;
-}
 .order-item {
   padding: 12px 0;
   border-top: 1px solid #414141;
@@ -259,15 +236,6 @@
   gap: 5px;
   flex-wrap: wrap;
   margin: 9px 0;
-}
-.option-buttons button {
-  font-size: 10px;
-  padding: 7px 9px;
-}
-.option-buttons .selected {
-  background: #444444;
-  color: #d8d8d8;
-  border-color: #8e8e8e;
 }
 .item-color {
   font-size: 10px;
@@ -316,7 +284,6 @@
   font-size: 12px;
 }
 .freight-row button {
-  font-size: 9px;
   padding: 8px 7px;
 }
 .freight-reason {
@@ -362,11 +329,6 @@
   gap: 5px;
   margin-top: 10px;
 }
-.order-status-actions button {
-  flex: 1;
-  font-size: 10px;
-  padding: 8px 4px;
-}
 .queue-action {
   display: flex;
   gap: 8px;
@@ -380,7 +342,6 @@
 .queue-action button {
   flex: 1;
   padding: 9px;
-  font-size: 12px;
 }
 .messages-pane {
   background: #1f1f1f;
@@ -428,7 +389,6 @@
 }
 .desk-message button {
   padding: 7px 9px;
-  font-size: 10px;
 }
 .message-account small {
   font-size: 9px;
@@ -513,9 +473,6 @@
   margin: 12px 0 18px;
   align-items: center;
 }
-.manager-filters > input {
-  flex: 1;
-}
 .manager-filters select {
   max-width: 180px;
 }
@@ -536,7 +493,6 @@
   border-color: #707070;
 }
 .price-cell input {
-  width: 100px;
   padding: 6px;
   text-align: right;
 }
@@ -545,9 +501,6 @@
 }
 .product-table-scroll {
   overflow: auto;
-}
-.management-container .card {
-  margin-bottom: 18px;
 }
 .danger {
   color: #c4c4c4;
@@ -573,9 +526,7 @@
   width: auto;
 }
 .docked .app-header {
-  gap: 8px;
   height: 56px;
-  padding: 0 10px;
 }
 .docked .wordmark {
   font-size: 12px;
@@ -583,14 +534,6 @@
 .docked .wordmark span,
 .docked .wordmark small {
   display: none;
-}
-.docked .app-header nav button {
-  font-size: 10px;
-  padding: 9px 6px;
-}
-.docked .header-actions button {
-  font-size: 9px;
-  padding: 7px;
 }
 .docked .desk-container {
   padding: 7px;
@@ -752,4 +695,14 @@
   .source-actions small {
     font-size: 9px;
   }
+}
+/* Explicitly two viewing modes; disconnect is a separate action. */
+.kakao-view-modes {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.kakao-view-modes button[aria-pressed="true"] {
+  background: var(--surface-hover);
+  border-color: var(--border-focus);
 }

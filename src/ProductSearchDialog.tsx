@@ -22,14 +22,13 @@ export function ProductSearchDialog({
 }) {
   const { run: openLink } = useAsyncTask();
   const [query, setQuery] = useState(""),
-    [major, setMajor] = useState(""),
-    [minor, setMinor] = useState(""),
+    [category, setCategory] = useState(""),
     [brand, setBrand] = useState(""),
     input = useRef<HTMLInputElement>(null);
   useEffect(() => input.current?.focus(), []);
   const classifiedIds = useMemo(
-    () => new Set(classifiedProducts(state, major, minor, brand).map((p) => p.id)),
-    [state.products, state.categories, major, minor, brand],
+    () => new Set(classifiedProducts(state, category, "", brand).map((p) => p.id)),
+    [state.products, state.categories, category, brand],
   );
   const rows = useMemo(
     () =>
@@ -39,7 +38,7 @@ export function ProductSearchDialog({
           !p.variants.some((v) => v.source === "DEMO") &&
           classifiedIds.has(p.id),
       ),
-    [state, query, clientId, major, minor, brand],
+    [state, query, clientId, category, brand],
   );
   return (
     <Surface title="상품 검색" onClose={onClose}>
@@ -55,13 +54,11 @@ export function ProductSearchDialog({
       <div className="manager-filters">
         <ClassificationFilters
           state={state}
-          major={major}
-          minor={minor}
+          category={category}
           brand={brand}
-          onChange={(a, b, c) => {
-            setMajor(a);
-            setMinor(b);
-            setBrand(c);
+          onChange={(nextCategory, nextBrand) => {
+            setCategory(nextCategory);
+            setBrand(nextBrand);
           }}
         />
       </div>

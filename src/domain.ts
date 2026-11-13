@@ -3,6 +3,8 @@ import { z } from "zod";
 import { aliasProblems } from "./matching.js";
 import { parseSmart } from "./parser.js";
 import { colorLabel, registeredProducts } from "./product-models.js";
+import { productNameEvidence, registeredNameCandidates } from "./product-name-match.js";
+import { renderAutomaticTemplate } from "./automatic-message-templates.js";
 import type { Alias, Client, Item, Order, Product, Recipient, Settings, State } from "./types.js";
 import { blocking, orderIssues } from "./validation.js";
 export const unassignedClient: Client = {
@@ -73,7 +75,8 @@ export const productSchema = z.object({
   origin: z.enum(["STORE", "FACTORY"]),
   defaultColor: z.string().min(1),
   active: z.boolean(),
-  variants: z.array(variantSchema).min(1),
+  // Each business product has exactly one price record; website configurations are separate products.
+  variants: z.array(variantSchema).length(1),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -83,18 +86,16 @@ export function validateProduct(p: Product, products: Product[]) {
     products.some(
       (x) =>
         x.id !== p.id &&
-        normalizeCode(x.code) === normalizeCode(p.code) &&
-        p.variants.some((v) => v.source === "DEMO") ===
-          x.variants.some((v) => v.source === "DEMO") &&
-        (!p.saleUnit || !x.saleUnit || p.modelKey === x.modelKey) &&
-        (!p.siteId || !x.siteId || p.siteId === x.siteId),
+        !products.some((existing) => existing.id === p.id) &&
+        x.active !== false && !x.deletedAt && !x.supersededBy &&
+        x.catalog === p.catalog &&
+        x.name.normalize("NFKC").toLocaleLowerCase().replace(/\s+/g,"") ===
+          p.name.normalize("NFKC").toLocaleLowerCase().replace(/\s+/g,""),
     )
   )
-    throw Error("같은 상품코드가 이미 있습니다.");
-  const colors = p.variants.map((v) => normalizeColor(v.color) + "|" + (v.option ?? ""));
-  if (new Set(colors).size !== colors.length) throw Error("색상 / 옵션이 중복됩니다.");
+    throw Error("같은 상품명이 이미 있습니다. 판매 구성을 구별할 수 있게 이름을 수정하세요.");
   if (!p.variants.some((v) => normalizeColor(v.color) === normalizeColor(p.defaultColor)))
-    throw Error("기본 색상을 판매 옵션에 등록하세요.");
+    throw Error("상품 색상이 가격 기록과 일치하지 않습니다.");
   for (const v of p.variants)
     if (v.url && !validProductUrl(v.url))
       throw Error("상품 링크는 확인된 반도스탠드 / 반도몰 상세페이지 URL을 입력하세요.");
@@ -155,21 +156,37 @@ export function itemFromProduct(
   client: Client,
   color?: string,
   quantity: number | null = 1,
+  selectedVariantId?: string,
 ): Item {
-  const c = normalizeColor(color ?? p.defaultColor);
-  const v =
-    p.requiresOption && !color ? undefined : p.variants.find((v) => normalizeColor(v.color) === c);
+  const explicit = selectedVariantId
+    ? p.variants.find((variant) => variant.id === selectedVariantId)
+    : undefined;
+  const c = normalizeColor(explicit?.color ?? color ?? p.defaultColor);
+  const eligible = p.variants.filter((variant) => normalizeColor(variant.color) === c);
+  // Color alone does not distinguish same-color options such as a bag
+  // included/excluded, wheels included/excluded or perforated top.
+  // Even an explicitly supplied price ID cannot override unresolved source
+  // configurations. New orders require one validated independent sale product.
+  const selectable = p.variants.length === 1 && !p.requiresOption;
+  const v = !selectable ? undefined : selectedVariantId ? explicit : eligible[0];
+  // Preserve the curated business-facing product label for every order line.
+  // Distinct products can share a model code (e.g. instrument/fixture variants).
+  const basicName = (p.name || p.code).replace(/^반도스탠드\s*/i, "").trim();
+  const detail = p.variants.length > 1 ? (v?.option ?? "").trim() : "";
+  const productName = [basicName, ...(detail ? [detail] : [])].join(" / ");
+  const configurationIncomplete = !!v && ["가방", "바퀴"].some((kind) => {
+    const pattern = new RegExp(kind + "\\s*(?:미포함|포함|미장착|장착|없음|있음)");
+    return p.variants.some((variant) => pattern.test(variant.option ?? "")) &&
+      !pattern.test(v.option ?? "");
+  });
   return {
     id: uid(),
     productId: p.id,
     variantId: v?.id ?? null,
-    raw: p.code,
-    name:
-      p.catalog === "BANDOMALL"
-        ? p.name
-        : p.variants.some((v) => v.source === "DEMO")
-          ? "[가상] " + p.code
-          : p.code,
+    raw: p.name,
+    name: p.variants.some((variant) => variant.source === "DEMO") &&
+      !productName.startsWith("[가상] ")
+      ? "[가상] " + productName : productName,
     color: c,
     quantity,
     unitPrice: v ? resolvePrice(p, v.id, client) : null,
@@ -180,8 +197,10 @@ export function itemFromProduct(
           (!p.saleUnit && ["색상 미표기", "", undefined].includes(p.defaultColor))) &&
         !color
         ? ["기본 색상 확인 필요"]
-        : []
-      : ["등록되지 않은 색상 / 옵션 확인"],
+        : (configurationIncomplete ? ["가방 또는 바퀴 포함 / 미포함 정보 확인 필요"] : [])
+      : p.requiresOption
+        ? ["상품 구성 미확정 / 판매 구성을 확인하세요"]
+        : ["등록된 독립 상품을 다시 선택하세요"],
     url: v?.url ?? "",
     catalog: p.catalog,
   };
@@ -202,14 +221,7 @@ export function parseLegacy(raw: string, client: Client, state: State): Recipien
     recipients.push(current);
     return current;
   };
-  const patterns = (p: Product) =>
-    [p.code, ...(p.modelCodes ?? [])]
-      .flatMap((code) => {
-        const values = [code];
-        if (/^BD\s*[- ]?\s*\d{3}/i.test(code)) values.push(code.replace(/^BD\s*[- ]?\s*/i, ""));
-        return values;
-      })
-      .sort((a, b) => b.length - a.length);
+
   for (const original of raw.replace(/\r/g, "").split("\n")) {
     const line = original.trim();
     if (!line) continue;
@@ -251,9 +263,7 @@ export function parseLegacy(raw: string, client: Client, state: State): Recipien
       r.address += (r.address ? " " : "") + line;
       continue;
     }
-    let candidates = registeredProducts(state.products).filter((p) =>
-      patterns(p).some((code) => codePattern(code).test(line)),
-    );
+    let candidates = registeredNameCandidates(registeredProducts(state.products), line);
     if (candidates.some((p) => !p.variants.some((v) => v.source === "DEMO")))
       candidates = candidates.filter((p) => !p.variants.some((v) => v.source === "DEMO"));
     const matches = state.aliases
@@ -275,7 +285,7 @@ export function parseLegacy(raw: string, client: Client, state: State): Recipien
     if (!candidates.length && !aliasProduct && !quantities.length) continue;
     const r = current ?? create();
     const quantity = quantities.length === 1 ? Number(quantities[0][1]) : null;
-    // Two different pages with the same code are ambiguous; do not choose a color or model arbitrarily.
+    // Duplicate registered business names are ambiguous regardless of old codes.
     const unique = [...new Map(candidates.map((p) => [p.id, p])).values()];
     let p = unique.length === 1 ? unique[0] : aliasProduct;
     const explicitColor = Object.keys(colorMap).find((word) =>
@@ -310,8 +320,8 @@ export function parseLegacy(raw: string, client: Client, state: State): Recipien
       });
       continue;
     }
-    const matchedCode = patterns(p).find((code) => codePattern(code).test(line));
-    let tail = matchedCode ? line.replace(codePattern(matchedCode), "") : line;
+    const matchedName = productNameEvidence(line,p);
+    let tail = matchedName ? line.replace(matchedName[0], "") : line;
     tail = tail
       .replace(/\d+\s*(?:개|대|세트|ea|pcs)/gi, "")
       .replace(
@@ -335,7 +345,8 @@ export function parseLegacy(raw: string, client: Client, state: State): Recipien
       quantity,
     );
     it.raw = line;
-    if (alias?.variantId && !explicitColor && !variantWord && !unknownColor && !unknownWord) {
+    if (!p.requiresOption && p.variants.length === 1 &&
+        alias?.variantId && !explicitColor && !variantWord && !unknownColor && !unknownWord) {
       const v = p.variants.find((v) => v.id === alias.variantId);
       if (v) {
         it.variantId = v.id;
@@ -351,13 +362,13 @@ export function parseLegacy(raw: string, client: Client, state: State): Recipien
           codePattern(code).test(line) || codePattern(code.replace(/^BD\s*/, "")).test(line),
       ),
     );
-    if (exactOptions.length === 1) {
+    if (exactOptions.length === 1 && !p.requiresOption && p.variants.length === 1) {
       const v = exactOptions[0];
       it.variantId = v.id;
       it.color = v.color;
       it.unitPrice = resolvePrice(p, v.id, client);
       it.url = v.url;
-      it.name = optionCodes(v.option ?? "")[0] ?? p.code;
+      it.name = p.name;
       it.issues = [];
       it.defaulted = false;
     }
@@ -365,7 +376,7 @@ export function parseLegacy(raw: string, client: Client, state: State): Recipien
     if (quantities.length > 1)
       it.issues.push("한 줄에 여러 상품이 있습니다. 상품별로 분리해 주세요.");
     if (unique.length === 1 && aliasProduct && aliasProduct.id !== p.id)
-      it.issues.push("별칭이 정식 상품코드와 충돌합니다. 정식 코드 우선 적용.");
+      it.issues.push("별칭과 등록 상품명이 충돌합니다. 상품을 다시 확인하세요.");
     let residual = tail
       .replace(/(?:색상|컬러|옵션)\s*[:：]?/g, "")
       .replace(
@@ -410,7 +421,7 @@ export function repriceOrder(order: Order, client: Client, state: State): Order 
 }
 export function orderClient(o: Order, state: State) {
   if (o.orderType === "RETAIL") return o.clientSnapshot ?? companyParty(state.settings);
-  return o.pricesLocked && o.clientSnapshot
+  return (o.confirmedAt || o.pricesLocked) && o.clientSnapshot
     ? o.clientSnapshot
     : (state.clients.find((c) => c.id === o.clientId) ?? o.clientSnapshot);
 }
@@ -542,46 +553,49 @@ export function messages(
       ...(!a?.bank.trim() || !a.number.trim() || !a.holder.trim() ? ["입금 계좌 등록 필요"] : []),
     ]),
   ];
-  const amountLines = items.map(
-    (i) =>
-      `${label(i)} * ${i.quantity ?? "?"}개${i.quantityConfirmed === false ? " (수량 미확정)" : ""} : ${i.unitPrice !== null && i.quantity !== null ? won(i.unitPrice * i.quantity) : i.quantity === null ? "수량 확인 필요" : !c.id ? "거래처 선택 후 단가 적용" : "판매가 확인 필요"}`,
+  const amountLines = items.map(i =>
+    renderAutomaticTemplate(s,"paymentItem",{
+      상품명:label(i),수량:String(i.quantity??"?"),
+      금액:i.unitPrice !== null && i.quantity !== null
+        ? won(i.unitPrice * i.quantity)
+        : i.quantity === null ? "수량 확인 필요"
+        : !c.id ? "거래처 선택 후 단가 적용" : "판매가 확인 필요",
+    })+(i.quantityConfirmed === false ? " (수량 미확정)" : ""),
   );
   const payment = [
-    "안녕하세요.",
+    renderAutomaticTemplate(s,"paymentGreeting"),
     "",
     ...(paymentIssues.length ? ["[작성 중 / 확인 후 복사 가능]", ""] : []),
     ...amountLines,
     "",
-    `운임 : ${won(t.shipping)}`,
-    ...(o.applyVat ? [`부가세 : ${won(t.vat)}`] : []),
+    renderAutomaticTemplate(s,"paymentFreight",{운임:won(t.shipping)}),
+    ...(o.applyVat ? [renderAutomaticTemplate(s,"paymentVat",{부가세:won(t.vat)})] : []),
     "",
-    ...(t.total === null ? ["합계 : 금액 확인 필요"] : [`합계 : ${won(t.total)} 입니다.`]),
+    renderAutomaticTemplate(s,"paymentTotal",{합계:t.total===null ? "금액 확인 필요" : won(t.total)}),
     "",
     a?.bank && a.number && a.holder
-      ? `${a.bank} ${a.number} ${a.holder} 입니다.`
+      ? renderAutomaticTemplate(s,"paymentAccount",{
+          은행명:a.bank,계좌번호:a.number,예금주:a.holder,
+        })
       : "[입금 계좌 등록 필요]",
     urls(links.payment),
   ].join("\n");
   const questions = items.flatMap((i) => [
-    ...(i.quantityConfirmed === false ? [`${i.name} 수량을 확인 부탁드립니다.`] : []),
-    ...(!i.productId ? [`${i.name}: 정확한 모델명을 확인해 주세요.`] : []),
+    ...(i.quantityConfirmed === false ? [renderAutomaticTemplate(s,"quantityMissing",{상품명:i.name})] : []),
+    ...(!i.productId ? [renderAutomaticTemplate(s,"modelMissing",{상품명:i.name})] : []),
     ...(i.issues.some((x) => x.includes("색상")) ? [`${i.name}: 실제 색상을 확인해 주세요.`] : []),
   ]);
   const options = [
-    "안녕하세요.",
+    renderAutomaticTemplate(s,"paymentGreeting"),
     "",
-    "주문하신 내역 확인 부탁드립니다.",
+    renderAutomaticTemplate(s,"optionsIntro"),
     "",
     ...items.map((i) => `${label(i)} * ${i.quantity ?? "?"}개`),
     "",
     ...questions,
-    ...(items.some((i) => i.defaulted && normalizeColor(i.color) === "Black")
-      ? [
-          "별도 색상 지정이 없는 상품은 기본 색상인 검정으로 출고됩니다. 다른 색상을 원하시면 말씀해 주세요.",
-        ]
-      : []),
+
     "",
-    "주문 내용 확인 후 회신 부탁드립니다.",
+    renderAutomaticTemplate(s,"optionsClosing"),
     urls(links.options),
   ].join("\n");
   return { payment, options, paymentIssues };

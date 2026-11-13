@@ -1,21 +1,17 @@
-import { RepresentativeManager } from "./RepresentativeManager";
+import { ColorGuidanceManager } from "./ColorGuidanceManager";
 import { CategoryManager } from "./CategoryManager";
 import { categoryPath } from "./category-tree";
 import { catalogFromCategory, withCatalogRoots } from "./category-roots";
 import { BrandCombobox, ProductCategoryPicker } from "./ProductDetailComponents";
 import { SALE_STATES } from "./sale-status";
-import { isRepresentative } from "./model-families";
 import { useEffect, useMemo, useState } from "react";
 import { AliasManager } from "./AliasManager";
 import { ClassificationFilters, RegistrySettings } from "./Classification";
 import { confirmAction } from "./dialogs";
-import { normalizeColor, uid, validateProduct, won } from "./domain";
-import { CatalogPanel } from "./ManagementUI";
-import { ProductPriceWorkbookTools } from "./ProductPriceWorkbookTools";
+import { normalizeColor, uid, validateProduct } from "./domain";
 import { PriceCell } from "./PriceCell";
 import {
   colorLabel,
-  normalizeModel,
   productKey,
   registeredProducts,
   sortProducts,
@@ -23,11 +19,20 @@ import {
 } from "./product-models";
 import { classifiedProducts } from "./product-registry";
 import { ProductImports } from "./ProductImports";
+import { ProductSyncWorkbookTools } from "./ProductSyncWorkbookTools";
+import { optimizeProductImage } from "./product-image-preprocess";
 import { RegistrationManager } from "./RegistrationManager";
 import type { NoticeSink } from "./shared/notices";
 import { useAsyncTask } from "./shared/useAsyncTask";
+import { sameProductEditor } from "./shared/meaningful-changes";
+import { requestEditorLeave, requestPageLeave, usePageLeaveGuard } from "./shared/page-leave";
+
 import type { Product, State, Variant } from "./types";
 import { Field, Modal, MoneyInput, clone } from "./ui";
+import { HelpTooltip } from "./ui/HelpTooltip";
+import { EmptyState, PageHeading } from "./ui/PageHeading";
+import { ManagementTable } from "./ui/ManagementTable";
+import { ManagementSearch } from "./ui/ManagementSearch";
 export function ProductManager({
   state,
   onSave,
@@ -36,21 +41,23 @@ export function ProductManager({
 }: {
   state: State;
   onSave: (state: State) => Promise<void>;
-  onRefresh: () => Promise<void>;
+  onRefresh: (committed?: State) => Promise<void>;
   onNotice: NoticeSink;
 }) {
   const { busy: savingView, run: runSave } = useAsyncTask(onNotice);
-  const [major, setMajor] = useState(""),
-    [minor, setMinor] = useState(""),
+  const [category, setCategory] = useState(""),
     [brand, setBrand] = useState("");
   const [search, setSearch] = useState(""),
     [missing, setMissing] = useState(false),
     [edit, setEdit] = useState<Product>(),
+    [originalEdit, setOriginalEdit] = useState<Product>(),
     [section, setSection] = useState("상품 목록"),
     [adding, setAdding] = useState(false),
+    [excelOpen, setExcelOpen] = useState(false),
     [priceMode, setPriceMode] = useState(false),
     [detailPriceMode, setDetailPriceMode] = useState(false),
     [categoryPicker, setCategoryPicker] = useState(false);
+  const editDirty = !!edit && !!originalEdit && !sameProductEditor(edit, originalEdit);
   const [localImage, setLocalImage] = useState<{ id: string; data: string }>();
   useEffect(() => {
     setLocalImage(undefined);
@@ -73,8 +80,8 @@ export function ProductManager({
     (localImage?.id === edit.id ? localImage.data : edit.imageData)
   );
   const classifiedIds = useMemo(
-    () => new Set(classifiedProducts(state, major, minor, brand).map((p) => p.id)),
-    [state.products, state.categories, major, minor, brand],
+    () => new Set(classifiedProducts(state, category, "", brand).map((p) => p.id)),
+    [state.products, state.categories, category, brand],
   );
   const products = sortProducts(
     state.products.filter((p) => !p.deletedAt && !p.supersededBy),
@@ -83,7 +90,7 @@ export function ProductManager({
       p.catalog !== "DEMO" &&
       !p.variants.some((v) => v.source === "DEMO") &&
       classifiedIds.has(p.id) &&
-      (p.name + " " + p.code + " " + p.subtitle)
+      (p.name + " " + (p.subtitle ?? ""))
         .toLowerCase()
         .replace(/\s/g, "")
         .includes(search.toLowerCase().replace(/\s/g, "")) &&
@@ -93,7 +100,7 @@ export function ProductManager({
     setDetailPriceMode(false);
     setCategoryPicker(false);
     const at = new Date().toISOString();
-    setEdit({
+    const fresh: Product = {
       id: uid(),
       code: "",
       name: "",
@@ -119,20 +126,23 @@ export function ProductManager({
       ],
       createdAt: at,
       updatedAt: at,
-    });
+    };
+    setEdit(fresh);
+    setOriginalEdit(clone(fresh));
   };
-  const save = async () => {
-    if (!edit) return;
-    await runSave(async () => {
+  const save = async (): Promise<boolean> => {
+    if (!edit) return true;
+    const result = await runSave(async () => {
       const p = clone(edit);
-      p.code = normalizeModel(p.manufacturerCode?.trim() || p.code || p.name);
-      p.name = normalizeModel(p.name || p.code);
+      p.name = p.name.trim();
+      // Existing databases still have a legacy code column; new rows store
+      // an opaque immutable ID there until the versioned SQLite migration.
+      p.code ||= p.id;
+      if (p.variants.length !== 1) throw Error("상품은 한 가지 판매 구성으로만 등록할 수 있습니다. 기존 복수 구성은 각각 별도 상품으로 전환하세요.");
       p.saleUnit = true;
-      p.familyKey ??= p.registrationIdentity
-        ? p.id
-        : (p.catalog ?? "BANDOSTAND") + "|" + p.code.replace(/\s/g, "").toUpperCase();
+      p.familyKey ??= p.id;
       p.modelKey = productKey(p);
-      p.modelCodes = [p.code];
+      // No new model-code list: the model is part of the product name.
       p.variants = p.variants.map((v) => ({
         ...v,
         color: normalizeColor(v.color),
@@ -150,13 +160,45 @@ export function ProductManager({
       else next.products.push(p);
       await onSave(next);
       setEdit(undefined);
+      setOriginalEdit(undefined);
       onNotice("상품 상세 정보를 저장했습니다.", "success");
     });
+    return result.ok;
+  };
+  usePageLeaveGuard({
+    label: "상품",
+    hasChanges: () => editDirty,
+    busy: () => savingView,
+    save,
+    discard: () => { setEdit(undefined); setOriginalEdit(undefined); setCategoryPicker(false); },
+  });
+  const closeDetail = async () => {
+    if (!edit || savingView) return;
+    if (editDirty) {
+      const leave = await requestEditorLeave({
+        label: "상품",
+        hasChanges: () => editDirty,
+        save,
+        discard: () => { setEdit(undefined); setOriginalEdit(undefined); setCategoryPicker(false); },
+      }, (message) => onNotice(message, "error"));
+      if (!leave.proceed) return;
+    }
+    setEdit(undefined);
+    setOriginalEdit(undefined);
+    setCategoryPicker(false);
+  };
+  const chooseSection = async (next: string) => {
+    if (next === section) return;
+    const leave = await requestPageLeave((message) => onNotice(message, "error"));
+    if (!leave.proceed) return;
+    setSection(next);
+    setSearch("");
   };
   const openDetail = (p: Product) => {
     setDetailPriceMode(false);
     setCategoryPicker(false);
     setEdit(clone(p));
+    setOriginalEdit(clone(p));
   };
   const remove = async (p: Product) => {
     if (
@@ -173,6 +215,7 @@ export function ProductManager({
       next.aliases = next.aliases.filter((a) => a.productId !== p.id);
       await onSave(next);
       setEdit(undefined);
+      setOriginalEdit(undefined);
       onNotice("상품을 삭제하고 과거 기록은 보존했습니다.");
     } catch (e) {
       onNotice(String(e), "error");
@@ -180,56 +223,49 @@ export function ProductManager({
   };
   return (
     <div className="fixed-manager">
-      <nav className="product-subnav" aria-label="상품 관리 메뉴">
+      <PageHeading title="상품 관리" />
+      <nav className="product-subnav management-tabbar" aria-label="상품 관리 메뉴">
         {[
           "상품 목록",
           "카테고리 관리",
           "모델군 관리",
           "별칭 관리",
           "브랜드 관리",
-          "상품 동기화",
         ].map((label) => (
           <button
             key={label}
             aria-current={section === label ? "page" : undefined}
-            onClick={() => { setSection(label); setSearch(""); }}
+            onClick={() => void chooseSection(label)}
           >
             {label}
           </button>
         ))}
       </nav>
-      <div className="management-search">
-        <input
-          aria-label="상품 검색"
-          placeholder={section === "카테고리 관리" ? "카테고리 이름 또는 전체 경로 검색" : section === "모델군 관리" ? "모델 코드 또는 상품명 검색" : "모델명 또는 상품명 검색"}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-      </div>
-      <div className="management-scroll">
+      <div className={"management-scroll" + (section === "상품 목록" && !adding && !excelOpen ? " product-list-workspace" : "")}>
         {section === "상품 목록" && (
           <>
-            <div className="manager-bar">
-              <div>
-                <h2>
-                  상품 가격표 <span>{products.length}개 모델</span>
-                </h2>
-                <small>
-                  {priceMode
-                    ? "가격 수정 중 / 0은 미등록 / Enter 저장 / Esc 취소 / Tab 다음 셀"
-                    : "가격 잠금 / 수정하려면 가격 수정 모드를 켜세요."}
-                </small>
+            <div className="product-list-subheading">
+              <div className="product-heading-help">
+                  <h2>상품 가격표 <span>{products.length}개 상품</span></h2>
+                  <HelpTooltip
+                    title="상품 가격 수정"
+                    purpose="등록된 상품의 도매가, 반도매가, 소매가를 확인하거나 변경하는 기능입니다."
+                    when="판매 가격이 달라졌거나 잘못 등록한 가격을 고칠 때 사용합니다."
+                    steps={["가격 수정 모드 켜기를 누릅니다.", "변경할 가격을 입력합니다.", "Enter를 눌러 해당 가격을 저장합니다.", "수정을 마치면 가격 수정 모드 종료를 누릅니다."]}
+                    result="저장한 가격이 상품 가격표에 반영됩니다."
+                    caution="수정 모드를 켜기 전에는 가격을 바꿀 수 없습니다. 가격이 비어 있으면 등록되지 않은 상태입니다."
+                  />
               </div>
-              <div className="actions">
-                <button
-                  aria-pressed={priceMode}
-                  className={priceMode ? "primary" : ""}
-                  onClick={() => setPriceMode(!priceMode)}
-                >
-                  {priceMode ? "가격 수정 모드 종료" : "가격 수정 모드 켜기"}
-                </button>
-                <RegistrationManager onRefresh={onRefresh} onNotice={onNotice} />
-                <button onClick={() => setAdding(!adding)}>상품 추가</button>
+              <div className="management-section-actions" aria-label="상품 목록 작업">
+                <button type="button" aria-expanded={excelOpen} onClick={() => setExcelOpen((open) => !open)}>Excel 관리</button>
+                      <button
+                        aria-pressed={priceMode}
+                        className={priceMode ? "primary" : ""}
+                        onClick={() => setPriceMode(!priceMode)}
+                      >
+                        {priceMode ? "가격 수정 모드 종료" : "가격 수정 모드 켜기"}
+                      </button>
+                      <button className="primary" onClick={() => setAdding(!adding)}>상품 추가</button>
               </div>
             </div>
             {adding && (
@@ -237,20 +273,34 @@ export function ProductManager({
                 <button className="primary" onClick={create}>
                   직접 등록
                 </button>
-                <ProductImports state={state} onSave={onSave} onNotice={onNotice} />
+                <ProductImports state={state} onSave={onSave} onRefresh={onRefresh} onNotice={onNotice} />
               </section>
             )}
+            {excelOpen && <section className="card product-excel-panel">
+              <h3>상품 Excel 관리 <HelpTooltip
+                title="상품 Excel 관리"
+                purpose="상품을 여러 개 수정하거나 새 상품을 한꺼번에 등록할 때 사용합니다."
+                when="가격이나 상품 정보를 많이 변경해야 할 때 사용합니다."
+                steps={["현재 상품 전체 Excel을 내려받거나 신규 등록 양식을 받습니다.", "Excel 파일에 상품 정보를 입력하거나 수정합니다.", "파일을 업로드하고 변경 내용을 확인합니다.", "오류가 없을 때 변경사항을 승인합니다."]}
+                result="검토한 상품 정보만 저장됩니다."
+                caution="색상이나 가방 포함 여부 등 판매 구성이 다르면 각각 별도의 상품으로 관리합니다."
+              /> </h3>
+              <ProductSyncWorkbookTools onSave={onSave} onRefresh={onRefresh} onNotice={onNotice} />
+              <RegistrationManager state={state} onSave={onSave} onRefresh={onRefresh} onNotice={onNotice} />
+            </section>}
             <section className="card product-prices">
+              <div className="management-search-toolbar">
+                <ManagementSearch label="상품 검색" placeholder="모델명 또는 상품명 검색"
+                  value={search} onChange={setSearch}/>
+              </div>
               <div className="manager-filters">
                 <ClassificationFilters
                   state={state}
-                  major={major}
-                  minor={minor}
+                  category={category}
                   brand={brand}
-                  onChange={(a, b, c) => {
-                    setMajor(a);
-                    setMinor(b);
-                    setBrand(c);
+                  onChange={(nextCategory, nextBrand) => {
+                    setCategory(nextCategory);
+                    setBrand(nextBrand);
                   }}
                 />
                 <label className="check">
@@ -262,12 +312,11 @@ export function ProductManager({
                   가격 미등록만
                 </label>
               </div>
-              <ProductPriceWorkbookTools state={state} onSave={onSave} onRefresh={onRefresh} onNotice={onNotice} locked={!priceMode} />
               <div className="price-table-scroll">
-                <table>
+                <ManagementTable>
                   <thead>
                     <tr>
-                      <th>상품명 / 부제</th>
+                      <th>상품명 / 상품설명</th>
                       <th>도매가</th>
                       <th>반도매가</th>
                       <th>소매가</th>
@@ -282,9 +331,6 @@ export function ProductManager({
                             <div className="product-title-line">
                               <b>
                                 {p.name}{" "}
-                                {isRepresentative(state, p) && (
-                                  <small className="representative-badge">대표</small>
-                                )}
                               </b>
                               <span>{p.subtitle}</span>
                               {p.colorStatus !== "NOT_REQUIRED" &&
@@ -300,8 +346,8 @@ export function ProductManager({
                                 value={v[tier]}
                                 label={`${p.name} ${variantLabel(v)} ${{ wholesale: "도매가", semi: "반도매가", retail: "소매가" }[tier]}`}
                                 onSave={async (n, expected) => {
-                                  await window.bando!.setPrice(p.id, v.id, tier, n, expected);
-                                  await onRefresh();
+                                  const committed = await window.bando!.setPrice(p.id, v.id, tier, n, expected);
+                                  await onRefresh(committed);
                                 }}
                               />
                             </td>
@@ -313,32 +359,32 @@ export function ProductManager({
                       )),
                     )}
                   </tbody>
-                </table>
-                {!products.length && <p className="empty">등록된 상품이 없습니다.</p>}
+                </ManagementTable>
+                {!products.length && <EmptyState compact title={search || missing || category || brand ? "조건에 맞는 상품이 없습니다." : "등록된 상품이 없습니다."} />}
               </div>
             </section>
           </>
         )}
         {section === "카테고리 관리" && (
-          <CategoryManager state={state} onSave={onSave} onNotice={onNotice} query={search} />
+          <CategoryManager state={state} onSave={onSave} onNotice={onNotice}
+            query={search} onQueryChange={setSearch} />
         )}
-        {section === "모델군 관리" && <RepresentativeManager state={state} onSave={onSave} query={search} />}
+        {section === "모델군 관리" && <ColorGuidanceManager state={state} onRefresh={onRefresh}
+          query={search} onQueryChange={setSearch} />}
         {section === "별칭 관리" && (
           <AliasManager state={state} onSave={onSave} onNotice={onNotice} />
         )}
         {section === "브랜드 관리" && (
           <RegistrySettings state={state} onSave={onSave} onNotice={onNotice} categories={false} />
         )}
-        {section === "상품 동기화" && (
-          <CatalogPanel state={state} onRefresh={onRefresh} onError={onNotice} />
-        )}
         {edit && (
           <Modal
             draft={edit}
+            dirty={editDirty}
             busy={savingView}
             className="product-detail-dialog"
-            title="상품 상세관리"
-            onClose={() => { if (!savingView) { setEdit(undefined); setCategoryPicker(false); } }}
+            title={state.products.some((item) => item.id === edit.id) ? "상품 상세 관리" : "상품 등록"}
+            onClose={() => void closeDetail()}
           >
             <div className="product-detail-body">
               <div className="product-detail-top">
@@ -352,20 +398,18 @@ export function ProductManager({
                       <input
                         type="file"
                         accept="image/jpeg,image/png,image/webp"
+                        disabled={savingView}
                         onChange={(event) => {
                           const file = event.currentTarget.files?.[0];
-                          if (!file) return;
-                          if (!/^image\/(jpeg|png|webp)$/.test(file.type) || file.size > 5 * 1024 * 1024) {
-                            onNotice("이미지는 JPG, PNG, WEBP 형식이며 5MB 이하여야 합니다.", "error");
-                            return;
-                          }
-                          const reader = new FileReader();
-                          reader.onload = () => {
-                            if (typeof reader.result === "string")
-                              setEdit((prev) => prev ? { ...prev, imageData: reader.result as string, imageOverride: "MANUAL" } : prev);
-                          };
-                          reader.readAsDataURL(file);
                           event.currentTarget.value = "";
+                          if (!file) return;
+                          const editingId = edit.id;
+                          void runSave(async () => {
+                            const imageData = await optimizeProductImage(file);
+                            setEdit((previous) => previous?.id === editingId
+                              ? { ...previous, imageData, imageOverride: "MANUAL" }
+                              : previous);
+                          });
                         }}
                       />
                     </label>
@@ -396,14 +440,11 @@ export function ProductManager({
                     </select>
                   </div>
                   <div className="product-detail-price-heading">
-                    <strong>판매 가격</strong>
+                    <span className="product-heading-help"><strong>판매 가격</strong><HelpTooltip title="상품 가격" purpose="이 상품을 거래처에 판매할 때 적용할 가격을 등록합니다." steps={["가격 수정을 눌러 입력을 시작합니다.", "도매가, 반도매가, 소매가를 각각 입력합니다.", "상품 상세 화면 아래의 변경사항 저장을 누릅니다."]} result="거래처 가격 등급에 맞는 금액으로 주문 금액을 계산할 수 있습니다." /></span>
                     <button type="button" disabled={edit.variants.length !== 1} onClick={() => setDetailPriceMode((open) => !open)}>
                       {detailPriceMode ? "가격 수정 잠금" : "가격 수정"}
                     </button>
                   </div>
-                  {edit.variants.length !== 1 && (
-                    <small className="product-detail-multi-note">기존 상품에 옵션이 여러 개 있습니다. 세부 가격은 고급 정보에서 확인하세요.</small>
-                  )}
                   {edit.variants[0] && (["wholesale", "semi", "retail"] as const).map((tier) => (
                     <div className="product-detail-fieldline" key={tier}>
                       <label htmlFor={"product-price-" + tier}>{({ wholesale: "도매가", semi: "반도매가", retail: "소매가" })[tier]}</label>
@@ -427,10 +468,10 @@ export function ProductManager({
                 </div>
               </div>
               <div className="product-detail-wide-fields">
-                <Field label="상품명 / 모델명">
+                <Field label="상품명" help={{ purpose: "매장 직원과 공장 직원이 같은 상품을 정확히 구별할 수 있도록 이름을 정합니다.", steps: ["상품의 모델명과 판매 구성의 차이를 알 수 있도록 입력합니다.", "가방 포함 또는 미포함, 바퀴 포함 여부, 크기 등 주문에 중요한 차이를 빠뜨리지 않습니다.", "상품 정보를 저장합니다."], result: "입력한 상품명이 주문 확인과 발송 업무에 사용됩니다.", caution: "판매 구성이 다르면 옵션 하나로 합치지 않고 각각 별도 상품으로 등록합니다." }}>
                   <input value={edit.name} onChange={(event) => setEdit({ ...edit, name: event.target.value })} />
                 </Field>
-                <Field label="상품 설명">
+                <Field label="상품설명" help={{ purpose: "매장 직원이 상품 특징을 기억하거나 상품을 구별할 때 참고할 내용을 남깁니다.", steps: ["직원에게 필요한 상품 특징이나 참고사항을 입력합니다.", "변경사항을 저장합니다."], result: "매장 상품 관리에서 상품 정보를 확인할 때 참고할 수 있습니다.", caution: "주문서와 공장에 전달해야 할 구성 정보는 상품설명이 아니라 상품명에 적습니다." }}>
                   <input value={edit.subtitle ?? ""} onChange={(event) => setEdit({ ...edit, subtitle: event.target.value })} />
                 </Field>
                 <div className="field">
@@ -443,9 +484,24 @@ export function ProductManager({
                   </div>
                 </div>
               </div>
+              {edit.variants.length === 1 && (
+                <div className="product-detail-wide-fields">
+                  <Field label="상품 색상" help={{ purpose: "이 상품의 판매 색상을 기록해 다른 색상의 상품과 구별합니다.", steps: ["상품에 실제 색상 구분이 있다면 해당 색상을 입력합니다.", "색상 구분이 없는 상품은 단일로 입력합니다.", "변경사항을 저장합니다."], result: "주문 접수와 상품 검색에서 색상을 확인할 수 있습니다." }}>
+                    <input
+                      value={edit.variants[0].color}
+                      placeholder="예: 블랙 / 색상 구분이 없으면 단일"
+                      onChange={(event) => setEdit((old) => old ? {
+                        ...old,
+                        defaultColor: event.target.value,
+                        variants: old.variants.map((v) => ({ ...v, color: event.target.value })),
+                      } : old)}
+                    />
+                  </Field>
+                </div>
+              )}
               <details className="product-detail-advanced">
-                <summary>고급 정보 / 공식 상품 URL / 배송 그룹 / 변경 이력</summary>
-                <Field label="배송 그룹">
+                <summary>고급 정보 / 홈페이지 연결 (선택) / 배송 그룹 / 변경 이력</summary>
+                <Field label="배송 그룹" help={{ purpose: "같은 포장 기준으로 배송할 수 있는 상품을 묶어 운임을 관리합니다.", when: "이미 확인된 배송 그룹을 이 상품에 적용할 때 사용합니다.", steps: ["해당 상품이 속할 배송 그룹을 선택합니다.", "상품 정보를 저장합니다."], result: "주문에서 해당 그룹에 등록된 운임 기준을 참고할 수 있습니다.", caution: "포장 조건이 확인되지 않았다면 그룹을 임의로 선택하지 않습니다." }}>
                   <select
                     value={edit.shippingGroupId ?? ""}
                     onChange={(event) => setEdit({ ...edit, shippingGroupId: event.target.value || undefined })}
@@ -456,18 +512,21 @@ export function ProductManager({
                     ))}
                   </select>
                 </Field>
-                {edit.variants.map((variant, index) => (
-                  <div key={variant.id} className="product-detail-variant-extra">
-                    <Field label={"공식 상세페이지 URL " + (index + 1)}>
+                {edit.variants.length === 1 && (
+                  <div className="product-detail-variant-extra">
+                    <Field label="홈페이지 상품 연결" help={{ purpose: "공식 쇼핑몰의 상품 주소를 저장해 상품 정보를 빠르게 확인합니다.", steps: ["해당 상품의 공식 상세페이지 주소를 입력합니다.", "변경사항을 저장합니다."], result: "필요한 경우 상품 안내에 해당 주소를 사용할 수 있습니다.", caution: "이 주소를 입력해도 모든 주문 메시지에 자동으로 링크가 붙는 것은 아닙니다." }}>
                       <input
-                        value={variant.url}
-                        onChange={(event) => setEdit({ ...edit, variants: edit.variants.map((v) => v.id === variant.id ? { ...v, url: event.target.value } : v) })}
+                        value={edit.variants[0].url}
+                        onChange={(event) => setEdit({
+                          ...edit,
+                          variants: edit.variants.map((v, index) =>
+                            index === 0 ? { ...v, url: event.target.value } : v),
+                        })}
                       />
                     </Field>
-                    {edit.variants.length > 1 && <p className="muted">{variantLabel(variant)}: 도매 {won(variant.wholesale)}, 반도매 {won(variant.semi)}, 소매 {won(variant.retail)}</p>}
                   </div>
-                ))}
-                <p className="muted">원래 모델: {edit.originalCode || "없음"} / 홈페이지 상품 ID: {edit.siteRefs?.join(", ") || edit.siteId || "없음"}</p>
+                )}
+                <p className="muted">홈페이지 연결 ID: {edit.siteRefs?.join(", ") || edit.siteId || "없음"}</p>
                 {edit.priceHistory?.slice().reverse().map((history, index) => (
                   <p className="muted" key={index}>{history.at} / {history.field} / {String(history.before)} → {String(history.after)}</p>
                 ))}
@@ -477,8 +536,8 @@ export function ProductManager({
               </details>
             </div>
             <div className="product-detail-footer">
-              <button type="button" disabled={savingView} onClick={() => setEdit(undefined)}>취소</button>
-              <button type="button" className="primary" disabled={savingView} onClick={() => void save()}>
+              <button type="button" disabled={savingView} onClick={() => void closeDetail()}>닫기</button>
+              <button type="button" className="primary" disabled={savingView || (!editDirty && state.products.some((p) => p.id === edit.id))} onClick={() => void save()}>
                 {savingView ? "저장 중" : "변경사항 저장"}
               </button>
             </div>

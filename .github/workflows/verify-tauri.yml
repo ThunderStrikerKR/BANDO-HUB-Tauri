@@ -1,0 +1,154 @@
+name: Verify Tauri migration (draft)
+on:
+  push:
+    branches:
+      - feature/tauri-product-bulk-registration
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+permissions:
+  contents: read
+# A draft PR receives both push and pull_request events for the same commit.
+# Keep only the newest branch revision to avoid duplicate Windows CI queues.
+concurrency:
+  # A push and its PR may fire within seconds; they must not cancel each
+  # other's browser run while the runner is stopping the previous process.
+  group: bando-tauri-${{ github.event_name }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  node-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install JavaScript dependencies
+        run: npm install --no-audit --no-fund --ignore-scripts
+      - name: TypeScript type check
+        run: npm run check:types
+      # The full 20-case audit intentionally retains failing 18/19/20
+      # until those independent parser defects are repaired. Keep a separate
+      # green assertion for recipient boundaries 5/16/17 and institution-only
+      # addressees, rather than masking or deleting the unrelated failures.
+      - name: Recipient boundary regressions (orders 5, 16, 17)
+        run: |
+          node --test --test-name-pattern="ORDER_SAMPLE_05|ORDER_SAMPLE_16|ORDER_SAMPLE_17" tests/audit-20-order-samples.test.mjs
+          node --test tests/recipient-institution-boundaries.test.mjs
+      - name: Node tests
+        run: npm test
+  rust-reception:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Rust receipt boundary unit tests (no Tauri GUI libraries)
+        run: cargo test --manifest-path tests/reception-rust/Cargo.toml
+
+  windows-native-sqlite:
+    name: Windows SQLite persistence and Rust tests
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          cache-targets: true
+      - name: Test real app Rust / SQLite persistence on Windows
+        run: cargo test --manifest-path src-tauri/Cargo.toml --lib -- --nocapture
+  windows-release-build:
+    name: Windows Tauri executable compilation
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          cache-targets: true
+      - name: Install frontend dependencies
+        run: npm install --no-audit --no-fund
+      - name: Build actual Windows executable
+        run: npm run build:windows
+      - name: Verify EXE exists
+        shell: pwsh
+        run: |
+          $exe = "src-tauri/target/release/bando_hub_tauri.exe"
+          if (!(Test-Path $exe)) { throw "Tauri Windows EXE was not produced" }
+          Write-Host "EXE generated: $((Get-Item $exe).Length) bytes"
+      - name: Restore versioned portable OCR runtime and models
+        id: ocr-cache
+        uses: actions/cache@v4
+        with:
+          path: ocr-build-cache
+          key: bando-ocr-win-x64-v1-${{ hashFiles('scripts/package-ocr-runtime.ps1', 'scripts/prepare-ocr-bundle.py', 'scripts/verify-packaged-ocr.ps1', 'scripts/verify-portable-ocr.py', 'src-tauri/resources/ocr/recognize.py') }}
+      - name: Bundle private embedded Python and Korean PP-OCRv5 models
+        if: steps.ocr-cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: ./scripts/package-ocr-runtime.ps1 -TargetDir "ocr-build-cache"
+      - name: Verify cached or freshly prepared OCR files
+        shell: pwsh
+        run: |
+          if (!(Test-Path "ocr-build-cache/runtime/python.exe")) { throw "Cached OCR Python missing" }
+          if (!(Test-Path "ocr-build-cache/models/PP-OCRv5_mobile_det/inference.json")) { throw "Cached OCR detector missing" }
+          if (!(Test-Path "ocr-build-cache/models/korean_PP-OCRv5_mobile_rec/inference.json")) { throw "Cached OCR Korean recognizer missing" }
+      - name: Produce offline-ready Windows portable ZIP
+        shell: pwsh
+        run: |
+          $root = "src-tauri/target/release"
+          $portable = Join-Path $root "BANDO-HUB-portable"
+          New-Item -ItemType Directory -Path $portable -Force | Out-Null
+          Copy-Item (Join-Path $root "bando_hub_tauri.exe") (Join-Path $portable "bando_hub.exe")
+          Copy-Item "ocr-build-cache" (Join-Path $portable "ocr") -Recurse
+          if (!(Test-Path (Join-Path $portable "ocr/runtime/python.exe"))) { throw "Bundled Python missing" }
+          if (!(Test-Path (Join-Path $portable "ocr/models/korean_PP-OCRv5_mobile_rec"))) { throw "Bundled Korean model missing" }
+          Compress-Archive -Path (Join-Path $portable "*") -DestinationPath (Join-Path $root "BANDO-HUB-portable.zip") -Force
+      - name: Validate offline OCR from the extracted ZIP
+        shell: pwsh
+        run: |
+          $root = "src-tauri/target/release"
+          # A Korean installation path must work with the Paddle native loader.
+          $unpacked = Join-Path $env:RUNNER_TEMP "반도허브-한글경로-검증"
+          Expand-Archive -LiteralPath (Join-Path $root "BANDO-HUB-portable.zip") -DestinationPath $unpacked
+          ./scripts/verify-packaged-ocr.ps1 -OcrRoot (Join-Path $unpacked "ocr")
+      - name: Upload portable Windows test distribution (EXE and OCR together)
+        uses: actions/upload-artifact@v4
+        with:
+          name: BANDO-HUB-Tauri-v0.0.4-Windows-portable-OCR
+          path: src-tauri/target/release/BANDO-HUB-portable.zip
+          if-no-files-found: error
+          retention-days: 7
+
+  receipt-audit-ui-smoke:
+    name: Browser audit view smoke test (mock Tauri IPC)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install frontend dependencies
+        run: npm install --no-audit --no-fund --ignore-scripts
+      - name: Install browser test driver
+        run: npm install --no-save --no-package-lock --no-audit --no-fund playwright@1.55.1
+      # ubuntu-24.04 already has the runtime libraries required by Chromium.
+      # The with-deps flag runs apt and can fail on transient Ubuntu mirror DNS
+      # failures before any UI test is executed.
+      - name: Install headless Chromium
+        run: npx playwright install chromium
+      - name: Guard saved order against passive repricing in actual React UI
+        run: node scripts/reception-pricing-ui-smoke.mjs
+      - name: Run real React UI audit smoke test
+        run: node scripts/receipt-audit-ui-smoke.mjs
+      - name: Verify product manager displays curated names instead of website titles
+        run: node scripts/product-name-ui-smoke.mjs

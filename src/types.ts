@@ -133,6 +133,10 @@ export interface Item {
   temporary?: boolean;
   recognitionReason?: string;
   modelProposal?: { original: string; required: boolean };
+  /** Legacy historical color notice. Never overwritten by a model-group selection. */
+  appliedDefaultColor?: { groupId: string; color: string };
+  /** Explicit employee selection of one product from an existing model group. */
+  appliedRepresentativeModel?: { groupId: string; productId: string; productName: string };
   manuallyConfirmed?: boolean;
   quantityConfirmed?: boolean;
   productCandidates?: Candidate[];
@@ -396,8 +400,13 @@ export interface Settings {
   senderPostcode?: string;
   excelDirectory?: string;
   factoryReplyDirectory?: string;
-  modelRepresentatives?: Record<string, { productId: string; variantId: string }>;
-  modelFamilies?: Record<string, { code: string; productIds: string[] }>;
+  // Database key retained for compatibility. New groups select a stable product ID;
+  // representativeColor exists only on previously saved color-only groups.
+  colorGuidanceGroups?: Record<string, { name: string; productIds: string[]; representativeProductId?: string; representativeColor?: string }>;
+  /** Company-wide user-edited message snippets used for future copyable output. */
+  automaticMessageTemplates?: Record<string, string>;
+  /** Staff-authored guidance for tentative manual product selections, keyed by stable product ID. */
+  provisionalProductNotices?: Record<string, string>;
   kakaoTitleMappings?: Record<
     string,
     { clientId: string; updatedAt: string; actor: string; ambiguous?: boolean }
@@ -418,6 +427,7 @@ export interface Settings {
   specialPolicy?: "WHOLESALE_EXCEPTIONS" | "UNCONFIRMED";
 }
 export interface ExportRecord {
+  savedPath?: string;
   snapshots?: import("./workflow-types.js").ExcelQueueEntry[];
   id: string;
   at: string;
@@ -454,9 +464,17 @@ export interface State {
 export interface ImportPreview {
   product: Product;
   existingId: string | null;
+  modelSource?: "MODEL_FIELD" | "CUSTOM_CODE" | "TITLE" | "UNRESOLVED";
+  optionEvidence?: {
+    group: string;
+    kind: "SELECT" | "RADIO" | "CHECKBOX" | "CUSTOM";
+    values: { label: string; token: string }[];
+  }[];
   warnings: string[];
   sourceUrl: string;
   related?: Product[];
+  canApply?: boolean;
+  revision?: number;
 }
 export interface OfficialLink {
   name: string;
@@ -517,19 +535,71 @@ export interface DockStatus {
   active: boolean;
   ratio: number;
   handle?: string;
+  selectionRequired?: boolean;
+}
+export interface StartupStatus {
+  phase: "OPENING" | "ERROR" | "RETRYING" | "READY";
+  error?: string | null;
+  attempts: number;
+  databaseMs?: number | null;
+  readyMs?: number | null;
+  isTest: boolean;
 }
 export interface StartupMetrics {
-  windowShownMs: number;
-  databaseMs: number;
-  dataMs: number;
-  readyMs: number;
+  // The native startup layer can measure DB open and ready times. It cannot
+  // claim a browser paint/JS hydration time that was never measured.
+  windowShownMs: number | null;
+  databaseMs: number | null;
+  dataMs: number | null;
+  readyMs: number | null;
 }
+export interface DeveloperTestReport {
+  scenario: string;
+  raw: string;
+  passed: boolean;
+  expected: string[];
+  detected: string[];
+  recipients: { name: string; address: string; contact: string; items: string[] }[];
+  notes: string[];
+}
+export interface DeveloperRunHistory {
+  id: number;
+  at: string;
+  scenario: string;
+  passed: boolean;
+  report: DeveloperTestReport;
+}
+export interface OcrCapture {
+  text: string;
+  imageDataUrl: string;
+  width: number;
+  height: number;
+}
+
 export interface Api {
-  saveProductWorkbook?: (bytes: number[]) => Promise<string>;
+  captureOcr?: () => Promise<OcrCapture>;
+  saveProductWorkbook?: (bytes: number[]) => Promise<string | null>;
+  saveProductSyncWorkbook?: (bytes: number[]) => Promise<string | null>;
+  saveFactoryWorkbook?: (bytes: number[]) => Promise<string | null>;
+  saveStoreWorkbook?: (bytes: number[]) => Promise<string | null>;
+  saveSettlementWorkbook?: (bytes: number[]) => Promise<string | null>;
+  saveOrderHistoryWorkbook?: (bytes: number[]) => Promise<string | null>;
+  saveClientWorkbook?: (bytes: number[]) => Promise<string | null>;
+  saveRegistrationWorkbook?: (kind: "양식" | "결과", bytes: number[]) => Promise<string | null>;
+  archiveFactoryReply?: (id: string, bytes: number[]) => Promise<string>;
+  chooseFactoryReplyDirectory?: () => Promise<string | undefined>;
+  factoryReplyWatchScan?: () => Promise<import("./factory-reply-auto.js").WatchedReplyFile[]>;
+  factoryReplyWatchCommit?: (
+    filename: string, id: string, candidate: State, expectedRevision: number,
+  ) => Promise<import("./factory-reply-auto.js").WatchedReplyResult>;
   openFactoryFile?: (id: string) => Promise<void>;
   productImage?: (id: string) => Promise<{ data: string; source: string } | null>;
-  approveFactoryConflict?: (id: string, row: number) => Promise<void>;
+  approveFactoryConflict?: (id: string, row: number, expectedRevision: number) => Promise<void>;
   isTestWorkspace?: boolean;
+  workspaceMode?: () => Promise<boolean>;
+  testRecordRun?: (report: DeveloperTestReport) => Promise<void>;
+  testRunHistory?: () => Promise<DeveloperRunHistory[]>;
+  testReceptionBoundary?: (candidate: Order) => Promise<{ accepted: boolean; reason: string | null }>;
   openTestWorkspace?: () => Promise<void>;
   testDatabasePreview?: () => Promise<
     | { enabled: false }
@@ -546,32 +616,22 @@ export interface Api {
   >;
   resetTestDatabase?: (revision: number) => Promise<{ backup: string }>;
   receiptArchive: () => Promise<{ id: string; orderId: string; record: Record<string, unknown> }[]>;
-  captureReceipt: (id: string, text: string) => Promise<NonNullable<Order["receipt"]>>;
-  recordReceiptCorrection: (
-    id: string,
-    record: NonNullable<Order["rawCorrections"]>[number],
-  ) => Promise<void>;
-  registrationTemplate: () => Promise<void>;
-  registrationPreview: () => Promise<{
-    fingerprint: string;
-    rows: import("./product-registry.js").RegistrationRow[];
-  } | null>;
-  registrationCommit: (fingerprint: string) => Promise<{ created: number; skipped: number }>;
-  registrationResults: () => Promise<void>;
   openProduct: (url: string) => Promise<void>;
   dockRegion: (region: { x: number; y: number; width: number; height: number }) => Promise<void>;
   requestClose: (hasUnsavedChanges: boolean) => Promise<void>;
   onLayoutReset?: (fn: () => void) => () => void;
   dockCycle: () => Promise<DockStatus>;
+  dockMode: (mode: "OVERLAP" | "STACK") => Promise<DockStatus>;
   windowControl: (action: "minimize" | "maximize" | "close") => Promise<void>;
   dockSelect: (handle: string) => Promise<DockStatus>;
   load: () => Promise<State>;
-  save: (state: State) => Promise<void>;
+  save: (state: State) => Promise<State>;
   patchSettings?: (changes: Record<string, unknown>, expected: Record<string, unknown>) => Promise<State>;
   chooseExcelDirectory: () => Promise<string | undefined>;
   openExcelDirectory: () => Promise<void>;
+  openDailyExcelDirectory: (kind: "FACTORY" | "STORE") => Promise<void>;
   openExportFile: (id: string) => Promise<void>;
-  exportExcel: (ids: string[]) => Promise<{ cancelled: boolean; filename?: string }>;
+  openExportDirectory: (id: string) => Promise<void>;
   previewImport: (url: string) => Promise<ImportPreview>;
   officialList: () => Promise<OfficialLink[]>;
   copy: (text: string) => Promise<void>;
@@ -581,10 +641,6 @@ export interface Api {
   mobileStatus: () => Promise<MobileStatus>;
   inbox: () => Promise<InboxEntry[]>;
   catalogReport: () => Promise<CatalogReport>;
-  approveCatalog: () => Promise<{ updated: number; created: number }>;
-  downloadSheet: (kind: "prices" | "clients") => Promise<void>;
-  previewSheet: (kind: "prices" | "clients") => Promise<BulkPreview | null>;
-  approveSheet: () => Promise<void>;
   backup: () => Promise<string>;
   backups: () => Promise<string[]>;
   restore: (filename: string) => Promise<void>;
@@ -599,8 +655,9 @@ export interface Api {
   dockStart: (handle: string, ratio: number) => Promise<DockStatus>;
   dockStop: () => Promise<DockStatus>;
   dockStatus: () => Promise<DockStatus>;
+  startupStatus?: () => Promise<StartupStatus>;
   startupMetrics: () => Promise<StartupMetrics>;
-  retryStartup: () => Promise<void>;
+  retryStartup: () => Promise<StartupStatus>;
 }
 declare global {
   interface Window {
@@ -609,7 +666,8 @@ declare global {
 }
 
 export type MatchKind =
-  | "CODE"
+  | "CODE" // historical recognition records
+  | "NAME"
   | "CLIENT_ALIAS"
   | "COMMON_ALIAS"
   | "COMMON_INHERIT"

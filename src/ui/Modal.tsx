@@ -2,13 +2,11 @@ import type { ReactNode } from "react";
 import { useLayoutEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { usePendingChanges } from "../shared/pending-changes";
+import { sameValue } from "../shared/draft";
 const modalStack: HTMLDialogElement[] = [];
+// Keep the editing dialog open while a native decision dialog is stacked above it.
 export function pauseModalLayer() {
-  const el = modalStack.at(-1);
-  el?.close();
-  return () => {
-    if (el?.isConnected && modalStack.at(-1) === el && !el.open) el.showModal();
-  };
+  return () => {};
 }
 export function Modal({
   title,
@@ -16,6 +14,7 @@ export function Modal({
   onClose,
   busy = false,
   draft,
+  dirty,
   className,
 }: {
   title: string;
@@ -23,28 +22,30 @@ export function Modal({
   onClose: () => void;
   busy?: boolean;
   draft?: unknown;
+  dirty?: boolean;
   className?: string;
 }) {
   const ref = useRef<HTMLDialogElement>(null),
     close = useRef(onClose);
-  const initial = useRef(JSON.stringify(draft));
-  usePendingChanges(draft !== undefined && JSON.stringify(draft) !== initial.current);
+  const initial = useRef(draft === undefined ? undefined : structuredClone(draft));
+  // A form may supply a semantic dirty flag (e.g. blank optional inputs).
+  // For other dialogs compare actual values rather than JSON key order.
+  usePendingChanges(dirty ?? (draft !== undefined && !sameValue(draft, initial.current)));
   close.current = () => {
     if (!busy) onClose();
   };
   useLayoutEffect(() => {
     const el = ref.current!,
       previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    modalStack.at(-1)?.close();
     modalStack.push(el);
     el.showModal();
     return () => {
       const top = modalStack.at(-1) === el;
-      modalStack.splice(modalStack.indexOf(el), 1);
+      const index = modalStack.indexOf(el);
+      if (index >= 0) modalStack.splice(index, 1);
       el.close();
       if (top) {
         const parent = modalStack.at(-1);
-        if (parent?.isConnected && !parent.open) parent.showModal();
         if (previous?.isConnected && (!parent || parent.contains(previous)))
           previous.focus({ preventScroll: true });
       }

@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { rebaseDraft } from "./draft";
+import { rebaseDraft, sameValue } from "./draft";
 import { usePendingChanges } from "./pending-changes";
-export function useDraft<T extends object>(incoming: T) {
+export function useDraft<T extends object>(
+  incoming: T,
+  equal: (left: T, right: T) => boolean = sameValue,
+) {
   const baseline = useRef(structuredClone(incoming)),
     latest = useRef(incoming),
     current = useRef(structuredClone(incoming));
@@ -13,20 +16,21 @@ export function useDraft<T extends object>(incoming: T) {
       typeof value === "function" ? (value as (previous: T) => T)(current.current) : value;
     current.current = next;
     setDraftState(next);
+    setConflicts((previous) => previous.filter((key) => !sameValue(next[key], latest.current[key])));
   };
   useEffect(() => {
-    if (JSON.stringify(baseline.current) === JSON.stringify(incoming)) return;
+    if (sameValue(baseline.current, incoming)) return;
     const result = rebaseDraft(baseline.current, current.current, incoming);
     baseline.current = structuredClone(incoming);
     setDraft(result.draft);
-    setConflicts((previous) => [...new Set([...previous, ...result.conflicts])]);
+    setConflicts(result.conflicts);
   }, [incoming]);
   const reset = () => {
     baseline.current = structuredClone(latest.current);
     setDraft(structuredClone(latest.current));
     setConflicts([]);
   };
-  const dirty = JSON.stringify(draft) !== JSON.stringify(incoming);
+  const dirty = !equal(draft, incoming);
   usePendingChanges(dirty);
   return {
     draft,

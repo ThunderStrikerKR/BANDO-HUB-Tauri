@@ -29,9 +29,6 @@
   background: #294457 !important;
   color: #fff;
 }
-.app-header {
-  border-bottom: 1px solid #444;
-}
 .hub-management > .pane-heading {
   gap: 6px;
   min-height: 48px;
@@ -50,8 +47,23 @@
   cursor: default;
 }
 .review-layout {
-  grid-template-rows: minmax(0, 0.28fr) minmax(0, 0.32fr) minmax(0, 0.4fr);
+  /* The recipient panel keeps its allotted space even before parsing finds any recipients.
+     Its own content scrolls rather than moving the freight panel upward. */
+  grid-template-rows: minmax(0, 28%) 210px minmax(0, 1fr);
   gap: 6px;
+}
+.review-layout > .recipient-body > .receipt-panel-content {
+  flex: 0 1 auto;
+  padding: 6px 10px 4px;
+}
+.review-layout > .recipient-body .recipient-review {
+  padding: 0;
+  margin: 0;
+}
+.review-layout > .recipient-body .recipient-fields {
+  padding-bottom: 0;
+  margin-bottom: 0;
+  border-bottom: 0;
 }
 .review-layout > .staff-checks,
 .review-layout > .recipient-body,
@@ -103,10 +115,30 @@
 .items-freight-panel .compact-items th:first-child {
   width: 40%;
 }
-.dispatch-origin {
+.recipient-row-actions {
+  flex-wrap: wrap;
+}
+.recipient-row-actions > .dispatch-origin {
   display: flex;
-  gap: 6px;
-  padding: 8px 0;
+  align-items: center;
+  gap: 3px;
+  padding: 0;
+  margin-left: auto;
+  white-space: nowrap;
+}
+.items-freight-panel .recipient-row-actions .dispatch-origin button {
+  box-sizing: border-box;
+  width: auto;
+  min-width: 0;
+  min-height: 0;
+  height: 28px;
+  padding: 3px 6px !important;
+  font-size: 12px !important;
+  line-height: 1.25;
+}
+.dispatch-origin-label {
+  font-size: 13px;
+  color: #bbb;
 }
 .dispatch-origin button[aria-pressed="true"] {
   background: #414141;
@@ -137,11 +169,11 @@
 }
 .flow-fixed-summary {
   display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  min-height: 48px;
-  font-size: 13px;
-  padding: 6px 9px;
+  flex-direction: column;
+  gap: 3px;
+  min-height: 42px;
+  font-size: 12px;
+  padding: 5px 8px;
   font-variant-numeric: tabular-nums;
 }
 .source-actions {
@@ -215,16 +247,14 @@
 .app-modal-layer > .modal {
   display: flex;
   flex-direction: column;
-  height: min(820px, calc(100dvh - 36px));
+  /* Ordinary dialogs size to their content; long editors retain their own
+     explicit fixed heights and scroll owners. */
+  height: auto;
+  max-height: calc(100dvh - var(--modal-viewport-gutter));
   overflow: hidden;
 }
 .app-modal-layer .modal > header {
   flex-shrink: 0;
-}
-.app-modal-layer .modal-fields {
-  overflow: auto;
-  min-height: 0;
-  flex: 1;
 }
 .app-modal-layer:has(.retail-order-dialog) .modal-fields {
   overflow: hidden;
@@ -298,6 +328,11 @@
   min-height: 0;
   overflow: auto;
   border: 1px solid #444;
+}
+.excel-table-scroll.excel-list-empty {
+  flex: 0 0 auto;
+  min-height: 0;
+  max-height: min(320px, 45dvh);
 }
 .excel-table-scroll thead {
   position: sticky;
@@ -404,21 +439,24 @@
 }
 
 .flow-fixed-summary {
-  height: 72px;
-  min-height: 72px;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 3px 6px;
-  overflow: hidden;
+  height: auto;
+  min-height: 42px;
+  max-height: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  overflow: visible;
 }
-.flow-fixed-summary span {
+.flow-fixed-summary .flow-summary-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 2px 7px;
+}
+.flow-fixed-summary .flow-summary-line span {
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.flow-fixed-summary span:nth-child(2) {
-  grid-column: 1/-1;
-  order: 4;
+  font-size: 12px;
 }
 
 /* Two reserved toolbar rows keep all three entry buttons visible at narrow resolutions. */
@@ -482,13 +520,14 @@
   }
 }
 .items-freight-panel .compact-items th:first-child {
-  width: 35%;
+  /* The product name uses all space remaining after compact numeric columns. */
+  width: auto;
 }
 .items-freight-panel .compact-items th:nth-child(2) {
-  width: 25%;
+  width: 78px;
 }
 .items-freight-panel .compact-items th:nth-child(3) {
-  width: 40%;
+  width: 108px;
 }
 .items-freight-panel .compact-items td:nth-child(2) .linked-field {
   min-width: 0;
@@ -496,10 +535,11 @@
   gap: 2px;
 }
 .items-freight-panel .compact-items input[type="number"] {
-  min-width: 0;
-  width: 100%;
-  max-width: 100%;
-  flex: 1;
+  box-sizing: border-box;
+  width: 56px;
+  min-width: 56px;
+  max-width: 56px;
+  flex: 0 0 56px;
   padding: 3px;
 }
 .items-freight-panel .compact-items td:nth-child(2) .linked-field:after {
@@ -512,21 +552,58 @@
   white-space: nowrap;
 }
 .items-freight-panel .freight-line {
-  flex-wrap: wrap;
-  gap: 4px;
-}
-.items-freight-panel .freight-line > .freight-money {
-  flex: 1;
-  min-width: 70px;
-}
-.items-freight-panel .freight-money > input {
+  /* Share spare horizontal room among controls without stretching inputs. */
+  display: flex;
   width: 100%;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+}
+.items-freight-panel .freight-line > .freight-amount-code {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: 0 0 auto;
   min-width: 0;
 }
-.items-freight-panel .freight-line > button {
-  font-size: 12px;
-  padding: 4px;
+.items-freight-panel .freight-payment-code {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+.items-freight-panel .freight-payment-code > select {
+  box-sizing: border-box;
+  flex: 0 0 66px;
+  width: 66px;
+  min-width: 66px;
+  height: 32px;
+  padding: 4px 2px !important;
+}
+.items-freight-panel .freight-amount-code > .freight-money {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 0;
+}
+.items-freight-panel .freight-money > input {
+  box-sizing: border-box;
+  width: 84px;
+  min-width: 84px;
+  max-width: 84px;
+  flex: 0 0 84px;
+}
+.items-freight-panel .freight-line > .freight-inquiry {
+  box-sizing: border-box;
+  flex: 0 0 112px;
+  width: 112px;
+  min-width: 112px;
+  max-width: 112px;
+  font-size: 12px !important;
+  padding: 4px 6px !important;
   margin-left: auto;
+  white-space: nowrap;
 }
 
 .source-pane .receipt-client > b {
@@ -566,4 +643,33 @@
   grid-row: 2;
   font-size: 10px;
   white-space: nowrap;
+}
+
+/* Product links are an optional copy choice beside the message title. */
+.messages-pane > .pane-heading h2 {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.messages-pane .message-link-toggle {
+  margin-left: auto;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.messages-pane .message-link-toggle input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  min-width: 15px;
+  margin: 0;
+  flex: none;
+  cursor: pointer;
+}
+
+/* Keep the tax checkbox inset from the left edge of the freight section. */
+.items-freight-panel .shipment-vat {
+  padding: 0 12px;
 }

@@ -1,0 +1,82 @@
+/* Compact item rows for product pricing and product freight.
+   Only vertical rhythm changes: product-name column width and single-line
+   product labels are intentionally preserved. Loaded last to override
+   generic control sizes (40px) and earlier table padding. */
+.app-v03 .management-container .product-prices .price-table-scroll tbody tr,
+.app-v03 .management-container .shipping-product-list .shipping-table-scroll tbody tr {
+  height: 35px;
+}
+
+.app-v03 .management-container .product-prices .price-table-scroll tbody td,
+.app-v03 .management-container .shipping-product-list .shipping-table-scroll tbody td {
+  padding-top: 3px;
+  padding-bottom: 3px;
+  vertical-align: middle;
+  line-height: 1.3;
+}
+
+/* Keep all row actions on the same baseline as price fields and status text. */
+.app-v03 .management-container .product-prices .price-table-scroll tbody td button,
+.app-v03 .management-container .shipping-product-list .shipping-table-scroll tbody td button {
+  box-sizing: border-box;
+  height: 28px;
+  min-height: 28px;
+  padding: 3px 9px;
+  font-size: 12px;
+  line-height: 1.25;
+  vertical-align: middle;
+}
+
+.app-v03 .management-container .product-prices .price-table-scroll tbody td input[data-price-cell] {
+  box-sizing: border-box;
+  height: 28px;
+  min-height: 28px;
+  padding: 3px 7px;
+  font-size: 12px;
+  line-height: 1.25;
+  vertical-align: middle;
+}
+
+/* Previously the price status line (including a non-breaking space when
+   empty) added an extra line of height to every SKU. Preserve live status
+   accessibility but float visible messages, leaving the row compact. */
+.app-v03 .management-container .product-prices .price-cell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 28px;
+}
+.app-v03 .management-container .product-prices .price-cell small {
+  position: absolute;
+  top: calc(100% + 2px);
+  right: 0;
+  z-index: 5;
+  width: max-content;
+  max-width: 240px;
+  padding: 3px 6px;
+  border: 1px solid #505050;
+  border-radius: 4px;
+  background: #292929;
+  color: #dedede;
+  opacity: 0;
+  pointer-events: none;
+  font-size: 11px;
+  line-height: 1.3;
+}
+.app-v03 .management-container .product-prices .price-cell small:empty { display: none; }
+.app-v03 .management-container .product-prices .price-cell:focus-within small:not(:empty),
+.app-v03 .management-container .product-prices .price-cell.invalid small:not(:empty) {
+  opacity: 1;
+}
+.app-v03 .management-container .product-prices .price-cell.invalid small {
+  border-color: #b47d7d;
+  color: #ffb4b4;
+}
+.app-v03 .management-container .shipping-product-list .shipping-table-scroll tbody input[type="checkbox"] {
+  margin-top: 0;
+  margin-bottom: 0;
+  vertical-align: middle;
+}
+
+/* Keep the full-length name columns flexible. No fixed small width or
+   truncation is introduced by the row-density change. */

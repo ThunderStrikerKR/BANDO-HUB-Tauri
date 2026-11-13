@@ -12,7 +12,7 @@ body,
 }
 .app-header {
   background: #1c1c1c;
-  border-color: #404040;
+  border-bottom: 1px solid #444;
   gap: 12px;
   height: 64px;
   -webkit-app-region: drag;
@@ -26,12 +26,8 @@ body,
 .app-header nav button {
   color: #bdbdbd;
   font-size: calc(15px * var(--ui-scale));
-  padding: 10px;
 }
-.app-header nav button.current {
-  background: #404040;
-  color: #fff;
-}
+
 .wordmark span {
   color: #ddd;
 }
@@ -148,11 +144,6 @@ body,
 }
 .app-v03 .text-button {
   background: transparent;
-  color: #c4c4c4;
-}
-.app-v03 .field > .field-label,
-.app-v03 .field > label {
-  font-size: calc(14px * var(--ui-scale));
   color: #c4c4c4;
 }
 .app-v03 .field {
@@ -364,15 +355,10 @@ body,
   gap: 9px;
 }
 .product-title-line span {
-  font-size: calc(15px * var(--ui-scale));
   color: #a3a3a3;
-}
-.product-title-line b {
-  font-size: calc(16px * var(--ui-scale));
 }
 .app-v03 .price-cell input {
   font-size: calc(16px * var(--ui-scale));
-  width: 125px;
   background: #262626;
 }
 .app-v03 td small {
@@ -1160,10 +1146,6 @@ body,
 .app-v03 .flow-footer-actions select {
   padding: 5px;
   font-size: 13px;
-}
-.app-v03 .flow-footer-actions button {
-  font-size: 13px;
-  padding: 7px;
 }
 .review-pane .recipient-review {
   padding: 8px;

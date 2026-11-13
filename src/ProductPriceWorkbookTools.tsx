@@ -21,7 +21,7 @@ export function ProductPriceWorkbookTools({ state, onSave, onRefresh, onNotice, 
     const bytes = await exportPriceWorkbook(state);
     if (!window.bando?.saveProductWorkbook) throw Error("가격표 저장 기능이 준비되지 않았습니다.");
     const path = await window.bando.saveProductWorkbook(bytes);
-    onNotice("상품 가격표를 저장했습니다: " + path, "success");
+    if (path) onNotice("상품 가격표를 저장했습니다: " + path, "success");
   });
   const select = (file?: File) => {
     if (!file) return;

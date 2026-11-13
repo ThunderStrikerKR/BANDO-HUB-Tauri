@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { confirmDiscardDraft } from "./shared/editor-flow";
 import type { Order, State } from "./types";
 import { correctWorkingRaw } from "./working-raw";
 import { Modal, Field } from "./ui";
@@ -18,9 +19,11 @@ export function WorkingRawDialog({
     [preview, setPreview] = useState<State>(),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
+  const changed = text !== (order.analysisRaw ?? order.raw) || !!reason.trim();
+  const closeDraft = () => void confirmDiscardDraft("원문 정정", changed, onClose, busy);
   const updated = preview?.orders.find((o) => o.id === order.id);
   return (
-    <Modal title="원문 정정" onClose={onClose} busy={busy} draft={{ text, reason }}>
+    <Modal title="원문 정정" onClose={closeDraft} busy={busy} draft={{ text, reason }}>
       <p>최초 접수 원문과 확정 스냅샷은 보존합니다. 작업용 원문만 다시 분석합니다.</p>
       <details>
         <summary>최초 접수 원문</summary>
@@ -74,7 +77,7 @@ export function WorkingRawDialog({
         {error}
       </p>
       <div className="product-edit-footer">
-        <button onClick={onClose}>취소</button>
+        <button onClick={closeDraft}>닫기</button>
         <button
           onClick={() => {
             try {

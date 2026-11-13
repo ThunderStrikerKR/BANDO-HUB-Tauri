@@ -1,6 +1,13 @@
 import type { Order, State } from "./types.js";
 import { orderIssues } from "./validation.js";
 import { applyOrderRawEdit } from "./workflow.js";
+const rawCorrectionIssueKinds = new Set([
+  "NAME", "ADDRESS", "CONTACT", "CONTACT_INVALID",
+  "MODEL", "QUANTITY_MISSING", "QUANTITY_INVALID", "ITEM", "UNASSIGNED_EVIDENCE",
+]);
+export function rawCorrectableIssue(kind?: string) {
+  return kind !== undefined && rawCorrectionIssueKinds.has(kind);
+}
 export function rawCorrectionAllowed(s: State, o: Order) {
   const ids = new Set(s.workflow?.shipments.filter((v) => v.orderId === o.id).map((v) => v.id));
   return (
@@ -10,19 +17,7 @@ export function rawCorrectionAllowed(s: State, o: Order) {
     !o.postpaidApproved &&
     o.orderType !== "RETAIL" &&
     orderIssues(o).some(
-      (i) =>
-        i.severity === "ACTION" &&
-        [
-          "NAME",
-          "ADDRESS",
-          "CONTACT",
-          "CONTACT_INVALID",
-          "MODEL",
-          "QUANTITY_MISSING",
-          "QUANTITY_INVALID",
-          "ITEM",
-          "UNASSIGNED_EVIDENCE",
-        ].includes(i.kind),
+      (i) => i.severity === "ACTION" && rawCorrectableIssue(i.kind),
     ) &&
     !s.workflow?.shipments.some(
       (v) => ids.has(v.id) && (v.step >= 2 || v.transferred || v.delivery),

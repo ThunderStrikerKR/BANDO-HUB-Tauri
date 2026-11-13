@@ -1,12 +1,15 @@
 import { replyNeedsReview } from "./factory-replies";
 import { FactoryNotifications } from "./FactoryNotifications";
+import { FactoryReplyWatcher } from "./FactoryReplyWatcher";
 import { lazy, Suspense, useState } from "react";
 import { AppHeader } from "./app/AppHeader";
 import { AppNotice } from "./app/AppNotice";
+import { StartupRecoveryPanel } from "./app/StartupRecoveryPanel";
 import { DailySettlement } from "./app/DailySettlement";
 import { OrderHistory } from "./app/OrderHistory";
 import { useAppModel } from "./app/useAppModel";
 import { HubShell } from "./HubShell";
+import { KakaoDockPicker } from "./KakaoDockPicker";
 import { HubWorkspace } from "./HubWorkspace";
 import { NoticeContext } from "./shared/NoticeContext";
 import { EmptyState } from "./ui/PageHeading";
@@ -40,16 +43,37 @@ export function App() {
   const [notifications, setNotifications] = useState(false);
   const model = useAppModel(),
     { state, draft, tab } = model;
-  if (!state || !draft)
+  if (!state || !draft) {
+    if (model.startup.phase === "ERROR" || model.startup.phase === "RETRYING") {
+      return (
+        <StartupRecoveryPanel
+          startup={model.startup}
+          retrying={model.startupBusy}
+          onRetry={model.retryStartup}
+        />
+      );
+    }
     return (
-      <main className="loading">
+      <main className="loading" role="status">
         <h1>반도허브</h1>
-        <p>{model.notice?.message ?? "업무 화면 준비 중…"}</p>
+        <p>업무 데이터베이스를 안전하게 확인하는 중입니다.</p>
       </main>
     );
+  }
   return (
     <NoticeContext.Provider value={model.setNotice}>
       <div className="app-v03" aria-busy={model.busy}>
+        {window.bando?.isTestWorkspace && (
+          <div className="developer-workspace-indicator" role="status">
+            TEST / 격리 DB / 외부 발송 금지
+          </div>
+        )}
+        <FactoryReplyWatcher
+          enabled={Boolean(state.settings.factoryReplyDirectory) || Boolean(window.bando?.isTestWorkspace)}
+          paused={model.dirty || model.busy}
+          onRefresh={model.refresh}
+          onNotice={model.setNotice}
+        />
         <AppHeader
           onNotifications={() => setNotifications(true)}
           notificationCount={
@@ -60,11 +84,22 @@ export function App() {
           busy={model.dockBusy}
           onNavigate={model.navigate}
           onDock={() => void model.run(model.docking)}
+          onDockMode={(mode) => void model.run(() => model.setDockMode(mode))}
+          onDockStop={() => void model.run(model.stopDock)}
           onWindow={(action) => void model.run(() => model.windowAction(action))}
         />
+        {model.dockCandidates.length > 0 && (
+          <KakaoDockPicker
+            windows={model.dockCandidates}
+            busy={model.dockBusy}
+            onClose={() => model.setDockCandidates([])}
+            onSelect={(handle) => void model.run(() => model.selectDock(handle))}
+          />
+        )}
         {notifications && (
           <FactoryNotifications
             state={state}
+            onRefresh={model.refresh}
             onClose={() => setNotifications(false)}
             onOpen={(id) => {
               const order = state.orders.find((o) => o.id === id);
@@ -114,6 +149,7 @@ export function App() {
                   onSettings={() => void model.navigate("설정")}
                   onRawEditDirty={model.setRawEditDirty}
                   onRememberSelection={model.setWorkflowSelection}
+                  onRegisterOrderLeaveGuard={model.registerOrderLeaveGuard}
                   externalKakao={true}
                   onResetDock={() => {}}
                   workflowSelection={model.workflowSelection}
@@ -161,11 +197,11 @@ export function App() {
                     onQuery={model.setQuery}
                     date={model.historyDate}
                     onDate={model.setHistoryDate}
-                    onOpen={model.open}
+                    onNotice={model.setNotice}
                   />
                 )}{" "}
                 {tab === "결산" && (
-                  <DailySettlement date={model.settlementDate} onDate={model.setSettlementDate} />
+                  <DailySettlement state={state} date={model.settlementDate} onDate={model.setSettlementDate} onNotice={model.setNotice} />
                 )}{" "}
                 {tab === "공장목록" && (
                   <WorkflowQueue
@@ -186,7 +222,6 @@ export function App() {
                     onSaveSettings={model.saveSettings}
                     onNotice={model.setNotice}
                     onRestored={model.afterRestore}
-                    onReceive={model.receive}
                   />
                 )}
               </ScreenBoundary>

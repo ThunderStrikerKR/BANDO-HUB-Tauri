@@ -1,15 +1,16 @@
-/** BANDO HUB v0.0.4. Tauri-to-legacy React compatibility layer.
- * Electron IPC methods that have not been migrated fail explicitly.
+/** BANDO HUB Tauri bridge. Active React actions map to native commands.
+ * Planned mobile networking remains explicitly unavailable offline.
  */
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import type { Api, State, CatalogReport } from "./types";
+import type { Api, State, CatalogReport, OcrCapture } from "./types";
 import productImages from "./tauri-product-images.json";
+import { parseOfficialProductPage } from "./official-product-import";
+import { officialLinksFromSnapshot } from "./official-links";
 
 const notReady = (feature: string): never => {
-  throw new Error(`${feature}: Tauri v0.0.4에서 아직 이전하지 않은 기능입니다.`);
+  throw new Error(`${feature} 기능은 아직 구현되지 않았습니다.`);
 };
-const inactiveDock = { active: false, ratio: 0.8 } as const;
 const appWindow = () => getCurrentWindow();
 const safeImage = (siteId?: string) => {
   if (!siteId || !Object.prototype.hasOwnProperty.call(productImages, siteId)) return null;
@@ -18,18 +19,29 @@ const safeImage = (siteId?: string) => {
 };
 
 const api: Api = {
-  isTestWorkspace: true,
-  saveProductWorkbook: (bytes) => invoke<string>("save_product_workbook", { bytes }),
+  isTestWorkspace: false,
+  workspaceMode: () => invoke<boolean>("workspace_mode"),
+  testRecordRun: (report) => invoke<void>("test_record_run", { report }),
+  testRunHistory: () => invoke("test_run_history"),
+  testReceptionBoundary: (candidate) => invoke("test_reception_boundary", { candidate }),
+  saveProductWorkbook: (bytes) => invoke<string | null>("save_product_workbook", { bytes }),
+  saveProductSyncWorkbook: (bytes) => invoke<string | null>("save_product_sync_workbook", { bytes }),
+  saveFactoryWorkbook: (bytes) => invoke<string | null>("save_factory_workbook", { bytes }),
+  saveStoreWorkbook: (bytes) => invoke<string | null>("save_store_workbook", { bytes }),
+  saveSettlementWorkbook: (bytes) => invoke<string | null>("save_settlement_workbook", { bytes }),
+  saveOrderHistoryWorkbook: (bytes) => invoke<string | null>("save_order_history_workbook", { bytes }),
+  saveClientWorkbook: (bytes) => invoke<string | null>("save_client_workbook", { bytes }),
+  saveRegistrationWorkbook: (kind, bytes) => invoke<string | null>("save_registration_workbook", { kind, bytes }),
   load: () => invoke<State>("state_load"),
-  save: (state) => invoke<void>("state_save", { state }),
+  save: (state) => invoke<State>("state_save", { state }),
   patchSettings: (changes, expected) => invoke<State>("settings_patch", { changes, expected }),
   setPrice: (productId, variantId, tier, price, expected) =>
     invoke<State>("price_set", { productId, variantId, tier, price, expected }),
   copy: (text) => invoke<void>("clipboard_write", { text }),
   readClipboard: () => invoke<string>("clipboard_read"),
+  captureOcr: () => invoke<OcrCapture>("capture_ocr"),
   openProduct: (url) => invoke<void>("product_open", { target: url }),
   catalogReport: () => invoke<CatalogReport>("catalog_report"),
-  approveCatalog: () => invoke<{ updated: number; created: number }>("catalog_approve"),
   backup: () => invoke<string>("backup_create"),
   backups: () => invoke<string[]>("backup_list"),
   restore: (filename) => invoke<void>("backup_restore", { filename }),
@@ -47,40 +59,49 @@ const api: Api = {
     if (hasUnsavedChanges && !window.confirm("저장하지 않은 변경사항이 있습니다. 종료할까요?")) return;
     await appWindow().close();
   },
-  dockStatus: async () => ({ ...inactiveDock }),
-  dockCycle: async () => notReady("카카오톡 창 도킹"),
-  dockStart: async () => notReady("카카오톡 창 도킹"),
-  dockStop: async () => ({ ...inactiveDock }),
-  dockSelect: async () => notReady("카카오톡 창 선택"),
-  dockWindows: async () => notReady("카카오톡 창 검색"),
-  dockRegion: async () => {}, // There is no OS-docking window in this preview.
-  startupMetrics: async () => notReady("시작 성능 계측"),
-  retryStartup: async () => notReady("다시 시작"),
+  dockStatus: () => invoke("dock_status_native"),
+  dockCycle: () => invoke("dock_cycle_native"),
+  dockMode: (mode) => invoke("dock_mode_native", { mode }),
+  dockStart: (handle, ratio) => invoke("dock_start_native", { handle, ratio }),
+  dockStop: () => invoke("dock_stop_native"),
+  dockSelect: (handle) => invoke("dock_select_native", { handle }),
+  dockWindows: () => invoke("dock_windows_native"),
+  dockRegion: (region) => invoke("dock_region_native", { region }),
+  startupStatus: () => invoke("startup_status"),
+  startupMetrics: () => invoke("startup_metrics"),
+  retryStartup: () => invoke("retry_startup"),
   receiptArchive: () => invoke<{ id: string; orderId: string; record: Record<string, unknown> }[]>("receipt_archive"),
-  captureReceipt: async () => notReady("접수 원문 감사 저장"),
-  recordReceiptCorrection: async () => notReady("접수 원문 정정 감사"),
-  registrationTemplate: async () => notReady("상품 일괄 등록 양식 다운로드"),
-  registrationPreview: async () => notReady("상품 일괄 등록 검증"),
-  registrationCommit: async () => notReady("상품 일괄 등록 반영"),
-  registrationResults: async () => notReady("상품 일괄 등록 결과"),
-  chooseExcelDirectory: async () => notReady("엑셀 폴더 선택"),
-  openExcelDirectory: async () => notReady("엑셀 폴더 열기"),
-  openExportFile: async () => notReady("엑셀 출력 파일 열기"),
-  exportExcel: async () => notReady("공장 엑셀 내보내기"),
-  previewImport: async () => notReady("외부 상품 가져오기"),
-  officialList: async () => notReady("공식 홈페이지 목록 조회"),
-  downloadSheet: async () => notReady("시트 다운로드"),
-  previewSheet: async () => notReady("시트 업로드 검증"),
-  approveSheet: async () => notReady("시트 업로드 승인"),
+  // Confirmed receipts and corrections are written atomically by state_save.
+  // The old Electron secondary-write IPC is intentionally not duplicated.
+  chooseExcelDirectory: async () => (await invoke<string | null>("choose_excel_directory")) ?? undefined,
+  openExcelDirectory: () => invoke<void>("open_excel_directory"),
+  openDailyExcelDirectory: (kind) => invoke<void>("open_daily_excel_directory", { kind }),
+  openExportFile: (id) => invoke<void>("open_export_file", { id }),
+  openExportDirectory: (id) => invoke<void>("open_export_directory", { id }),
+  previewImport: async (url) => {
+    const html = await invoke<string>("fetch_official_product_html", { target: url });
+    const state = await invoke<State>("state_load");
+    return parseOfficialProductPage(url, html, state);
+  },
+  // Suggests links from the bundled historical catalog; individual previews
+  // still fetch their official product detail pages live.
+  officialList: async () => officialLinksFromSnapshot(await invoke<CatalogReport>("catalog_report")),
   mobileStart: async () => notReady("스마트폰 연동"),
   mobileStop: async () => notReady("스마트폰 연동"),
   mobileStatus: async () => ({ running: false, urls: [] }),
   inbox: async () => [],
-  openFactoryFile: async () => notReady("공장 회신 파일 열기"),
-  approveFactoryConflict: async () => notReady("공장 회신 충돌 승인"),
-  testDatabasePreview: async () => ({ enabled: false as const }),
-  openTestWorkspace: async () => notReady("격리 테스트 작업공간"),
-  resetTestDatabase: async () => notReady("격리 테스트 초기화"),
+  archiveFactoryReply: (id, bytes) => invoke<string>("archive_factory_reply", { id, bytes }),
+  chooseFactoryReplyDirectory: async () =>
+    (await invoke<string | null>("choose_factory_reply_directory")) ?? undefined,
+  factoryReplyWatchScan: () => invoke("factory_reply_watch_scan"),
+  factoryReplyWatchCommit: (filename, id, candidate, expectedRevision) =>
+    invoke("factory_reply_watch_commit", { filename, id, candidate, expectedRevision }),
+  openFactoryFile: (id) => invoke<void>("open_factory_reply_file", { id }),
+  approveFactoryConflict: (id, row, expectedRevision) =>
+    invoke<void>("approve_factory_conflict", { id, row, expectedRevision }),
+  testDatabasePreview: () => invoke("test_database_preview"),
+  openTestWorkspace: () => invoke<void>("open_test_workspace"),
+  resetTestDatabase: (revision) => invoke("reset_test_database", { revision }),
 };
 
 if (typeof window !== "undefined") window.bando = api;

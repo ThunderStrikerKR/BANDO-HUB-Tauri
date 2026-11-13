@@ -1,4 +1,5 @@
 import type { Client, Item, Recipient, State } from "./types.js";
+import { productModelNames } from "./product-name-match.js";
 
 export interface OrderEvidence {
   id: string;
@@ -96,7 +97,7 @@ export function analyzeEvidence(
     };
     const organization = match[0]
       .trim()
-      .match(/^[가-힣A-Za-z0-9 ()]{2,30}(?:학교|교회|월드|목사)$/);
+      .match(/^[가-힣A-Za-z0-9 ()]{2,30}(?:학교|교회|성당|병원|학원|월드|목사)$/);
     if (organization && !local.some((r) => r.items.length || r.address)) {
       const value = organization[0].replace(/\s+목사$/, "");
       add(
@@ -187,6 +188,18 @@ export function analyzeEvidence(
       r.items.flatMap((i) => i.sources?.filter((s) => s.field === "product") ?? []),
     );
     if (localProducts.length && !local.some((r) => r.name || r.address)) {
+      // A product recognizer may use a short code span (e.g. '709') rather
+      // than the full product/option prefix. Extract a clearly trailing name
+      // after a confirmed quantity without requiring all option tokens to
+      // disappear from the source line.
+      const trailing = match[0].match(
+        /(?:\d+)\s*(?:개|대|세트|ea|pcs)\s+([가-힣]{2,5})(?:님)?\s*$/i,
+      );
+      if (trailing && !/(?:보면대|스탠드|마이크|교회|학교|성당|병원|학원|도서관|회관|센터|배송|출고|발송|요청|선불|착불|확인|주세요|감사)/.test(trailing[1])) {
+        const start = match[0].lastIndexOf(trailing[1]);
+        add("name", start, start + trailing[1].length, trailing[1],
+          "상품 수량 뒤의 독립 수취인명");
+      }
       const removed = [
         ...localProducts,
         ...extractQuantities(match[0]).map((q) => ({ start: q.start, end: q.end })),
@@ -205,7 +218,9 @@ export function analyzeEvidence(
         .trim();
       if (
         /^[가-힣]{2,5}(?:님)?$/.test(name) &&
-        !/보면대|스탠드|마이크|주세요|감사|안녕|배송/.test(name)
+        !/보면대|스탠드|마이크|주세요|감사|안녕|배송/.test(name) &&
+        // A brand name left after product/quantity removal is not a recipient.
+        !/^(?:반도|반도스탠드|모델명|상품명|품목|제품명)(?:님)?$/.test(name)
       ) {
         const start = match[0].indexOf(name);
         add(
@@ -242,9 +257,9 @@ export function analyzeEvidence(
     const knownNumericModel =
       contactValue &&
       state.products.some((p) =>
-        [p.code, ...(p.modelCodes ?? [])].some(
-          (code) =>
-            code.replace(/^BD\s*/i, "").replace(/\s/g, "") === contactValue.replace(/\s/g, ""),
+        productModelNames(p).some(
+          (name) =>
+            name.replace(/^BD\s*/i, "").replace(/\s/g, "") === contactValue.replace(/\s/g, ""),
         ),
       );
     if (

@@ -5,8 +5,10 @@ import { readFileSync } from 'node:fs';
 const seed = JSON.parse(readFileSync(new URL('../src-tauri/resources/state-seed.json',import.meta.url),'utf8'));
 const catalog = JSON.parse(readFileSync(new URL('../src-tauri/resources/catalog.json',import.meta.url),'utf8'));
 test('product catalog retained and IDs unique', () => {
- assert.equal(seed.products.length,303);
- assert.equal(seed.products.length,catalog.products.length);
+ assert.equal(seed.products.length,360);
+ assert.equal(catalog.products.length,303);
+ assert.ok(seed.products.every(p=>p.variants.length===1));
+ assert.equal(new Set(seed.products.map(p=>p.variants[0].id)).size,360);
  assert.equal(new Set(seed.products.map(p=>p.id)).size,seed.products.length);
  const variants=seed.products.flatMap(p=>p.variants);
  assert.equal(variants.length,360);

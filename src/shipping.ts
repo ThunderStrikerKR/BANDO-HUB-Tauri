@@ -193,11 +193,6 @@ export function shippingBundles(o: Order, state: State): ShippingBundle[] {
             reason = "수량 확인 필요";
             break;
           }
-          if (r.packable === false && q > 1 && !(r.maxConfirmed && r.maxBundle === 1)) {
-            pending = true;
-            reason = entry.name + " 합포장 불가 / 직원 확인 필요";
-            break;
-          }
           if (validAmount(r.perItem)) {
             sum += r.perItem * q;
             continue;
@@ -392,33 +387,8 @@ export function editableShippingRule(input: ShippingRule): ShippingRule {
   return r;
 }
 
-export function shippingRuleCurrent(
-  rule: ShippingRule | undefined,
-  day = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date()),
-) {
-  return (
-    !!rule &&
-    (!rule.validFrom || rule.validFrom <= day) &&
-    (!rule.validUntil || rule.validUntil >= day)
-  );
+export function shippingRuleCurrent(rule: ShippingRule | undefined) {
+  // Past freight dates no longer control active pricing.
+  return !!rule;
 }
 
-export function validateShippingDates(rule: ShippingRule) {
-  for (const value of [rule.validFrom, rule.validUntil])
-    if (value) {
-      const parsed = Date.parse(value + "T00:00:00Z");
-      if (
-        !/^\d{4}-\d{2}-\d{2}$/.test(value) ||
-        !Number.isFinite(parsed) ||
-        new Date(parsed).toISOString().slice(0, 10) !== value
-      )
-        throw Error("운임 적용일을 확인하세요.");
-    }
-  if (rule.validFrom && rule.validUntil && rule.validFrom > rule.validUntil)
-    throw Error("운임 종료일은 시작일 이후여야 합니다.");
-}

@@ -22,13 +22,15 @@ export function EmptyState({
   title,
   description,
   children,
+  compact = false,
 }: {
   title: string;
   description?: string;
   children?: ReactNode;
+  compact?: boolean;
 }) {
   return (
-    <div className="empty-state" role="status">
+    <div className={compact ? "empty-state empty-state-compact" : "empty-state"} role="status">
       <p>{title}</p>
       {description && <small>{description}</small>}
       {children}

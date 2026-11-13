@@ -43,16 +43,8 @@ export function WorkflowFreightRows({
                       ? "공장 운임"
                       : "매장 운임"}
                 </b>
-                <select
-                  aria-label={index ? "운임구분 " + b.origin : "운임구분"}
-                  value={shipmentFreightCode(order, recipient)}
-                  disabled={disabled}
-                  onChange={(e) => onCode(e.target.value as "010" | "020")}
-                >
-                  <option value="010">선불</option>
-                  <option value="020">후불</option>
-                </select>
-                <div className="freight-money">
+                <div className="freight-amount-code">
+                  <div className="freight-money">
                   <input
                     aria-label={`${recipient.name} ${b.origin === "FACTORY" ? "공장" : "매장"} 적용 운임`}
                     inputMode="numeric"
@@ -82,9 +74,29 @@ export function WorkflowFreightRows({
                       });
                     }}
                   />
-                  <span>원</span>
+                    <span>원</span>
+                  </div>
+                  <span className="freight-payment-code">
+                    <span aria-hidden="true">(</span>
+                    <select
+                      aria-label={index ? "운임구분 " + b.origin : "운임구분"}
+                      value={shipmentFreightCode(order, recipient)}
+                      disabled={disabled}
+                      onChange={(e) => onCode(e.target.value as "010" | "020")}
+                    >
+                      <option value="010">선불</option>
+                      <option value="020">착불</option>
+                    </select>
+                    <span aria-hidden="true">)</span>
+                  </span>
                 </div>
-                <button hidden={b.origin !== "FACTORY"} disabled title="공장 문의 연동 준비 중">
+                <button
+                  className="freight-inquiry"
+                  aria-hidden={b.origin !== "FACTORY"}
+                  style={{ visibility: b.origin === "FACTORY" ? "visible" : "hidden" }}
+                  disabled
+                  title="공장 문의 연동 준비 중"
+                >
                   공장에 운임 문의
                 </button>
               </div>
@@ -99,13 +111,11 @@ export function WorkflowFooter({
   state,
   shipment,
   onVat,
-  onSave,
 }: {
   state: State;
   shipment: WorkflowShipment;
   groupId: string;
   onVat: (v: boolean | undefined) => void;
-  onSave: () => void;
 }) {
   const { order, recipient } = shipmentContext(state, shipment),
     disabled = shipment.transferred;
@@ -120,16 +130,9 @@ export function WorkflowFooter({
             checked={shipmentVat(order, recipient)}
             onChange={(e) => onVat(e.target.checked)}
           />{" "}
-          부가세 10% 추가
+          부가세 포함
         </label>
       </div>
-      {(!!order.confirmedAt || order.receptionVersion !== 1) && (
-        <div className="row-end">
-          <button disabled={disabled} onClick={onSave}>
-            주문 저장
-          </button>
-        </div>
-      )}
     </section>
   );
 }

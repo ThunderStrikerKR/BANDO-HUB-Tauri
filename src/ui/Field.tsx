@@ -1,10 +1,11 @@
 import type { ReactNode } from "react";
+import { HelpTooltip, type HelpTooltipText } from "./HelpTooltip";
 import { Children, cloneElement, createContext, isValidElement, useContext, useId } from "react";
 const FieldContext = createContext<{ id: string; label: string } | undefined>(undefined);
 export function useField() {
   return useContext(FieldContext);
 }
-export function Field({ label, children }: { label: string; children: ReactNode }) {
+export function Field({ label, children, help }: { label: string; children: ReactNode; help?: HelpTooltipText }) {
   const id = useId();
   const native = Children.toArray(children).find(
     (child) =>
@@ -16,9 +17,14 @@ export function Field({ label, children }: { label: string; children: ReactNode 
   return (
     <FieldContext.Provider value={{ id: target, label }}>
       <div className="field">
-        <label className="field-label" htmlFor={target}>
-          {label}
-        </label>
+        {help ? (
+          <div className="field-label-wrap">
+            <label className="field-label" htmlFor={target}>{label}</label>
+            <HelpTooltip title={label} {...help} />
+          </div>
+        ) : (
+          <label className="field-label" htmlFor={target}>{label}</label>
+        )}
         {Children.map(children, (child) =>
           isValidElement<{ "aria-label"?: string; id?: string }>(child) &&
           typeof child.type === "string" &&

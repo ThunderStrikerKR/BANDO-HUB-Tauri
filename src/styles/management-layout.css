@@ -1,0 +1,799 @@
+/* BANDO HUB: shared management-screen layout contract.
+   This is imported AFTER legacy, product, and table-density styles.
+   The reserved Kakao panel is intentionally untouched. */
+
+:root {
+  --manage-gap: 10px;
+  --manage-title-size: calc(20px * var(--ui-scale, 1));
+  --manage-subtitle-size: calc(15px * var(--ui-scale, 1));
+  --manage-control-height: calc(40px * var(--ui-scale, 1));
+  --manage-tab-height: calc(34px * var(--ui-scale, 1));
+  --manage-cell-y: 6px;
+}
+
+/* The product/client screen previously removed the 20px management padding
+   entirely, shifting its title and toolbar left of every other page. */
+.app-v03 .hub-main-content > .management-container {
+  box-sizing: border-box;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  padding: 20px;
+  overflow: hidden;
+}
+.app-v03 .hub-main-content > .management-container.management-fixed {
+  padding: 20px;
+}
+.app-v03 .management-container > :is(.page-heading, .management-tabbar) {
+  flex: 0 0 auto;
+}
+/* A whole page must never grow the shell: main workspaces either scroll
+   internally or host a bounded scrollable table. */
+.app-v03 .management-container > :is(.order-history-list, .daily-settlement, .management-screen, .settings-tab-panels) {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Consistent horizontal origin, title baseline, type hierarchy and rhythm. */
+.app-v03 .management-container > :is(.fixed-manager, .shipping-manager, .excel-workspace, .daily-settlement),
+.app-v03 .management-container > .management-screen {
+  min-width: 0;
+  width: 100%;
+  max-width: none;
+}
+.app-v03 .management-container .page-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin: 0 0 12px;
+  min-height: var(--manage-control-height);
+  padding: 0;
+}
+.app-v03 .management-container .page-heading h1 {
+  margin: 0;
+  font: 650 var(--manage-title-size)/1.35 var(--font-heading);
+  letter-spacing: 0;
+}
+.app-v03 .management-container .page-heading .actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+.app-v03 .management-container .page-heading .actions > button {
+  min-height: var(--manage-control-height);
+}
+.app-v03 .management-container :is(.fixed-manager, .excel-workspace) > .page-heading {
+  margin-bottom: 12px;
+}
+.app-v03 .management-container :is(h2, .section-title h2) {
+  font-size: var(--manage-subtitle-size);
+  line-height: 1.4;
+}
+.app-v03 .management-container h3 {
+  font-size: calc(14px * var(--ui-scale, 1));
+  line-height: 1.4;
+}
+.app-v03 .management-container .card {
+  margin-bottom: 12px;
+}
+
+/* Common search/filter toolbar; visually identical to freight management. */
+.app-v03 .management-container .management-search-toolbar {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: var(--manage-gap);
+  width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  margin: 0 0 12px;
+  background: var(--manage-toolbar-surface);
+  border: 1px solid var(--manage-toolbar-border);
+  border-radius: 8px;
+}
+.app-v03 .management-container .management-search-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1 1 280px;
+  min-width: 160px;
+  max-width: none;
+}
+.app-v03 .management-container .management-search-field .management-search-icon {
+  position: absolute;
+  z-index: 1;
+  left: 13px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 20px;
+  font-weight: 400;
+  line-height: 1;
+  pointer-events: none;
+  color: #959595;
+}
+.app-v03 .management-container .management-search-field > input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  height: var(--manage-control-height);
+  min-height: var(--manage-control-height);
+  padding: 8px 12px 8px 38px !important;
+  margin: 0;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  color: var(--text-primary);
+  font: 400 calc(14px * var(--ui-scale, 1))/1.4 var(--font-body);
+}
+.app-v03 .management-container .management-search-toolbar > :is(select, button),
+.app-v03 .management-container .management-search-toolbar > .date-navigator {
+  flex: 0 0 auto;
+}
+.app-v03 .management-container .management-search-toolbar > select {
+  max-width: min(280px, 33%);
+}
+.app-v03 .management-container .management-toolbar-label {
+  flex: 0 0 auto;
+  font-size: calc(12px * var(--ui-scale, 1));
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.app-v03 .management-container .management-search-toolbar .result-count {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--text-secondary);
+}
+.app-v03 .management-container .date-navigator {
+  flex: 0 0 auto;
+  gap: 5px;
+}
+.app-v03 .management-container .date-navigator > :is(button, input) {
+  box-sizing: border-box;
+  min-height: var(--manage-control-height);
+  height: var(--manage-control-height);
+}
+
+/* Shared tabs across Excel, products, clients, freight, settings and
+   nested tabs. Equal-width buttons size to the longest label; the bar must
+   not stretch across the whole page. Narrow workspaces scroll horizontally
+   instead of squeezing text or pushing tabs to multiple rows. */
+.app-v03 .management-container .management-tabbar {
+  box-sizing: border-box;
+  display: inline-grid;
+  grid-auto-flow: column;
+  grid-template-columns: none;
+  grid-auto-columns: minmax(max-content, 1fr);
+  align-items: stretch;
+  justify-content: start;
+  gap: 4px;
+  width: max-content;
+  max-width: 100%;
+  min-width: 0;
+  align-self: flex-start;
+  flex: 0 0 auto;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  margin: 0 0 12px;
+  padding: 3px;
+  background: var(--manage-toolbar-surface);
+  border: 1px solid var(--manage-toolbar-border);
+  border-radius: 8px;
+}
+.app-v03 .management-container .management-tabbar > button {
+  box-sizing: border-box;
+  flex: none;
+  min-width: max-content;
+  width: 100%;
+  height: var(--manage-tab-height);
+  min-height: var(--manage-tab-height);
+  padding: 6px 12px;
+  margin: 0;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: #c0c0c0;
+  font: 600 calc(12px * var(--ui-scale, 1))/1.35 var(--font-body);
+  white-space: nowrap;
+}
+.app-v03 .management-container .management-tabbar > button:is([aria-current="page"],[aria-pressed="true"],[aria-selected="true"],.chosen) {
+  background: #404040;
+  border-color: #717171;
+  color: #f4f4f4;
+}
+.app-v03 .management-container .settings-tab-list.management-tabbar .settings-tab {
+  box-sizing: border-box;
+  flex: none;
+  width: 100%;
+  height: var(--manage-tab-height);
+  min-height: var(--manage-tab-height);
+  padding: 6px 12px;
+  margin: 0;
+  background: transparent;
+  border-color: transparent;
+  color: #c0c0c0;
+}
+.app-v03 .management-container .settings-tab-list.management-tabbar .settings-tab[aria-selected="true"] {
+  background: #404040;
+  border-color: #717171;
+  color: #f4f4f4;
+}
+.app-v03 .management-container .management-tabbar-secondary {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--border-default);
+  border-radius: 0;
+}
+.app-v03 .management-container .shipping-tabs.management-tabbar {
+  display: inline-grid;
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(max-content, 1fr);
+  width: max-content;
+  max-width: 100%;
+  border-bottom: 1px solid #454545;
+  margin-bottom: 12px;
+}
+.app-v03 .management-container .shipping-tabs.management-tabbar > button.chosen {
+  border: 1px solid #717171;
+  background: #404040;
+}
+.app-v03 .management-container .settings-tab-panels {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+}
+.app-v03 .management-container .settings-tab-list {
+  flex: 0 0 auto;
+}
+.app-v03 .management-container .settings-tab-panels > [role="tabpanel"] {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Freight search lives inside its card, so it uses a shared control without
+   an unnecessary extra box border around the internal toolbar. */
+.app-v03 .management-container .shipping-card > .shipping-tools.management-search-toolbar {
+  margin: 0;
+  border: 0;
+  border-bottom: 1px solid var(--manage-toolbar-border);
+  border-radius: 0;
+  padding: 12px 14px;
+  background: var(--manage-toolbar-surface);
+}
+.app-v03 .management-container .shipping-card > .shipping-tools.management-search-toolbar > select {
+  max-width: 280px;
+}
+
+/* Consistent product identity typography in the pricing and freight lists.
+   Retain each screen's existing single-line/truncation and column policies. */
+.app-v03 .management-container .product-prices .product-title-line b,
+.app-v03 .management-container .shipping-product-list .shipping-product-name > strong {
+  font-size: var(--manage-product-name-size);
+  line-height: 1.3;
+}
+.app-v03 .management-container .product-prices .product-title-line span,
+.app-v03 .management-container .shipping-product-list .shipping-product-description {
+  font-size: var(--manage-product-description-size);
+  line-height: 1.3;
+}
+
+/* Explicit list tables:
+   - allocate columns from content, not arbitrary fixed width;
+   - do not wrap short labels into several lines while horizontal space remains;
+   - allow horizontal scroll for genuinely wide data rather than squeezing it. */
+.app-v03 .management-container table.management-data-table {
+  width: 100%;
+  min-width: 100%;
+  table-layout: auto;
+  border-collapse: collapse;
+}
+.app-v03 .management-container table.management-data-table thead th {
+  background: var(--manage-table-head-surface);
+  color: var(--text-secondary);
+  padding: 8px 10px;
+  font-size: calc(12px * var(--ui-scale, 1));
+  line-height: 1.3;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.app-v03 .management-container table.management-data-table tbody td {
+  padding: var(--manage-cell-y) 10px;
+  line-height: 1.35;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.app-v03 .management-container table.management-data-table tbody td > small {
+  display: inline;
+  margin-top: 0;
+  margin-left: 8px;
+  font-size: calc(11px * var(--ui-scale, 1));
+  line-height: 1.35;
+  color: #a9a9a9;
+}
+.app-v03 .management-container table.management-data-table tbody td > small:empty {
+  display: none;
+}
+.app-v03 .management-container table.management-data-table tbody td > button,
+.app-v03 .management-container table.management-data-table tbody td > .actions button {
+  min-height: 28px;
+  height: 28px;
+  padding: 3px 9px;
+  vertical-align: middle;
+  font-size: calc(12px * var(--ui-scale, 1));
+}
+.app-v03 .management-container table.management-data-table tbody td > button + button {
+  margin-left: 6px;
+}
+.app-v03 .management-container table.management-data-table tbody td > .actions {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 6px;
+  vertical-align: middle;
+}
+
+/* Category filters follow the saved category tree at any depth.
+   Keep the product table wide: additional levels wrap only inside its filter row. */
+.app-v03 .management-container .manager-filters > .product-category-filter,
+.app-modal-layer .manager-filters > .product-category-filter {
+  display: flex;
+  flex: 1 1 360px;
+  flex-wrap: wrap;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+.app-v03 .management-container .product-category-filter > select,
+.app-modal-layer .product-category-filter > select {
+  flex: 1 1 150px;
+  min-width: 135px;
+  max-width: 260px;
+}
+.app-v03 .management-container .product-category-filter > button,
+.app-modal-layer .product-category-filter > button {
+  flex: 0 0 auto;
+}
+
+/* Section-owned controls: title and tabs stay outside the content surface.
+   A single card owns the search and the corresponding list, as in order history.
+   Avoid creating a second rounded bordered search card inside a list card. */
+.app-v03 .management-container .excel-list-panel {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-panel);
+  background: var(--surface-panel);
+}
+.app-v03 .management-container :is(
+  .excel-list-panel,
+  .product-prices,
+  .client-list-panel
+) > .management-search-toolbar {
+  flex: 0 0 auto;
+  margin: 0;
+  border: 0;
+  border-bottom: 1px solid var(--manage-toolbar-border);
+  border-radius: 0;
+}
+.app-v03 .management-container .excel-list-panel > .excel-table-scroll {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  max-height: none;
+  border: 0;
+}
+.app-v03 .management-container .excel-list-panel:has(> .excel-table-scroll.excel-list-empty) {
+  flex: 0 0 auto;
+}
+.app-v03 .management-container .excel-list-panel > .excel-table-scroll.excel-list-empty {
+  flex: 0 0 auto;
+  min-height: 0;
+  max-height: min(320px, 45dvh);
+}
+.app-v03 .management-container .product-list-subheading {
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+.app-v03 .management-container .management-section-actions {
+  display: flex;
+  flex: 0 0 auto;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+.app-v03 .management-container .management-section-actions > button {
+  flex: 0 0 auto;
+}
+.app-v03 .management-container .client-list-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.app-v03 .management-container .client-list-workspace > .client-list-panel {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  margin-bottom: 0;
+  padding: 0;
+  overflow: hidden;
+}
+.app-v03 .management-container .client-list-panel > .client-table-scroll {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-gutter: stable;
+}
+.app-v03 .management-container .client-list-workspace.client-excel-expanded {
+  display: block;
+  overflow-y: auto;
+}
+.app-v03 .management-container .client-excel-expanded > .client-list-panel {
+  min-height: 280px;
+}
+.app-v03 .management-container .catalog-panel-header > .management-search-toolbar,
+.app-v03 .management-container .family-list-panel > .management-search-toolbar {
+  flex: 0 0 auto;
+  margin: 10px 0 0;
+  border: 0;
+  border-top: 1px solid var(--manage-toolbar-border);
+  border-radius: 0;
+}
+.app-v03 .management-container .catalog-panel-header > .management-search-toolbar {
+  margin-bottom: -12px;
+  padding: 10px 0;
+}
+.app-v03 .management-container .family-list-panel > .management-search-toolbar {
+  margin: 0;
+  border-bottom: 1px solid var(--manage-toolbar-border);
+}
+
+/* Excel: stop forcing a second row for context and buttons while the
+   5-column / 4-column tables have ample width. Details expand by intent. */
+.app-v03 .management-container .excel-workspace { gap: 10px; }
+.app-v03 .management-container .excel-workspace > :is(.page-heading,.management-tabbar) {
+  margin-bottom: 0;
+}
+.app-v03 .management-container .excel-table-scroll {
+  /* Same compact data-row rhythm as the product list; multiline content still grows naturally. */
+  --manage-cell-y: 3px;
+  width: 100%;
+  min-width: 0;
+  overflow: auto;
+}
+.app-v03 .management-container .excel-table-scroll table.management-data-table {
+  width: 100%;
+  min-width: 760px;
+  table-layout: auto;
+}
+.app-v03 .management-container .excel-table-scroll table.excel-queue-table th:first-child,
+.app-v03 .management-container .excel-table-scroll table.excel-queue-table td:first-child {
+  width: 42px;
+  min-width: 42px;
+  text-align: center;
+}
+.app-v03 .management-container .excel-table-scroll table.excel-queue-table th:nth-child(2) { min-width: 170px; }
+.app-v03 .management-container .excel-table-scroll table.excel-queue-table th:nth-child(3) { min-width: 280px; }
+.app-v03 .management-container .excel-table-scroll table.excel-history-table th:first-child { min-width: 140px; }
+.app-v03 .management-container .excel-table-scroll table.excel-history-table th:nth-child(2) { min-width: 95px; }
+.app-v03 .management-container .excel-table-scroll table.excel-history-table th:nth-child(3) { min-width: 320px; }
+.app-v03 .management-container .excel-table-scroll table.excel-history-table th:nth-child(4) { min-width: 230px; }
+.app-v03 .management-container .excel-table-scroll table.management-data-table tbody td:nth-child(3) {
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+.app-v03 .management-container .excel-table-scroll table.management-data-table tbody td > small {
+  display: inline;
+  margin-left: 8px;
+  line-height: 1.35;
+}
+.app-v03 .management-container .excel-table-scroll table.management-data-table td > details:not([open]) {
+  display: inline-block;
+  vertical-align: middle;
+  margin: 0 0 0 8px;
+}
+.app-v03 .management-container .excel-table-scroll table.management-data-table td > details:not([open]) summary {
+  cursor: pointer;
+  white-space: nowrap;
+}
+.app-v03 .management-container .excel-table-scroll table.excel-queue-table tbody td:last-child {
+  min-width: 132px;
+  white-space: nowrap;
+}
+.app-v03 .management-container .excel-fixed-footer {
+  gap: 10px 16px;
+  padding: 10px 0;
+  align-items: center;
+}
+.app-v03 .management-container .excel-fixed-footer small { min-width: 0; }
+.app-v03 .management-container .excel-fixed-footer .excel-footer-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  flex: 0 0 auto;
+  gap: 8px;
+}
+.app-v03 .management-container .excel-fixed-footer .excel-footer-actions > button {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/* Table workspaces should not add a full card's padding on every side of a
+   toolbar and again around the table; preserve clear header row separators. */
+.app-v03 .management-container .order-history-list,
+.app-v03 .management-container .product-prices,
+.app-v03 .management-container .client-list-panel {
+  padding: 0;
+  overflow: hidden;
+}
+.app-v03 .management-container .order-history-list > .management-search-toolbar {
+  margin: 0;
+  border: 0;
+  border-bottom: 1px solid var(--border-default);
+  border-radius: 0;
+}
+.app-v03 .management-container .product-prices > .manager-filters {
+  margin: 0;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--manage-toolbar-border);
+  background: var(--manage-toolbar-surface);
+}
+/* Client list owns its scroll area; the search remains visible above the table. */
+.app-v03 .management-container .client-table td:nth-child(2) {
+  white-space: normal;
+}
+.app-v03 .management-container .product-prices table.management-data-table {
+  table-layout: fixed;
+}
+.app-v03 .management-container .settings-tab-panels .settings-support {
+  max-width: none;
+  width: 100%;
+}
+.app-v03 .management-container .settings-layout-single {
+  width: 100%;
+}
+/* Order history has expandable recipient details inside the third column.
+   Its headers must not drift when expansion changes intrinsic text width or
+   starts a vertical scrollbar. This applies only to order history, not to
+   other management tables whose columns remain content-sized. */
+.app-v03 .management-container .order-history-list {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.app-v03 .management-container .order-history-list > .management-search-toolbar {
+  flex: 0 0 auto;
+}
+.app-v03 .management-container .order-history-list > .table-scroll {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
+}
+.app-v03 .management-container .order-history-list .management-data-table {
+  table-layout: fixed;
+  min-width: 1000px;
+}
+.app-v03 .management-container .order-history-list .management-data-table th:nth-child(1) { width: 12%; }
+.app-v03 .management-container .order-history-list .management-data-table th:nth-child(2) { width: 10%; }
+.app-v03 .management-container .order-history-list .management-data-table th:nth-child(3) { width: 42%; }
+.app-v03 .management-container .order-history-list .management-data-table th:nth-child(4) { width: 13%; }
+.app-v03 .management-container .order-history-list .management-data-table th:nth-child(5) { width: 12%; }
+.app-v03 .management-container .order-history-list .management-data-table th:nth-child(6) { width: 11%; }
+.app-v03 .management-container .order-history-list .management-data-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+.app-v03 .management-container .order-history-list .management-data-table td:nth-child(3) {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.app-v03 .management-container .order-history-list .management-data-table td:nth-child(3) > div,
+.app-v03 .management-container .order-history-list .management-data-table td:nth-child(3) p {
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.app-v03 .management-container .daily-settlement > .card { padding: 14px; }
+.app-v03 .management-container .management-scroll { min-width: 0; }
+/* Price list fills the same available area as freight. Expanded Excel/add
+   forms keep their own existing scrolling instead of clipping controls. */
+.app-v03 .management-container .management-scroll.product-list-workspace {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  padding: 8px 0 0;
+  overflow: hidden;
+}
+.app-v03 .management-container .product-list-workspace > .product-list-subheading {
+  flex: 0 0 auto;
+}
+.app-v03 .management-container .product-list-workspace > .product-prices {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  margin-bottom: 0;
+  overflow: hidden;
+}
+.app-v03 .management-container .product-list-workspace .price-table-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+/* The shipping heading, counters, tabs and save toolbar stay visible.
+   Table rows scroll inside the remaining space. */
+.app-v03 .management-container > .shipping-manager {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+.app-v03 .management-container .shipping-manager > :is(.page-heading, .shipping-stats, .shipping-tabs) {
+  flex: 0 0 auto;
+}
+.app-v03 .management-container .shipping-manager > .shipping-card {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.app-v03 .management-container .shipping-manager > :is(.shipping-product-list, .shipping-assignment-list) {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.app-v03 .management-container .shipping-manager > :is(.shipping-product-list, .shipping-assignment-list) > :is(.shipping-tools, .shipping-bulk, .shipping-savebar) {
+  flex: 0 0 auto;
+}
+.app-v03 .management-container .shipping-manager > :is(.shipping-product-list, .shipping-assignment-list) > .shipping-table-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.app-v03 .management-container .shipping-manager > :is(.shipping-product-list, .shipping-assignment-list) > .shipping-table-scroll.shipping-list-empty {
+  flex: 0 0 auto;
+  min-height: 0;
+  max-height: none;
+}
+/* Use columns proportional to information length, not full-width rows for
+   one short value. Do not alter field values or draft-save behavior. */
+.app-v03 .management-container .settings-basic-top-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: 12px 16px;
+  align-items: start;
+}
+.app-v03 .management-container .settings-basic-cell,
+.app-v03 .management-container .settings-sender-section {
+  min-width: 0;
+}
+.app-v03 .management-container .settings-basic-cell > .settings-help-heading,
+.app-v03 .management-container .settings-sender-section > .settings-help-heading {
+  margin: 0 0 8px;
+}
+.app-v03 .management-container .settings-sender-section {
+  margin-top: 14px;
+}
+.app-v03 .management-container .settings-sender-grid {
+  display: grid;
+  grid-template-columns: minmax(140px, 1.1fr) minmax(180px, 1.6fr) minmax(100px, .8fr);
+  gap: 10px 14px;
+}
+.app-v03 .management-container .settings-sender-grid > * {
+  min-width: 0;
+}
+.app-v03 .management-container .settings-sender-address {
+  grid-column: span 2;
+}
+.app-v03 .management-container .settings-basic-top-grid .field,
+.app-v03 .management-container .settings-sender-grid .field {
+  min-width: 0;
+  margin: 0;
+}
+@media (max-width: 1120px) {
+  .app-v03 .management-container .settings-sender-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .app-v03 .management-container .settings-sender-address {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 760px) {
+  .app-v03 .management-container .settings-basic-top-grid,
+  .app-v03 .management-container .settings-sender-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .app-v03 .management-container .settings-sender-address {
+    grid-column: auto;
+  }
+}
+
+/* When the reserved Kakao panel leaves a narrow working area, toolbar elements
+   wrap as groups; tab labels and important text do not split mid-word. */
+@media (max-width: 1220px) {
+  .app-v03 .management-container .management-search-toolbar {
+    flex-wrap: wrap;
+  }
+  .app-v03 .management-container .management-search-field { flex-basis: 100%; }
+
+  /* Freight assignment has only one search and one filter. Preserve both at
+     full control height in a single row rather than consuming two rows. */
+  .app-v03 .management-container .shipping-assignment-list > .shipping-tools.management-search-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(150px, 200px);
+    align-items: center;
+    gap: 8px;
+  }
+  .app-v03 .management-container .shipping-assignment-list > .shipping-tools.management-search-toolbar .management-search-field {
+    width: 100%;
+    min-width: 0;
+    flex-basis: auto;
+  }
+  .app-v03 .management-container .shipping-assignment-list > .shipping-tools.management-search-toolbar > select {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+  }
+}
+
+/* Short desktop windows: reclaim empty chrome, not product-name width or
+   editable row height. Shared freight summary/tabs retain the same design
+   across every freight tab; only assignment has a persistent save footer. */
+@media (max-height: 760px) {
+  .app-v03 .management-container .shipping-manager > .shipping-stats {
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  .app-v03 .management-container .shipping-manager > .shipping-stats article {
+    padding: 5px 8px;
+  }
+  .app-v03 .management-container .shipping-manager > .shipping-tabs.management-tabbar {
+    margin-bottom: 6px;
+  }
+  .app-v03 .management-container .shipping-manager > .shipping-assignment-list > .shipping-tools.management-search-toolbar {
+    padding: 7px 10px;
+  }
+  .app-v03 .management-container .shipping-manager > .shipping-assignment-list > .shipping-bulk {
+    padding: 6px 10px;
+    gap: 8px;
+  }
+  .app-v03 .management-container .shipping-manager > .shipping-assignment-list > .shipping-savebar {
+    padding: 7px 10px;
+    gap: 10px;
+  }
+}

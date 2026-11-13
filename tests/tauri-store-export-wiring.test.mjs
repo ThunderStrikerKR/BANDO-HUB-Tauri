@@ -1,0 +1,38 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+const read=(p)=>readFileSync(new URL("../"+p,import.meta.url),"utf8");
+test("Tauri can save a store Excel independently of factory and only after preview",()=>{
+ const bridge=read("src/tauri-bridge.ts"),rust=read("src-tauri/src/lib.rs");
+ const types=read("src/types.ts"),ui=read("src/WorkflowQueue.tsx");
+ assert.match(types,/saveStoreWorkbook\?:/);
+ assert.match(bridge,/saveStoreWorkbook: \(bytes\) => invoke<string \| null>\("save_store_workbook", \{ bytes \}\)/);
+ assert.match(rust,/async fn save_store_workbook\(/);
+ // Store shipping now writes directly to the classified, day-based archive.
+ assert.match(rust, /save_xlsx_in_archive\(app, WorkbookKind::Store, bytes\)/);
+ assert.match(rust, /Self::Store => "매장 발송"/);
+ assert.match(rust, /Self::Store => "매장"/);
+ assert.match(rust, /fn archive_daily_directory/);
+ assert.match(rust, /format!\("\{stamp\}\(\{\}\{number\}\)\.xlsx", kind\.stem\(\)\)/);
+ assert.match(rust, /\.create_new\(true\)/);
+ assert.match(rust,/save_factory_workbook, save_store_workbook, save_settlement_workbook/);
+ assert.match(ui,/previewStoreExport\(current, chosen\)/);
+ assert.match(ui,/createStoreWorkbook\(preview\)/);
+ assert.match(ui,/recordStoreExport\(latest, preview, savedPath\)/);
+ assert.match(ui,/saveStoreWorkbook\(bytes\)/);
+ assert.match(ui,/선택 " \+ chosen.length \+ "건 매장 Excel 작성"/);
+ assert.doesNotMatch(ui,/매장 Excel 출력 미이식/);
+});
+test("a printed store workbook stays pending until a separately confirmed shipment",()=>{
+ const ui=read("src/WorkflowQueue.tsx"),work=read("src/workflow.ts");
+ const corrections=read("src/corrections.ts"),model=read("src/store-export.ts");
+ assert.match(ui,/q!\.origin === "STORE"/);
+ assert.match(ui,/매장 발송 확인/);
+ assert.match(ui,/markStoreSent\(state, q!\.id\)/);
+ assert.ok(work.includes('!["QUEUED", "EXPORTED"].includes(q.status)'));
+ assert.match(work,/q\.fileOnly = false/);
+ assert.match(model,/entry\.status = "EXPORTED"/);
+ assert.match(model,/entry\.fileOnly = true/);
+ assert.match(corrections,/q\.origin === "STORE"/);
+ assert.match(corrections,/매장 Excel 출력 또는 발송 이력/);
+});

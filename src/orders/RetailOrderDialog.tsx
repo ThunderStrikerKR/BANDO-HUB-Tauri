@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { sameValue } from "../shared/draft";
+import { confirmDiscardDraft } from "../shared/editor-flow";
 import { Modal, Field, MoneyInput } from "../ui";
 import { itemFromProduct } from "../domain";
 import { companyClient, companySenderMissing } from "../order-types";
@@ -27,6 +29,8 @@ export function RetailOrderDialog({
     [attempted, setAttempted] = useState(false),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
+  const initial = useRef(structuredClone(order));
+  const closeDraft = () => void confirmDiscardDraft("직접 입력 주문", !sameValue(order, initial.current), onClose, busy);
   useEffect(() => onDraft?.(order), [order, onDraft]);
   const row = order.recipients[0],
     required = deliveryRequirements(row),
@@ -34,7 +38,7 @@ export function RetailOrderDialog({
       setOrder({ ...order, recipients: [{ ...row, ...values }] });
   return (
     <>
-      <Modal title="소매 주문 작성" draft={order} busy={busy} onClose={onClose}>
+      <Modal title="직접 입력" draft={order} busy={busy} onClose={closeDraft}>
         <div className="retail-order-dialog">
           <div className="retail-order-body">
             <p>주문처: 반도스탠드</p>
@@ -206,7 +210,9 @@ export function RetailOrderDialog({
                 {companySenderMissing(state.settings).map((text) => (
                   <p key={text}>{text}</p>
                 ))}
-                {onSettings && <button onClick={onSettings}>반도스탠드 정보 설정</button>}
+                {onSettings && <button onClick={() => void confirmDiscardDraft(
+                  "직접 입력 주문", !sameValue(order,initial.current),onSettings,busy,
+                )}>반도스탠드 정보 설정</button>}
               </div>
             )}
             <Field label="출고지">
@@ -230,7 +236,7 @@ export function RetailOrderDialog({
             <span role="status" className="form-error">
               {error}
             </span>
-            <button onClick={onClose}>취소</button>
+            <button type="button" disabled={busy} onClick={closeDraft}>닫기</button>
             <button
               className="primary"
               disabled={busy}

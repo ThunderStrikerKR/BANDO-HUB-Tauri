@@ -56,9 +56,6 @@
   white-space: normal;
   line-height: 1.5;
 }
-.staff-checks .staff-block:hover {
-  background: #3b2c1c !important;
-}
 .staff-checks .staff-block b {
   display: block;
   font-size: 15px;
@@ -309,4 +306,14 @@
   transition:
     outline-color 180ms ease,
     background-color 180ms ease;
+}
+
+/* Detail placeholder uses the same readable, left-aligned empty text rhythm
+   as management lists; do not restore the older 12px centered variant. */
+.receipt-panel-content > .detail-empty {
+  margin: 0;
+  padding: 12px 8px;
+  font: 400 calc(13px * var(--ui-scale, 1))/1.4 var(--font-body);
+  color: var(--text-secondary);
+  text-align: left;
 }

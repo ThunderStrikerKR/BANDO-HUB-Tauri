@@ -1,0 +1,650 @@
+{
+  "version": "2026-11-09",
+  "scope": "exact-match-only; never modify staff names, prices or confirmed orders",
+  "changes": [
+    {
+      "id": "bando-site-312",
+      "priceRecordId": "bando-312-single",
+      "originalName": "반도스탠드 BD 777",
+      "oldName": "BD 777",
+      "newName": "BD 777 / 고정형 보면대"
+    },
+    {
+      "id": "bando-site-300",
+      "priceRecordId": "bando-300-single",
+      "originalName": "반도스탠드 BD 730",
+      "oldName": "BD 730",
+      "newName": "BD 730 / 이동형 보면대"
+    },
+    {
+      "id": "bando-site-277",
+      "priceRecordId": "bando-277-single",
+      "originalName": "반도스탠드 BD 801",
+      "oldName": "BD 801",
+      "newName": "BD 801 / 안정형 보면대"
+    },
+    {
+      "id": "bando-site-272",
+      "priceRecordId": "bando-272-single",
+      "originalName": "반도스탠드 BD 601",
+      "oldName": "BD 601",
+      "newName": "BD 601 / ABS플라스틱 보면대"
+    },
+    {
+      "id": "bando-site-271",
+      "priceRecordId": "bando-271-single",
+      "originalName": "반도스탠드 BD 607",
+      "oldName": "BD 607",
+      "newName": "BD 607 / ABS플라스틱 보면대"
+    },
+    {
+      "id": "bando-site-270",
+      "priceRecordId": "bando-270-single",
+      "originalName": "반도스탠드 BD 605",
+      "oldName": "BD 605",
+      "newName": "BD 605 / ABS플라스틱 보면대"
+    },
+    {
+      "id": "bando-site-241",
+      "priceRecordId": "bando-241-single",
+      "originalName": "반도스탠드 성악용 녹음용 보면대 BD 803-1",
+      "oldName": "BD 803-1",
+      "newName": "BD 803-1 / 성악 및 녹음용 보면대"
+    },
+    {
+      "id": "bando-site-240",
+      "priceRecordId": "bando-240-single",
+      "originalName": "반도스탠드 BD 803  성악용 녹음용 보면대",
+      "oldName": "BD 803",
+      "newName": "BD 803 / 성악 및 녹음용 보면대"
+    },
+    {
+      "id": "bando-site-239",
+      "priceRecordId": "bando-239-single",
+      "originalName": "반도스탠드 BD 610  탁상,국악용 보면대",
+      "oldName": "BD 610",
+      "newName": "BD 610 / 탁상 및 국악용 보면대"
+    },
+    {
+      "id": "bando-site-72",
+      "priceRecordId": "bando-72-single",
+      "originalName": "반도스탠드 BD 670",
+      "oldName": "BD 670",
+      "newName": "BD 670 / ABS플라스틱 보면대"
+    },
+    {
+      "id": "bando-site-71",
+      "priceRecordId": "bando-71-single",
+      "originalName": "반도스탠드 BD 604",
+      "oldName": "BD 604",
+      "newName": "BD 604 / ABS플라스틱 보면대"
+    },
+    {
+      "id": "bando-site-63",
+      "priceRecordId": "bando-63-single",
+      "originalName": "반도스탠드 BD Conductor (지휘자스탠드)",
+      "oldName": "BD Conductor",
+      "newName": "BD Conductor / 지휘자 보면대"
+    },
+    {
+      "id": "bando-site-62",
+      "priceRecordId": "bando-62-single",
+      "originalName": "반도스탠드 BD 771-1",
+      "oldName": "BD 771-1",
+      "newName": "BD 771-1 / U 스타일 보면대"
+    },
+    {
+      "id": "bando-site-61",
+      "priceRecordId": "bando-61-single",
+      "originalName": "반도스탠드 BD 771",
+      "oldName": "BD 771",
+      "newName": "BD 771 / U 스타일 보면대"
+    },
+    {
+      "id": "bando-site-60",
+      "priceRecordId": "bando-60-single",
+      "originalName": "반도스탠드 BD 770-1",
+      "oldName": "BD 770-1",
+      "newName": "BD 770-1 / U 스타일 보면대"
+    },
+    {
+      "id": "bando-site-59",
+      "priceRecordId": "bando-59-single",
+      "originalName": "반도스탠드 BD 770",
+      "oldName": "BD 770",
+      "newName": "BD 770 / U 스타일 보면대"
+    },
+    {
+      "id": "bando-site-58",
+      "priceRecordId": "bando-58-single",
+      "originalName": "반도스탠드 BD 801-1",
+      "oldName": "BD 801-1",
+      "newName": "BD 801-1 / 안정형 보면대"
+    },
+    {
+      "id": "bando-site-56",
+      "priceRecordId": "bando-56-single",
+      "originalName": "반도스탠드 BD 703",
+      "oldName": "BD 703",
+      "newName": "BD 703 / 이동형 보면대"
+    },
+    {
+      "id": "bando-site-55",
+      "priceRecordId": "bando-55-single",
+      "originalName": "반도스탠드 BD 701-1",
+      "oldName": "BD 701-1",
+      "newName": "BD 701-1 / 이동형 보면대"
+    },
+    {
+      "id": "bando-site-54",
+      "priceRecordId": "bando-54-single",
+      "originalName": "반도스탠드 BD 701",
+      "oldName": "BD 701",
+      "newName": "BD 701 / 이동형 보면대"
+    },
+    {
+      "id": "bando-site-45",
+      "priceRecordId": "bando-45-single",
+      "originalName": "반도스탠드 BD 710",
+      "oldName": "BD 710",
+      "newName": "BD 710 / 보면대"
+    },
+    {
+      "id": "bando-site-28",
+      "priceRecordId": "bando-28-single",
+      "originalName": "반도스탠드 BD 702-1",
+      "oldName": "BD 702-1",
+      "newName": "BD 702-1 / 고정형 보면대"
+    },
+    {
+      "id": "bando-site-27",
+      "priceRecordId": "bando-27-single",
+      "originalName": "반도스탠드 BD 702",
+      "oldName": "BD 702",
+      "newName": "BD 702 / 고정형 보면대"
+    },
+    {
+      "id": "bando-site-22",
+      "priceRecordId": "bando-22-single",
+      "originalName": "반도스탠드 BD 706",
+      "oldName": "BD 706",
+      "newName": "BD 706 / 고정형 보면대"
+    },
+    {
+      "id": "bando-site-21",
+      "priceRecordId": "bando-21-single",
+      "originalName": "반도스탠드 BD 704",
+      "oldName": "BD 704",
+      "newName": "BD 704 / 고정형 보면대"
+    },
+    {
+      "id": "bando-site-20",
+      "priceRecordId": "bando-20-single",
+      "originalName": "반도스탠드 BD 719C",
+      "oldName": "BD 719C",
+      "newName": "BD 719C / 이동형 보면대"
+    },
+    {
+      "id": "bando-site-19",
+      "priceRecordId": "bando-19-single",
+      "originalName": "반도스탠드 BD 719B",
+      "oldName": "BD 719B",
+      "newName": "BD 719B / 이동형 보면대"
+    },
+    {
+      "id": "bando-site-18",
+      "priceRecordId": "bando-18-single",
+      "originalName": "반도스탠드 BD 718C",
+      "oldName": "BD 718C",
+      "newName": "BD 718C / 이동형 보면대"
+    },
+    {
+      "id": "bando-site-17",
+      "priceRecordId": "bando-17-single",
+      "originalName": "반도스탠드 BD 718B",
+      "oldName": "BD 718B",
+      "newName": "BD 718B / 이동형 보면대"
+    },
+    {
+      "id": "bando-site-96",
+      "priceRecordId": "bando-96-single",
+      "originalName": "반도스탠드 BD 930BK",
+      "oldName": "BD 930BK",
+      "newName": "BD 930BK / 일자형 마이크 스탠드"
+    },
+    {
+      "id": "bando-site-97",
+      "priceRecordId": "bando-97-single",
+      "originalName": "반도스탠드 BD 930C",
+      "oldName": "BD 930C",
+      "newName": "BD 930C / 일자형 마이크 스탠드"
+    },
+    {
+      "id": "bando-site-339",
+      "priceRecordId": "bando-339-single",
+      "originalName": "반도스탠드 BD 506",
+      "oldName": "BD 506",
+      "newName": "BD 506 / X자형 키보드 스탠드"
+    },
+    {
+      "id": "bando-site-141",
+      "priceRecordId": "bando-141-single",
+      "originalName": "반도스탠드 BD ROOM 스탠드",
+      "oldName": "BD ROOM",
+      "newName": "BD ROOM / 스탠드"
+    },
+    {
+      "id": "bando-site-139",
+      "priceRecordId": "bando-139-single",
+      "originalName": "반도스탠드 BD BX-1000",
+      "oldName": "BD BX-1000",
+      "newName": "BD BX-1000 / 믹서 스탠드"
+    },
+    {
+      "id": "bando-site-133",
+      "priceRecordId": "bando-133-single",
+      "originalName": "반도스탠드 BD 407",
+      "oldName": "BD 407",
+      "newName": "BD 407 / X자형 키보드 스탠드"
+    },
+    {
+      "id": "bando-site-132",
+      "priceRecordId": "bando-132-single",
+      "originalName": "반도스탠드 BD 400",
+      "oldName": "BD 400",
+      "newName": "BD 400 / X자형 키보드 스탠드"
+    },
+    {
+      "id": "bando-site-131",
+      "priceRecordId": "bando-131-single",
+      "originalName": "반도스탠드 BD 405",
+      "oldName": "BD 405",
+      "newName": "BD 405 / X자형 키보드 스탠드"
+    },
+    {
+      "id": "bando-site-130",
+      "priceRecordId": "bando-130-single",
+      "originalName": "반도스탠드 BD 409",
+      "oldName": "BD 409",
+      "newName": "BD 409 / X자형 키보드 스탠드"
+    },
+    {
+      "id": "bando-site-129",
+      "priceRecordId": "bando-129-single",
+      "originalName": "반도스탠드 BD 505",
+      "oldName": "BD 505",
+      "newName": "BD 505 / X자형 키보드 스탠드"
+    },
+    {
+      "id": "bando-site-128",
+      "priceRecordId": "bando-128-single",
+      "originalName": "반도스탠드 BD 505B",
+      "oldName": "BD 505B",
+      "newName": "BD 505B / X자형 키보드 스탠드"
+    },
+    {
+      "id": "bando-site-127",
+      "priceRecordId": "bando-127-single",
+      "originalName": "반도스탠드 BD 503",
+      "oldName": "BD 503",
+      "newName": "BD 503 / X자형 키보드 스탠드"
+    },
+    {
+      "id": "bando-site-296",
+      "priceRecordId": "bando-296-single",
+      "originalName": "반도스탠드 BD UST-100B",
+      "oldName": "BD UST-100B",
+      "newName": "BD UST-100B / 기타 스탠드"
+    },
+    {
+      "id": "bando-site-292",
+      "priceRecordId": "bando-292-single",
+      "originalName": "반도스탠드 BD BS-100B 색소폰스탠드 (알토,테너 겸용)",
+      "oldName": "BD BS-100B",
+      "newName": "BD BS-100B / 알토 및 테너 겸용 색소폰 스탠드"
+    },
+    {
+      "id": "bando-site-291",
+      "priceRecordId": "bando-291-single",
+      "originalName": "반도스탠드 BD BS-100C 색소폰스탠드 (알토,테너 겸용)",
+      "oldName": "BD BS-100C",
+      "newName": "BD BS-100C / 알토 및 테너 겸용 색소폰 스탠드"
+    },
+    {
+      "id": "bando-site-295",
+      "priceRecordId": "bando-295-single",
+      "originalName": "반도스탠드 BD UST-100C",
+      "oldName": "BD UST-100C",
+      "newName": "BD UST-100C / 기타 스탠드"
+    },
+    {
+      "id": "bando-site-150",
+      "priceRecordId": "bando-150-single",
+      "originalName": "반도스탠드 BD BC-105 (첼로)",
+      "oldName": "BD BC-105",
+      "newName": "BD BC-105 / 첼로 스탠드"
+    },
+    {
+      "id": "bando-site-161",
+      "priceRecordId": "bando-161-single",
+      "originalName": "반도스탠드 BD BS-SORP (소프라노용)",
+      "oldName": "BD BS-SORP",
+      "newName": "BD BS-SORP / 소프라노용 관악기 스탠드"
+    },
+    {
+      "id": "bando-site-169",
+      "priceRecordId": "bando-169-single",
+      "originalName": "반도스탠드 BD GT-150H",
+      "oldName": "BD GT-150H",
+      "newName": "BD GT-150H / 기타 스탠드"
+    },
+    {
+      "id": "bando-site-289",
+      "priceRecordId": "bando-289-single",
+      "originalName": "반도스탠드 BD BS-FLUTE (플룻용)",
+      "oldName": "BD BS-FLUTE",
+      "newName": "BD BS-FLUTE / 플루트 스탠드"
+    },
+    {
+      "id": "bando-site-148",
+      "priceRecordId": "bando-148-single",
+      "originalName": "반도스탠드 BD BS-107 (바이올린)",
+      "oldName": "BD BS-107",
+      "newName": "BD BS-107 / 바이올린 스탠드"
+    },
+    {
+      "id": "bando-site-160",
+      "priceRecordId": "bando-160-single",
+      "originalName": "반도스탠드 BD BS-Trumpet (트럼펫)",
+      "oldName": "BD BS-Trumpet",
+      "newName": "BD BS-Trumpet / 트럼펫 스탠드"
+    },
+    {
+      "id": "bando-site-144",
+      "priceRecordId": "bando-144-single",
+      "originalName": "반도스탠드 BD GS (기타스탠드)",
+      "oldName": "BD GS",
+      "newName": "BD GS / 기타 스탠드"
+    },
+    {
+      "id": "bando-site-145",
+      "priceRecordId": "bando-145-single",
+      "originalName": "반도스탠드 BD GT-100(기타, 비올라)",
+      "oldName": "BD GT-100",
+      "newName": "BD GT-100 / 기타 및 비올라용 스탠드"
+    },
+    {
+      "id": "bando-site-159",
+      "priceRecordId": "bando-159-single",
+      "originalName": "반도스탠드 BD BS-Clarinet (클라리넷)",
+      "oldName": "BD BS-Clarinet",
+      "newName": "BD BS-Clarinet / 클라리넷 스탠드"
+    },
+    {
+      "id": "bando-site-143",
+      "priceRecordId": "bando-143-single",
+      "originalName": "반도스탠드 BD 109 콘트라베이스",
+      "oldName": "BD 109",
+      "newName": "BD 109 / 콘트라베이스 스탠드"
+    },
+    {
+      "id": "bando-site-147",
+      "priceRecordId": "bando-147-single",
+      "originalName": "반도스탠드 BD GT-50",
+      "oldName": "BD GT-50",
+      "newName": "BD GT-50 / 기타 스탠드"
+    },
+    {
+      "id": "bando-site-149",
+      "priceRecordId": "bando-149-single",
+      "originalName": "반도스탠드 BD BS-300T (테너용)",
+      "oldName": "BD BS-300T",
+      "newName": "BD BS-300T / 테너용 관악기 스탠드"
+    },
+    {
+      "id": "bando-site-142",
+      "priceRecordId": "bando-142-single",
+      "originalName": "반도스탠드 BD BS-300R (알토용)",
+      "oldName": "BD BS-300R",
+      "newName": "BD BS-300R / 알토용 관악기 스탠드"
+    },
+    {
+      "id": "bando-site-146",
+      "priceRecordId": "bando-146-single",
+      "originalName": "반도스탠드 BD GT-200",
+      "oldName": "BD GT-200",
+      "newName": "BD GT-200 / 기타 스탠드"
+    },
+    {
+      "id": "bando-site-164",
+      "priceRecordId": "bando-164-single",
+      "originalName": "반도스탠드 BD GT-700 (기타스탠드)",
+      "oldName": "BD GT-700",
+      "newName": "BD GT-700 / 기타 스탠드"
+    },
+    {
+      "id": "bando-site-163",
+      "priceRecordId": "bando-163-single",
+      "originalName": "반도스탠드 BD GT-500 (기타스탠드)",
+      "oldName": "BD GT-500",
+      "newName": "BD GT-500 / 기타 스탠드"
+    },
+    {
+      "id": "bando-site-162",
+      "priceRecordId": "bando-162-single",
+      "originalName": "반도스탠드 BD GT-300 (기타스탠드)",
+      "oldName": "BD GT-300",
+      "newName": "BD GT-300 / 기타 스탠드"
+    },
+    {
+      "id": "bando-site-190",
+      "priceRecordId": "bando-190-single",
+      "originalName": "반도스탠드 BD 401",
+      "oldName": "BD 401",
+      "newName": "BD 401 / 스피커 스탠드"
+    },
+    {
+      "id": "bando-site-179",
+      "priceRecordId": "bando-179-single",
+      "originalName": "반도스탠드 BD BA-1",
+      "oldName": "BD BA-1",
+      "newName": "BD BA-1 / 스피커 스탠드"
+    },
+    {
+      "id": "bando-site-332",
+      "priceRecordId": "bando-332-single",
+      "originalName": "반도스탠드 BD LCD-C",
+      "oldName": "BD LCD-C",
+      "newName": "BD LCD-C / 미디어 스탠드"
+    },
+    {
+      "id": "bando-site-307",
+      "priceRecordId": "bando-307-single",
+      "originalName": "반도스탠드 BD 1200AB-LCD",
+      "oldName": "BD 1200AB-LCD",
+      "newName": "BD 1200AB-LCD / 미디어 스탠드"
+    },
+    {
+      "id": "bando-site-208",
+      "priceRecordId": "bando-208-single",
+      "originalName": "반도스탠드 BD LCD-SW",
+      "oldName": "BD LCD-SW",
+      "newName": "BD LCD-SW / 미디어 스탠드"
+    },
+    {
+      "id": "bando-site-207",
+      "priceRecordId": "bando-207-single",
+      "originalName": "반도스탠드 BD LCD-S",
+      "oldName": "BD LCD-S",
+      "newName": "BD LCD-S / 미디어 스탠드"
+    },
+    {
+      "id": "bando-site-205",
+      "priceRecordId": "bando-205-single",
+      "originalName": "반도스탠드 BD BLS 반도 모니터스탠드",
+      "oldName": "BD BLS",
+      "newName": "BD BLS / 모니터 스탠드"
+    },
+    {
+      "id": "bando-site-200",
+      "priceRecordId": "bando-200-single",
+      "originalName": "반도스탠드 BD LCD-B",
+      "oldName": "BD LCD-B",
+      "newName": "BD LCD-B / 미디어 스탠드"
+    },
+    {
+      "id": "bando-site-199",
+      "priceRecordId": "bando-199-single",
+      "originalName": "반도스탠드 BD LCD-A",
+      "oldName": "BD LCD-A",
+      "newName": "BD LCD-A / 미디어 스탠드"
+    },
+    {
+      "id": "bando-site-308",
+      "priceRecordId": "bando-308-single",
+      "originalName": "반도스탠드 BD AC-1 반도 퍼커션&악세사리 테이블",
+      "oldName": "BD AC-1",
+      "newName": "BD AC-1 / 퍼커션 및 악세사리 테이블"
+    },
+    {
+      "id": "bando-site-229",
+      "priceRecordId": "bando-229-single",
+      "originalName": "반도스탠드 BD LED-2s (Mighty Bright Light)",
+      "oldName": "BD LED-2s",
+      "newName": "BD LED-2S / Mighty Bright Light"
+    },
+    {
+      "id": "bando-site-228",
+      "priceRecordId": "bando-228-single",
+      "originalName": "반도스탠드 BD LED-3 (Mighty Bright Light)",
+      "oldName": "BD LED-3",
+      "newName": "BD LED-3 / Mighty Bright Light"
+    },
+    {
+      "id": "bando-site-340",
+      "priceRecordId": "bando-340-single",
+      "originalName": "반도스탠드 BD 250ABK",
+      "oldName": "BD 250ABK",
+      "newName": "BD 250ABK / 일자형 마이크 스탠드"
+    },
+    {
+      "id": "bando-site-294",
+      "priceRecordId": "bando-294-single",
+      "originalName": "반도스탠드 BD 250AC",
+      "oldName": "BD 250AC",
+      "newName": "BD 250AC / 일자형 마이크 스탠드"
+    },
+    {
+      "id": "bando-site-341",
+      "priceRecordId": "bando-341-single",
+      "originalName": "반도스탠드 BD 940ABK",
+      "oldName": "BD 940ABK",
+      "newName": "BD 940ABK / T자형 마이크 스탠드"
+    },
+    {
+      "id": "bando-site-338",
+      "priceRecordId": "bando-338-single",
+      "originalName": "반도스탠드 BD 260T",
+      "oldName": "BD 260T",
+      "newName": "BD 260T / T자형 마이크 스탠드"
+    },
+    {
+      "id": "bando-site-311",
+      "priceRecordId": "bando-311-single",
+      "originalName": "반도스탠드 반도 마이크스탠드 BD 959 (높이 참고하세요)",
+      "oldName": "BD 959",
+      "newName": "BD 959 / 미니형 마이크 스탠드"
+    },
+    {
+      "id": "bando-site-290",
+      "priceRecordId": "bando-290-single",
+      "originalName": "반도스탠드 반도 마이크스탠드 BD 950 (높이 참고하세요)",
+      "oldName": "BD 950",
+      "newName": "BD 950 / 미니형 마이크 스탠드"
+    },
+    {
+      "id": "bando-site-363",
+      "priceRecordId": "bando-363-single",
+      "originalName": "반도스탠드 BD Desk-MA01",
+      "oldName": "BD Desk-MA01",
+      "newName": "BD Desk-MA01 / 미니형 마이크 스탠드"
+    },
+    {
+      "id": "bando-site-337",
+      "priceRecordId": "bando-337-single",
+      "originalName": "반도스탠드 BD Floor-BTS",
+      "oldName": "BD Floor-BTS",
+      "newName": "BD Floor-BTS / 미니형 마이크 스탠드"
+    },
+    {
+      "id": "bando-site-334",
+      "priceRecordId": "bando-334-single",
+      "originalName": "반도스탠드 BD Desk-BTS",
+      "oldName": "BD Desk-BTS",
+      "newName": "BD Desk-BTS / 미니형 마이크 스탠드"
+    },
+    {
+      "id": "bando-site-323",
+      "priceRecordId": "bando-323-single",
+      "originalName": "반도스탠드 BD Floor TS-2",
+      "oldName": "BD Floor TS-2",
+      "newName": "BD Floor TS-2 / 미니형 마이크 스탠드"
+    },
+    {
+      "id": "bando-site-322",
+      "priceRecordId": "bando-322-single",
+      "originalName": "반도스탠드 BD Floor TS-1",
+      "oldName": "BD Floor TS-1",
+      "newName": "BD Floor TS-1 / 미니형 마이크 스탠드"
+    },
+    {
+      "id": "bando-site-321",
+      "priceRecordId": "bando-321-single",
+      "originalName": "반도스탠드 BD FloorJS-4BK",
+      "oldName": "BD FloorJS-4BK",
+      "newName": "BD FloorJS-4BK / 미니형 마이크 스탠드"
+    },
+    {
+      "id": "bando-site-320",
+      "priceRecordId": "bando-320-single",
+      "originalName": "반도스탠드 BD FloorJS-3BK",
+      "oldName": "BD FloorJS-3BK",
+      "newName": "BD FloorJS-3BK / 미니형 마이크 스탠드"
+    },
+    {
+      "id": "bando-site-319",
+      "priceRecordId": "bando-319-single",
+      "originalName": "반도스탠드 BD FloorJS-2BK",
+      "oldName": "BD FloorJS-2BK",
+      "newName": "BD FloorJS-2BK / 미니형 마이크 스탠드"
+    },
+    {
+      "id": "bando-site-249",
+      "priceRecordId": "bando-249-single",
+      "originalName": "반도스탠드 BD Desk TS-3 (길이 참고)",
+      "oldName": "BD Desk TS-3",
+      "newName": "BD Desk TS-3 / Bar 길이 32cm"
+    },
+    {
+      "id": "bando-site-248",
+      "priceRecordId": "bando-248-single",
+      "originalName": "반도스탠드 BD Desk TS-2 (길이 참고)",
+      "oldName": "BD Desk TS-2",
+      "newName": "BD Desk TS-2 / Bar 길이 22cm"
+    },
+    {
+      "id": "bando-site-247",
+      "priceRecordId": "bando-247-single",
+      "originalName": "반도스탠드 BD Desk TS-1 (길이 참고)",
+      "oldName": "BD Desk TS-1",
+      "newName": "BD Desk TS-1 / Bar 길이 15cm"
+    },
+    {
+      "id": "bando-site-365",
+      "priceRecordId": "bando-365-single",
+      "originalName": "반도스탠드 매직암 BD MA-01",
+      "oldName": "BD MA-01",
+      "newName": "BD MA-01 / 매직암"
+    }
+  ]
+}

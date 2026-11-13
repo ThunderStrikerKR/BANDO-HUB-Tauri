@@ -1,4 +1,3 @@
-import { splitSales } from "./sales.js";
 import type { Product, State, Variant } from "./types.js";
 const colorAliases: Record<string, string> = {
   gold: "골드",
@@ -24,7 +23,7 @@ const colorAliases: Record<string, string> = {
   silver: "실버",
   blue: "블루",
   red: "레드",
-  "색상 미표기": "색상 확인 필요",
+  "색상 미표기": "",
 };
 export const colorLabel = (value: string) => colorAliases[value.trim().toLowerCase()] ?? value;
 export const normalizeModel = (value: string) =>
@@ -94,164 +93,17 @@ function subtitle(name: string, models: string[]) {
     .trim();
 }
 /** Split distinct model codes, merge the same model's colors, keep stable option IDs. */
-export function canonicalizeState(input: State) {
-  if (registeredProducts(input.products).every((p) => p.saleUnit)) return structuredClone(input);
-  const state = structuredClone(input),
-    groups = new Map<string, Product>(),
-    mapping: Record<string, string> = { ...(state.productMappings ?? {}) };
-  const original = state.products;
-  state.variantMappings ??= {};
-  const sourceToTargets = new Map<string, Set<string>>();
-  for (const p of registeredProducts(original))
-    for (const originalVariant of p.variants) {
-      const v = structuredClone(originalVariant);
-      v.siteProductId ??= p.siteId;
-      let code = optionModel(v.option ?? "") ?? normalizeModel(p.code);
-      const suffix = code.match(/(Black|White|Gray|Grey|Brown|Silver|Blue|Red)$/i);
-      if (suffix && colorLabel(suffix[1]) === colorLabel(v.color))
-        code = code.slice(0, -suffix[1].length).trim();
-      const originalName = p.originalName ?? p.name;
-      const trailing = originalName.match(/\)\s*(-[A-Za-z0-9-]+)$/);
-      if (trailing && !code.endsWith(trailing[1])) code += trailing[1];
-      const composite = originalName.match(
-        /\bBD\s*[A-Za-z0-9-]+(?:\s*\+\s*(?:BD\s*)?[A-Za-z0-9-]+)+/i,
-      );
-      if (composite) code = composite[0];
-      if (
-        new RegExp(esc(p.code).replace(/\s+/g, "\\s*") + "(?:용|\\s*전용)", "i").test(originalName)
-      )
-        code = originalName.replace(/^반도스탠드\s*/, "").trim();
-      code = normalizeModel(code);
-      if (/^(?:P\d{3,}|SITE-)/i.test(code)) code = p.name.replace(/^반도스탠드\s*/, "").trim();
-      const key = productKey(p, code);
-      let target = groups.get(key);
-      if (!target) {
-        const same = compact(normalizeModel(p.code)) === compact(code);
-        const id = same ? p.id : p.id + "~" + compact(code);
-        target = {
-          ...p,
-          id,
-          code,
-          catalog:
-            p.catalog ?? (p.variants.some((v) => v.source === "DEMO") ? "DEMO" : "BANDOSTAND"),
-          name: p.variants.some((v) => v.source === "DEMO") ? "[가상] " + code : code,
-          subtitle:
-            p.subtitle ??
-            subtitle(p.originalName ?? p.name, [
-              p.code,
-              ...(p.modelCodes ?? []),
-              ...p.variants.map((v) => optionModel(v.option ?? "") ?? "").filter(Boolean),
-            ]),
-          originalName: p.originalName ?? p.name,
-          originalCode: p.originalCode ?? p.code,
-          variants: [],
-          modelCodes: [code],
-          modelKey: key,
-          siteRefs: [],
-          active: true,
-          requiresOption: false,
-          dataIssues: [],
-        };
-        delete target.deletedAt;
-        delete target.supersededBy;
-        groups.set(key, target);
-      }
-      if (!v.option && colorLabel(v.color) === "색상 확인 필요")
-        v.option = subtitle(originalName, [p.code, ...(p.modelCodes ?? [])]);
-      if (!target.variants.some((x) => x.id === v.id)) target.variants.push(v);
-      target.priceHistory = [
-        ...(target.priceHistory ?? []),
-        ...(p.priceHistory ?? []).filter(
-          (h) => !(target!.priceHistory ?? []).some((t) => t.at === h.at && t.field === h.field),
-        ),
-      ];
-      for (const ref of [p.siteId, ...(p.siteRefs ?? [])].filter((s): s is string => !!s))
-        if (!target.siteRefs!.includes(ref)) target.siteRefs!.push(ref);
-      mapping[p.id + "|" + v.id] = target.id;
-      const targets = sourceToTargets.get(p.id) ?? new Set<string>();
-      targets.add(target.id);
-      sourceToTargets.set(p.id, targets);
-    }
-  for (const p of groups.values()) {
-    const unique: Variant[] = [];
-    for (const v of p.variants) {
-      const prior = unique.find(
-        (x) =>
-          colorLabel(x.color) === colorLabel(v.color) &&
-          (x.option ?? "") === (v.option ?? "") &&
-          x.wholesale === v.wholesale &&
-          x.semi === v.semi &&
-          x.retail === v.retail &&
-          !state.clients.some(
-            (c) =>
-              c.overrides[x.id] !== undefined &&
-              c.overrides[v.id] !== undefined &&
-              c.overrides[x.id] !== c.overrides[v.id],
-          ),
-      );
-      if (prior) {
-        prior.legacyIds = [...(prior.legacyIds ?? []), v.id, ...(v.legacyIds ?? [])];
-        state.variantMappings![v.id] = prior.id;
-      } else unique.push(v);
-    }
-    p.variants = unique;
-    const keys = p.variants.map((v) => colorLabel(v.color) + "|" + (v.option ?? ""));
-    if (new Set(keys).size !== keys.length)
-      p.dataIssues!.push("동일 색상 / 옵션의 원본이 중복되어 단가 확인 필요");
-    p.defaultColor =
-      p.variants.find((v) => colorLabel(v.color) === "블랙")?.color ??
-      p.variants.find((v) => v.color === p.defaultColor)?.color ??
-      p.variants[0].color;
-    p.requiresOption =
-      !!p.dataIssues!.length ||
-      p.variants.filter((v) => colorLabel(v.color) === "색상 확인 필요").length > 1;
-  }
-
-  const active = [...groups.values()];
-  const ids = new Set(active.map((p) => p.id));
-  const archives = original
-    .filter((p) => !ids.has(p.id))
-    .map((p) =>
-      sourceToTargets.has(p.id) ? { ...p, supersededBy: [...sourceToTargets.get(p.id)!][0] } : p,
-    );
-  state.products = [...active, ...archives];
-  state.productMappings = mapping;
-  for (const o of state.orders) {
-    const c = state.clients.find((c) => c.id === o.clientId);
-    if (!o.clientSnapshot && c) o.clientSnapshot = structuredClone(c);
-    for (const r of o.recipients)
-      for (const i of r.items) {
-        const target = mapping[(i.productId ?? "") + "|" + (i.variantId ?? "")];
-        if (target && target !== i.productId) {
-          i.originalProductId ??= i.productId ?? undefined;
-          i.originalModel ??= i.name;
-          i.productId = target;
-        }
-        const variant = state.variantMappings?.[i.variantId ?? ""];
-        if (variant) {
-          i.originalVariantId ??= i.variantId ?? undefined;
-          i.variantId = variant;
-        }
-      }
-  }
-  for (const a of state.aliases) {
-    const old = original.find((p) => p.id === a.productId);
-    if (!old) continue;
-    const chosen =
-      a.variantId ??
-      old.variants.find((v) => v.color === old.defaultColor)?.id ??
-      old.variants[0]?.id;
-    const target = mapping[a.productId + "|" + chosen];
-    if (target) {
-      a.productId = target;
-      if (chosen) a.variantId = state.variantMappings?.[chosen] ?? chosen;
+/** All configurations are registered directly as their own business product.
+ * Do not merge products by model code or silently create/select options.
+ */
+export function canonicalizeState(input: State): State {
+  const copy = structuredClone(input);
+  for (const p of registeredProducts(copy.products)) {
+    if (p.variants.length !== 1) {
+      throw Error("독립 상품 규칙 위반: 여러 판매 구성이 하나의 상품에 연결돼 있습니다.");
     }
   }
-  for (const c of state.clients)
-    for (const [oldId, newId] of Object.entries(state.variantMappings ?? {}))
-      if (c.overrides[oldId] !== undefined && c.overrides[newId] === undefined)
-        c.overrides[newId] = c.overrides[oldId];
-  return splitSales(state);
+  return copy;
 }
 export function sortProducts(products: Product[]) {
   const natural = new Intl.Collator("ko", {
@@ -265,21 +117,19 @@ export function sortProducts(products: Product[]) {
       natural.compare(a.name, b.name),
   );
 }
+/** Related independent products, never nested selectable selling options. */
 export function siblingOptions(product: Product, products: Product[]) {
   return registeredProducts(products)
-    .filter(
-      (p) =>
-        p.id === product.id ||
-        (p.familyKey && p.familyKey === product.familyKey) ||
-        p.siteRefs?.some((id) => product.siteRefs?.includes(id)),
+    .filter((p) =>
+      p.id === product.id ||
+      (p.familyKey && p.familyKey === product.familyKey) ||
+      p.siteRefs?.some((id) => product.siteRefs?.includes(id)),
     )
-    .flatMap((p) =>
-      p.variants.map((v) => ({
-        product: p,
-        variant: v,
-        label: (p.id === product.id ? "" : p.code + " / ") + variantLabel(v),
-      })),
-    );
+    .map((p) => ({
+      product: p,
+      variant: p.variants[0],
+      label: p.name,
+    }));
 }
 export function canonicalizeProducts(products: Product[]) {
   return registeredProducts(

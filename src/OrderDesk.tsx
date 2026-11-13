@@ -1,5 +1,3 @@
-import { WorkingRawDialog } from "./WorkingRawDialog";
-import { rawCorrectionAllowed } from "./working-raw";
 import { useState } from "react";
 import { CorrectionPanel } from "./CorrectionPanel";
 import { ActualFreightField } from "./ActualFreightField";
@@ -21,7 +19,6 @@ import { billingSnapshot } from "./replies";
 import { Field, clone } from "./ui";
 import { clientChangeIssue, orderGrandTotal, reconcileWorkflow, shipmentVat } from "./workflow";
 export function OrderDesk(props: OrderDeskProps) {
-  const [correcting, setCorrecting] = useState(false);
   const [changeRequest, setChangeRequest] = useState<string>();
   const {
     highlight,
@@ -43,7 +40,6 @@ export function OrderDesk(props: OrderDeskProps) {
     portalTargets,
     staffBlocks,
     selectIssue,
-    question,
     recEdit,
     products,
     pricingClient,
@@ -185,13 +181,9 @@ export function OrderDesk(props: OrderDeskProps) {
           place(
             <section className="desk-pane review-pane compact-review">
               <div className="review-layout">
-                {rawCorrectionAllowed(flowState, draft) && (
-                  <button onClick={() => setCorrecting(true)}>원문 정정</button>
-                )}
                 <StaffChecks
                   blocks={staffBlocks}
                   onSelect={selectIssue}
-                  onQuestion={question}
                   onCancelApproval={(b) => {
                     if (b.itemId)
                       recEdit(
@@ -254,7 +246,7 @@ export function OrderDesk(props: OrderDeskProps) {
                   </header>
                   <div className="receipt-panel-content">
                     {!draft.recipients.length && (
-                      <p className="detail-empty">발주 원문을 입력하거나 배송 건을 선택하세요.</p>
+                      <p className="empty detail-empty">발주 원문을 입력하거나 배송 건을 선택하세요.</p>
                     )}
                     {draft.recipients
                       .filter((r) => r.id === shownRecipient)
@@ -411,40 +403,6 @@ export function OrderDesk(props: OrderDeskProps) {
                       .filter((r) => r.id === shownRecipient)
                       .map((r) => (
                         <article key={r.id}>
-                          <div className="dispatch-origin" aria-label="배송 건 출고지">
-                            {(["FACTORY", "STORE"] as const).map((origin) => (
-                              <button
-                                key={origin}
-                                disabled={exported}
-                                aria-pressed={
-                                  (r.dispatchOrigin ??
-                                    (r.items.every((i) => i.origin === "STORE")
-                                      ? "STORE"
-                                      : r.items.every((i) => i.origin === "FACTORY")
-                                        ? "FACTORY"
-                                        : undefined)) === origin
-                                }
-                                onClick={() =>
-                                  recEdit(
-                                    r.id,
-                                    (row) => {
-                                      const previous =
-                                        row.dispatchOrigin ?? row.items[0]?.origin ?? "FACTORY";
-                                      row.dispatchOrigin = origin;
-                                      row.items.forEach((i) => (i.origin = origin));
-                                      if (row.shippingCharges)
-                                        row.shippingCharges = {
-                                          [origin]: row.shippingCharges[previous] ?? null,
-                                        };
-                                    },
-                                    false,
-                                  )
-                                }
-                              >
-                                {origin === "FACTORY" ? "공장" : "매장"}
-                              </button>
-                            ))}
-                          </div>
                           <table className="compact-items">
                             <thead>
                               <tr>
@@ -543,6 +501,41 @@ export function OrderDesk(props: OrderDeskProps) {
                             >
                               ＋ 상품 추가
                             </button>
+                            <div className="dispatch-origin" role="group" aria-label="발송지">
+                              <span className="dispatch-origin-label">발송지:</span>
+                              {(["FACTORY", "STORE"] as const).map((origin) => (
+                                <button
+                                  key={origin}
+                                  disabled={exported}
+                                  aria-pressed={
+                                    (r.dispatchOrigin ??
+                                      (r.items.every((i) => i.origin === "STORE")
+                                        ? "STORE"
+                                        : r.items.every((i) => i.origin === "FACTORY")
+                                          ? "FACTORY"
+                                          : undefined)) === origin
+                                  }
+                                  onClick={() =>
+                                    recEdit(
+                                      r.id,
+                                      (row) => {
+                                        const previous =
+                                          row.dispatchOrigin ?? row.items[0]?.origin ?? "FACTORY";
+                                        row.dispatchOrigin = origin;
+                                        row.items.forEach((i) => (i.origin = origin));
+                                        if (row.shippingCharges)
+                                          row.shippingCharges = {
+                                            [origin]: row.shippingCharges[previous] ?? null,
+                                          };
+                                      },
+                                      false,
+                                    )
+                                  }
+                                >
+                                  {origin === "FACTORY" ? "공장" : "매장"}
+                                </button>
+                              ))}
+                            </div>
                           </div>
                         </article>
                       ))}
@@ -560,7 +553,6 @@ export function OrderDesk(props: OrderDeskProps) {
                       onVat={(v) =>
                         recEdit(activeShipment.recipientId, (r) => (r.vatOverride = v), false)
                       }
-                      onSave={() => void run(() => onWorkflowSave(flowState))}
                     />
                   ) : null}
                 </section>
@@ -586,7 +578,7 @@ export function OrderDesk(props: OrderDeskProps) {
                   (
                   {draft.recipients.some((r) => shipmentVat(draft, r)) &&
                   draft.recipients.some((r) => !shipmentVat(draft, r))
-                    ? "배송 건별 부가세 적용"
+                    ? "부가세 포함/별도"
                     : draft.recipients.some((r) => shipmentVat(draft, r))
                       ? "부가세 포함"
                       : "부가세 별도"}
@@ -672,19 +664,6 @@ export function OrderDesk(props: OrderDeskProps) {
             ) : null;
           })()}
       </div>
-      {correcting && (
-        <WorkingRawDialog
-          state={flowState}
-          order={draft}
-          onClose={() => setCorrecting(false)}
-          onApply={async (next) => {
-            const updated = next.orders.find((o) => o.id === draft.id)!;
-            if (saved) await onSaveState(next);
-            setSource(updated.analysisRaw ?? updated.raw);
-            onChange(updated);
-          }}
-        />
-      )}
     </LinkContext.Provider>
   );
 }

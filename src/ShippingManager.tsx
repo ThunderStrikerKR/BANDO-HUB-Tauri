@@ -4,10 +4,13 @@ import { money, won } from "./domain";
 import { internalModel } from "./matching";
 import { colorLabel, registeredProducts, sortProducts } from "./product-models";
 import { ProductFreightPanel } from "./ProductFreightPanel";
+import { ShippingFeeRanges } from "./ShippingFeeRanges";
 import type { NoticeSink } from "./shared/notices";
 import { useAsyncTask } from "./shared/useAsyncTask";
+import { sameFreightEditor } from "./shared/meaningful-changes";
+import { requestEditorLeave, requestPageLeave, usePageLeaveGuard } from "./shared/page-leave";
+
 import {
-  bundleCounts,
   changeShippingBasis,
   combinationCurrent,
   combinationVersions,
@@ -17,8 +20,12 @@ import {
   initialShipping,
 } from "./shipping";
 import type { ShippingRule, ShippingState, State } from "./types";
+import { HelpTooltip } from "./ui/HelpTooltip";
 import { Field, Modal } from "./ui";
-import { PageHeading } from "./ui/PageHeading";
+import { EmptyState, PageHeading } from "./ui/PageHeading";
+import { ManagementTable } from "./ui/ManagementTable";
+import { ManagementSearch } from "./ui/ManagementSearch";
+import { Button } from "./ui/Button";
 export function ShippingManager({
   state,
   onSave,
@@ -42,6 +49,7 @@ export function ShippingManager({
       rule: ShippingRule;
     }>(),
     [newName, setNewName] = useState("");
+  const [initialEditing, setInitialEditing] = useState<ShippingRule>();
   const products = useMemo(
     () =>
       sortProducts(
@@ -53,7 +61,7 @@ export function ShippingManager({
   );
   const rows = products.filter(
     (p) =>
-      (p.name + " " + p.code + " " + p.subtitle + " " + p.category)
+      (p.name + " " + p.subtitle + " " + p.category)
         .toLowerCase()
         .includes(query.toLowerCase()) &&
       (filter === "all" ||
@@ -78,13 +86,143 @@ export function ShippingManager({
   const changes = Object.entries(pending).filter(
     ([id, g]) => products.find((p) => p.id === id)?.shippingGroupId !== (g || undefined),
   );
+  const savePending = async (): Promise<boolean> => {
+    if (!changes.length) return true;
+                  const updatedShipping = structuredClone(shipping);
+                  for (const [id, value] of changes)
+                    if (!value) {
+                      updatedShipping.productRules ??= {};
+                      updatedShipping.productHistory ??= {};
+                      const old = updatedShipping.productRules[id];
+                      if (old)
+                        updatedShipping.productHistory[id] = [
+                          ...(updatedShipping.productHistory[id] ?? []),
+                          old,
+                        ];
+                      updatedShipping.productRules[id] = emptyProductRule();
+                    }
+                  const next = {
+                    ...state,
+                    shipping: updatedShipping,
+                    products: state.products.map((p) =>
+                      pending[p.id] !== undefined
+                        ? { ...p, shippingGroupId: pending[p.id] || undefined }
+                        : p,
+                    ),
+                  };
+                  const ok = await save(next, "배송 그룹 지정을 저장했습니다.");
+                  if (ok) { setPending({}); setSelected([]); }
+                  return ok;
+  };
+  const editingDirty = !!editing && !!initialEditing && !sameFreightEditor(editing.rule, initialEditing);
+  const saveEditedRule = async (): Promise<boolean> => {
+    if (!editing || !editingDirty) return true;
+              const next = structuredClone(shipping),
+                g = next.groups.find((g) => g.id === editing.id)!;
+              g.history.push(g.current);
+              if (Object.entries(editing.rule.fees).some(([count, amount]) =>
+                typeof amount === "number" && editing.rule.maxBundle !== null &&
+                Number(count) > editing.rule.maxBundle)) {
+                onNotice("최대 묶음 수량을 초과하는 운임 구간을 확인하세요.", "error");
+                return false;
+              }
+              g.current = {
+                ...editing.rule,
+                maxConfirmed: editing.rule.maxBundle !== null,
+                version: crypto.randomUUID(),
+                at: new Date().toISOString(),
+              };
+              delete g.current.validFrom;
+              delete g.current.validUntil;
+              delete g.current.basis;
+              delete g.current.packable;
+              const ok = await save(
+                { ...state, shipping: next },
+                "운임표를 저장했습니다. 변경 전 기준은 이력으로 보존됩니다.",
+              );
+              if (ok) { setEditing(undefined); setInitialEditing(undefined); }
+              return ok;
+  };
+  usePageLeaveGuard({
+    label: "운임 관리",
+    hasChanges: () => changes.length > 0 || editingDirty || newName.trim().length > 0,
+    busy: () => busy,
+    save: async () => {
+      if (newName.trim().length > 0) {
+        onNotice("새 배송 그룹을 등록하려면 배송 그룹 추가를 눌러 주세요. 등록 전의 이름은 자동 저장하지 않습니다.", "error");
+        return false;
+      }
+      if (editingDirty) return saveEditedRule();
+      return savePending();
+    },
+    discard: () => { setPending({});setSelected([]);setEditing(undefined);setInitialEditing(undefined);setNewName(""); },
+  });
+  const chooseTab = async (next: typeof tab) => {
+    if (next === tab) return;
+    const leave = await requestPageLeave((message) => onNotice(message, "error"));
+    if (!leave.proceed) return;
+    setTab(next);
+  };
+  const closeEditing = async () => {
+    if (!editing || busy) return;
+    if (editingDirty) {
+      const leave = await requestEditorLeave({
+        label: "동급 그룹 운임",
+        hasChanges: () => editingDirty,
+        save: saveEditedRule,
+        discard: () => { setEditing(undefined); setInitialEditing(undefined); },
+      }, (message) => onNotice(message, "error"));
+      if (!leave.proceed) return;
+    }
+    setEditing(undefined);
+    setInitialEditing(undefined);
+  };
   return (
     <div className="shipping-manager">
       <PageHeading
-        title="배송 그룹 관리"
-        description="상품별 최대 묶음 수량과 운임을 등록합니다. 모델이 달라도 동급 그룹으로 지정하면 수량을 합산합니다."
-        actions={<span className="shipping-version">운임 기준 {shipping.epoch}</span>}
+        title="운임 관리"
+        actions={<div className="shipping-heading-help">
+          <HelpTooltip
+            title="운임 관리"
+            purpose="상품을 포장해 보낼 때 필요한 배송비와 합포장 기준을 관리합니다."
+            when="상품의 배송비가 달라졌거나 같은 상자로 보낼 수 있는 상품을 정할 때 사용합니다."
+            steps={["상품별 기본 운임에서 확인된 배송비를 등록합니다.", "같은 포장 기준을 쓸 상품은 배송 그룹 지정에서 묶습니다.", "동급 그룹 운임표에서 그룹별 배송비를 확인하거나 수정합니다.", "필요한 경우 조합 및 기준 이력을 확인합니다."]}
+            result="주문 접수 시 등록된 운임 기준을 참고할 수 있습니다."
+            caution="실제 확인하지 않은 운임은 임의로 입력하지 않습니다."
+          />
+          <span className="shipping-version">운임 기준 {shipping.epoch}</span>
+        </div>}
       />
+      <div className="shipping-tabs management-tabbar" role="group" aria-label="배송 관리">
+        <button
+          aria-pressed={tab === "products"}
+          className={tab === "products" ? "chosen" : ""}
+          onClick={() => void chooseTab("products")}
+        >
+          상품별 기본 운임
+        </button>
+        <button
+          aria-pressed={tab === "assign"}
+          className={tab === "assign" ? "chosen" : ""}
+          onClick={() => void chooseTab("assign")}
+        >
+          동급 배송 그룹 지정
+        </button>
+        <button
+          aria-pressed={tab === "rates"}
+          className={tab === "rates" ? "chosen" : ""}
+          onClick={() => void chooseTab("rates")}
+        >
+          동급 그룹 운임표
+        </button>
+        <button
+          aria-pressed={tab === "history"}
+          className={tab === "history" ? "chosen" : ""}
+          onClick={() => void chooseTab("history")}
+        >
+          조합 / 기준 이력
+        </button>
+      </div>
       <div className="shipping-stats">
         <article>
           <span>등록 상품</span>
@@ -115,51 +253,15 @@ export function ShippingManager({
           </b>
         </article>
       </div>
-      <div className="shipping-tabs" role="group" aria-label="배송 관리">
-        <button
-          aria-pressed={tab === "products"}
-          className={tab === "products" ? "chosen" : ""}
-          onClick={() => setTab("products")}
-        >
-          상품별 기본 운임
-        </button>
-        <button
-          aria-pressed={tab === "assign"}
-          className={tab === "assign" ? "chosen" : ""}
-          onClick={() => setTab("assign")}
-        >
-          동급 배송 그룹 지정
-        </button>
-        <button
-          aria-pressed={tab === "rates"}
-          className={tab === "rates" ? "chosen" : ""}
-          onClick={() => setTab("rates")}
-        >
-          동급 그룹 운임표
-        </button>
-        <button
-          aria-pressed={tab === "history"}
-          className={tab === "history" ? "chosen" : ""}
-          onClick={() => setTab("history")}
-        >
-          조합 / 기준 이력
-        </button>
-      </div>
       {tab === "products" && (
         <ProductFreightPanel state={{ ...state, shipping }} onSave={onSave} onNotice={onNotice} />
       )}
       {tab === "assign" && (
-        <section className="shipping-card">
-          <div className="shipping-tools">
-            <div className="shipping-search">
-              <span>⌕</span>
-              <input
-                aria-label="배송 그룹 상품 검색"
-                placeholder="모델명 / 상품명 / 카테고리 검색"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-              />
-            </div>
+        <section className="shipping-card shipping-assignment-list">
+          <div className="shipping-tools management-search-toolbar">
+            <ManagementSearch label="배송 그룹 상품 검색"
+              placeholder="모델명 / 상품명 / 카테고리 검색"
+              value={query} onChange={setQuery}/>
             <select
               aria-label="배송 그룹 필터"
               value={filter}
@@ -207,14 +309,14 @@ export function ShippingManager({
             <button disabled={!selected.length} onClick={applyBulk}>
               선택 상품에 적용
             </button>
-            <small>변경사항을 확인한 뒤 아래에서 저장하세요.</small>
+            <HelpTooltip title="배송 그룹 일괄 지정" purpose="선택한 여러 상품을 같은 배송 그룹으로 한꺼번에 지정합니다." when="같은 포장 기준을 사용하는 상품들을 정리할 때 사용합니다." steps={["변경할 상품을 체크합니다.", "적용할 배송 그룹을 선택합니다.", "선택 상품에 적용을 누릅니다.", "아래에서 변경 내용을 확인하고 그룹 지정 저장을 누릅니다."]} result="저장한 상품의 배송 그룹이 변경됩니다." caution="실제 포장 조건이 확인된 상품만 같은 그룹으로 묶습니다." />
           </div>
-          <div className="shipping-table-scroll">
-            <table>
+          <div className={"shipping-table-scroll" + (!rows.length ? " shipping-list-empty" : "")}>
+            <ManagementTable>
               <thead>
                 <tr>
                   <th />
-                  <th>상품명 / 부제</th>
+                  <th>상품명 / 상품설명</th>
                   <th>카테고리</th>
                   <th>색상 / 옵션</th>
                   <th>배송 그룹</th>
@@ -243,8 +345,12 @@ export function ShippingManager({
                         />
                       </td>
                       <td>
-                        <strong>{internalModel(p.name)}</strong>
-                        <small>{p.subtitle || p.originalName || p.name}</small>
+                        <span className="shipping-product-inline" title={[internalModel(p.name), p.subtitle].filter(Boolean).join(" / ")}>
+                          <strong>{internalModel(p.name)}</strong>
+                          {p.subtitle?.trim() && p.subtitle !== p.name && (
+                            <span className="shipping-product-description">{p.subtitle}</span>
+                          )}
+                        </span>
                       </td>
                       <td>
                         <span className="category-label">{p.category || "분류 미지정"}</span>
@@ -281,8 +387,8 @@ export function ShippingManager({
                   );
                 })}
               </tbody>
-            </table>
-            {!rows.length && <p className="empty">검색 조건에 맞는 상품이 없습니다.</p>}
+            </ManagementTable>
+            {!rows.length && <EmptyState compact title="검색 조건에 맞는 상품이 없습니다." />}
           </div>
           <footer className="shipping-savebar">
             <span>
@@ -295,41 +401,14 @@ export function ShippingManager({
               )}
             </span>
             <div>
-              <button disabled={!changes.length || busy} onClick={() => setPending({})}>
-                변경 취소
-              </button>
+              {changes.length > 0 && <button disabled={busy} onClick={() => setPending({})}>
+                미저장 변경 초기화
+              </button>}
               <button
                 className="primary"
                 disabled={!changes.length || busy}
                 onClick={() => {
-                  const updatedShipping = structuredClone(shipping);
-                  for (const [id, value] of changes)
-                    if (!value) {
-                      updatedShipping.productRules ??= {};
-                      updatedShipping.productHistory ??= {};
-                      const old = updatedShipping.productRules[id];
-                      if (old)
-                        updatedShipping.productHistory[id] = [
-                          ...(updatedShipping.productHistory[id] ?? []),
-                          old,
-                        ];
-                      updatedShipping.productRules[id] = emptyProductRule();
-                    }
-                  const next = {
-                    ...state,
-                    shipping: updatedShipping,
-                    products: state.products.map((p) =>
-                      pending[p.id] !== undefined
-                        ? { ...p, shippingGroupId: pending[p.id] || undefined }
-                        : p,
-                    ),
-                  };
-                  void save(next, "배송 그룹 지정을 저장했습니다.").then((ok) => {
-                    if (ok) {
-                      setPending({});
-                      setSelected([]);
-                    }
-                  });
+                  void savePending();
                 }}
               >
                 그룹 지정 저장 {changes.length > 0 && ` / ${changes.length}개`}
@@ -341,8 +420,12 @@ export function ShippingManager({
       {tab === "rates" && (
         <section className="shipping-card shipping-rates">
           <div className="section-title">
-            <h3>확인된 기본 운임만 추천합니다</h3>
-            <button
+            <h3 className="shipping-rates-title">그룹 운임표 <HelpTooltip title="배송 그룹 운임표" purpose="같은 배송 기준으로 묶은 상품에 적용할 운임을 등록합니다." when="같은 포장 조건의 상품이 여러 개 있을 때 배송비를 확인하거나 수정할 때 사용합니다." steps={["배송 그룹을 확인합니다.", "운임 수정 버튼을 누릅니다.", "최대 합포장 수량과 확인된 운임을 입력합니다.", "저장 버튼을 눌러 적용합니다."]} result="해당 그룹의 상품들이 새 운임 기준을 참고할 수 있습니다." caution="기존 운임 기준을 종료할 때에는 운임 기준 관리에서 따로 처리합니다." /></h3>
+            <details className="shipping-basis-settings">
+              <summary>운임 기준 관리</summary>
+              <div className="shipping-basis-actions">
+                <HelpTooltip title="전체 운임 기준 변경" purpose="지금까지 사용하던 운임 기준을 종료하고 새로운 운임을 등록할 수 있도록 합니다." when="기존 배송비 기준을 더 이상 사용하지 않을 때만 사용합니다." steps={["새 운임 기준을 적용해야 하는지 확인합니다.", "전체 운임 기준 변경 버튼을 누릅니다.", "확인창에서 변경 범위를 확인하고 승인합니다.", "새로운 배송비를 확인한 뒤 다시 등록합니다."]} result="이전 운임의 자동 추천이 중단되고 새 기준을 등록할 수 있습니다." caution="기존 운임 기준 전체에 영향을 주므로 일반적인 운임 수정에는 사용하지 않습니다." />
+            <button className="danger" type="button"
               onClick={async () => {
                 if (
                   await confirmAction(
@@ -357,15 +440,19 @@ export function ShippingManager({
             >
               전체 운임 기준 변경
             </button>
+              </div>
+            </details>
           </div>
           <div className="new-group">
-            <input
-              aria-label="새 배송 그룹명"
-              placeholder="새 배송 그룹명"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-            />
-            <button
+            <Field label="새 배송 그룹명">
+              <input
+                aria-label="새 배송 그룹명"
+                placeholder="새 배송 그룹명"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+              />
+            </Field>
+            <Button
               disabled={busy || !newName.trim()}
               onClick={async () => {
                 if (shipping.groups.some((g) => g.name === newName.trim())) {
@@ -392,16 +479,16 @@ export function ShippingManager({
               }}
             >
               배송 그룹 추가
-            </button>
+            </Button>
           </div>
-          <table>
+          <ManagementTable>
             <thead>
               <tr>
                 <th>배송 그룹</th>
-                <th>합포장</th>
-                {[1, 2, 3, 4, 5, 6].map((n) => (
-                  <th key={n}>{n}개</th>
-                ))}
+                <th>최대 묶음 수량</th>
+                <th>운임 등록 상태</th>
+                <th>직원 참고 메모</th>
+                <th>최근 수정</th>
                 <th>관리</th>
               </tr>
             </thead>
@@ -410,9 +497,21 @@ export function ShippingManager({
                 .filter((g) => !g.deletedAt)
                 .map((g) => (
                   <tr key={g.id}>
+                    <td><b>{g.name}</b></td>
+                    <td>{g.current.maxConfirmed && g.current.maxBundle
+                      ? g.current.maxBundle + "개" : "확인 필요"}</td>
                     <td>
-                      <b>{g.name}</b>
-                      <button
+                      {typeof g.current.perItem === "number" ||
+                        Object.values(g.current.fees).some((fee) => typeof fee === "number")
+                        ? "등록" : "미등록"}
+                    </td>
+                    <td className="shipping-group-notes" title={g.current.notes}>
+                      {g.current.notes || "-"}
+                    </td>
+                    <td>{g.current.at ? new Date(g.current.at).toLocaleDateString("ko-KR") : "-"}</td>
+                    <td>
+                      <div className="shipping-group-actions">
+                      <Button size="compact"
                         onClick={async () => {
                           const name = await promptText("배송 그룹명", g.name);
                           if (!name?.trim()) return;
@@ -420,39 +519,20 @@ export function ShippingManager({
                           next.groups.find((x) => x.id === g.id)!.name = name.trim();
                           void save({ ...state, shipping: next }, "배송 그룹명을 변경했습니다.");
                         }}
-                      >
-                        이름 수정
-                      </button>
-                      <small>{g.current.notes}</small>
-                    </td>
-                    <td>
-                      {g.current.maxBundle ?? "미확정"}
-                      {!g.current.maxConfirmed && " / 잠정"}
-                    </td>
-                    {[1, 2, 3, 4, 5, 6].map((n) => (
-                      <td key={n}>
-                        {won(
-                          g.current.perItem !== null
-                            ? g.current.perItem * n
-                            : (g.current.fees[n] ?? null),
-                        )}
-                      </td>
-                    ))}
-                    <td>
-                      <button
-                        onClick={() =>
-                          setEditing({
-                            id: g.id,
-                            rule: editableShippingRule(g.current),
-                          })
-                        }
+                      >이름 수정</Button>
+                      <Button size="compact"
+                        onClick={() => {
+                          const initial = editableShippingRule(g.current);
+                          setInitialEditing(structuredClone(initial));
+                          setEditing({ id: g.id, rule: initial });
+                        }}
                       >
                         운임 수정
-                      </button>
-                      <button className="danger" onClick={() => setDeleting(g.id)}>
+                      </Button>
+                      <Button size="compact" variant="danger" onClick={() => setDeleting(g.id)}>
                         삭제
-                      </button>
-                      <button
+                      </Button>
+                      <Button size="compact"
                         onClick={async () => {
                           if (
                             await confirmAction(
@@ -469,18 +549,19 @@ export function ShippingManager({
                         }}
                       >
                         기준 변경
-                      </button>
+                      </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}
             </tbody>
-          </table>
+          </ManagementTable>
         </section>
       )}
       {tab === "history" && (
         <section className="shipping-card shipping-rates">
           <h3>확인된 배송 조합</h3>
-          <table>
+          <ManagementTable>
             <thead>
               <tr>
                 <th>조합</th>
@@ -551,9 +632,9 @@ export function ShippingManager({
                   </tr>
                 ))}
             </tbody>
-          </table>
+          </ManagementTable>
           {!shipping.combinations.length && (
-            <p className="empty">실제 배송 완료 후 검증한 운임 조합이 여기에 표시됩니다.</p>
+            <EmptyState compact title="실제 배송 완료 후 검증한 운임 조합이 여기에 표시됩니다." />
           )}
           <h3>이전 그룹 운임 기준</h3>
           {shipping.groups
@@ -622,14 +703,15 @@ export function ShippingManager({
       {editing && (
         <Modal
           title="배송 그룹 운임 수정"
+          dirty={editingDirty}
           onClose={() => {
-            if (!busy) setEditing(undefined);
+            if (!busy) void closeEditing();
           }}
         >
-          <h3>{shipping.groups.find((g) => g.id === editing.id)?.name} 운임</h3>
-          <p className="muted">
-            미확정 운임은 빈칸으로 둡니다. 기존 기준을 바꾸려면 ‘기준 변경’ 후 새 값을 입력하세요.
-          </p>
+          <h3 className="shipping-rates-title">
+            {shipping.groups.find((g) => g.id === editing.id)?.name} 운임
+            <HelpTooltip title="배송 그룹 운임 수정" purpose="선택한 배송 그룹에 적용할 배송비를 등록하거나 수정합니다." steps={["최대 묶음 수량을 선택합니다.", "운임 구간 추가로 확인한 수량만 등록합니다.", "저장 버튼을 눌러 운임을 반영합니다."]} result="그룹에 등록된 상품들이 수정된 운임 기준을 참고할 수 있습니다." caution="확인하지 않은 운임은 빈칸으로 둡니다. 기존 기준을 아예 바꾸려면 기준 변경 작업을 먼저 합니다." />
+          </h3>
           <div className="form-row">
             <label>
               최대 합포장 수량
@@ -653,97 +735,12 @@ export function ShippingManager({
             </label>
           </div>
           {!editing.rule.maxBundle && <p className="muted">최대 묶음 수량을 먼저 선택하세요.</p>}
-          <div className="rate-inputs">
-            {bundleCounts(editing.rule.maxBundle).map((n) => (
-              <label key={n}>
-                {n}개 운임
-                <input
-                  aria-label={n + "개 운임"}
-                  inputMode="numeric"
-                  value={editing.rule.fees[n] ?? ""}
-                  onChange={(e) => {
-                    const v = e.target.value === "" ? null : Number(e.target.value);
-                    if (v === null || money.safeParse(v).success)
-                      setEditing({
-                        ...editing,
-                        rule: {
-                          ...editing.rule,
-                          fees: { ...editing.rule.fees, [n]: v },
-                        },
-                      });
-                  }}
-                />
-              </label>
-            ))}
-          </div>
-          <div className="form-row">
-            <Field label="운임 적용 시작일">
-              <input
-                type="date"
-                value={editing.rule.validFrom ?? ""}
-                onChange={(e) =>
-                  setEditing({
-                    ...editing,
-                    rule: {
-                      ...editing.rule,
-                      validFrom: e.target.value || undefined,
-                    },
-                  })
-                }
-              />
-            </Field>
-            <Field label="운임 적용 종료일">
-              <input
-                type="date"
-                value={editing.rule.validUntil ?? ""}
-                onChange={(e) =>
-                  setEditing({
-                    ...editing,
-                    rule: {
-                      ...editing.rule,
-                      validUntil: e.target.value || undefined,
-                    },
-                  })
-                }
-              />
-            </Field>
-          </div>
-          <Field label="운임 적용 기준">
-            <input
-              value={editing.rule.basis ?? ""}
-              onChange={(e) =>
-                setEditing({
-                  ...editing,
-                  rule: { ...editing.rule, basis: e.target.value },
-                })
-              }
-            />
-          </Field>
-          <Field label="실제 합포장 가능 여부">
-            <select
-              value={
-                editing.rule.packable === undefined || editing.rule.packable === null
-                  ? ""
-                  : String(editing.rule.packable)
-              }
-              onChange={(e) =>
-                setEditing({
-                  ...editing,
-                  rule: {
-                    ...editing.rule,
-                    packable: e.target.value === "" ? null : e.target.value === "true",
-                  },
-                })
-              }
-            >
-              <option value="">확인 필요</option>
-              <option value="true">가능</option>
-              <option value="false">불가</option>
-            </select>
-          </Field>
+          <ShippingFeeRanges key={editing.id} rule={editing.rule}
+            onChange={(rule) => setEditing({ ...editing, rule })} />
           <label>
-            비고
+            직원 참고 메모
             <input
+              placeholder="포장할 때 직원이 참고할 사항 (선택)"
               value={editing.rule.notes}
               onChange={(e) =>
                 setEditing({
@@ -753,30 +750,13 @@ export function ShippingManager({
               }
             />
           </label>
-          <button
-            className="primary"
-            disabled={busy}
-            onClick={async () => {
-              const next = structuredClone(shipping),
-                g = next.groups.find((g) => g.id === editing.id)!;
-              g.history.push(g.current);
-              g.current = {
-                ...editing.rule,
-                maxConfirmed: editing.rule.maxBundle !== null,
-                version: crypto.randomUUID(),
-                at: new Date().toISOString(),
-              };
-              if (
-                await save(
-                  { ...state, shipping: next },
-                  "운임표를 저장했습니다. 변경 전 기준은 이력에 보존됩니다.",
-                )
-              )
-                setEditing(undefined);
-            }}
-          >
-            확인한 운임 저장
-          </button>
+          <div className="actions">
+            <button type="button" disabled={busy} onClick={() => void closeEditing()}>닫기</button>
+            <button type="button" className="primary" disabled={busy || !editingDirty}
+              onClick={() => void saveEditedRule()}>
+              확인한 운임 저장
+            </button>
+          </div>
         </Modal>
       )}
     </div>

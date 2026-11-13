@@ -1,36 +1,46 @@
 /* App-wide native top-layer dialogs: uniform dim, native inert/focus trap. */
 .app-modal-layer {
   position: fixed;
-  inset: 0;
+  /* Center inside the visible BANDO HUB region, not behind the always-on-top
+     external KakaoTalk window. HubShell owns this single width token. */
+  inset: 0 0 0 var(--kakao-reserved-width, 0px);
   margin: auto;
   padding: 0;
   border: 0;
   background: transparent;
   color: #eee;
-  width: min(880px, calc(100vw - 36px));
-  max-width: calc(100vw - 36px);
-  max-height: calc(100dvh - 36px);
+  width: min(
+    var(--modal-width),
+    max(0px, calc(100vw - var(--kakao-reserved-width, 0px) - var(--modal-viewport-gutter)))
+  );
+  max-width: max(0px, calc(100vw - var(--kakao-reserved-width, 0px) - var(--modal-viewport-gutter)));
+  max-height: calc(100dvh - var(--modal-viewport-gutter));
   overflow: visible;
-  font: 400 15px/1.6 var(--font-body);
+  font: 400 var(--modal-body-size)/1.5 var(--font-body);
   letter-spacing: normal;
 }
 .app-modal-layer:not([open]) {
   display: none !important;
 }
-.app-modal-layer::backdrop,
-.app-action-dialog::backdrop {
-  background: rgb(0 0 0 / 65%);
+.app-modal-layer::backdrop {
+  background: linear-gradient(
+    to right,
+    transparent 0,
+    transparent var(--kakao-reserved-width, 0px),
+    rgb(0 0 0 / 65%) var(--kakao-reserved-width, 0px),
+    rgb(0 0 0 / 65%) 100%
+  );
 }
 .app-modal-layer > .modal {
   box-sizing: border-box;
   width: 100%;
   max-width: none;
-  max-height: calc(100dvh - 36px);
+  max-height: calc(100dvh - var(--modal-viewport-gutter));
   margin: 0;
   overflow: auto;
   background: #202020;
   color: #eee;
-  padding: 24px;
+  padding: var(--modal-panel-padding);
   border: 1px solid #555;
   border-radius: 10px;
   box-shadow: 0 18px 70px #0009;
@@ -39,11 +49,24 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 16px;
-  margin-bottom: 20px;
+  gap: var(--modal-header-gap);
+  min-height: var(--modal-close-height);
+  margin-bottom: var(--modal-header-gap);
 }
 .app-modal-layer .modal > header h2 {
+  min-width: 0;
   margin: 0;
+  font-family: var(--font-heading);
+  font-size: var(--modal-title-size);
+  font-weight: 650;
+  letter-spacing: 0;
+  line-height: 1.35;
+}
+.app-modal-layer .modal > header > button {
+  flex: 0 0 auto;
+  min-height: var(--modal-close-height);
+  height: var(--modal-close-height);
+  padding: 5px 10px;
 }
 .app-modal-layer button,
 .app-modal-layer input,
@@ -51,6 +74,22 @@
 .app-modal-layer textarea {
   font: inherit;
   letter-spacing: normal;
+}
+.app-modal-layer .modal-fields {
+  /* This must be a real flex item, not the legacy display:contents fieldset.
+     Product and client editors override the scroll owner for their fixed footers. */
+  display: block;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  max-width: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+}
+.app-modal-layer .modal-fields :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+  box-sizing: border-box;
+  max-width: 100%;
 }
 .app-modal-layer textarea {
   width: 100%;
@@ -66,10 +105,6 @@
   overflow-wrap: anywhere;
   max-height: 320px;
   overflow: auto;
-}
-.app-action-dialog {
-  left: 50%;
-  width: min(560px, calc(100vw - 36px));
 }
 .receipt-client {
   padding: 4px 0 12px;

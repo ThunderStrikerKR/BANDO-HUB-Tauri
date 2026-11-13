@@ -19,6 +19,34 @@ fn is_confirmed(order: &Value) -> bool {
     order.get("confirmedAt").and_then(Value::as_str).is_some_and(|s| !s.is_empty())
 }
 
+/// A working-copy correction must match the change actually persisted.
+/// The immutable customer-supplied original remains in order.raw and receipt.original.
+fn validate_new_correction(old: &Value, next: &Value, correction: &Value) -> Result<(), String> {
+    identifier(correction, "정정")?;
+    let before = old["analysisRaw"].as_str().or_else(|| old["raw"].as_str())
+        .ok_or("정정 이전 작업용 원문이 없습니다.")?;
+    let after = next["analysisRaw"].as_str()
+        .ok_or("정정 이후 작업용 원문이 없습니다.")?;
+    if before == after
+        || correction["before"].as_str() != Some(before)
+        || correction["after"].as_str() != Some(after)
+    {
+        return Err("접수 정정의 전후 원문이 실제 변경과 일치하지 않습니다.".into());
+    }
+    for key in ["at", "actor", "reason"] {
+        if !correction[key].as_str().is_some_and(|s| !s.trim().is_empty()) {
+            return Err("접수 정정에는 시각, 담당자, 사유가 모두 필요합니다.".into());
+        }
+    }
+    if !list(correction, "affectedRecipientIds").iter()
+        .all(|id| id.as_str().is_some_and(|s| !s.trim().is_empty()))
+        || list(correction, "affectedRecipientIds").is_empty()
+    {
+        return Err("접수 정정의 영향받은 배송 건을 확인하세요.".into());
+    }
+    Ok(())
+}
+
 fn valid_new_order(order: &Value, next: &Value) -> Result<(), String> {
     let id = identifier(order, "주문")?;
     if order["receptionVersion"].as_u64() != Some(1) {
@@ -94,11 +122,19 @@ fn valid_new_order(order: &Value, next: &Value) -> Result<(), String> {
 pub(crate) fn validate_reception(previous: &Value, next: &Value) -> Result<(), String> {
     let previous_orders: HashMap<&str, &Value> = list(previous, "orders").iter()
         .filter_map(|o| o["id"].as_str().map(|id| (id, o))).collect();
+    // Detect duplicate IDs before any other per-order validation. A malformed
+    // first row must not hide a duplicate ID in the same incoming snapshot.
     let mut seen = HashSet::new();
     for order in list(next, "orders") {
         let id = identifier(order, "주문")?;
         if !seen.insert(id) { return Err("주문 ID가 중복되었습니다.".into()); }
+    }
+    for order in list(next, "orders") {
+        let id = identifier(order, "주문")?;
         if let Some(old) = previous_orders.get(id) {
+            if !is_confirmed(old) && is_confirmed(order) {
+                valid_new_order(order, next)?;
+            }
             if is_confirmed(old) {
                 if old["confirmedAt"] != order["confirmedAt"]
                     || old["raw"] != order["raw"]
@@ -116,8 +152,24 @@ pub(crate) fn validate_reception(previous: &Value, next: &Value) -> Result<(), S
                 || old_corrections.iter().zip(new_corrections).any(|(a,b)| a != b) {
                 return Err("이미 등록한 접수 원문 정정 이력은 변경하거나 삭제할 수 없습니다.".into());
             }
+            if !is_confirmed(order) &&
+                (old["receipt"] != order["receipt"] || new_corrections.len() != old_corrections.len()) {
+                return Err("확정 전 초안은 원문 감사 기록을 저장할 수 없습니다.".into());
+            }
+            if new_corrections.len() > old_corrections.len() {
+                if !is_confirmed(old) || !is_confirmed(order) ||
+                    new_corrections.len() != old_corrections.len() + 1 {
+                    return Err("접수 원문 정정은 확정 주문에서 한 건씩 등록하세요.".into());
+                }
+                validate_new_correction(old, order, &new_corrections[old_corrections.len()])?;
+            } else if is_confirmed(old) && old["analysisRaw"] != order["analysisRaw"] {
+                return Err("정정 이력 없이 작업용 원문을 변경할 수 없습니다.".into());
+            }
         } else {
             valid_new_order(order, next)?;
+            if !list(order, "rawCorrections").is_empty() {
+                return Err("최초 주문 확정과 원문 정정은 분리해서 저장하세요.".into());
+            }
         }
     }
     // A confirmed order can be soft-deleted; it must not silently disappear.
@@ -134,14 +186,23 @@ pub(crate) fn new_archive_entries(previous: &Value, next: &Value) -> Result<Vec<
     let prev: HashMap<&str, &Value> = list(previous, "orders").iter()
         .filter_map(|o| o["id"].as_str().map(|id| (id, o))).collect();
     let mut archive = Vec::new();
+    let mut new_ids = HashSet::new();
+    let historical_ids: HashSet<&str> = list(previous, "orders").iter()
+        .flat_map(|o| list(o, "rawCorrections"))
+        .filter_map(|c| c["id"].as_str()).collect();
     for order in list(next, "orders") {
         let id = identifier(order, "주문")?;
-        if !prev.contains_key(id) && is_confirmed(order) {
+        if is_confirmed(order) && prev.get(id).is_none_or(|old| !is_confirmed(old)) {
             archive.push((format!("receipt:{id}"), id.to_owned(), order["receipt"].clone()));
         }
         let previous_len = prev.get(id).map(|o| list(o, "rawCorrections").len()).unwrap_or(0);
+        // Draft analysis never produces permanent audit entries.
+        if !is_confirmed(order) { continue; }
         for correction in list(order, "rawCorrections").iter().skip(previous_len) {
             let cid = identifier(correction, "정정")?;
+            if historical_ids.contains(cid) || !new_ids.insert(cid) {
+                return Err("접수 정정 ID가 다른 기록과 중복됩니다.".into());
+            }
             archive.push((format!("correction:{cid}"), id.to_owned(), correction.clone()));
         }
     }
@@ -195,6 +256,54 @@ mod tests {
         assert_eq!(audit.len(),1);
         assert_eq!(audit[0].0,"receipt:order-1");
         assert_eq!(audit[0].2["original"],"709B 2개");
+    }
+    #[test]
+    fn draft_to_confirmed_receipt_is_archived_once() {
+        let mut before=base();
+        before["orders"] = json!([{"id":"a","raw":"초안","receptionVersion":1}]);
+        let mut after=before.clone();
+        after["orders"][0]["confirmedAt"] = json!("2026-11-07T08:00:00Z");
+        after["orders"][0]["receipt"] = json!({"original":"초안","at":"2026-11-07T08:00:00Z"});
+        let entries=new_archive_entries(&before,&after).unwrap();
+        assert_eq!(entries.len(),1);
+        assert_eq!(entries[0].0,"receipt:a");
+        assert_eq!(new_archive_entries(&after,&after).unwrap().len(),0);
+    }
+    #[test]
+    fn draft_corrections_cannot_enter_permanent_archive() {
+        let before=base(); let mut after=base();
+        after["orders"] = json!([{"id":"draft","rawCorrections":[{"id":"c1","after":"임시"}]}]);
+        assert!(new_archive_entries(&before,&after).unwrap().is_empty());
+        let mut next=after.clone();
+        next["orders"][0]["rawCorrections"].as_array_mut().unwrap()
+            .push(json!({"id":"c2","after":"변경"}));
+        assert!(validate_reception(&after,&next).unwrap_err().contains("초안"));
+    }
+    #[test]
+    fn confirmed_working_raw_requires_matching_one_step_audit() {
+        let mut before=base();
+        before["orders"] = json!([{"id":"a","confirmedAt":"t","raw":"원본",
+            "analysisRaw":"수정 전","receipt":{"original":"원본"},
+            "confirmationSnapshot":{"at":"t"},"rawCorrections":[]}]);
+        let mut after=before.clone();
+        after["orders"][0]["analysisRaw"]=json!("수정 후");
+        assert!(validate_reception(&before,&after).unwrap_err().contains("정정 이력"));
+        after["orders"][0]["rawCorrections"]=json!([{"id":"correction-1","at":"2026-11-07T08:00:00Z",
+            "actor":"직원","reason":"잘못 입력된 모델 정정","before":"수정 전","after":"수정 후",
+            "affectedRecipientIds":["recipient"]}]);
+        assert!(validate_reception(&before,&after).is_ok());
+        after["orders"][0]["rawCorrections"][0]["before"]=json!("위조한 원문");
+        assert!(validate_reception(&before,&after).unwrap_err().contains("전후 원문"));
+    }
+    #[test]
+    fn duplicate_new_correction_ids_are_rejected() {
+        let mut before=base();
+        before["orders"]=json!([{"id":"a","confirmedAt":"t"},{"id":"b","confirmedAt":"t"}]);
+        let mut after=before.clone();
+        for order in after["orders"].as_array_mut().unwrap() {
+            order["rawCorrections"]=json!([{"id":"same","after":"수정"}]);
+        }
+        assert!(new_archive_entries(&before,&after).unwrap_err().contains("중복"));
     }
     #[test]
     fn archive_new_correction_only() {

@@ -13,13 +13,14 @@ import {
 import type { StaffBlock } from "../hub-messages";
 import { hubMessages } from "../hub-messages";
 import { addressParts, mergeParsedItem, parseEvidence } from "../parser";
-import { registeredProducts, sortProducts, variantLabel } from "../product-models";
+import { registeredProducts, sortProducts } from "../product-models";
 import { billingSnapshot } from "../replies";
 import type { NoticeSink } from "../shared/notices";
 import { recommendShipping } from "../shipping";
 import type { Item, Order, Product, State } from "../types";
 import { clone } from "../ui";
 import { pendingIssue } from "../validation";
+import { shouldRefreshUncommittedOrderPricing } from "./passive-pricing";
 import { matchingRecipient, rebindEvidence } from "../order-evidence";
 import { groupMessages, groupShipments, reconcileWorkflow } from "../workflow";
 type SaveMode = "save" | "notify" | "pay" | "queue" | "wait";
@@ -40,6 +41,10 @@ export type OrderDeskProps = {
   onSelectWorkflow: (s: WorkflowSelection) => void;
   onWorkflowSave: (s: State) => Promise<void>;
   state: State;
+  // HubWorkspace may supply a preview state containing unsaved orders.
+  // Use the authoritative persisted order set when deciding whether this
+  // record is a new reception that may track current master prices.
+  persistedOrders?: readonly Pick<Order, "id">[];
   draft: Order;
   onChange: (next: Order | ((previous: Order) => Order)) => void;
   onSave: (mode: SaveMode) => Promise<void>;
@@ -51,6 +56,7 @@ export type OrderDeskProps = {
 };
 export function useOrderDesk({
   state,
+  persistedOrders,
   draft,
   onChange,
   onSave,
@@ -113,7 +119,11 @@ export function useOrderDesk({
   const generated = activeGroupId
     ? groupMessages(flowState, activeGroupId, links)
     : hubMessages(draft, state, undefined, links);
-  const saved = state.orders.some((o) => o.id === draft.id),
+  const persisted = persistedOrders ?? state.orders;
+  const saved = persisted.some((o) => o.id === draft.id),
+    // Saved orders retain historical prices even when their preview state
+    // contains a revised product/shipping master.
+    passivePricingAllowed = shouldRefreshUncommittedOrderPricing(draft, persisted),
     exported = draft.status === "EXPORTED" || activeShipment?.transferred === true;
   useEffect(() => {
     if (viewMode === "details" && highlight)
@@ -130,9 +140,11 @@ export function useOrderDesk({
     if (viewMode !== "details") onRawEditDirty?.(rawEditing && source !== draft.raw);
   }, [rawEditing, source, draft.raw, viewMode, onRawEditDirty]);
   useEffect(() => {
-    if (!liveClient) return;
+    if (!liveClient || !passivePricingAllowed) return;
     onChange((previous) => {
-      if (previous.pricesLocked) return previous;
+      // Check the latest draft too: a save may complete between scheduling
+      // the effect and running its state-updater callback.
+      if (!shouldRefreshUncommittedOrderPricing(previous, persisted)) return previous;
       const next = repriceOrder(previous, liveClient, state);
       for (const r of next.recipients)
         if (
@@ -147,10 +159,14 @@ export function useOrderDesk({
       if (JSON.stringify(previous.recipients) === JSON.stringify(next.recipients)) return previous;
       return next;
     });
-  }, [state.products, liveClient?.id, liveClient?.tier, JSON.stringify(liveClient?.overrides)]);
+  }, [state.products, liveClient?.id, liveClient?.tier, JSON.stringify(liveClient?.overrides), passivePricingAllowed]);
   useEffect(() => {
+    if (!passivePricingAllowed) return;
     onChange((previous) => {
-      if (previous.pricesLocked || previous.shippingMode === "MANUAL") return previous;
+      if (!shouldRefreshUncommittedOrderPricing(previous, persisted) ||
+          previous.shippingMode === "MANUAL" ||
+          !previous.recipients.some((recipient) => recipient.items.length > 0))
+        return previous;
       const result = recommendShipping(previous, state),
         fee = liveClient?.shippingFeeExcluded ? 0 : result.total;
       if (previous.shippingFee === fee && previous.shippingVersion === result.version)
@@ -162,7 +178,7 @@ export function useOrderDesk({
         shippingMode: "AUTO",
       };
     });
-  }, [state.shipping, state.products, draft.recipients, liveClient?.shippingFeeExcluded]);
+  }, [state.shipping, state.products, draft.recipients, liveClient?.shippingFeeExcluded, passivePricingAllowed]);
   useEffect(() => {
     if (
       viewMode === "details" ||
@@ -352,15 +368,11 @@ export function useOrderDesk({
           (b.kind === "APPLIED" ? " × " + item?.quantity : "") +
           (item?.recognitionReason ? " / " + item.recognitionReason : ""),
         choices:
-          b.kind === "OPTION" && item
-            ? products
-                .find((p) => p.id === item.productId)
-                ?.variants.map((v) => ({ label: variantLabel(v), value: v.id }))
-            : b.kind.startsWith("CANDIDATE_")
-              ? r?.candidates
-                  ?.filter((c) => c.field === b.kind.slice(10))
-                  .map((c) => ({ label: c.label, value: c.value }))
-              : undefined,
+          b.kind.startsWith("CANDIDATE_")
+            ? r?.candidates
+                ?.filter((c) => c.field === b.kind.slice(10))
+                .map((c) => ({ label: c.label, value: c.value }))
+            : undefined,
       };
     });
   const question = (b: StaffBlock) => {
@@ -381,8 +393,9 @@ export function useOrderDesk({
       onManual?.();
       return;
     }
-    if (block.kind === "ITEM" && block.recipientId) {
-      setProductSearch({ rid: block.recipientId });
+    if ((block.kind === "ITEM" || block.kind === "OPTION") && block.recipientId) {
+      // A configuration is a standalone product, never a secondary dropdown selection.
+      setProductSearch({ rid: block.recipientId, iid: block.itemId });
       return;
     }
     if (exported && block.itemId) {
@@ -476,6 +489,12 @@ export function useOrderDesk({
     );
   }
   const chooseProduct = (rid: string, p: Product, iid?: string) => {
+    if (p.variants.length !== 1 || p.requiresOption) {
+      onNotice(p.requiresOption
+        ? "상품 구성이 미확정입니다. 판매 구성을 확인한 뒤 독립 상품으로 등록하세요."
+        : "상품 가격 기록이 정확히 하나가 아닙니다. 상품 데이터를 확인하세요.", "error");
+      return;
+    }
     if (iid)
       itemEdit(rid, iid, (item) => {
         const proposal = !item.productId || !!item.modelProposal?.required;
@@ -488,7 +507,7 @@ export function useOrderDesk({
         Object.assign(item, itemFromProduct(p, pricingClient, undefined, item.quantity), old, {
           manuallyConfirmed: true,
         });
-        item.match = { kind: "CODE", term: p.code, productIds: [p.id] };
+        item.match = { kind: "NAME", term: p.name, productIds: [p.id] };
         item.temporary = false;
         delete item.pendingAlias;
         if (proposal) {

@@ -339,19 +339,31 @@ export function WorkflowBoard({
               </div>
             )}
             <div className="flow-fixed-summary">
-              <span>배송 {ss.length}건</span>
-              <span>입금 예정 {won(groupTotals(state, g.id).total)}</span>
-              <span>
-                {first.order.recipients.some((r) => shipmentVat(first.order, r))
-                  ? "부가세 적용"
-                  : "부가세 미추가"}
-              </span>
-              <span>
-                운임{" "}
-                {ss.every((s) => shipmentTotals(state, s).shipping !== null)
-                  ? won(ss.reduce((sum, s) => sum + shipmentTotals(state, s).shipping!, 0))
-                  : "확인 필요"}
-              </span>
+              <div className="flow-summary-line">
+                <span>배송 {ss.length}건</span>
+                <span>
+                  총 운임{" "}
+                  {ss.every((s) => shipmentTotals(state, s).shipping !== null)
+                    ? won(ss.reduce((sum, s) => sum + shipmentTotals(state, s).shipping!, 0))
+                    : "확인 필요"}
+                </span>
+              </div>
+              <div className="flow-summary-line">
+                <span>입금 예정 {won(groupTotals(state, g.id).total)}</span>
+                <span>
+                  {ss.every((s) => {
+                    const { order, recipient } = shipmentContext(state, s);
+                    return shipmentVat(order, recipient);
+                  })
+                    ? "부가세 포함"
+                    : ss.some((s) => {
+                      const { order, recipient } = shipmentContext(state, s);
+                      return shipmentVat(order, recipient);
+                    })
+                      ? "부가세 포함/별도"
+                      : "부가세 별도"}
+                </span>
+              </div>
             </div>
             {(g.needsNotice || ss.some((s) => s.rechecks?.some((c) => !c.resolvedAt))) && (
               <div className="flow-recheck">
@@ -434,7 +446,7 @@ export function WorkflowBoard({
                       </span>
                       <span className="shipment-freight">
                         {shipmentFreightCode(shipmentContext(state, s).order, recipient) === "020"
-                          ? "후불"
+                          ? "착불"
                           : shipmentTotals(state, s).shipping === null
                             ? "확인 필요"
                             : won(shipmentTotals(state, s).shipping)}
