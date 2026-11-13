@@ -59,7 +59,7 @@ export function ProductFreightPanel({
       })
     ).ok;
   const writeRule = async (): Promise<boolean> => {
-    if (!editing) return true;
+    if (!editing || !editingDirty) return true;
     const next = clone(state),
       shipping = next.shipping!;
     if (Object.entries(editing.rule.fees).some(([count, amount]) =>

@@ -129,7 +129,12 @@ export function ColorGuidanceManager({state,onRefresh,query="",onQueryChange}: {
         {rows.filter(g=>!query.trim()||(g.name+" "+g.productIds.map(id=>
           draft.products.find(p=>p.id===id)?.name??"").join(" ")).toLocaleLowerCase()
             .includes(query.trim().toLocaleLowerCase())).map(g=>
-          <button type="button" key={g.id} onClick={()=>{setSelected(g.id);setSearch("");}}
+          <button type="button" key={g.id} onClick={()=>void (async()=>{
+            if (g.id===activeId) return;
+            const leave=await requestEditorLeave(leaveGuard,setStatus);
+            if (!leave.proceed) return;
+            setSelected(g.id);setSearch("");setStatus("");
+          })()}
             className={"family-list-row"+(activeId===g.id?" selected":"")}>
             <span><strong>{g.name}</strong><small>대표모델: {draft.products.find(p=>p.id===g.representativeProductId)?.name ?? (g.representativeColor ? "이전 대표색상 " + colorLabel(g.representativeColor) + " / 대표모델 재지정 필요" : "미지정")}</small></span>
             <span className="family-member-count">{g.productIds.length}개 상품</span>

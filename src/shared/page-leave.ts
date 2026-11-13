@@ -36,11 +36,12 @@ export async function requestEditorLeave(
   guard: PageLeaveGuard,
   onError: (message: string) => void,
 ): Promise<{ proceed: boolean; handled: boolean }> {
-  if (!guard.hasChanges()) return { proceed: true, handled: false };
+  // Even a clean draft cannot close while its successful write is in flight.
   if (guard.busy?.()) {
     onError("현재 작업의 저장이 끝난 뒤 이동할 수 있습니다.");
     return { proceed: false, handled: false };
   }
+  if (!guard.hasChanges()) return { proceed: true, handled: false };
   const choice = await askSaveChanges(
     (guard.label ? guard.label + "에 " : "현재 화면에 ") +
     "저장하지 않은 변경사항이 있습니다. 어떻게 할까요?",

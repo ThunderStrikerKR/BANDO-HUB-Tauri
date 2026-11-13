@@ -49,9 +49,20 @@ export function CategoryManager({
     [...descendants(cats, c.id)].some((id) =>
       cats.find((item) => item.id === id)?.name.toLocaleLowerCase().includes(q),
     );
-  const select = (c: Category) => {
+  const select = async (c: Category): Promise<boolean> => {
+    if (selected === c.id) return true;
+    const leave = await requestEditorLeave({
+      label: "카테고리",
+      hasChanges: () => hasUnsaved,
+      busy: () => busy,
+      save: saveChanges,
+      discard,
+    }, (message) => onNotice(message, "error"));
+    if (!leave.proceed) return false;
+    setEditorOpen(false);
     setSelected(c.id);
     setName(c.name);
+    return true;
   };
   const save = async (next: State, success: string): Promise<boolean> => {
     setBusy(true);
@@ -162,12 +173,12 @@ export function CategoryManager({
           className={"catalog-map-row" + (selected === c.id ? " selected" : "") + (isCatalogRoot(c.id) ? " root" : "")}
           style={{ paddingLeft: 17 + depth * 24 }}
           aria-label={`${c.name}, 하위 포함 상품 ${categoryCount(c.id)}개`}
-          onClick={() => {
-            select(c);
+          onClick={() => void (async () => {
+            if (!(await select(c))) return;
             if (branches.length && !q) {
               setExpanded((old) => old.includes(c.id) ? old.filter((id) => id !== c.id) : [...old, c.id]);
             }
-          }}
+          })()}
         >
           <span className="catalog-map-indicator" aria-hidden="true">{branches.length ? (open ? "⌄" : "›") : ""}</span>
           <span className="catalog-map-name">{c.name}</span>
@@ -284,7 +295,7 @@ export function CategoryManager({
                       current.parentId,
                     ),
                     "분류 이름을 변경했습니다.",
-                  )
+                  ).then((ok) => { if (ok) setEditorOpen(false); })
                 }
               >
                 변경사항 저장
@@ -350,9 +361,11 @@ export function CategoryManager({
                     } catch (error) { onNotice(String(error), "error"); }
                   } else {
                     void (async () => {
-                      await save(deleteCategory(base, current.id), "빈 분류를 삭제했습니다.");
-                      setSelected(current.parentId ?? CATALOG_ROOTS[0].id);
-                      setEditorOpen(false);
+                      const ok = await save(deleteCategory(base, current.id), "빈 분류를 삭제했습니다.");
+                      if (ok) {
+                        setSelected(current.parentId ?? CATALOG_ROOTS[0].id);
+                        setEditorOpen(false);
+                      }
                     })();
                   }
                 }}

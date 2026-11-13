@@ -66,7 +66,7 @@ export function PriceCell({
         data-price-cell
         inputMode="numeric"
         readOnly={!enabled}
-        title={enabled ? "0 입력 시 미등록 / Enter 저장 / Esc 취소" : "가격 수정 모드를 켜세요"}
+        title={enabled ? "Enter 저장 / Esc 취소 / 다른 곳 클릭 시 미저장 입력 폐기 (0은 미등록)" : "가격 수정 모드를 켜세요"}
         value={editing ? draft : value ? value.toLocaleString("ko-KR") : ""}
         placeholder="미등록"
         onFocus={(e) => {
@@ -85,12 +85,19 @@ export function PriceCell({
             setError("");
           }
         }}
-        onBlur={() => void save()}
+        onBlur={() => {
+          // Focus changes are not permission to write a product price.
+          if (saving.current || !editing) return;
+          setDraft(value ? String(value) : "");
+          setEditing(false);
+          setError("");
+          setStatus("");
+        }}
         onKeyDown={(e) => {
           if (!enabled) return;
           if (e.key === "Enter") {
             e.preventDefault();
-            input.current?.blur();
+            void save();
           }
           if (e.key === "Escape") {
             cancelled.current = true;

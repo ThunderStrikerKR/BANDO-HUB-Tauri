@@ -401,9 +401,9 @@ export function ShippingManager({
               )}
             </span>
             <div>
-              <button disabled={!changes.length || busy} onClick={() => setPending({})}>
-                변경 취소
-              </button>
+              {changes.length > 0 && <button disabled={busy} onClick={() => setPending({})}>
+                미저장 변경 초기화
+              </button>}
               <button
                 className="primary"
                 disabled={!changes.length || busy}

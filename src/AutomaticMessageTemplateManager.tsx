@@ -130,9 +130,7 @@ export function AutomaticMessageTemplateManager({
       <footer className="family-editor-footer">
         <span role="status" className="muted">{status||(dirty?"저장하지 않은 변경사항 있음":"변경사항 없음")}</span>
         <div className="family-footer-actions">
-          <button type="button" disabled={!dirty||busy} onClick={()=>{
-            setDraft(structuredClone(baseline));setStatus("");
-          }}>변경 취소</button>
+
           <button type="button" className="primary" disabled={!dirty||busy} onClick={()=>void save()}>
             {busy?"저장 중":"변경사항 저장"}
           </button>
