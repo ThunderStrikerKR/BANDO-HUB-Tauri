@@ -1058,6 +1058,12 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
                             product_source["start"]=json!(utf16(raw,start));
                             product_source["end"]=json!(utf16(raw,finish));
                             product_source["text"]=json!(&hit.raw[begin..end]);
+                            // TS analyzes product NameEvidence once and
+                            // exposes the same narrowed source span in both
+                            // Item.sources and the top-level evidence list.
+                            // Previously Rust narrowed only Item.sources.
+                            events[hit.evidence].start=start;
+                            events[hit.evidence].end=finish;
                         }
                     }
                 }
