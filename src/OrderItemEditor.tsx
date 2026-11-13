@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { confirmDiscardDraft } from "./shared/editor-flow";
 import { Modal } from "./ui";
 import { itemFromProduct } from "./domain";
@@ -58,7 +58,8 @@ export function OrderItemEditor({
       query, clientId: client.id, excludeDemo: true,
     }, [query, client.id],
   );
-  const results = matchedProducts.slice(0, 100);
+  // Stable result identity prevents duplicate price lookups on every render.
+  const results = useMemo(() => matchedProducts.slice(0, 100), [matchedProducts]);
 
   const clientQuoteSignature = JSON.stringify(client);
   useEffect(() => {
