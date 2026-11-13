@@ -409,8 +409,14 @@ pub(super) fn apply(payload:&Value)->Result<Value,String> {
             }
             if next==1 && field(&state["orders"][oi],"receptionVersion").as_i64()==Some(1)
                 && !has_value(field(&state["orders"][oi],"confirmedAt")) {
-                let sender=payload.get("sender").or_else(||state["orders"][oi].get("senderSnapshot"))
-                    .ok_or("최초 주문 확인에 필요한 송하인 정보를 입력하세요.")?.clone();
+                // The source TS uses senderFor(order,state) during first confirmation.
+                // Rust already owns an equivalent sender_for rule, including
+                // explicitly supplied sender lines in the source document.
+                let sender=payload.get("sender")
+                    .filter(|s|!s.is_null())
+                    .cloned()
+                    .unwrap_or_else(||super::reconciliation::sender_for(
+                        &state,&state["orders"][oi]));
                 let order=&mut state["orders"][oi];
                 // Preserve the explicit staff-to-source product selection
                 // before capturing the immutable first-receipt snapshot.

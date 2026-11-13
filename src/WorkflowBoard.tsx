@@ -9,18 +9,14 @@ import type { State } from "./types";
 import { Field, Modal } from "./ui";
 import { blocking, orderIssues } from "./validation";
 import {
-  advanceGroup,
-  confirmGroupPayment,
   groupShipments,
   groupStep,
   groupTotals,
   paymentBalance,
-  processGroup,
   shipmentContext,
   shipmentFreightCode,
   shipmentTotals,
   shipmentVat,
-  undoGroup,
   workflowIssues,
 } from "./workflow";
 export interface WorkflowSelection {
@@ -136,13 +132,13 @@ export function WorkflowBoard({
     }, 100);
     return () => clearInterval(timer);
   }, [latestDeadline]);
-  const run = async (fn: () => State, stageGroupId?: string) => {
+  const run = async (fn: () => Promise<State> | State, stageGroupId?: string) => {
     if (inFlight.current || (stageGroupId && (stageDeadlines[stageGroupId] ?? 0) > Date.now()))
       return;
     inFlight.current = true;
     setBusy(true);
     try {
-      await onSave(fn());
+      await onSave(await fn());
       if (stageGroupId) {
         const at = Date.now();
         setDeadlines((previous) => ({
@@ -313,12 +309,15 @@ export function WorkflowBoard({
                     )
                       return;
                     void run(
-                      () =>
+                      () => nativeApplyWorkflowAction(
+                        actionState(g.id),
                         step === 4 && !g.needsNotice
-                          ? processGroup(actionState(g.id), g.id)
+                          ? "process_group"
                           : step === 3 && !g.needsNotice
-                            ? confirmGroupPayment(actionState(g.id), g.id)
-                            : advanceGroup(actionState(g.id), g.id),
+                            ? "confirm_group_payment"
+                            : "advance_group",
+                        { groupId: g.id },
+                      ),
                       g.id,
                     );
                   }}
@@ -330,7 +329,8 @@ export function WorkflowBoard({
                   disabled={busy || step === 0 || ss.some((s) => s.transferred)}
                   title="이전 단계 취소"
                   aria-label="이전 단계 취소"
-                  onClick={() => void run(() => undoGroup(actionState(g.id), g.id))}
+                  onClick={() => void run(() =>
+                    nativeApplyWorkflowAction(actionState(g.id), "undo_group", { groupId: g.id }))}
                 >
                   ↶
                 </button>
