@@ -321,13 +321,16 @@ test("report screens keep live read-only views while Excel export buttons are de
   const bridge=read("src/tauri-bridge.ts");
   assert.match(app,/<DailySettlement state=\{state\}/);
   assert.match(daily,/businessCoreCall<DailySettlementReport>\("output", "prepare_settlement"/);
-  assert.match(daily,/const historyRows = orderHistory\(state, "", date\)/);
+  assert.match(daily, /"rules", "list_order_history"/);
+  assert.match(daily, /"output", "prepare_settlement"/);
+  assert.doesNotMatch(daily, /[^A-Za-z]orderHistory\(state, "", date\)/);
   assert.match(daily,/requestId\.current === id/);
   // Keep actual daily settlement and order-history queries, filters and warnings.
   assert.match(daily, /report\.orderRows\.map/);
   assert.match(daily, /report\.paymentRows\.map/);
   assert.match(daily, /report\.warnings\.map/);
-  assert.match(history, /orderHistory\(state, query, date\)/);
+  assert.match(history, /"rules", "list_order_history"/);
+  assert.doesNotMatch(history, /[^A-Za-z]orderHistory\(state, query, date\)/);
   assert.match(history, /value=\{query\} onChange=\{onQuery\}/);
   assert.doesNotMatch(history, /주문 열기|onOpen\(row\.order\)/);
   assert.match(history, /trackingMessage\(state, row\.order\.id\)/);
