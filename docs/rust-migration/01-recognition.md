@@ -100,12 +100,12 @@
 - [x] 실제 20건 원본 fixture를 참조하는 Rust 테스트 작성
 - [x] 독점 브랜치 소스 커밋
 - [x] Rust 컴파일 성공 (GitHub Actions, `61dc08d4`; 회귀 테스트는 미통과)
-- [ ] 20건 Rust 회귀 실측 및 회귀 없음 입증
+- [x] 20건 Rust 회귀 실측: 원본 발주서 표본 20건 모두 합격 (커밋 f49015be / CI 43356394941)
 - [ ] TS 결과/신규 오류 비교
 - [ ] JSON 스키마/기존 React 연결 실측
 - [ ] Windows/Tauri 최종 통합(세션 3)
 
-**결론: 작업 중이며 완료 판정 불가.**
+**최신 상태는 문서 최하단 재이식 검증 결과 참조. 독립 테스트 통과와 TypeScript 전 필드 동등성 및 Windows 통합은 구분한다.**
 
 ## 2026-11-13 추가 검증 기록 (CI 소스 수정 이후)
 
@@ -160,3 +160,18 @@
 6. 테스트 통과한 6건에서도 모든 상품 ID, 색상, 상세주소, 오프셋까지 검증하는 것은 아님. 이후 구체 필드 기대값을 추가해 계약 검사를 강화할 것.
 
 **중요:** 이번 작업에서는 테스트 실행 및 원인 조사만 수행했고, 위 코드 결함은 아직 수정하지 않았다. Rust 독립 테스트 컴파일 가능과 업무 회귀 통과를 혼동하지 말 것. React/Tauri/Windows 전체 통합 검증은 별도 필요.
+
+
+## 2026-11-13 최종: TypeScript 원본 기준 Rust 인식 로직 재이식 및 CI 실측
+
+- 재이식 소스 기준선: src/parser.ts (person, logicalLines, parseLegacy, reanalyzeWithAliases), src/order-evidence.ts (analyzeEvidence, matchingRecipient), src/product-name-match.ts. TypeScript 파일/테스트 원본은 변경하지 않음.
+- Rust 모듈: src-tauri/src/business_core/recognition/ts_semantics.rs (원본에서 파생한 처리 조건 및 함수), mod.rs (문서 근거 수집과 수취인/상품 귀속, 다중행 주소와 메모, 재분석), model.rs (기존 상품 매칭).
+- 명시적으로 이전하여 검증한 규칙: 거래처 문서의 금액/헤더 및 연락처 제외, 수취인/기관과 배송 요청 문구 분리, 주소 앞 모델/수량 우선순위, 원본 표 문자열을 재조합하지 않는 수량·상품 근거 추출, 전화번호-주소 혼입 방지, 두 배송건의 상품 귀속, 괄호 메모, 들여쓰기 상세주소, 단일 수취인 근거 기반 직원 확정값 연결, 수동 분류 false와 true 구분.
+- 테스트: tests/rust-migration/recognition/src/lib.rs가 기존 tests/audit-20-order-samples.test.mjs의 20건 원문과 기대 배송건/수량을 재사용. 13번 SSB와 705의 서로 다른 배송건 귀속, 19/20번 모든 근거의 실제 UTF-16 원문 좌표, 동일 원문 재분석, 07/08번 주소와 전화번호 분리, 08번 배송 메모 및 09번 상세주소 연속 행을 추가 검증.
+- **최신 테스트 대상 코드 SHA: f49015bef8fe901ca349054a67b110fffdfb73da.**
+- **GitHub Actions: https://github.com/ThunderStrikerKR/TSBH/actions/runs/43356394941**
+- **Linux 독립 Rust Cargo test: 39개 통과 / 0개 실패**, 컴파일 성공. 그중 **20건 발주서 표본: 20개 통과 / 0개 실패**. 로그에서 39개 테스트 및 20개의 order_XX 통과를 확인함.
+- 이 섹션 이전의 6/20 및 16/20 기록은 이전 커밋의 역사적 실패 내역이며 최신 상태를 뜻하지 않는다.
+- **아직 완료로 보고하면 안 되는 범위:** TypeScript parseEvidence와 Rust analyze_order가 모든 JSON 출력 필드(상품ID, 색상, 모델 후보, 발주서 특수 형식, 가격, note/근거 등)에서 동일한지 양측 엔진을 구동해 비교한 전체 differential test는 미실시. 모델 색상/별칭/브랜드 우선순위와 일부 특수 문서의 완전한 함수 단위 동등성도 미검증. 20건 수량 테스트 통과만으로 전체 알고리즘의 완전 동등성을 주장할 수 없음.
+- Windows Tauri 앱 빌드, UI 연동, 전역 serde_json/regex 의존성 및 주문 워크플로 통합은 세션 3 담당. 이 세션에서는 다른 세션의 파일을 변경하지 않음.
+- 이 섹션과 이후 추가 작업은 반드시 TypeScript 소스 대비 차이를 명시하고, 단순히 기존 Rust 추정 규칙을 기준으로 새 업무 판단을 추가하지 말 것.
