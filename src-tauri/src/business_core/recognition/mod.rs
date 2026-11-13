@@ -669,9 +669,15 @@ fn reanalyze(payload: &Value) -> Result<Value, String> {
     if !old.is_object() { return Err("order must be an object".into()); }
     let state = required_state(payload)?;
     let mut next = old.clone();
-    if old.get("manualClassification").map_or(false, |x|!x.is_null()) {
-        return Ok(next);
-    }
+    // parser.ts::reanalyzeWithAliases only skips automatic parsing when
+    // manualClassification is truthy, not merely present (false is valid).
+    let manually_classified=match old.get("manualClassification") {
+        None|Some(Value::Null)|Some(Value::Bool(false))=>false,
+        Some(Value::Number(n))=>n.as_f64().map_or(false,|n|n!=0.0),
+        Some(Value::String(s))=>!s.is_empty(),
+        _=>true,
+    };
+    if manually_classified {return Ok(next);}
     let raw = old.get("analysisRaw").and_then(Value::as_str)
         .or_else(||old.get("raw").and_then(Value::as_str))
         .ok_or("order needs raw or analysisRaw")?;
@@ -686,28 +692,13 @@ fn reanalyze(payload: &Value) -> Result<Value, String> {
     let mut used=HashSet::<usize>::new();
     let mut recipient_rewrites=HashMap::<String,String>::new();
     let mut item_rewrites=HashMap::<String,String>::new();
+    // order-evidence.ts::matchingRecipient receives the complete original
+    // parsed rows, not partially updated rows from the reanalysis loop.
+    let identity_rows=incoming.clone();
     for row in &mut incoming {
-        // Identity must be unique. Never silently transfer confirmations between
-        // two recipients who happen to have the same name.
-        let matching: Vec<usize> = prior.iter().enumerate().filter_map(|(index,r)|{
-            let old_sources=r["sources"].as_array();
-            let new_sources=row["sources"].as_array();
-            let same_evidence=old_sources.and_then(|old|new_sources.map(|fresh|
-                old.iter().any(|a|fresh.iter().any(|b|
-                    a["field"]==b["field"] && a["start"]==b["start"] &&
-                    a["end"]==b["end"] && a["text"]==b["text"] &&
-                    (a["field"]=="name" || a["field"]=="address")
-                ))
-            )).unwrap_or(false);
-            let names=r["name"].as_str().filter(|x|!x.is_empty())==
-                row["name"].as_str().filter(|x|!x.is_empty());
-            let address=r["address"].as_str().filter(|x|!x.is_empty())==
-                row["address"].as_str().filter(|x|!x.is_empty());
-            ((same_evidence || (names && address)) && !used.contains(&index))
-                .then_some(index)
-        }).collect();
-        if matching.len()!=1 { continue; }
-        let index=matching[0];
+        let Some(index)=ts_semantics::matching_recipient(
+            row,prior,&used,&identity_rows
+        ) else {continue;};
         used.insert(index);
         let old_row=&prior[index];
         if let (Some(from),Some(to))=(row["id"].as_str(),old_row["id"].as_str()) {
