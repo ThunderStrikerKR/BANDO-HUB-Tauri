@@ -96,6 +96,39 @@ pub(super) fn project(payload: &Value) -> Result<Value, String> {
     Ok(json!({ "groups": projected }))
 }
 
+
+/** The order-detail footer includes even transferred shipments, except
+ * archived/deleted ones, exactly like workflow.ts::orderGrandTotal.
+ * Recipient VAT display is separate from the monetary snapshot.
+ */
+pub(super) fn project_order(payload: &Value) -> Result<Value, String> {
+    let state = req(payload, "state")?;
+    let order_id = super::required_str(payload, "orderId")?;
+    let order = find_by_id(field(state, "orders"), order_id)
+        .ok_or("주문 미리보기의 발주서를 확인하세요.")?;
+    let groups = rows(field(field(state, "workflow"), "groups"));
+    let ships = rows(field(field(state, "workflow"), "shipments")).iter()
+        .filter(|ship| str_field(ship, "orderId") == order_id)
+        .filter(|ship| !flag(ship, "legacyArchived"))
+        .filter(|ship| !groups.iter().any(|group|
+            str_field(group, "id") == str_field(ship, "groupId")
+                && has_value(field(group, "deletedAt"))))
+        .collect::<Vec<_>>();
+    let amounts = ships.iter()
+        .map(|ship| workflow::shipment_totals(state, str_field(ship, "id")))
+        .collect::<Result<Vec<_>, _>>()?;
+    let recipients = rows(field(order, "recipients"));
+    let has_vat = recipients.iter().any(|row| vat_applies(order, row));
+    let has_excluded = recipients.iter().any(|row| !vat_applies(order, row));
+    Ok(json!({
+        "orderId": order_id,
+        "shipmentCount": ships.len(),
+        "total": sum_field(&amounts, "total"),
+        "vatLabel": if has_vat && has_excluded { "부가세 포함/별도" }
+            else if has_vat { "부가세 포함" } else { "부가세 별도" }
+    }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::project;
