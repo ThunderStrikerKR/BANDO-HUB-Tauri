@@ -1,4 +1,4 @@
-import { seoulDate } from "./settlement-report";
+import { seoulDate } from "./seoul-date";
 import type { State } from "../types";
 import type { DailySettlementReport, HistoryRow } from "./settlement-report";
 
