@@ -1,0 +1,735 @@
+{
+  "schema": "tsbh-recognition-ts-rust-after-fixes-v1",
+  "date": "2026-11-13",
+  "branch": "migration/01-recognition",
+  "sourceCommit": "79583388d99b3a7dab496b5d328f9e718107c5fc",
+  "githubActionsRun": "43374760179",
+  "githubActionsJob": "131718541053",
+  "method": "Same real TS parseEvidence and Rust analyze_order, 15 in-memory color-corrected catalog cases plus 20 original orders; all Item fields recursively compared, generated IDs normalized",
+  "sourceBugsOnly": true,
+  "classification": {
+    "corrected-01": "TypeScript domain.ts normalizeColor lacks 레드 alias; Rust correctly selects bando-site-104",
+    "original-19": "TypeScript misclassifies order-date 2026 as a product and misses explicit spreadsheet quantity",
+    "original-20": "TypeScript misclassifies order-date 2026-11-03 as a product and misses explicit spreadsheet quantity"
+  },
+  "result": {
+    "cases": 35,
+    "casesWithDifferences": 3,
+    "comparedLeaves": 1442,
+    "mismatchCount": 22
+  },
+  "fields": [
+    {
+      "count": 2,
+      "field": "items.length"
+    },
+    {
+      "count": 2,
+      "field": "items[].quantity"
+    },
+    {
+      "count": 2,
+      "field": "items[].quantityConfirmed"
+    },
+    {
+      "count": 2,
+      "field": "items[0].sources.length"
+    },
+    {
+      "count": 2,
+      "field": "items[].sources[]"
+    },
+    {
+      "count": 2,
+      "field": "items.unmatchedTs[]"
+    },
+    {
+      "count": 1,
+      "field": "items[].catalog"
+    },
+    {
+      "count": 1,
+      "field": "items[].color"
+    },
+    {
+      "count": 1,
+      "field": "items[0].issues.length"
+    },
+    {
+      "count": 1,
+      "field": "items[].issues[]"
+    },
+    {
+      "count": 1,
+      "field": "items[].match.kind"
+    },
+    {
+      "count": 1,
+      "field": "items[].name"
+    },
+    {
+      "count": 1,
+      "field": "items[].productId"
+    },
+    {
+      "count": 1,
+      "field": "items[].recognitionReason"
+    },
+    {
+      "count": 1,
+      "field": "items[].url"
+    },
+    {
+      "count": 1,
+      "field": "items[].variantId"
+    }
+  ],
+  "cases": [
+    {
+      "id": "corrected-01",
+      "mismatchCount": 10,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-104"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        null
+      ]
+    },
+    {
+      "id": "corrected-02",
+      "mismatchCount": 0,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-337"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "bando-site-337"
+      ]
+    },
+    {
+      "id": "corrected-03",
+      "mismatchCount": 0,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-334"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "bando-site-334"
+      ]
+    },
+    {
+      "id": "corrected-04",
+      "mismatchCount": 0,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-324"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "bando-site-324"
+      ]
+    },
+    {
+      "id": "corrected-05",
+      "mismatchCount": 0,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-323"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "bando-site-323"
+      ]
+    },
+    {
+      "id": "corrected-06",
+      "mismatchCount": 0,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-322"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "bando-site-322"
+      ]
+    },
+    {
+      "id": "corrected-07",
+      "mismatchCount": 0,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-321"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "bando-site-321"
+      ]
+    },
+    {
+      "id": "corrected-08",
+      "mismatchCount": 0,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-320"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "bando-site-320"
+      ]
+    },
+    {
+      "id": "corrected-09",
+      "mismatchCount": 0,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-319"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "bando-site-319"
+      ]
+    },
+    {
+      "id": "corrected-10",
+      "mismatchCount": 0,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-252"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "bando-site-252"
+      ]
+    },
+    {
+      "id": "corrected-11",
+      "mismatchCount": 0,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-251"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "bando-site-251"
+      ]
+    },
+    {
+      "id": "corrected-12",
+      "mismatchCount": 0,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-250"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "bando-site-250"
+      ]
+    },
+    {
+      "id": "corrected-13",
+      "mismatchCount": 0,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-249"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "bando-site-249"
+      ]
+    },
+    {
+      "id": "corrected-14",
+      "mismatchCount": 0,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-248"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "bando-site-248"
+      ]
+    },
+    {
+      "id": "corrected-15",
+      "mismatchCount": 0,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-247"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "bando-site-247"
+      ]
+    },
+    {
+      "id": "original-01",
+      "mismatchCount": 0,
+      "rustItemCount": 3,
+      "rustProductIds": [
+        "sku:bando-site-50:bando-50-P00000BX000C",
+        "bando-site-63",
+        "bando-site-83"
+      ],
+      "tsItemCount": 3,
+      "tsProductIds": [
+        "sku:bando-site-50:bando-50-P00000BX000C",
+        "bando-site-63",
+        "bando-site-83"
+      ]
+    },
+    {
+      "id": "original-02",
+      "mismatchCount": 0,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-290"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "bando-site-290"
+      ]
+    },
+    {
+      "id": "original-03",
+      "mismatchCount": 0,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-107"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "bando-site-107"
+      ]
+    },
+    {
+      "id": "original-04",
+      "mismatchCount": 0,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-87"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "bando-site-87"
+      ]
+    },
+    {
+      "id": "original-05",
+      "mismatchCount": 0,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        null
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        null
+      ]
+    },
+    {
+      "id": "original-06",
+      "mismatchCount": 0,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        null
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        null
+      ]
+    },
+    {
+      "id": "original-07",
+      "mismatchCount": 0,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-130"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "bando-site-130"
+      ]
+    },
+    {
+      "id": "original-08",
+      "mismatchCount": 0,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-290"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "bando-site-290"
+      ]
+    },
+    {
+      "id": "original-09",
+      "mismatchCount": 0,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-176"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "bando-site-176"
+      ]
+    },
+    {
+      "id": "original-10",
+      "mismatchCount": 0,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "sku:bando-site-48:bando-48-P00000BV000B"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "sku:bando-site-48:bando-48-P00000BV000B"
+      ]
+    },
+    {
+      "id": "original-11",
+      "mismatchCount": 0,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-202"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "bando-site-202"
+      ]
+    },
+    {
+      "id": "original-12",
+      "mismatchCount": 0,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "sku:bando-site-48:bando-48-P00000BV000B"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "sku:bando-site-48:bando-48-P00000BV000B"
+      ]
+    },
+    {
+      "id": "original-13",
+      "mismatchCount": 0,
+      "rustItemCount": 2,
+      "rustProductIds": [
+        null,
+        "sku:bando-site-23:bando-23-P000000W000F"
+      ],
+      "tsItemCount": 2,
+      "tsProductIds": [
+        null,
+        "sku:bando-site-23:bando-23-P000000W000F"
+      ]
+    },
+    {
+      "id": "original-14",
+      "mismatchCount": 0,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-150"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "bando-site-150"
+      ]
+    },
+    {
+      "id": "original-15",
+      "mismatchCount": 0,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-70"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "bando-site-70"
+      ]
+    },
+    {
+      "id": "original-16",
+      "mismatchCount": 0,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-63"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "bando-site-63"
+      ]
+    },
+    {
+      "id": "original-17",
+      "mismatchCount": 0,
+      "rustItemCount": 2,
+      "rustProductIds": [
+        "sku:bando-site-48:bando-48-P00000BV000B",
+        "sku:bando-site-237:bando-237-P00000JC000J"
+      ],
+      "tsItemCount": 2,
+      "tsProductIds": [
+        "sku:bando-site-48:bando-48-P00000BV000B",
+        "sku:bando-site-237:bando-237-P00000JC000J"
+      ]
+    },
+    {
+      "id": "original-18",
+      "mismatchCount": 0,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "sku:bando-site-48:bando-48-P00000BV000C"
+      ],
+      "tsItemCount": 1,
+      "tsProductIds": [
+        "sku:bando-site-48:bando-48-P00000BV000C"
+      ]
+    },
+    {
+      "id": "original-19",
+      "mismatchCount": 6,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-219"
+      ],
+      "tsItemCount": 2,
+      "tsProductIds": [
+        null,
+        "bando-site-219"
+      ]
+    },
+    {
+      "id": "original-20",
+      "mismatchCount": 6,
+      "rustItemCount": 1,
+      "rustProductIds": [
+        "bando-site-248"
+      ],
+      "tsItemCount": 2,
+      "tsProductIds": [
+        null,
+        "bando-site-248"
+      ]
+    }
+  ],
+  "differences": [
+    {
+      "caseId": "corrected-01",
+      "path": "items[0].catalog",
+      "rust": "BANDOSTAND",
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "corrected-01",
+      "path": "items[0].color",
+      "rust": "Red",
+      "ts": "레드"
+    },
+    {
+      "caseId": "corrected-01",
+      "path": "items[0].issues.length",
+      "rust": 0,
+      "ts": 1
+    },
+    {
+      "caseId": "corrected-01",
+      "path": "items[0].issues[0]",
+      "rust": "<MISSING>",
+      "ts": "제품명이 확인되지 않습니다."
+    },
+    {
+      "caseId": "corrected-01",
+      "path": "items[0].match.kind",
+      "rust": "NAME",
+      "ts": "UNKNOWN"
+    },
+    {
+      "caseId": "corrected-01",
+      "path": "items[0].name",
+      "rust": "BD 911R / 레드",
+      "ts": "BD 911R"
+    },
+    {
+      "caseId": "corrected-01",
+      "path": "items[0].productId",
+      "rust": "bando-site-104",
+      "ts": null
+    },
+    {
+      "caseId": "corrected-01",
+      "path": "items[0].recognitionReason",
+      "rust": "<MISSING>",
+      "ts": "등록된 모델명 또는 별칭과 일치하지 않습니다."
+    },
+    {
+      "caseId": "corrected-01",
+      "path": "items[0].url",
+      "rust": "https://bandostand.com/product/detail.html?product_no=104",
+      "ts": ""
+    },
+    {
+      "caseId": "corrected-01",
+      "path": "items[0].variantId",
+      "rust": "bando-104-single",
+      "ts": null
+    },
+    {
+      "caseId": "original-19",
+      "path": "items.length",
+      "rust": 1,
+      "ts": 2
+    },
+    {
+      "caseId": "original-19",
+      "path": "items[0].quantity",
+      "rust": 1,
+      "ts": null
+    },
+    {
+      "caseId": "original-19",
+      "path": "items[0].quantityConfirmed",
+      "rust": true,
+      "ts": false
+    },
+    {
+      "caseId": "original-19",
+      "path": "items[0].sources.length",
+      "rust": 2,
+      "ts": 1
+    },
+    {
+      "caseId": "original-19",
+      "path": "items[0].sources[1]",
+      "rust": {
+        "end": 85,
+        "field": "quantity",
+        "recipientId": "<GENERATED_ID>",
+        "start": 84,
+        "targetId": "<GENERATED_ID>",
+        "text": "1"
+      },
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-19",
+      "path": "items.unmatchedTs[0]",
+      "rust": "<MISSING>",
+      "ts": {
+        "color": "",
+        "defaulted": false,
+        "id": "<GENERATED_ID>",
+        "issues": [
+          "제품명이 확인되지 않습니다."
+        ],
+        "match": {
+          "aliasId": "<MISSING>",
+          "kind": "UNKNOWN",
+          "productIds": [],
+          "term": "2026"
+        },
+        "name": "2026",
+        "origin": "FACTORY",
+        "productCandidates": [],
+        "productId": null,
+        "quantity": null,
+        "quantityConfirmed": false,
+        "raw": "발주일자 2026년 10월 22일",
+        "recognitionReason": "등록된 모델명 또는 별칭과 일치하지 않습니다.",
+        "sources": [
+          {
+            "end": 15,
+            "field": "product",
+            "recipientId": "<GENERATED_ID>",
+            "start": 11,
+            "targetId": "<GENERATED_ID>",
+            "text": "2026"
+          }
+        ],
+        "unitPrice": null,
+        "url": "",
+        "variantId": null
+      }
+    },
+    {
+      "caseId": "original-20",
+      "path": "items.length",
+      "rust": 1,
+      "ts": 2
+    },
+    {
+      "caseId": "original-20",
+      "path": "items[0].quantity",
+      "rust": 1,
+      "ts": null
+    },
+    {
+      "caseId": "original-20",
+      "path": "items[0].quantityConfirmed",
+      "rust": true,
+      "ts": false
+    },
+    {
+      "caseId": "original-20",
+      "path": "items[0].sources.length",
+      "rust": 2,
+      "ts": 1
+    },
+    {
+      "caseId": "original-20",
+      "path": "items[0].sources[1]",
+      "rust": {
+        "end": 189,
+        "field": "quantity",
+        "recipientId": "<GENERATED_ID>",
+        "start": 188,
+        "targetId": "<GENERATED_ID>",
+        "text": "1"
+      },
+      "ts": "<MISSING>"
+    },
+    {
+      "caseId": "original-20",
+      "path": "items.unmatchedTs[0]",
+      "rust": "<MISSING>",
+      "ts": {
+        "color": "",
+        "defaulted": false,
+        "id": "<GENERATED_ID>",
+        "issues": [
+          "제품명이 확인되지 않습니다."
+        ],
+        "match": {
+          "aliasId": "<MISSING>",
+          "kind": "UNKNOWN",
+          "productIds": [],
+          "term": "2026-11-03"
+        },
+        "name": "2026-11-03",
+        "origin": "FACTORY",
+        "productCandidates": [],
+        "productId": null,
+        "quantity": null,
+        "quantityConfirmed": false,
+        "raw": "발주일 2026-11-03",
+        "recognitionReason": "등록된 모델명 또는 별칭과 일치하지 않습니다.",
+        "sources": [
+          {
+            "end": 20,
+            "field": "product",
+            "recipientId": "<GENERATED_ID>",
+            "start": 10,
+            "targetId": "<GENERATED_ID>",
+            "text": "2026-11-03"
+          }
+        ],
+        "unitPrice": null,
+        "url": "",
+        "variantId": null
+      }
+    }
+  ]
+}
