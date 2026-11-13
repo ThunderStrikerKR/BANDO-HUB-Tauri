@@ -117,7 +117,7 @@ pub(super) fn shipment_totals(state: &Value, shipment_id: &str) -> Result<Value,
     set(&mut view,"vatAmount",Value::Null)?;
     pricing::totals(&view,client)
 }
-fn account_for<'a>(state: &'a Value,group:&Value,order:&Value,client:&Value) -> Option<&'a Value> {
+pub(super) fn account_for<'a>(state: &'a Value,group:&Value,order:&Value,client:&Value) -> Option<&'a Value> {
     let settings=field(state,"settings");
     let accounts=field(settings,"accounts");
     if str_field(group,"accountMode")=="MANUAL" || str_field(order,"accountMode")=="MANUAL" {
