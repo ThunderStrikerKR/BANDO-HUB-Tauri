@@ -55,23 +55,31 @@ test("new uncommitted reception follows master changes until finalized", () => {
   }), [{ id: "historical-order" }]), true);
 });
 
-test("both passive React effects use the saved-order guard, explicit edit path still prices", () => {
+test("native Rust pricing/shipping effects protect persisted records and explicit edits", () => {
   const source = readFileSync(new URL("../src/orders/useOrderDesk.tsx", import.meta.url), "utf8");
   const parts = source.split(/\n  useEffect\(\(\) => \{/);
-  const priceEffect = parts.find((part) => part.includes("repriceOrder(previous, liveClient, state)"));
-  const freightEffect = parts.find((part) => part.includes("recommendShipping(previous, state)"));
-  assert.ok(priceEffect, "Reprice effect should remain present for new receptions");
-  assert.ok(freightEffect, "Freight effect should remain present for new receptions");
+  const priceEffect = parts.find((part) => part.includes('"rules", "reprice_order"'));
+  const freightEffect = parts.find((part) => part.includes('"rules", "calculate_shipping"'));
+  assert.ok(priceEffect, "New receptions must invoke the real Rust repricing engine");
+  assert.ok(freightEffect, "Auto freight must invoke the real Rust shipping engine");
   assert.match(priceEffect, /!liveClient \|\| !passivePricingAllowed/);
-  assert.match(freightEffect, /if \(!passivePricingAllowed\)/);
+  assert.match(freightEffect, /!passivePricingAllowed && !shippingPending/,
+    "Saved orders may refresh freight only after a deliberate edit marked pending");
   for (const block of [priceEffect, freightEffect]) {
-    assert.match(block, /shouldRefreshUncommittedOrderPricing\(previous, persisted\)/);
+    assert.match(block, /shouldRefreshUncommittedOrderPricing\(previous, persisted\)/,
+      "The latest draft must be rechecked before any async native result is applied");
+    assert.match(block, /ruleRequests\.current/,
+      "Out-of-order native responses must be rejected");
   }
-  assert.match(source, /const edit = \([\s\S]*?recommendShipping\(next, state\)/,
-    "Explicit staff edit must still recalculate shipping");
+  assert.match(source, /const edit = \([\s\S]*?next\.shippingFee = null;[\s\S]*?next\.shippingVersion = "";/,
+    "Explicit staff edits must invalidate old freight until Rust recalculates it");
+  assert.doesNotMatch(source, /recommendShipping\(previous, state\)/,
+    "React must not silently revert to TypeScript tariff computation");
   const orderDesk = readFileSync(new URL("../src/OrderDesk.tsx", import.meta.url), "utf8");
-  assert.match(orderDesk, /onDealer=\{async \(c\) => \{[\s\S]*?repriceOrder\(/,
-    "Explicit dealer change must continue repricing");
+  assert.match(orderDesk, /onDealer=\{async \(c\) => \{[\s\S]*?nativeRepriceEditedOrder\(/,
+    "Dealer change must call the real Rust unit-price resolver");
+  assert.match(orderDesk, /nativeReconcileWorkflow\(state, next\)/,
+    "Saved dealer edits must run Rust workflow reconciliation");
 });
 
 test("preview order is not treated as persisted when backing storage has no such order", () => {
