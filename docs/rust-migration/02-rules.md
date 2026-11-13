@@ -4,7 +4,7 @@ Date: 2026-11-13 KST
 Repository: ThunderStrikerKR/TSBH
 Branch: migration/02-rules (created at d5ea8ed20b8120b844437263c2eb2b8963559e8d)
 Last implementation/test-source commit before this document: ecdb71e20490ccd2acd71112e37ef19a67683f83
-Last runtime-verified commit: NONE / NOT_RUN
+Last independent Cargo test-verified code commit: 3f68c89be8a0bb6c8d6b7f1611937e48a244fe5c (GitHub Actions; not an end-to-end parity or Windows validation)
 
 ## Scope and ownership
 
@@ -200,7 +200,7 @@ Eighteen synthetic Rust regression tests were authored for:
   actual freight event;
   immutable workflow history and duplicate IDs.
 
-RESULT: 18 NOT_RUN (not PASS).
+RESULT UPDATE: 18/18 Rust independent regression tests PASS in GitHub Actions run 43351968128. TS parity, Tauri integration and Windows EXE remain UNVERIFIED.
 TS baseline test source inspected, not executed:
   tests/tauri-confirmed-order-master-freeze.test.mjs
   tests/reception-passive-pricing.test.mjs
@@ -256,3 +256,11 @@ with source of truth for receipt and workflow histories kept intact.
 4. Cover STORE and FACTORY mixed shipments, overridden VAT, postpaid,
    master tariff changes and full order snapshot preservation.
 5. Re-run regression suite and commit corrections only on migration/02-rules.
+
+## 2026-11-13 CI implementation update
+
+- Fixed earlier workflow borrow conflicts in existing agent commit `5e7713d958c84911b49244a9ab4cf75ad8e27d01`.
+- Remaining compile error fixed at `3f68c89be8a0bb6c8d6b7f1611937e48a244fe5c`: `field(&shipment_totals(state, ...)?,"total")` borrows temporary JSON for the expected `&Value` argument.
+- GitHub Actions: https://github.com/ThunderStrikerKR/TSBH/actions/runs/43351968128
+- Result: standalone rules crate compiles, 18 passed / 0 failed; Windows integration job is skipped for this standalone branch by design.
+- This result does NOT establish parity for all TypeScript workflows, nor final Tauri/Windows readiness. Session 3 must retain those gates.
