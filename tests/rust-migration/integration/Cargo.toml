@@ -5,6 +5,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
+unicode-normalization = "0.1"
 serde_json = "1"
 regex = "1"
 url = "2"
