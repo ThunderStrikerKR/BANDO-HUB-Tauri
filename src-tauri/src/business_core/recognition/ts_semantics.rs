@@ -105,6 +105,28 @@ pub(super) fn table_quantity(text: &str, model_end: Option<usize>) -> Option<(i6
     Some((m.as_str().parse().ok()?,start+m.start(),start+m.end()))
 }
 
+/// Direct port of parser.ts:102-149 (logicalLines): when a line contains
+/// a delivery address, its prefix is an order item only if a real registered
+/// model is present, or an unknown three-digit SKU also has an explicit
+/// quantity. Do not turn five-digit postal codes into fake SKUs.
+pub(super) fn model_before_address(prefix: &str, state: &serde_json::Value) -> bool {
+    let known=super::model::products(state).iter().any(|p|
+        super::model::model_names(p).iter()
+            .any(|name|super::model::find_term(prefix,name,true).is_some()));
+    if known { return true; }
+    let model=Regex::new(r"(?i)(?:BD\s*)?\d{3}[A-Za-z0-9-]*")
+        .expect("legacy unknown model");
+    let unknown=model.find_iter(prefix).any(|m|{
+        let before=prefix[..m.start()].chars().next_back();
+        let after=prefix[m.end()..].chars().next();
+        // The three-digit unknown model must not be a postal number,
+        // telephone or part of a longer numeric field.
+        before.map_or(true,|c|!c.is_ascii_digit() && c!='(')
+            && after.map_or(true,|c|!c.is_ascii_digit())
+    });
+    unknown && !super::quantity::extract(prefix).is_empty()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
