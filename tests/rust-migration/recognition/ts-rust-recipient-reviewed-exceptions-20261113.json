@@ -2,12 +2,12 @@
   "schema": "tsbh-recognition-reviewed-ts-legacy-recipient-exceptions-v1",
   "date": "2026-11-13",
   "branch": "migration/01-recognition",
-  "sourceSha": "06ea61b500fb867118a00c57da89c54b1cab4a67",
-  "runId": "43383721172",
-  "jobId": "131747184142",
-  "verdict": "35? no: exactly 44 recipient inputs, 39 have zero differences, five reviewed TS upstream recognition defects remain",
+  "sourceSha": "ce8440116a9bae92263757d9d176f8963c7a4061",
+  "runId": "43384721427",
+  "jobId": "131750389444",
+  "verdict": "44 recipient inputs, 39 exact matching on all inspected fields; five reviewed upstream TS recognition defect cases total 65 differences",
   "limits": {
-    "maxExceptions": 66,
+    "maxExceptions": 65,
     "maxCases": 5
   },
   "method": "Real TypeScript parseEvidence and Rust analyze_order; recips and candidates and unassigned compared recursively, generated IDs normalized, evidence rows aligned by source span",
@@ -242,7 +242,7 @@
     },
     {
       "id": "recipient-inline",
-      "mismatchCount": 11,
+      "mismatchCount": 10,
       "rustRecipientCount": 1,
       "tsRecipientCount": 1
     },
@@ -361,10 +361,6 @@
     {
       "count": 1,
       "field": "recipients[].phone"
-    },
-    {
-      "count": 1,
-      "field": "candidates[].value"
     },
     {
       "count": 1,
@@ -1037,12 +1033,6 @@
       "path": "candidates.length",
       "rust": 5,
       "ts": 4
-    },
-    {
-      "caseId": "recipient-inline",
-      "path": "candidates[0].value",
-      "rust": "BD 709 민판 한개",
-      "ts": "BD 709 민판 한개 이가상 010-1234-5678"
     },
     {
       "caseId": "recipient-inline",
