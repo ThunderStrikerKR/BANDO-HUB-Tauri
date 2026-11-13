@@ -245,4 +245,61 @@ mod regression {
         s["workflow"]["shipments"].as_array_mut().unwrap().push(dupe);
         assert!(execute("validate_workflow",json!({"state":s})).is_err());
     }
+    #[test]
+    fn two_recipients_are_billed_as_two_shipping_bundles() {
+        let mut o=order(1,json!(30000));
+        let mut second=recipient(2,json!(30000));
+        second["id"]=json!("r2");
+        second["items"][0]["id"]=json!("item2");
+        o["recipients"].as_array_mut().unwrap().push(second);
+        let r=run("calculate_shipping",json!({"order":o,"state":shipping_state()}));
+        assert_eq!(r["bundles"].as_array().unwrap().len(),2);
+        assert_eq!(r["total"],7000);
+    }
+    #[test]
+    fn process_group_creates_snapshot_queue_and_preserves_order() {
+        let s=workflow_state("POSTPAID");
+        let advanced=run("apply_workflow_action",json!({
+            "state":s,"groupId":"group:o1","action":"advance_group",
+            "eventId":"event-1","now":"2026-11-13T10:00:00+09:00"
+        }));
+        let processed=run("apply_workflow_action",json!({
+            "state":advanced["state"],"groupId":"group:o1","action":"process_group",
+            "eventId":"event-2","now":"2026-11-13T10:10:00+09:00"
+        }));
+        assert_eq!(processed["entries"].as_array().unwrap().len(),1);
+        let queue=&processed["state"]["workflow"]["queue"][0];
+        assert_eq!(queue["id"],"excel:shipment:o1:r1:FACTORY");
+        assert_eq!(queue["status"],"QUEUED");
+        assert_eq!(queue["snapshot"]["total"],36300);
+        assert_eq!(queue["snapshot"]["freightCode"],"010");
+        assert_eq!(processed["state"]["workflow"]["shipments"][0]["transferred"],true);
+        assert_eq!(processed["state"]["orders"][0]["raw"],s["orders"][0]["raw"]);
+    }
+    #[test]
+    fn actual_freight_is_an_audited_independent_field() {
+        let s=workflow_state("POSTPAID");
+        let recorded=run("apply_workflow_action",json!({
+            "state":s,"shipmentId":"shipment:o1:r1","origin":"FACTORY",
+            "action":"record_actual_freight","value":4200,
+            "eventId":"event-1","now":"2026-11-13T10:00:00+09:00"
+        }));
+        assert_eq!(recorded["state"]["workflow"]["shipments"][0]["actualFreight"]["FACTORY"],4200);
+        assert_eq!(recorded["state"]["workflow"]["shipments"][0]["charges"]["FACTORY"],3000);
+        assert_eq!(recorded["state"]["workflow"]["events"][0]["action"],"실제 출고 운임 입력");
+        let tested=run("validate_workflow",json!({"state":recorded["state"],"before":s}));
+        assert_eq!(tested["valid"],true);
+    }
+    #[test]
+    fn frozen_excel_queue_cannot_be_rewritten_after_export() {
+        let mut before=workflow_state("POSTPAID");
+        before["workflow"]["queue"]=json!([{
+            "id":"excel:shipment:o1:r1:FACTORY","shipmentId":"shipment:o1:r1",
+            "origin":"FACTORY","status":"EXPORTED","snapshot":{"total":36300}
+        }]);
+        let mut after=before.clone();
+        after["workflow"]["queue"][0]["snapshot"]["total"]=json!(1);
+        assert!(execute("validate_workflow",json!({"state":after,"before":before})).is_err());
+    }
+
 }
