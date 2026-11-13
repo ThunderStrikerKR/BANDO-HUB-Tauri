@@ -333,7 +333,11 @@ function checkBoardPreview(name, mutate = () => {}) {
       }];
     }),
   });
-  add("board preview " + name, "preview_workflow", {state}, expected);
+  // A Rust IPC response is JSON: TypeScript's own undefined-valued
+  // properties disappear at serialization. Compare the wire payloads,
+  // not the JS object's unobservable property-presence distinction.
+  add("board preview " + name, "preview_workflow", {state},
+    () => JSON.parse(JSON.stringify(expected())));
 }
 checkBoardPreview("normal confirmed postpaid");
 checkBoardPreview("prepaid stage 3", (s) => {
