@@ -4,11 +4,13 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { businessCoreCall } from "../tauri-bridge";
-import type { Price, State, ValidationIssue } from "../types";
+import type { Origin, Price, State, ValidationIssue } from "../types";
 
 export type NativeShipmentPreview = {
   shipmentId: string;
   paid: number;
+  displayCharges: Partial<Record<Origin, Price>>;
+  freightEditingBlocked: boolean;
   totals: { subtotal: Price; shipping: Price; vat: Price; total: Price };
   freightCode: string;
   vatIncluded: boolean;
