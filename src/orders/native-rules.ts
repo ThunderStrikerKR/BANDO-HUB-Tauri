@@ -177,6 +177,43 @@ export async function nativeConfirmRetail(
   return updated;
 }
 
+/** Resolve a staff-selected product and its alias/representative-model decision
+ * in Rust. Order stays an uncommitted draft until the caller persists it.
+ */
+export async function nativeResolveProduct(
+  state: State,
+  order: Order,
+  recipientId: string,
+  itemId: string,
+  productId: string,
+  scope: "once" | "client" | "common",
+  needsCustomer: boolean,
+  variantId?: string,
+  defaultColorGroupId?: string,
+): Promise<{ state: State; order: Order }> {
+  return businessCoreCall<{ state: State; order: Order }>(
+    "rules", "apply_product_action", {
+      state, order, action: "resolve_product",
+      recipientId, itemId, productId, scope, needsCustomer,
+      variantId, defaultColorGroupId,
+      now: new Date().toISOString(),
+      newItemId: crypto.randomUUID(),
+      aliasId: crypto.randomUUID(),
+    },
+  );
+}
+
+/** Commit a customer's explicit confirmation without re-running TS alias rules. */
+export async function nativeConfirmProposedProduct(
+  state: State, order: Order, recipientId: string, itemId: string,
+): Promise<{ state: State; order: Order }> {
+  return businessCoreCall<{ state: State; order: Order }>(
+    "rules", "apply_product_action", {
+      state, order, action: "confirm_proposed_product", recipientId, itemId,
+    },
+  );
+}
+
 /** Re-analyze an employee's working copy of the original order text in
  * Rust recognition, then apply the Rust raw-correction domain reducer.
  * Never reparse or change the immutable original/confirmation snapshot in TS.
