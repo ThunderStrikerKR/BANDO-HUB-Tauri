@@ -121,7 +121,7 @@ fn customer_model(name: &str) -> String {
     let name = regex::Regex::new(r"^\[가상\]\s*").unwrap().replace(name, "");
     let raw = name.trim_start();
     let bytes = raw.as_bytes();
-    let starts_bd = bytes.len() >= 2 && raw[..2].eq_ignore_ascii_case("BD")
+    let starts_bd = bytes.len() >= 2 && bytes[0].eq_ignore_ascii_case(&b'B') && bytes[1].eq_ignore_ascii_case(&b'D')
         && (bytes.len() == 2 || bytes[2].is_ascii_whitespace() || bytes[2].is_ascii_digit());
     if starts_bd {
         let rest = raw[2..].trim_start();
