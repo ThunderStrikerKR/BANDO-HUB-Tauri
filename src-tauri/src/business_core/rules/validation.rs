@@ -104,12 +104,52 @@ pub(super) fn validate(state: &Value, before: Option<&Value>) -> Result<(),Strin
     if let Some(old_state) = before {
         let old_w = field(old_state,"workflow");
         if !old_w.is_null() {
-            for name in ["payments","events","deliveries","sources","changeRequests"] {
-                if !unchanged_records(field(old_w,name),field(w,name)) {
-                    return Err("기존 입금 / 원문 / 배송 / 조작 이력은 변경하거나 삭제할 수 없습니다.".into());
+            for old in rows(field(old_w,"confirmations")) {
+                let current = find_by_id(field(w,"confirmations"),str_field(old,"id"));
+                let old_ids=rows(field(old,"shipmentIds")).iter()
+                    .filter_map(Value::as_str).collect::<Vec<_>>();
+                if let Some(current)=current {
+                    if current==old {continue;}
+                    let current_ids=rows(field(current,"shipmentIds")).iter()
+                        .filter_map(Value::as_str).collect::<Vec<_>>();
+                    let removed=old_ids.iter().filter(|id|!current_ids.contains(id))
+                        .copied().collect::<Vec<_>>();
+                    let mut expected=old.clone();
+                    let surviving=old_ids.iter().filter(|id|current_ids.contains(id))
+                        .copied().collect::<Vec<_>>();
+                    let allocations=rows(field(old,"allocations")).iter()
+                        .filter(|a|surviving.contains(&str_field(a,"shipmentId")))
+                        .cloned().collect::<Vec<_>>();
+                    let mut amounts=serde_json::Map::new();
+                    for id in &surviving {
+                        let previous=field(field(old,"amounts"),id);
+                        amounts.insert((*id).to_string(),if previous.is_null() {
+                            serde_json::json!(0)
+                        } else {previous.clone()});
+                    }
+                    let total=amounts.values().filter_map(safe).collect::<Vec<_>>();
+                    let amount=checked_sum(total).ok_or("금액 합계를 확인하세요.")?;
+                    super::set(&mut expected,"shipmentIds",serde_json::json!(surviving))?;
+                    super::set(&mut expected,"allocations",serde_json::json!(allocations))?;
+                    super::set(&mut expected,"amounts",Value::Object(amounts))?;
+                    super::set(&mut expected,"amount",serde_json::json!(amount))?;
+                    let allowed=!removed.is_empty() && current==&expected &&
+                        removed.iter().all(|id|find_by_id(field(w,"shipments"),id)
+                            .is_some_and(|s|!flag(s,"transferred") &&
+                                field(s,"step").as_i64().unwrap_or(0)<4));
+                    if !allowed {
+                        return Err("확인 기록은 입금 확인 취소에서만 삭제할 수 있습니다.".into());
+                    }
+                } else {
+                    let allowed=old_ids.iter().all(|id|
+                        find_by_id(field(w,"shipments"),id)
+                            .is_some_and(|s|!flag(s,"transferred") &&
+                                field(s,"step").as_i64().unwrap_or(0)<4));
+                    if !allowed {
+                        return Err("이관 전 입금 확인 취소에서만 기록을 삭제할 수 있습니다.".into());
+                    }
                 }
-            }
-            for old in rows(field(old_w,"shipments")) {
+            }            for old in rows(field(old_w,"shipments")) {
                 let Some(current) = find_by_id(field(w,"shipments"),str_field(old,"id")) else {
                     return Err("배송 건 고유 ID와 최초 연결은 보존해야 합니다.".into());
                 };
@@ -117,10 +157,6 @@ pub(super) fn validate(state: &Value, before: Option<&Value>) -> Result<(),Strin
                     if field(old,key) != field(current,key) {
                         return Err("배송 건 고유 ID와 최초 연결은 보존해야 합니다.".into());
                     }
-                }
-                if has_value(field(old,"delivery")) &&
-                    field(old,"delivery") != field(current,"delivery") {
-                    return Err("배송 완료 이력은 보존해야 합니다.".into());
                 }
                 for origin in ["STORE","FACTORY"] {
                     let old_freight = field(field(old,"actualFreight"),origin);
@@ -146,6 +182,10 @@ pub(super) fn validate(state: &Value, before: Option<&Value>) -> Result<(),Strin
                         return Err("실제 출고 운임의 수정 근거를 확인하세요.".into());
                     }
                 }
+                if has_value(field(old,"delivery")) &&
+                    field(old,"delivery") != field(current,"delivery") {
+                    return Err("배송 완료 이력은 보존해야 합니다.".into());
+                }
             }
             for old in rows(field(old_w,"groups")) {
                 let current = find_by_id(field(w,"groups"),str_field(old,"id"));
@@ -154,6 +194,11 @@ pub(super) fn validate(state: &Value, before: Option<&Value>) -> Result<(),Strin
                         != Some(notice) {
                         return Err("기존 계좌 안내 이력은 보존해야 합니다.".into());
                     }
+                }
+            }
+            for name in ["payments","events","deliveries","sources","changeRequests"] {
+                if !unchanged_records(field(old_w,name),field(w,name)) {
+                    return Err("기존 입금 / 원문 / 배송 / 조작 이력은 변경하거나 삭제할 수 없습니다.".into());
                 }
             }
             for old in rows(field(old_w,"queue")) {
@@ -203,52 +248,7 @@ pub(super) fn validate(state: &Value, before: Option<&Value>) -> Result<(),Strin
                     }
                 }
             }
-            for old in rows(field(old_w,"confirmations")) {
-                let current = find_by_id(field(w,"confirmations"),str_field(old,"id"));
-                let old_ids=rows(field(old,"shipmentIds")).iter()
-                    .filter_map(Value::as_str).collect::<Vec<_>>();
-                if let Some(current)=current {
-                    if current==old {continue;}
-                    let current_ids=rows(field(current,"shipmentIds")).iter()
-                        .filter_map(Value::as_str).collect::<Vec<_>>();
-                    let removed=old_ids.iter().filter(|id|!current_ids.contains(id))
-                        .copied().collect::<Vec<_>>();
-                    let mut expected=old.clone();
-                    let surviving=old_ids.iter().filter(|id|current_ids.contains(id))
-                        .copied().collect::<Vec<_>>();
-                    let allocations=rows(field(old,"allocations")).iter()
-                        .filter(|a|surviving.contains(&str_field(a,"shipmentId")))
-                        .cloned().collect::<Vec<_>>();
-                    let mut amounts=serde_json::Map::new();
-                    for id in &surviving {
-                        let previous=field(field(old,"amounts"),id);
-                        amounts.insert((*id).to_string(),if previous.is_null() {
-                            serde_json::json!(0)
-                        } else {previous.clone()});
-                    }
-                    let total=amounts.values().filter_map(safe).collect::<Vec<_>>();
-                    let amount=checked_sum(total).ok_or("금액 합계를 확인하세요.")?;
-                    super::set(&mut expected,"shipmentIds",serde_json::json!(surviving))?;
-                    super::set(&mut expected,"allocations",serde_json::json!(allocations))?;
-                    super::set(&mut expected,"amounts",Value::Object(amounts))?;
-                    super::set(&mut expected,"amount",serde_json::json!(amount))?;
-                    let allowed=!removed.is_empty() && current==&expected &&
-                        removed.iter().all(|id|find_by_id(field(w,"shipments"),id)
-                            .is_some_and(|s|!flag(s,"transferred") &&
-                                field(s,"step").as_i64().unwrap_or(0)<4));
-                    if !allowed {
-                        return Err("확인 기록은 입금 확인 취소에서만 삭제할 수 있습니다.".into());
-                    }
-                } else {
-                    let allowed=old_ids.iter().all(|id|
-                        find_by_id(field(w,"shipments"),id)
-                            .is_some_and(|s|!flag(s,"transferred") &&
-                                field(s,"step").as_i64().unwrap_or(0)<4));
-                    if !allowed {
-                        return Err("이관 전 입금 확인 취소에서만 기록을 삭제할 수 있습니다.".into());
-                    }
-                }
-            }
+
         }
     }
     Ok(())
