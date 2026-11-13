@@ -17,7 +17,8 @@ test("TypeScript business retirement audit reads actual app source import graph"
   assert.ok(output.reachableLegacyModules>0,
     "Business layer removal cannot be declared complete while live TS imports remain");
   assert.ok(output.inventory.some(row=>
-    row.module==="src/automatic-message.ts"&&row.exists&&row.reachableFromApp));
+    row.module==="src/automatic-message.ts"&&row.exists&&!row.reachableFromApp),
+    "Original automatic-message oracle must be retained but unreachable from the live app");
   assert.ok(output.inventory.some(row=>
     row.module==="src/factory-export.ts"&&row.exists&&row.reachableFromApp),
     "ExcelJS serializer remains a legitimate TS module");
