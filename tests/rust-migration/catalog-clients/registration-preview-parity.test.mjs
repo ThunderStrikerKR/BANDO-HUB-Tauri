@@ -124,7 +124,10 @@ async function caseFor(t){
 function stable(output){
   const clone=JSON.parse(JSON.stringify(output));
   if(!clone.ok)return clone;
+  const generatedIds=new Map(clone.value.rows.filter(row=>row.product)
+    .map(row=>[row.product.id, "GENERATED-ID-ROW-"+row.row]));
   for(const entry of clone.value.rows){
+    entry.duplicateIds=entry.duplicateIds.map(id=>generatedIds.get(id)??id);
     if(!entry.product)continue;
     const product=entry.product;
     product.id="PRODUCT-ID";
