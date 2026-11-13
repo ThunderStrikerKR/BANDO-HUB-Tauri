@@ -2,6 +2,7 @@
 //! All spans exposed to TypeScript use UTF-16 offsets, not Rust byte positions.
 mod model;
 mod quantity;
+mod ts_semantics;
 
 use regex::Regex;
 use serde_json::{json, Value};
@@ -154,42 +155,33 @@ fn address_begin(line: &str) -> Option<usize> {
     )).expect("address");
     address.find(line).map(|m| m.start())
 }
-fn is_person(text: &str) -> bool {
-    let re = Regex::new(r"^[가-힣]{2,5}(?:님)?$").expect("person");
-    let forbidden = Regex::new(
-        r"(?:아파트|빌라|센터|상가|학교|교회|성당|병원|학원|월드|도서관|회관|지원청|주세요|감사해요|보내세요)$",
-    ).expect("institution");
-    re.is_match(text) && !forbidden.is_match(text)
-        && !["반도","민판","무타공","비타공","주소","배송지","배송주소","연락처","품목",
-            "모델명","상품명","가방","바퀴","주문","발송"].contains(&text.trim_end_matches('님'))
-}
+fn is_person(text: &str) -> bool { ts_semantics::person(text) }
 fn is_institution(text: &str) -> bool {
     Regex::new(r"^[가-힣A-Za-z0-9 ()]{2,30}(?:학교|교회|성당|병원|학원|월드|도서관|회관)$")
         .expect("institution").is_match(text)
 }
-fn is_money_or_header(text: &str) -> bool {
-    let normalized = text.trim();
-    let payment = Regex::new(
-        r"^(?:[\d,]+\s*원(?:\s*입니다.*)?|배송료|운임까지.*|합계(?:금액)?(?:\s|:).*|계좌번호.*|발주(?:일자|일).*)$",
-    ).expect("payment");
-    payment.is_match(normalized) || normalized.contains("공급받는자")
-        || normalized.contains("발주처") || normalized.contains("수주처")
-        || normalized.contains("품목 | 제품명") || normalized.contains("NO | 품명")
-}
-fn product_signal(text: &str, decision: &Value, state: &Value) -> bool {
-    let kind = decision.pointer("/match/kind").and_then(Value::as_str).unwrap_or("UNKNOWN");
-    if kind != "UNKNOWN" { return true; }
-    let t = text.trim();
-    if Regex::new(r"(?i)(?:BD[\s-]*)?[A-Z]{1,6}[-\s]?\d{1,4}(?:[-A-Z0-9]+)*|\b\d{3}(?:-1)?(?:\b|$)")
-        .expect("model code").is_match(t) { return true; }
-    if t.contains("보면대") || t.contains("악보대") || t.contains("스탠드")
-        || t.contains("뮤직트레이") || t.contains("스테레오바")
-        || t.contains("홀더") || t.contains("카트") {
-        // Do not treat addresses, notes, or organization names as products.
-        return !state.get("products").and_then(Value::as_array).map_or(false, |xs| xs.is_empty())
-            || model::category(t).is_some() || t.contains("카트") || t.contains("홀더");
-    }
-    false
+fn is_money_or_header(text: &str) -> bool { ts_semantics::ignored_document_line(text) }
+fn product_signal(text: &str, decision: &Value, _state: &Value) -> bool {
+    // From parser.ts:479-570: only registered identity, aliases, quantity,
+    // a genuine unknown model, or a product category can form a product row.
+    let t=text.trim();
+    if ts_semantics::ignored_document_line(t) { return false; }
+    if t.contains("배송비") || t.contains("택배비") || t.contains("운임")
+        || t.starts_with("번호") || t.starts_with("TEL")
+        || t.starts_with("연락처") || t.starts_with("휴대") { return false; }
+    let kind=decision.pointer("/match/kind").and_then(Value::as_str).unwrap_or("UNKNOWN");
+    if kind!="UNKNOWN" { return true; }
+    // In the TS recognizer an unknown three-digit model is an item candidate,
+    // but an unlabelled money or phone line is not.
+    let model=Regex::new(r"(?i)(?:BD\s*)?\d{3}[A-Za-z0-9-]*")
+        .expect("unknown model");
+    if model.is_match(t) { return true; }
+    if model::category(t).is_some() { return true; }
+    let product_category=Regex::new(
+        r"(?i)보면대|악보대|스탠드|뮤직트레이|스테레오바|홀더|카트|의자|가방|발판|거치대|SSB"
+    ).expect("product category");
+    product_category.is_match(t)
+        && (quantity::extract(t).len()>0 || t.contains("BANDO") || t.contains("반도"))
 }
 fn source_json(raw: &str, e: &Evidence, recipient_id: &str, target_id: &str) -> Value {
     json!({
@@ -263,8 +255,6 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
     ).expect("name label");
     let inline_person = Regex::new(r"(?:^|[\s|/])([가-힣]{2,5})(?:님)?\s+(?:0(?:50\d|1[016789]|2|[3-6]\d|70|80))")
         .expect("inline name");
-    let quantity_person = Regex::new(r"(?i)(?:\d+|한|두|세|네)\s*(?:개|대|ea|pcs)(?:\s|ㅣ|\|)+([가-힣]{2,5})(?:님)?")
-        .expect("quantity name");
     let note_label = Regex::new(r"^\s*(?:배송\s*)?(?:메모|메시지|메세지|요청사항)\s*[:：]?\s*(.*)$")
         .expect("note");
     let mut sender_section = false;
@@ -313,11 +303,25 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
                 }
             }
         }
-        if let Some(c) = quantity_person.captures(line.text) {
-            if let Some(name) = c.get(1) {
-                if is_person(name.as_str()) && address.map_or(true, |a| name.end() <= a) {
-                    add_match(&mut events, line, name.start(), name.end(), "name",
-                        name.as_str().to_owned(), "수량 뒤에 적힌 수취인 이름");
+        // Port of order-evidence.ts:190-221: only an independent, trailing
+        // name after a quantity, never shipping-request text in the sentence.
+        let name_region = address.map_or(line.text, |at| &line.text[..at]);
+        let name_region = name_region.trim_end_matches(|c: char| c.is_whitespace() || c=='ㅣ' || c=='|');
+        if let Some((start,end)) = ts_semantics::trailing_product_name(name_region) {
+            add_match(&mut events,line,start,end,"name",
+                name_region[start..end].to_owned(),"상품 수량 뒤의 독립 수취인명");
+        }
+        // A column-separated (but address-sharing) row uses the same name
+        // boundary, after the explicit separator and before the address.
+        if let Some(at)=address {
+            if let Some(c)=Regex::new(
+                r"(?i)(?:\d+)\s*(?:개|대|ea|pcs)\s*[ㅣ|]\s*([가-힣]{2,5})\s*$"
+            ).expect("same-line name").captures(&line.text[..at].trim_end()) {
+                if let Some(m)=c.get(1) {
+                    if is_person(m.as_str()) {
+                        add_match(&mut events,line,m.start(),m.end(),"name",
+                            m.as_str().to_owned(),"상품과 주소 사이의 독립 이름");
+                    }
                 }
             }
         }
@@ -360,6 +364,11 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
             add_match(&mut events, line, full.start(),full.end(),kind,value,
                 "연락처 원문 구간");
         }
+        let contact_spans: Vec<(usize,usize)> = phone.find_iter(line.text)
+            .map(|m|(m.start(),m.end())).collect();
+        if address.is_none() && ts_semantics::only_contact_or_identity(line.text,&contact_spans) {
+            continue;
+        }
         let has_name = events.iter().any(|e| e.kind == "name" && e.line == line.number);
         if !has_name && address.is_none() {
             if let Some(c) = Regex::new(r"^([가-힣]{2,5})\s+(?:목사|선생님)$")
@@ -398,24 +407,35 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
 
         let product_part = address.map_or(line.text, |begin| &line.text[..begin]);
         let trimmed = product_part.trim();
-        if trimmed.is_empty() || trimmed.contains("배송비") || trimmed.contains("택배비")
-            || trimmed.starts_with("전화") || trimmed.starts_with("연락처") {
+        if trimmed.is_empty() || is_money_or_header(trimmed)
+            || (trimmed.contains('|') && trimmed.split('|').any(|column|
+                matches!(column.trim(),"배송비"|"택배비"|"운임"))) {
             continue;
         }
+        // Exact TS parser.ts contact branch: a phone/identity row must not
+        // create a product even when its digits match a generic model regex.
+        let trim_phones: Vec<(usize,usize)> = phone.find_iter(trimmed)
+            .map(|m|(m.start(),m.end())).collect();
+        if ts_semantics::only_contact_or_identity(trimmed,&trim_phones) { continue; }
         let decision = model::decision_json(&model::decide(trimmed,state,client_id));
         if !product_signal(trimmed, &decision, state) { continue; }
         // Require model/category evidence, not a value made solely from a date or contact.
         if trimmed.contains("발주일") || trimmed.contains("발송일") { continue; }
-        let skip_until = if trimmed.contains('|') {
-            // Ignore an address/recipient in the remarks column when matching the SKU.
-            let parts: Vec<_> = trimmed.split('|').collect();
-            if parts.len() >= 5 { parts[..4].join(" | ") } else { trimmed.to_owned() }
-        } else { trimmed.to_owned() };
-        let matched = model::decision_json(&model::decide(&skip_until,state,client_id));
-        let quantity_values = quantity::for_product(&skip_until, trimmed.contains('|'),
-            !trimmed.contains('|') && model::products(state).iter()
-                .any(|p| model::model_names(p).iter().any(|name|
-                    model::find_term(&skip_until,name,true).is_some())));
+        let skip_until = ts_semantics::table_product_prefix(trimmed);
+        // Never synthesize a new string and then treat its indexes as offsets
+        // into raw: UTF-8/UTF-16 source-evidence contract must be lossless.
+        let matched = model::decision_json(&model::decide(skip_until,state,client_id));
+        let quantity_values = if trimmed.contains('|') {
+            let model_end=matched.get("evidence").and_then(Value::as_object)
+                .and_then(|o|o.get("end")).and_then(Value::as_u64)
+                .map(|v|v as usize);
+            ts_semantics::table_quantity(trimmed,model_end).map_or_else(Vec::new,
+                |(value,start,end)|vec![quantity::Quantity{value,start,end}])
+        } else {
+            quantity::for_product(skip_until,false,
+                model::products(state).iter().any(|p|model::model_names(p).iter()
+                    .any(|name|model::find_term(skip_until,name,true).is_some())))
+        };
         let mut quantity_indexes = Vec::new();
         let offset = line.text.find(trimmed).unwrap_or(0);
         for q in quantity_values {
