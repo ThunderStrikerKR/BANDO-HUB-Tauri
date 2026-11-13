@@ -202,8 +202,11 @@ fn export_row(state: &Value, entry: &Value, origin: &str) -> Result<Value, Strin
     } else {
         items.iter().map(|item| {
             let name = trimmed(item, "name");
-            let color = trimmed(item, "color");
-            let color_suffix = if color.is_empty() || color == "단일" {
+            let raw_color = text(item, "color");
+            let color = raw_color.trim();
+            // TypeScript checks the untrimmed raw value against "단일" while
+            // rendering a trimmed label. Keep even this legacy boundary case.
+            let color_suffix = if color.is_empty() || raw_color == "단일" {
                 String::new()
             } else {
                 format!(" {}", color)
