@@ -419,18 +419,22 @@ pub(crate) fn decide(text: &str, state: &Value, client_id: &str) -> Decision {
     let (mut entries,known_brand) =
         filter_business_candidates(text,state,&ps,entries);
     let aliases = alias_entries(text, state, client_id, &ps);
-    let hint=code_color_hint(text,&ps);
-    if let Some((base,_,term))=&hint {
-        // parser.ts:627-648 never rewrites a genuinely registered SKU
-        // that includes the color suffix in its own model code.
+    let mut hint=code_color_hint(text,&ps);
+    if let Some((base,_,term))=hint.clone() {
+        // parser.ts::protectedCode guards against reinterpreting the final
+        // letter of a *registered full model* as a color suffix. Examples:
+        // 700W (wide), 719B, 930BK, 801C. Once protected, that hint
+        // must not be carried forward as an explicit requested color.
         let protected=entries.iter().any(|e|model_names(e.p).iter()
-            .any(|name|model_key(name)==model_key(term)));
-        if !protected {
+            .any(|name|model_key(name)==model_key(&term)));
+        if protected {
+            hint=None;
+        } else {
             let mut matched:Vec<Entry<'_>>=ps.iter().copied()
                 .filter(|p|model_names(p).iter()
-                    .any(|name|model_key(name)==model_key(base)))
+                    .any(|name|model_key(name)==model_key(&base)))
                 .map(|p|Entry{
-                    p,priority:2,span:find_term(text,term,false)
+                    p,priority:2,span:find_term(text,&term,false)
                         .unwrap_or((0,text.len()))
                 }).collect();
             if matched.iter().any(|e|!variants(e.p).iter()
