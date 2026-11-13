@@ -26,21 +26,34 @@ const client={id:"ci-dealer",name:"가상거래처",tier:"wholesale",overrides:{
 const {parseEvidence}=await tsImport("../../../src/parser.ts",import.meta.url);
 
 function property(x,key){return x?.[key]??null;}
+function sourceProjection(s){return {field:property(s,"field"),
+  text:property(s,"text"),start:property(s,"start"),end:property(s,"end")};}
+function candidateProjection(c){return {kind:property(c,"kind"),
+  text:property(c,"text"),value:property(c,"value"),
+  start:property(c,"start"),end:property(c,"end")};}
+function productCandidateProjection(c){return {
+  label:property(c,"label"),productId:property(c,"productId"),
+  variantId:property(c,"variantId"),start:property(c,"start"),end:property(c,"end")
+};}
 function normalized(out){
   if(!out.ok)return out;
   const result=out.value;
   return {ok:true,value:{
+    candidates:(result.candidates??[]).map(candidateProjection),
     recipients:(result.recipients??[]).map(r=>({
       name:property(r,"name"),address:property(r,"address"),
       phone:property(r,"phone"),mobile:property(r,"mobile"),note:property(r,"note"),
       addressStatus:property(r,"addressStatus"),addressKind:property(r,"addressKind"),
       addressParts:property(r,"addressParts"),
+      sources:(r.sources??[]).map(sourceProjection),
       items:(r.items??[]).map(i=>({
         raw:property(i,"raw"),name:property(i,"name"),quantity:property(i,"quantity"),
         quantityConfirmed:property(i,"quantityConfirmed"),
         productId:property(i,"productId"),variantId:property(i,"variantId"),
         color:property(i,"color"),origin:property(i,"origin"),
         issues:i.issues??[],
+        sources:(i.sources??[]).map(sourceProjection),
+        productCandidates:(i.productCandidates??[]).map(productCandidateProjection),
       })),
     })),
   }};
