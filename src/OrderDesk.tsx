@@ -498,6 +498,8 @@ export function OrderDesk(props: OrderDeskProps) {
                                   state={flowState}
                                   shipment={activeShipment}
                                   freightCode={activeShipmentPreview.freightCode}
+                                  displayCharges={activeShipmentPreview.displayCharges}
+                                  freightEditingBlocked={activeShipmentPreview.freightEditingBlocked}
                                   activeKey={highlight}
                                   onFreight={(origin, value) =>
                                     recEdit(
