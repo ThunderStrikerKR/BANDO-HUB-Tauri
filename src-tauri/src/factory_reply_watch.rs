@@ -584,6 +584,84 @@ mod tests {
     }
 
     #[test]
+    fn matched_reply_is_applied_to_sqlite_once_with_archived_source_and_revision_guard() {
+        let base = fixture();
+        let inbox = base.join("incoming");
+        let archive = base.join("archive");
+        fs::create_dir_all(&inbox).unwrap();
+        fs::create_dir_all(&archive).unwrap();
+        let filename = "matched-response.xlsx";
+        let bytes = b"PK\x03\x04synthetic-factory-reply-valid-identity";
+        let id = file_id(bytes);
+        fs::write(inbox.join(filename), bytes).unwrap();
+        let mut db = initialize_database(&base.join("actual-sqlite.db")).unwrap();
+        let mut initial = get_snapshot(&db).unwrap();
+        initial["settings"]["factoryReplyDirectory"] =
+            json!(fs::canonicalize(&inbox).unwrap().to_string_lossy().to_string());
+        initial["settings"]["excelDirectory"] =
+            json!(fs::canonicalize(&archive).unwrap().to_string_lossy().to_string());
+        let recipient = json!({"id":"r1","name":"박수하","address":"서울 서초구 123",
+            "phone":"010-1111-2222","mobile":"","actualFreight":4000,
+            "items":[{"id":"i1","origin":"FACTORY","quantity":1}]});
+        initial["orders"] = json!([{"id":"o1","clientId":"","status":"STATEMENT",
+            "createdAt":"2026-11-13T08:00:00Z","recipients":[recipient.clone()]}]);
+        initial["workflow"] = json!({"queue":[{
+            "id":"q1","shipmentId":"s1","origin":"FACTORY","status":"EXPORTED",
+            "snapshot":{"recipient":recipient}}],
+            "shipments":[{"id":"s1","orderId":"o1","recipientId":"r1",
+                "tracking":{},"actualFreight":{}}],
+            "events":[],"groups":[],"sources":[],"payments":[],
+            "deliveries":[],"changeRequests":[]});
+        write_snapshot(&mut db,initial,0,false).unwrap();
+        let before = get_snapshot(&db).unwrap();
+        let revision = before["revision"].as_u64().unwrap();
+        let mut candidate = before.clone();
+        candidate["workflow"]["shipments"][0]["tracking"]["FACTORY"] =
+            json!("001234567890");
+        candidate["workflow"]["events"].as_array_mut().unwrap().push(json!({
+            "id":"event-synthetic","at":"2026-11-13T08:05:00Z",
+            "action":"공장 회신 반영","shipmentIds":["s1"]}));
+        candidate["factoryReplies"].as_array_mut().unwrap().push(json!({
+            "id":id,"filename":filename,"status":"APPLIED",
+            "businessDate":"2026-11-13","at":"2026-11-13T08:05:00Z",
+            "actor":"직원","rows":[{
+                "row":2,"name":"박수하","address":"서울 서초구 １２３",
+                "contacts":["010-1111-2222"],"tracking":"001234567890",
+                "actual":4000,"shipmentId":"s1","orderId":"o1","applied":true
+            }]}));
+        let mut unauthorized = candidate.clone();
+        unauthorized["orders"][0]["recipients"][0]["name"] = json!("무단 변경");
+        assert!(commit_auto(&mut db,&base,false,filename,&id,unauthorized,revision)
+            .unwrap_err().contains("orders"));
+        assert_eq!(get_snapshot(&db).unwrap(),before);
+        let saved = commit_auto(&mut db,&base,false,filename,&id,
+            candidate.clone(),revision).unwrap();
+        assert!(!saved.duplicate);
+        assert_eq!((saved.applied,saved.held),(1,0));
+        let current = get_snapshot(&db).unwrap();
+        assert_eq!(current["revision"],revision + 1);
+        assert_eq!(current["orders"],before["orders"]);
+        assert_eq!(current["workflow"]["shipments"][0]["tracking"]["FACTORY"],
+            "001234567890");
+        // The original order had this amount already: no synthetic overwrite.
+        assert!(current["workflow"]["shipments"][0]["actualFreight"]["FACTORY"].is_null());
+        assert_eq!(current["factoryReplies"][0]["status"],"APPLIED");
+        let original=current["factoryReplies"][0]["archivedPath"].as_str().unwrap();
+        assert_eq!(fs::read(original).unwrap(),bytes);
+        let duplicate=commit_auto(&mut db,&base,false,filename,&id,
+            current.clone(),revision + 1).unwrap();
+        assert!(duplicate.duplicate);
+        assert_eq!(get_snapshot(&db).unwrap(),current);
+        let mut stale=candidate;
+        stale["revision"]=json!(revision);
+        assert!(commit_auto(&mut db,&base,false,filename,&id,stale,revision)
+            .unwrap_err().contains("다른 작업에서"));
+        assert_eq!(get_snapshot(&db).unwrap(),current);
+        drop(db);
+        let _ = fs::remove_dir_all(base);
+    }
+
+    #[test]
     fn unchanged_order_recipient_freight_is_valid_without_new_shipment_rate() {
         let recipient=json!({"id":"r1","name":"박수하","address":"서울 서초구 123",
             "phone":"010-1111-2222","mobile":"","actualFreight":4000,
