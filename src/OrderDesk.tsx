@@ -10,10 +10,12 @@ import { ProductSearchDialog } from "./ProductSearchDialog";
 import { SourceDocument } from "./SourceDocument";
 import { StaffChecks } from "./StaffChecks";
 import { WorkflowFooter, WorkflowFreightRows } from "./WorkflowFooter";
-import { repriceOrder, resolvePrice, won } from "./domain";
+import { won } from "./domain";
 import { confirmProposedProduct } from "./issue-actions";
 import { internalModel } from "./matching";
 import { useOrderDesk, type OrderDeskProps } from "./orders/useOrderDesk";
+import { nativeRepriceEditedOrder, nativeReconcileWorkflow } from "./orders/native-rules";
+import { businessCoreCall } from "./tauri-bridge";
 import { addressParts } from "./parser";
 import { billingSnapshot } from "./replies";
 import { Field, clone } from "./ui";
@@ -43,6 +45,7 @@ export function OrderDesk(props: OrderDeskProps) {
     recEdit,
     products,
     pricingClient,
+    isCurrentOrderInput,
     shownRecipient,
     setItemEditing,
     itemEdit,
@@ -148,7 +151,7 @@ export function OrderDesk(props: OrderDeskProps) {
                 if (issue) throw Error(issue);
                 if (exported || draft.deletedAt)
                   throw Error("완료 / 삭제된 주문의 거래처는 변경할 수 없습니다.");
-                const next = repriceOrder(
+                const next = await nativeRepriceEditedOrder(
                   {
                     ...clone(draft),
                     clientId: c.id,
@@ -162,13 +165,17 @@ export function OrderDesk(props: OrderDeskProps) {
                   c,
                   state,
                 );
+                // Async native decisions must not apply to another selected
+                // draft or a newly received catalog / persisted revision.
+                if (!isCurrentOrderInput(draft, state))
+                  throw Error("주문 또는 거래처 정보가 변경되었습니다. 다시 선택하세요.");
                 if (draft.pricesLocked)
                   next.billingHistory = [
                     ...(next.billingHistory ?? []),
                     billingSnapshot(draft, state, "거래처 변경"),
                   ];
                 next.updatedAt = new Date().toISOString();
-                if (saved) await onWorkflowSave(reconcileWorkflow(state, next));
+                if (saved) await onWorkflowSave(await nativeReconcileWorkflow(state, next));
                 onChange(next);
               }}
               onSave={onWorkflowSave}
@@ -195,38 +202,46 @@ export function OrderDesk(props: OrderDeskProps) {
                         false,
                       );
                   }}
-                  onCandidate={(b, value) =>
-                    recEdit(
-                      b.recipientId,
-                      (r) => {
-                        if (b.kind === "OPTION") {
-                          const i = r.items.find((i) => i.id === b.itemId),
-                            p = products.find((p) => p.id === i?.productId),
-                            v = p?.variants.find((v) => v.id === value);
-                          if (i && p && v) {
-                            i.variantId = v.id;
-                            i.color = v.color;
-                            i.url = v.url;
-                            i.unitPrice = resolvePrice(p, v.id, pricingClient);
-                            i.issues = i.issues.filter((x) => !/색상|옵션/.test(x));
-                            i.manuallyConfirmed = true;
-                            delete i.quantityApproval;
-                          }
-                          return;
-                        }
-                        const field = b.kind?.slice(10);
-                        if (field && ["name", "address", "phone", "mobile"].includes(field)) {
-                          (r as unknown as Record<string, unknown>)[field] = value;
-                          r.confirmedFields = [...new Set([...(r.confirmedFields ?? []), field])];
-                          if (field === "address")
-                            r.addressStatus = validDeliveryAddress(r.address)
-                              ? "COMPLETE"
-                              : "INCOMPLETE";
-                        }
-                      },
-                      false,
-                    )
-                  }
+                  onCandidate={(b, value) => {
+                    if (b.kind === "OPTION") {
+                      const row = draft.recipients.find((r) => r.id === b.recipientId);
+                      const item = row?.items.find((i) => i.id === b.itemId);
+                      const product = products.find((p) => p.id === item?.productId);
+                      const variant = product?.variants.find((v) => v.id === value);
+                      if (!item || !product || !variant) return;
+                      void run(async () => {
+                        const { unitPrice } = await businessCoreCall<{ unitPrice: number | null }>(
+                          "rules", "resolve_unit_price", {
+                            product, variantId: variant.id, client: pricingClient,
+                          },
+                        );
+                        if (!isCurrentOrderInput(draft, state)) return;
+                        recEdit(b.recipientId, (r) => {
+                          const current = r.items.find((i) => i.id === b.itemId);
+                          if (!current || current.productId !== product.id) return;
+                          current.variantId = variant.id;
+                          current.color = variant.color;
+                          current.url = variant.url;
+                          current.unitPrice = unitPrice;
+                          current.issues = current.issues.filter((x) => !/색상|옵션/.test(x));
+                          current.manuallyConfirmed = true;
+                          delete current.quantityApproval;
+                        }, false);
+                      });
+                      return;
+                    }
+                    recEdit(b.recipientId, (r) => {
+                      const field = b.kind?.slice(10);
+                      if (field && ["name", "address", "phone", "mobile"].includes(field)) {
+                        (r as unknown as Record<string, unknown>)[field] = value;
+                        r.confirmedFields = [...new Set([...(r.confirmedFields ?? []), field])];
+                        if (field === "address")
+                          r.addressStatus = validDeliveryAddress(r.address)
+                            ? "COMPLETE"
+                            : "INCOMPLETE";
+                      }
+                    }, false);
+                  }}
                 />
                 <div className="recipient-body">
                   <header className="recipient-section-heading">

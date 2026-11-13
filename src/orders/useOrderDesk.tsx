@@ -143,6 +143,9 @@ export function useOrderDesk({
   const rulesClientSignature = JSON.stringify(liveClient ?? null);
   const latestRulesInput = useRef({ draft, state, rulesClientSignature, saved });
   latestRulesInput.current = { draft, state, rulesClientSignature, saved };
+  const isCurrentOrderInput = (sourceDraft: Order, sourceState: State): boolean =>
+    latestRulesInput.current.draft === sourceDraft &&
+    latestRulesInput.current.state === sourceState;
   useEffect(() => {
     const request = ++ruleRequests.current.price;
     if (!liveClient || !passivePricingAllowed) return;
@@ -627,6 +630,7 @@ export function useOrderDesk({
     recEdit,
     products,
     pricingClient,
+    isCurrentOrderInput,
     shownRecipient,
     setItemEditing,
     itemEdit,
