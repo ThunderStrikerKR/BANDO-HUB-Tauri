@@ -199,6 +199,14 @@ fn basic_issues(order:&Value,recipient:&Value,client:&Value) -> Vec<String> {
     }
     issues
 }
+fn payment_won(value: Option<i64>) -> String {
+    let Some(n) = value else { return "확인 필요".into() };
+    let digits = n.unsigned_abs().to_string();
+    let groups = digits.as_bytes().rchunks(3).rev()
+        .map(|part| std::str::from_utf8(part).unwrap_or(""))
+        .collect::<Vec<_>>().join(",");
+    format!("{}{}원", if n < 0 { "-" } else { "" }, groups)
+}
 fn stage_issues(state:&Value,group_id:&str,next:i64) -> Result<Vec<String>,String> {
     let (gi,ids)=group_indices(state,group_id)?;
     let group=&state["workflow"]["groups"][gi];
@@ -256,7 +264,11 @@ fn stage_issues(state:&Value,group_id:&str,next:i64) -> Result<Vec<String>,Strin
                 str_field(a,k).trim().is_empty())) {
                 issues.push("입금 계좌를 등록 / 선택하세요".into());
             }
-            if flag(group,"needsNotice") {issues.push("변경된 금액 / 계좌 재안내 필요".into());}
+            if flag(group,"needsNotice") {
+                let recipient_name = str_field(row,"name").trim();
+                let prefix = if recipient_name.is_empty() { "수취인" } else { recipient_name };
+                issues.push(format!("{}: 변경된 금액 / 계좌 재안내 필요", prefix));
+            }
         }
         if next>=4 && str_field(order,"orderType")!="RETAIL" {
             if field(ship,"step").as_i64().unwrap_or(0)<3 {
@@ -265,8 +277,8 @@ fn stage_issues(state:&Value,group_id:&str,next:i64) -> Result<Vec<String>,Strin
             if str_field(client,"payment")=="PREPAID" && !flag(ship,"legacyApproval") {
                 let due=payment_due(state,ship,order,client)?;
                 if due.is_none_or(|v|v>0) {
-                    issues.push(format!("{}: 입금 부족 {}원",str_field(row,"name"),
-                        due.map(|v|v.to_string()).unwrap_or_else(||"확인 필요".into())));
+                    issues.push(format!("{}: 입금 부족 {}",str_field(row,"name"),
+                        payment_won(due)));
                 }
             }
         }
