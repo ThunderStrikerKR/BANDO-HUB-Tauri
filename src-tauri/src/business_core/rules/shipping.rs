@@ -294,6 +294,56 @@ pub(super) fn shipping_action(payload: &Value) -> Result<Value, String> {
             set(&mut shipping["groups"][index],"current",next)?;
             Ok(json!({"shipping":shipping}))
         }
+        "assign_products" => {
+            // ShippingManager::savePending: batch assignment changes apply to
+            // current products only; clearing an assignment issues a fresh
+            // standalone unresolved tariff and archives any earlier version.
+            let mut state=req(payload,"state")?.clone();
+            let assignments=req(payload,"assignments")?.as_object()
+                .ok_or("배송 그룹 지정 내역 형식 오류")?;
+            let now=required_str(payload,"now")?;
+            if !field(&state,"shipping").is_object() {
+                return Err("운임 기준을 확인하세요.".into());
+            }
+            for (pid,group) in assignments {
+                let target=group.as_str().ok_or("배송 그룹 값을 확인하세요.")?;
+                if !target.is_empty() { continue; }
+                if !field(&state["shipping"],"productRules").is_object() {
+                    set(&mut state["shipping"],"productRules",json!({}))?;
+                }
+                if !field(&state["shipping"],"productHistory").is_object() {
+                    set(&mut state["shipping"],"productHistory",json!({}))?;
+                }
+                let previous=field(field(&state["shipping"],"productRules"),pid).clone();
+                if !previous.is_null() {
+                    if !field(&state["shipping"]["productHistory"],pid).is_array() {
+                        set(&mut state["shipping"]["productHistory"],pid,json!([]))?;
+                    }
+                    state["shipping"]["productHistory"][pid].as_array_mut()
+                        .ok_or("이전 상품 운임 기록 형식 오류")?.push(previous);
+                }
+                let version=required_str(field(payload,"versionIds"),pid)?;
+                let current=json!({
+                    "version":version,"at":now,
+                    "fees":{"1":null,"2":null,"3":null,"4":null,"5":null,"6":null},
+                    "maxBundle":null,"maxConfirmed":false,"perItem":null,
+                    "notes":"상품의 최대 묶음 수량과 운임을 확인해 입력하세요."
+                });
+                set(&mut state["shipping"]["productRules"],pid,current)?;
+            }
+            for product in state["products"].as_array_mut()
+                .ok_or("상품 목록을 확인하세요.")? {
+                let pid=str_field(product,"id");
+                let Some(group)=assignments.get(pid).and_then(Value::as_str) else {continue};
+                if group.is_empty() {
+                    product.as_object_mut().ok_or("상품 정보 형식 오류")?
+                        .remove("shippingGroupId");
+                } else {
+                    set(product,"shippingGroupId",json!(group))?;
+                }
+            }
+            Ok(json!({"state":state}))
+        }
         "save_product_rule" => {
             // Port of ProductFreightPanel::writeRule for a standalone product.
             // Older versions must remain intact even when the new group
