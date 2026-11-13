@@ -284,9 +284,14 @@ fn append_extra_event(state:&mut Value,payload:&Value,id:&str,action:&str,
     if find_by_id(field(field(state,"workflow"),"events"),id).is_some() {
         return Err("업무 이벤트 ID가 중복됩니다.".into());
     }
-    let event=json!({"id":id,"at":required_str(payload,"now")?,
+    let mut event=json!({"id":id,"at":required_str(payload,"now")?,
         "actor":actor,"action":action,"shipmentIds":ship_ids,
-        "groupId":group_id,"before":before,"after":after,"reason":reason});
+        "groupId":group_id,"before":before,"reason":reason});
+    // The original downgrade event does not supply an "after" argument
+    // for confirmation invalidation, only for the stage recheck.
+    if action!="입금 승인 재확인 필요" {
+        set(&mut event,"after",after)?;
+    }
     state["workflow"]["events"].as_array_mut()
         .ok_or("업무 이벤트 목록 누락")?.push(event);
     Ok(())
@@ -546,14 +551,21 @@ pub(super) fn apply(payload:&Value)->Result<Value,String> {
                     "fromStage":old_step,"toStage":1
                 }));
                 let seed=required_str(payload,"eventId")?;
+                let audit_ids=rows(field(payload,"auditEventIds"));
+                let mut audit_cursor=0usize;
                 for confirmation_id in active_confirms {
-                    append_extra_event(&mut state,payload,
-                        &format!("{seed}:reconfirm:{ship_id}:{confirmation_id}"),
+                    let fallback=format!("{seed}:reconfirm:{ship_id}:{confirmation_id}");
+                    let id=audit_ids.get(audit_cursor).and_then(Value::as_str)
+                        .unwrap_or(fallback.as_str());
+                    audit_cursor+=1;
+                    append_extra_event(&mut state,payload,id,
                         "입금 승인 재확인 필요",&[ship_id.to_string()],&group_id,
                         json!(confirmation_id),Value::Null,"시스템","직원이 운임 변경")?;
                 }
-                append_extra_event(&mut state,payload,
-                    &format!("{seed}:recheck:{ship_id}"),"재검증 필요",
+                let fallback=format!("{seed}:recheck:{ship_id}");
+                let id=audit_ids.get(audit_cursor).and_then(Value::as_str)
+                    .unwrap_or(fallback.as_str());
+                append_extra_event(&mut state,payload,id,"재검증 필요",
                     &[ship_id.to_string()],&group_id,json!(old_step),json!(1),
                     "시스템","직원이 운임 변경")?;
             }
@@ -906,6 +918,8 @@ pub(super) fn apply(payload:&Value)->Result<Value,String> {
             set(&mut state["orders"][oi]["groupAccounts"],group_id,group_account)?;
             let now=required_str(payload,"now")?.to_string();
             let seed=required_str(payload,"eventId")?;
+            let audit_ids=rows(field(payload,"auditEventIds"));
+            let mut audit_cursor=0usize;
             for si in &ships {
                 let old_step=field(&state["workflow"]["shipments"][*si],"step").as_i64().unwrap_or(0);
                 if old_step < 3 {continue;}
@@ -931,13 +945,19 @@ pub(super) fn apply(payload:&Value)->Result<Value,String> {
                         "at":now,"reason":"입금 계좌 변경","fromStage":old_step,"toStage":2
                     }));
                 for confirmation_id in active_confirms {
-                    append_extra_event(&mut state,payload,
-                        &format!("{seed}:reconfirm:{ship_id}:{confirmation_id}"),
+                    let fallback=format!("{seed}:reconfirm:{ship_id}:{confirmation_id}");
+                    let id=audit_ids.get(audit_cursor).and_then(Value::as_str)
+                        .unwrap_or(fallback.as_str());
+                    audit_cursor+=1;
+                    append_extra_event(&mut state,payload,id,
                         "입금 승인 재확인 필요",&[ship_id.clone()],group_id,
                         json!(confirmation_id),Value::Null,"시스템","입금 계좌 변경")?;
                 }
-                append_extra_event(&mut state,payload,
-                    &format!("{seed}:recheck:{ship_id}"),"재검증 필요",&[ship_id],
+                let fallback=format!("{seed}:recheck:{ship_id}");
+                let id=audit_ids.get(audit_cursor).and_then(Value::as_str)
+                    .unwrap_or(fallback.as_str());
+                audit_cursor+=1;
+                append_extra_event(&mut state,payload,id,"재검증 필요",&[ship_id],
                     group_id,json!(old_step),json!(2),"시스템","입금 계좌 변경")?;
             }
             let all_ids=ships.iter().map(|i|str_field(&state["workflow"]["shipments"][*i],"id")
