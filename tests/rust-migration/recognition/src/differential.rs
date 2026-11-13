@@ -133,7 +133,7 @@ fn execute_original_typescript_and_rust_with_all_product_fields() {
     for entry in report["byCase"].as_array().into_iter().flatten(){
         println!("TS_RUST_PRODUCT_DIFF_CASE {}",entry);
     }
-    for entry in report["differences"].as_array().into_iter().flatten().take(200){
+    for entry in report["differences"].as_array().into_iter().flatten().take(1500){
         println!("TS_RUST_PRODUCT_DIFF_DETAIL {}",entry);
     }
     // This is an *audit*, not a false assertion of complete parity.
