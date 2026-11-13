@@ -155,6 +155,78 @@ mod regressions {
     }
 
     #[test]
+    fn two_recipient_product_ownership_uses_original_evidence_order() {
+        // Source: audit-20-order-samples.test.mjs, sample 13.
+        // A SKU preceding the first address belongs to its following
+        // recipient; the next SKU belongs to the following recipient.
+        let case=&samples()[12];
+        let result=recognition::execute("analyze_order",json!({
+            "raw":case["raw"],"state":seed()
+        })).expect("sample 13");
+        let rows=result["recipients"].as_array().expect("recipients");
+        assert_eq!(rows.len(),2);
+        assert_eq!(rows[0]["name"],"장가상");
+        assert_eq!(rows[1]["name"],"정가상");
+        assert_eq!(rows[0]["items"].as_array().unwrap().len(),1);
+        assert_eq!(rows[1]["items"].as_array().unwrap().len(),1);
+        assert_eq!(rows[0]["items"][0]["quantity"],2);
+        assert!(rows[0]["items"][0]["raw"].as_str().unwrap().contains("SSB"));
+        assert_eq!(rows[1]["items"][0]["quantity"],1);
+        assert!(rows[1]["items"][0]["raw"].as_str().unwrap().contains("705"));
+    }
+
+    #[test]
+    fn tabular_orders_preserve_exact_utf16_evidence_spans() {
+        // Source: parser.ts + order-evidence.ts, 19/20.
+        // Every returned source/candidate must point into the untouched raw
+        // UTF-16 string, not a reconstructed table cell.
+        for id in [19_usize,20] {
+            let case=&samples()[id-1];
+            let raw=case["raw"].as_str().unwrap();
+            let original:Vec<u16>=raw.encode_utf16().collect();
+            let output=recognition::execute("analyze_order",json!({
+                "raw":raw,"state":seed()
+            })).expect("tabular recognition");
+            let mut checked=0;
+            for candidate in output["candidates"].as_array().unwrap() {
+                let start=candidate["start"].as_u64().unwrap() as usize;
+                let end=candidate["end"].as_u64().unwrap() as usize;
+                assert!(start<=end && end<=original.len(),"order {id}: invalid candidate bounds");
+                let original_text=String::from_utf16(&original[start..end]).unwrap();
+                assert_eq!(original_text,candidate["text"],"order {id}: candidate source was shifted");
+                checked+=1;
+            }
+            for row in output["recipients"].as_array().unwrap() {
+                for item in row["items"].as_array().unwrap() {
+                    for source in item["sources"].as_array().unwrap() {
+                        let start=source["start"].as_u64().unwrap() as usize;
+                        let end=source["end"].as_u64().unwrap() as usize;
+                        assert!(start<=end && end<=original.len(),"order {id}: bad item span");
+                        assert_eq!(String::from_utf16(&original[start..end]).unwrap(),
+                            source["text"],"order {id}: source must equal original bytes in UTF-16");
+                    }
+                }
+            }
+            assert!(checked>0,"order {id} must retain evidence");
+        }
+    }
+
+    #[test]
+    fn old_false_manual_flag_does_not_block_reanalysis() {
+        let state=json!({"products":[],"aliases":[]});
+        let order=json!({
+            "raw":"고객정보\n이가상\n경기도 의정부시 시민로 100",
+            "manualClassification":false,
+            "recipients":[],
+            "analysisEvidence":[]
+        });
+        let result=recognition::execute("reanalyze_order",json!({
+            "order":order,"state":state
+        })).expect("reanalyze false manual flag");
+        assert!(!result["recipients"].as_array().unwrap().is_empty());
+    }
+
+    #[test]
     fn a_negative_quantity_never_becomes_approved() {
         let state=json!({"products":[],"aliases":[]});
         let result=recognition::execute("analyze_order",json!({
