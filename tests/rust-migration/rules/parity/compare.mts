@@ -21,6 +21,7 @@ import {
 import { shipmentTotals, validateWorkflow, reconcileWorkflow, deleteOrder, workflowIssues, stageIssues, applyOrderRawEdit, migrateWorkflow, advanceGroup, undoGroup, setShipmentFreight, processGroup, confirmGroupPayment, recordPayment, restoreShipment, markStoreSent, recordChangeRequest, setGroupAccount, detachShipment, regroupShipment, completeDelivery } from "../../../../src/workflow.ts";
 import { recordActualFreight } from "../../../../src/actual-freight.ts";
 import { deleteGroup, restoreGroup } from "../../../../src/group-trash.ts";
+import { correctionStatus, requestCorrection, copiedCorrection, confirmCorrection, markFactoryDelivered, markCollected, reopenUnsentExport } from "../../../../src/corrections.ts";
 import { orderIssues, approveMissingQuantity, pendingIssue } from "../../../../src/validation.ts";
 import { validateReceptionBoundary } from "../../../../src/orders/reception.ts";
 import { companyClient, companyParty } from "../../../../src/order-types.ts";
@@ -2385,6 +2386,166 @@ groupTrashCase("restore group with all existing shipment IDs","restore_group",
   s=>{s.workflow.groups[0].deletedAt="2026-01-01T00:00:00.000Z";
     s.workflow.shipments.push({...copy(s.workflow.shipments[0]),
       id:"shipment:o1:r2",recipientId:"r2"});},true);
+
+
+// Correction action direct parity with original src/corrections.ts.
+// Inject the same timestamp/UUID stream; compare immutable financial
+// ledgers and every recipient, shipment, queue and audit record.
+function correctionCase(name:string,action:string,setup:(s:any)=>void,
+  extra:(state:any)=>Record<string,unknown>,
+  source:(state:any)=>any,success:boolean) {
+  const state:any=copy(baseState);
+  state.orders[0].recipients[0].items[0].quantityConfirmed=true;
+  setup(state);
+  const ids=Array.from({length:6},(_,i)=>
+    "correction-"+name.replace(/[^a-zA-Z0-9]/g,"-")+"-"+i);
+  const payload={state,action,now:actionNow,ids,
+    shipmentId:"shipment:o1:r1",requestId:"correction-r1",...extra(state)};
+  add("correction: "+name,"apply_correction_action",payload,()=>{
+    const output=deterministicIds(ids,()=>source(state));
+    return action==="correction_status"?{status:output}:{state:output};
+  });
+  cases[cases.length-1].expectedOk=success;
+}
+const correctedRecipient=(s:any)=>{
+  const recipient=copy(s.orders[0].recipients[0]);
+  recipient.note="공장 출고 전 추가 메모";
+  return recipient;
+};
+const confirmedCorrection=(s:any,atStatus:"REGISTERED"|"PENDING_FACTORY"|"CONFIRMED"="REGISTERED")=>{
+  const old=copy(s.orders[0].recipients[0]), after=correctedRecipient(s);
+  s.workflow.shipments[0].transferred=true;
+  s.workflow.changeRequests.push({id:"correction-r1",
+    shipmentId:"shipment:o1:r1",orderId:"o1",at:now,
+    actor:"가상 담당자",text:"배송 정보 정정 요청",
+    beforeRecipient:old,afterRecipient:after});
+  if(atStatus!=="REGISTERED")
+    s.workflow.events.push({id:"corr-status-1",at:now,actor:"가상 담당자",
+      action:"정정 요청 상태",shipmentIds:["shipment:o1:r1"],
+      before:"correction-r1",after:atStatus});
+};
+correctionCase("initial status","correction_status",()=>{},
+  ()=>({requestId:"absent"}),s=>correctionStatus(s,"absent"),true);
+correctionCase("status after factory pending","correction_status",
+  s=>confirmedCorrection(s,"PENDING_FACTORY"),
+  ()=>({}),s=>correctionStatus(s,"correction-r1"),true);
+correctionCase("request valid changed note","request_correction",
+  s=>{s.workflow.shipments[0].transferred=true;},
+  s=>({afterRecipient:correctedRecipient(s)}),
+  s=>requestCorrection(s,"shipment:o1:r1",correctedRecipient(s)),true);
+correctionCase("request identical recipient","request_correction",
+  s=>{s.workflow.shipments[0].transferred=true;},
+  s=>({afterRecipient:copy(s.orders[0].recipients[0])}),
+  s=>requestCorrection(s,"shipment:o1:r1",copy(s.orders[0].recipients[0])),false);
+correctionCase("request before transfer","request_correction",
+  ()=>{},s=>({afterRecipient:correctedRecipient(s)}),
+  s=>requestCorrection(s,"shipment:o1:r1",correctedRecipient(s)),false);
+correctionCase("request after delivery","request_correction",
+  s=>{s.workflow.shipments[0].transferred=true;
+    s.workflow.shipments[0].delivery={at:now};},
+  s=>({afterRecipient:correctedRecipient(s)}),
+  s=>requestCorrection(s,"shipment:o1:r1",correctedRecipient(s)),false);
+correctionCase("request after collection","request_correction",
+  s=>{s.workflow.shipments[0].transferred=true;
+    s.workflow.shipments[0].collectedAt=now;},
+  s=>({afterRecipient:correctedRecipient(s)}),
+  s=>requestCorrection(s,"shipment:o1:r1",correctedRecipient(s)),false);
+correctionCase("request recipient ID changed","request_correction",
+  s=>{s.workflow.shipments[0].transferred=true;},
+  s=>{const row=correctedRecipient(s);row.id="another-id";return {afterRecipient:row};},
+  s=>{const row=correctedRecipient(s);row.id="another-id";
+    return requestCorrection(s,"shipment:o1:r1",row);},false);
+correctionCase("request shipping origin changed","request_correction",
+  s=>{s.workflow.shipments[0].transferred=true;},
+  s=>{const row=correctedRecipient(s);row.items[0].origin="STORE";
+    return {afterRecipient:row};},
+  s=>{const row=correctedRecipient(s);row.items[0].origin="STORE";
+    return requestCorrection(s,"shipment:o1:r1",row);},false);
+correctionCase("request shipping charge invalid","request_correction",
+  s=>{s.workflow.shipments[0].transferred=true;},
+  s=>{const row=correctedRecipient(s);row.shippingCharges={FACTORY:-2};
+    return {afterRecipient:row};},
+  s=>{const row=correctedRecipient(s);row.shippingCharges={FACTORY:-2};
+    return requestCorrection(s,"shipment:o1:r1",row);},false);
+correctionCase("request missing recipient name","request_correction",
+  s=>{s.workflow.shipments[0].transferred=true;},
+  s=>{const row=correctedRecipient(s);row.name="";
+    return {afterRecipient:row};},
+  s=>{const row=correctedRecipient(s);row.name="";
+    return requestCorrection(s,"shipment:o1:r1",row);},false);
+correctionCase("identical pending request no-op","request_correction",
+  s=>confirmedCorrection(s,"PENDING_FACTORY"),
+  s=>({afterRecipient:correctedRecipient(s)}),
+  s=>requestCorrection(s,"shipment:o1:r1",correctedRecipient(s)),true);
+correctionCase("copy registered correction","copied_correction",
+  s=>confirmedCorrection(s),
+  ()=>({}),s=>copiedCorrection(s,"correction-r1"),true);
+correctionCase("copy already pending correction no-op","copied_correction",
+  s=>confirmedCorrection(s,"PENDING_FACTORY"),
+  ()=>({}),s=>copiedCorrection(s,"correction-r1"),true);
+correctionCase("copy absent correction rejected","copied_correction",
+  ()=>{},()=>({}),s=>copiedCorrection(s,"correction-r1"),false);
+correctionCase("confirm copied factory correction","confirm_correction",
+  s=>confirmedCorrection(s,"PENDING_FACTORY"),
+  ()=>({}),s=>confirmCorrection(s,"correction-r1"),true);
+correctionCase("confirm before message copied blocked","confirm_correction",
+  s=>confirmedCorrection(s),()=>({}),
+  s=>confirmCorrection(s,"correction-r1"),false);
+correctionCase("confirm already confirmed no-op","confirm_correction",
+  s=>confirmedCorrection(s,"CONFIRMED"),()=>({}),
+  s=>confirmCorrection(s,"correction-r1"),true);
+correctionCase("confirm after collection blocked","confirm_correction",
+  s=>{confirmedCorrection(s,"PENDING_FACTORY");
+    s.workflow.shipments[0].collectedAt=now;},
+  ()=>({}),s=>confirmCorrection(s,"correction-r1"),false);
+correctionCase("confirm when recipient changed meanwhile blocked","confirm_correction",
+  s=>{confirmedCorrection(s,"PENDING_FACTORY");
+    s.orders[0].recipients[0].address="서울시 다른 주소길 22";},
+  ()=>({}),s=>confirmCorrection(s,"correction-r1"),false);
+const factoryExport=(s:any)=>{
+  s.workflow.shipments[0].transferred=true;
+  s.workflow.queue.push({id:"factory-export",shipmentId:"shipment:o1:r1",
+    origin:"FACTORY",status:"EXPORTED",fileOnly:true,at:now,
+    snapshot:{recipient:copy(s.orders[0].recipients[0]),total:50000}});
+};
+correctionCase("mark factory delivered","mark_factory_delivered",
+  s=>factoryExport(s),()=>({}),
+  s=>markFactoryDelivered(s,"shipment:o1:r1"),true);
+correctionCase("mark factory delivered idempotent","mark_factory_delivered",
+  s=>{factoryExport(s);
+    s.workflow.queue[0].fileOnly=false;
+    s.workflow.queue[0].factoryDeliveredAt=now;
+    s.workflow.events.push({id:"old-factory-confirm",at:now,actor:"직원",
+      action:"공장 전달 직원 확인",shipmentIds:["shipment:o1:r1"]});},
+  ()=>({}),s=>markFactoryDelivered(s,"shipment:o1:r1"),true);
+correctionCase("mark factory delivered without export","mark_factory_delivered",
+  ()=>{},()=>({}),s=>markFactoryDelivered(s,"shipment:o1:r1"),false);
+correctionCase("mark collection","mark_collected",
+  s=>{s.workflow.shipments[0].transferred=true;},()=>({}),
+  s=>markCollected(s,"shipment:o1:r1"),true);
+correctionCase("mark already collected no-op","mark_collected",
+  s=>{s.workflow.shipments[0].transferred=true;
+    s.workflow.shipments[0].collectedAt="2026-01-02T00:00:00.000Z";},
+  ()=>({}),s=>markCollected(s,"shipment:o1:r1"),true);
+correctionCase("mark collection without transfer blocked","mark_collected",
+  ()=>{},()=>({}),s=>markCollected(s,"shipment:o1:r1"),false);
+correctionCase("reopen unsent factory export","reopen_unsent_export",
+  s=>{factoryExport(s);s.exports=[{id:"export-snapshot",snapshots:[
+    {id:"factory-export",snapshot:copy(s.workflow.queue[0].snapshot)}]}];},
+  ()=>({}),s=>reopenUnsentExport(s,"shipment:o1:r1"),true);
+correctionCase("reopen requires intact file snapshot","reopen_unsent_export",
+  s=>factoryExport(s),()=>({}),
+  s=>reopenUnsentExport(s,"shipment:o1:r1"),false);
+correctionCase("reopen after employee handoff blocked","reopen_unsent_export",
+  s=>{factoryExport(s);s.workflow.queue[0].factoryDeliveredAt=now;},
+  ()=>({}),s=>reopenUnsentExport(s,"shipment:o1:r1"),false);
+correctionCase("reopen when store excel already exported blocked","reopen_unsent_export",
+  s=>{factoryExport(s);s.workflow.queue.push({id:"store-export",
+    shipmentId:"shipment:o1:r1",origin:"STORE",status:"EXPORTED",snapshot:{}});},
+  ()=>({}),s=>reopenUnsentExport(s,"shipment:o1:r1"),false);
+correctionCase("reopen after delivery blocked","reopen_unsent_export",
+  s=>{factoryExport(s);s.workflow.shipments[0].delivery={at:now};},
+  ()=>({}),s=>reopenUnsentExport(s,"shipment:o1:r1"),false);
 
 function normalized(v:unknown):string {
   if(Array.isArray(v))return "["+v.map(normalized).join(",")+"]";
