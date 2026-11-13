@@ -1,7 +1,8 @@
 import { HelpTooltip } from "./ui/HelpTooltip";
 import { useEffect, useRef, useState } from "react";
 import { confirmAction, promptText } from "./dialogs";
-import { clientCandidates, suggestClient, won } from "./domain";
+import { won } from "./domain";
+import { useNativeClients } from "./native-catalog-queries";
 import { businessCoreCall } from "./tauri-bridge";
 import { applyCatalogPriceSync, previewCatalogPriceSync, type CatalogPricePreview } from "./catalog-price-sync";
 import type { NoticeSink } from "./shared/notices";
@@ -36,12 +37,10 @@ export function ClientPicker({
     [dismissed, setDismissed] = useState("");
   const selectRef = useRef(onSelect);
   selectRef.current = onSelect;
-  const results = query ? clientCandidates(query, clients) : [],
-    suggested = suggestClient(raw, clients),
-    key = suggested
-      .map((c) => c.id)
-      .sort()
-      .join("|");
+  const nativeClients = useNativeClients(clients, query, raw);
+  const results = query ? nativeClients.results : [];
+  const suggested = nativeClients.suggested;
+  const key = suggested.map((c) => c.id).sort().join("|");
   useEffect(() => {
     if (selected) {
       setPopup(false);
@@ -91,10 +90,13 @@ export function ClientPicker({
           <button onClick={() => setAll(true)}>전체 거래처 목록</button>
         </div>
       )}
+      {nativeClients.error && <p role="alert">{nativeClients.error}</p>}
       {query && (
         <div className="client-results">
           {results.length ? (
             results.slice(0, 20).map(row)
+          ) : nativeClients.pending ? (
+            <p className="muted">검색 중</p>
           ) : (
             <p className="muted">검색 결과가 없습니다.</p>
           )}
