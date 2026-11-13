@@ -19,6 +19,7 @@ pub fn execute(operation: &str, payload: Value) -> Result<Value, String> {
         ).map(|price| json!({"unitPrice": price})),
         "reprice_order" => pricing::reprice_order(&payload),
         "should_refresh_pricing" => Ok(json!({"refresh": pricing::should_refresh(&payload)?})),
+        "apply_shipping_action" => shipping::shipping_action(&payload),
         "calculate_shipping" => shipping::recommend(
             req(&payload, "order")?, req(&payload, "state")?,
         ),
