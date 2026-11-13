@@ -121,6 +121,54 @@ add("new BANDOMALL product creates STORE origin",t=>{
   t.source.products.push(...f.products);t.source.options.push(...f.options);
 });
 
+// Port-completion matrix: compare raw TS decisions across every editable
+// product and price column rather than only hand-picked happy-path rows.
+const productColumnMatrix=[
+  [2,"product-name",["BD 709-1 비타공","GT-1","Desk TS-1","", "[비우기]"]],
+  [3,"subtitle",["","[비우기]","가방 미포함","Bar 길이 10cm"]],
+  [5,"catalog",["","반도스탠드","반도몰","BANDOSTAND"]],
+  [6,"origin",["","공장","매장","STORE"]],
+  [7,"category",["","leaf","bogus","leaf / bogus"]],
+  [8,"brand",["","brand1","unknown","[비우기]"]],
+  [9,"specification",["","[비우기]","높이 100cm"]],
+  [10,"unit",["","[비우기]","개","세트"]],
+  [11,"default-color",["","블랙","화이트","Rose Gold"]],
+  [12,"active",["","사용","중지","예","INVALID"]],
+  [13,"archived",["","정상","보관","[비우기]"]],
+];
+for(const [index,label,values] of productColumnMatrix){
+  for(const value of values){
+    add("product matrix "+label+" "+JSON.stringify(value),t=>{
+      t.source.products[0].cells[index]=value;
+    });
+  }
+}
+const priceColumnMatrix=[
+  [2,"variant-id",["","v1","invalid-variant"]],
+  [3,"color",["","Black","검정","Rose Gold","[비우기]"]],
+  [4,"official-option",["","가방 포함","[비우기]"]],
+  [5,"wholesale",["","0","[비우기]","12,000","-100","9007199254740992"]],
+  [6,"semi",["","1","[비우기]","12,000","12.5","123,45"]],
+  [7,"retail",["","1","[비우기]","15,000","삭제","9999999999999999999"]],
+  [8,"source",["","MANUAL","OFFICIAL","UNKNOWN"]],
+  [9,"official-id",["","p-code-123","[비우기]"]],
+];
+for(const [index,label,values] of priceColumnMatrix){
+  for(const value of values){
+    add("price matrix "+label+" "+JSON.stringify(value),t=>{
+      t.source.options[0].cells[index]=value;
+    });
+  }
+}
+for (const model of ["BD 709-1 / 비타공 상판","GT-1 / 기타 스탠드",
+  "SS-1 / 마이크 스탠드","Desk TS-1 (Bar 길이 10cm)","BD LED 709"]) {
+  add("new independent model "+model,t=>{
+    const f=fresh("product_"+model.replace(/\W/g,"").slice(0,12),model);
+    t.source.products.push(...f.products);
+    t.source.options.push(...f.options);
+  });
+}
+
 function stable(output,initial){
   const clone=JSON.parse(JSON.stringify(output));
   if(!clone.ok)return clone;
