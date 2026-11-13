@@ -18,7 +18,9 @@ test("payment preview and clipboard use the optional link flag, default off", ()
   assert.match(view, /nativeAutomaticMessage\(latestState\.current, gid, includeLinks\)/);
   assert.doesNotMatch(view, /\bautomaticMessage\(state, gid, includeLinks\)/);
   assert.match(content("src/native-automatic-message.ts"), /"output", "render_automatic_message"/);
-  assert.match(view, /window\.bando!\.copy\(greeting \? withGreeting\(text\) : text\)/);
+  assert.match(view, /window\.bando!\.copy\(await nativeDecorateCopyText\(text, greeting\)\)/);
+  assert.doesNotMatch(view, /from "\.\/automatic-message"/);
+  assert.match(content("src/native-automatic-message.ts"), /"output", "decorate_automatic_copy"/);
 });
 test("request drafts exclude optional links when edited and avoid duplicates", () => {
   assert.match(view, /!baseText\.includes\(entry\.slice\(entry\.lastIndexOf\("\\n"\) \+ 1\)\)/);
