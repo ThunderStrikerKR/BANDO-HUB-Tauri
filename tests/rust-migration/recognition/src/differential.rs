@@ -182,3 +182,134 @@ fn execute_original_typescript_and_rust_with_all_product_fields() {
     println!("TS_RUST_PRODUCT_PARITY_STATUS ONLY_THREE_REVIEWED_SOURCE_EXCEPTIONS");
     println!("TS_RUST_PRODUCT_EXPECTED_EXCEPTION_COUNT {}",differences.len());
 }
+
+
+fn recipient_client() -> Value {
+    json!({"id":"ci-dealer","name":"가상거래처","tier":"wholesale",
+        "overrides":{},"active":true,"payment":"PREPAID",
+        "contact":"","identifiers":"","shippingFeeExcluded":false})
+}
+fn print_recipient_report(tag:&str,report:&Value) {
+    println!("{tag}_SUMMARY {}",json!({
+        "cases":report["cases"],"comparedLeaves":report["comparedLeaves"],
+        "casesWithDifferences":report["casesWithDifferences"],
+        "mismatchCount":report["mismatchCount"]
+    }));
+    for field in report["byField"].as_array().into_iter().flatten() {
+        println!("{tag}_FIELD {}",field);
+    }
+    for case in report["byCase"].as_array().into_iter().flatten() {
+        println!("{tag}_CASE {}",case);
+    }
+    for entry in report["differences"].as_array().into_iter().flatten().take(1500) {
+        println!("{tag}_DIFF {}",entry);
+    }
+    assert!(!report["truncated"].as_bool().unwrap_or(true),
+        "{tag}: too many differences; the raw report was truncated");
+}
+fn recipient_cases() -> Vec<Value> {
+    let fixture=original_samples();
+    assert_eq!(fixture.len(),20);
+    let mut cases:Vec<Value>=fixture.iter().map(|x| json!({
+        "id":format!("original-{:02}",x["id"].as_u64().unwrap()),
+        "raw":x["raw"]
+    })).collect();
+    let (state,corrections)=corrected_state();
+    assert_eq!(state["products"].as_array().unwrap().len(),360);
+    for (i,c) in corrections.iter().enumerate() {
+        let name=c["expectedName"].as_str().expect("product name");
+        cases.push(json!({"id":format!("color-{:02}",i+1),
+            "raw":format!("{name} 2개\n김가상\n서울특별시 용산구 한강대로 100")}));
+    }
+    // Nine independent, business-oriented real order documents. Use
+    // original TS and Rust, never a simulated recipient parser.
+    for (id,raw) in [
+        ("recipient-two","BD Floor-BTS / 블랙 / 높이 27cm 2개\n김가상\n서울특별시 용산구 한강대로 100\n010-1234-5678\nBD Desk-BTS / 블랙 / 높이 27cm 1개\n박가상\n경기도 의정부시 시민로 20\n010-2345-6789"),
+        ("recipient-name-contact","수취인: 김가상\n연락처: 010-1234-5678\n배송지: 서울특별시 마포구 월드컵로 20\n709 민판 2개"),
+        ("recipient-note","김가상\n서울특별시 서대문구 연희로 100\n010-1234-5678\n배송 요청사항: 현관 앞 부탁드립니다\nBD 709 1개"),
+        ("recipient-inline","BD 709 민판 한개 이가상 010-1234-5678\n서울특별시 마포구 월드컵로 20"),
+        ("recipient-address-detail","박가상\n010-2345-6789\n서울특별시 성북구 길음로 11\n  101동 1102호\n709 1개"),
+        ("recipient-shipping","김가상\n경기도 의정부시 시민로 100\n010-1234-5678\nBD 950 3개\n메시지: 부재 시 문 앞"),
+        ("recipient-unnamed","서울특별시 용산구 한강대로 100\nBD 709 2개"),
+        ("recipient-duplicate-name","김가상\n서울특별시 용산구 한강대로 100\nBD 709 1개\n김가상\n경기도 의정부시 시민로 20\nBD 950 1개"),
+        ("recipient-common","BD 709 2개 공통\n김가상\n서울특별시 용산구 한강대로 100\n박가상\n경기도 의정부시 시민로 20"),
+    ] {
+        cases.push(json!({"id":id,"raw":raw}));
+    }
+    assert_eq!(cases.len(),44);
+    cases
+}
+
+#[test]
+fn compare_real_recipient_fields_addresses_contacts_and_all_evidence() {
+    let (mut state,_)=corrected_state();
+    let client=recipient_client();
+    state["clients"]=json!([client.clone()]);
+    let mut cases=recipient_cases();
+    for case in &mut cases {
+        let raw=case["raw"].as_str().expect("case raw");
+        let rust=recognition::execute("analyze_order",json!({
+            "raw":raw,"state":state,"client":client
+        })).expect("real Rust recipient parser");
+        case["rust"]=rust;
+    }
+    let report=run_node(
+        "tests/rust-migration/recognition/compare-ts-rust-recipients.mjs",
+        &json!({"phase":"compare","state":state,"client":client,"cases":cases}));
+    assert_eq!(report["cases"],44,"not all real documents were compared");
+    assert!(report["comparedLeaves"].as_u64().unwrap_or(0)>200,
+        "recipient comparison did not inspect real fields");
+    print_recipient_report("TS_RUST_RECIPIENT", &report);
+}
+
+#[test]
+fn compare_real_reanalysis_and_employee_confirmations() {
+    let (mut state,_)=corrected_state();
+    let client=recipient_client();
+    state["clients"]=json!([client.clone()]);
+    let base="BD Floor-BTS / 블랙 / 높이 27cm 2개\n김가상\n서울특별시 용산구 한강대로 100\n010-1234-5678";
+    let two="BD Floor-BTS / 블랙 / 높이 27cm 2개\n김가상\n서울특별시 용산구 한강대로 100\nBD Desk-BTS / 블랙 / 높이 27cm 1개\n박가상\n경기도 의정부시 시민로 20";
+    let scenarios=vec![
+        json!({"id":"reanalyze-base","raw":base,"mode":"base"}),
+        json!({"id":"reanalyze-staff-fields","raw":base,
+            "mode":"confirmed-freight-staff-item"}),
+        json!({"id":"reanalyze-edit-quantity",
+            "oldRaw":base,
+            "raw":base.replace("27cm 2개","27cm 3개"),
+            "mode":"confirmed-freight-staff-item-qty-edit"}),
+        json!({"id":"reanalyze-manual","raw":base,"mode":"manual"}),
+        json!({"id":"reanalyze-two-recipients","raw":two,"mode":"confirmed-freight"}),
+        json!({"id":"reanalyze-name-changed","oldRaw":base,
+            "raw":base.replace("김가상","박가상"),
+            "mode":"confirmed-freight-staff-item"}),
+        json!({"id":"reanalyze-new-destination","oldRaw":base,
+            "raw":format!("{base}\nBD Desk-BTS / 블랙 / 높이 27cm 1개\n박가상\n경기도 의정부시 시민로 20"),
+            "mode":"confirmed-freight"}),
+        json!({"id":"reanalyze-confirmed-address","raw":
+            "BD 709 2개\n김가상\n서울특별시 마포구 월드컵로 20\n배송 메모: 현관 앞",
+            "mode":"confirmed-freight"}),
+        json!({"id":"reanalyze-duplicate-name","raw":
+            "김가상\n서울특별시 용산구 한강대로 100\nBD 709 1개\n김가상\n경기도 의정부시 시민로 20\nBD 950 1개",
+            "mode":"confirmed-freight"}),
+    ];
+    let prepared=run_node(
+        "tests/rust-migration/recognition/compare-ts-rust-recipients.mjs",
+        &json!({"phase":"prepare","state":state,"client":client,"cases":scenarios}));
+    let mut cases=prepared["cases"].as_array().expect("real TypeScript order preparation")
+        .clone();
+    assert_eq!(cases.len(),9);
+    for case in &mut cases {
+        let order=case["order"].clone();
+        let rust=recognition::execute("reanalyze_order",json!({
+            "order":order,"state":state
+        })).expect("real Rust reanalysis");
+        case["rustReanalyzed"]=rust;
+    }
+    let report=run_node(
+        "tests/rust-migration/recognition/compare-ts-rust-recipients.mjs",
+        &json!({"phase":"reanalyze","state":state,"client":client,"cases":cases}));
+    assert_eq!(report["cases"],9,"not all employee decision scenarios were compared");
+    assert!(report["comparedLeaves"].as_u64().unwrap_or(0)>150,
+        "reanalysis did not inspect actual fields");
+    print_recipient_report("TS_RUST_REANALYSIS",&report);
+}
