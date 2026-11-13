@@ -1,9 +1,9 @@
 import { useRef, useState } from "react";
 import { confirmAction } from "./dialogs";
+import { previewNativeRegistrationWorkbook } from "./native-registration-workbook";
 import { businessCoreCall } from "./tauri-bridge";
 import {
   exportRegistrationTemplate,
-  previewRegistrationWorkbook,
   type RegistrationWorkbookPreview,
 } from "./product-registration-xlsx";
 import type { NoticeSink } from "./shared/notices";
@@ -39,7 +39,7 @@ export function RegistrationManager({
       setPreview(undefined);
       setApproved(false);
       const current = await window.bando!.load();
-      setPreview(await previewRegistrationWorkbook(current, file));
+      setPreview(await previewNativeRegistrationWorkbook(current, file));
       setSource(file.name);
     });
   };
