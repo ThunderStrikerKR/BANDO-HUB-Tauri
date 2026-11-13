@@ -149,26 +149,109 @@ pub(crate) fn norm_color(source: &str) -> String {
         _ => source.trim()
     }.to_owned()
 }
-fn written_color(text: &str) -> Option<String> {
-    // Color suffix must belong to the numeric model; a naked G is not evidence.
-    let suffix = Regex::new(r"(?i)(?:BD[\s-]*)?\d{3}(?:-1)?\s*(BR|BK|G|W)(?:\b|$)").ok()?;
-    if let Some(cap) = suffix.captures(text) {
-        let m = cap.get(0)?;
-        if is_boundary(text, m.start(), m.end()) {
-            return Some(norm_color(cap.get(1)?.as_str()));
+/// parser.ts::modelColorHint / registeredColorHint: a model-associated
+/// color suffix or prefix is stronger evidence than an unqualified color word.
+fn code_color_hint(text: &str, ps: &[&Value]) -> Option<(String,String,String)> {
+    let number_suffix=Regex::new(concat!(
+        r"(?i)(?:BD\s*)?(\d{3}(?:-\d+)?)\s*",
+        r"(?:\(\s*(BK|BR|B|C|W|G|검정|블랙|크롬|화이트|그레이|브라운)\s*\)",
+        r"|(BK|BR|B|C|W|G))"
+    )).expect("model color suffix");
+    for c in number_suffix.captures_iter(text) {
+        let m=c.get(0)?;
+        if !is_boundary(text,m.start(),m.end()) {continue;}
+        let color=c.get(2).or_else(||c.get(3))?.as_str();
+        return Some((c[1].to_owned(),norm_color(color),m.as_str().to_owned()));
+    }
+    let number_prefix=Regex::new(
+        r"(?i)(BK|BR|B|C|W|G)\s+(?:BD\s*)?(\d{3}(?:-\d+)?)"
+    ).expect("model color prefix");
+    for c in number_prefix.captures_iter(text) {
+        let m=c.get(0)?;
+        if is_boundary(text,m.start(),m.end()) {
+            return Some((c[2].to_owned(),norm_color(&c[1]),m.as_str().to_owned()));
         }
     }
-    for word in ["rose gold", "로즈골드", "cosmo black", "코스모블랙", "chrom", "크롬",
-        "black", "블랙", "검정", "gray", "grey", "그레이", "회색", "white",
-        "화이트", "흰색", "brown", "브라운", "silver", "실버", "gold", "골드",
-        "blue", "블루", "red", "레드", "clear", "클리어"] {
-        let token = if word == "chrom" { "chrome" } else { word };
-        if let Some((_,_)) = find_term(text, token, false) {
-            return Some(norm_color(token));
+    // The same code+color syntax also applies to alphabetic registered
+    // models. The source implementation uses registered model names,
+    // not unregistered fragments, as the only accepted bases.
+    let color_code=Regex::new(r"(?i)\s*(?:\(\s*(BK|BR|B|C|W|G)\s*\)|(BK|BR|B|C|W|G))")
+        .expect("registered color suffix");
+    for p in ps {
+        for model in model_names(p) {
+            let Some((begin,end))=find_term(text,&model,true) else {continue;};
+            if let Some(c)=color_code.captures(&text[end..]) {
+                let m=c.get(0)?;
+                if m.start()!=0 {continue;}
+                let end=end+m.end();
+                if !is_boundary(text,begin,end) {continue;}
+                let color=c.get(1).or_else(||c.get(2))?.as_str();
+                return Some((model.clone(),norm_color(color),
+                    text[begin..end].to_owned()));
+            }
         }
     }
     None
 }
+fn written_color(text: &str) -> Option<String> {
+    for word in ["rose gold","로즈골드","cosmo black","cosmoblack","코스모블랙",
+        "gold","골드","black","블랙","검정","gray","grey","그레이",
+        "회색","white","화이트","흰색","brown","브라운","clear",
+        "클리어","frost","프로스트","silver","실버","blue",
+        "블루","red","레드","pink","핑크","chrome","크롬"] {
+        if find_term(text,word,false).is_some() {
+            return Some(norm_color(word));
+        }
+    }
+    None
+}
+fn model_key(source: &str) -> String {
+    source.to_uppercase().chars().filter(|c|!c.is_whitespace()).collect::<String>()
+        .trim_start_matches("BD").to_owned()
+}
+fn brand_words<'a>(state: &'a Value, p: &Value) -> Vec<&'a str> {
+    let bid=str_field(p,"brandId");
+    if bid.is_empty(){return Vec::new();}
+    state.get("brands").and_then(Value::as_array).into_iter().flatten()
+        .filter(|b|str_field(b,"id")==bid)
+        .flat_map(|b| {
+            let mut words=vec![str_field(b,"name"),str_field(b,"korean")];
+            words.extend(b.get("aliases").and_then(Value::as_array)
+                .into_iter().flatten().filter_map(Value::as_str));
+            words
+        }).filter(|w|!w.is_empty()).collect()
+}
+fn brand_matches(text: &str, words: &[&str]) -> bool {
+    let lower=text.to_lowercase();
+    words.iter().any(|w|!w.is_empty() && lower.contains(&w.to_lowercase()))
+}
+fn filter_business_candidates<'a>(
+    text: &str,state: &'a Value, ps: &[&'a Value],mut entries:Vec<Entry<'a>>
+) -> (Vec<Entry<'a>>,bool) {
+    let branded:Vec<&Value>=ps.iter().copied().filter(|p|
+        brand_matches(text,&brand_words(state,p))).collect();
+    if !branded.is_empty() {
+        entries.retain(|e|branded.iter().any(|p|str_field(p,"id")==str_field(e.p,"id")));
+    } else if entries.iter().any(|e|str_field(e.p,"catalog")!="BANDOMALL")
+        && Regex::new(r"(?i)^(?:BD\s*)?\d{3}[A-Za-z-]*(?:\s|$)")
+            .expect("factory catalog code").is_match(text) {
+        entries.retain(|e|str_field(e.p,"catalog")!="BANDOMALL");
+    }
+    if entries.iter().any(|e|!variants(e.p).iter()
+        .any(|v|str_field(v,"source")=="DEMO")) {
+        entries.retain(|e|!variants(e.p).iter()
+            .any(|v|str_field(v,"source")=="DEMO"));
+    }
+    let known=state.get("brands").and_then(Value::as_array).map_or(false,|brands|
+        brands.iter().any(|b|{
+            let mut words=vec![str_field(b,"name"),str_field(b,"korean")];
+            words.extend(b.get("aliases").and_then(Value::as_array)
+                .into_iter().flatten().filter_map(Value::as_str));
+            brand_matches(text,&words)
+        }));
+    (entries,known)
+}
+
 fn qualifiers(text: &str) -> HashSet<String> {
     let input: String = text.to_lowercase().chars().filter(|c| !c.is_whitespace()).collect();
     let re = Regex::new(r"(?:가방|바퀴)(?:미포함|포함|미장착|장착)|[ab]타입|민판|무타공상판|무타공|비타공상판|타공상판|\d+(?:\.\d+)?cm")
@@ -304,8 +387,40 @@ fn alias_entries<'a>(text: &str, state: &'a Value, client_id: &str,
 pub(crate) fn decide(text: &str, state: &Value, client_id: &str) -> Decision {
     let ps = products(state);
     let verified = verified_bases(&ps);
-    let mut entries = name_entries(text, &ps, &verified);
+    let entries = name_entries(text, &ps, &verified);
+    // parser.ts:487-510 filters brand/catalog and DEMO before options.
+    let (mut entries,known_brand) =
+        filter_business_candidates(text,state,&ps,entries);
     let aliases = alias_entries(text, state, client_id, &ps);
+    let hint=code_color_hint(text,&ps);
+    if let Some((base,_,term))=&hint {
+        // parser.ts:627-648 never rewrites a genuinely registered SKU
+        // that includes the color suffix in its own model code.
+        let protected=entries.iter().any(|e|model_names(e.p).iter()
+            .any(|name|model_key(name)==model_key(term)));
+        if !protected {
+            let mut matched:Vec<Entry<'_>>=ps.iter().copied()
+                .filter(|p|model_names(p).iter()
+                    .any(|name|model_key(name)==model_key(base)))
+                .map(|p|Entry{
+                    p,priority:2,span:find_term(text,term,false)
+                        .unwrap_or((0,text.len()))
+                }).collect();
+            if matched.iter().any(|e|!variants(e.p).iter()
+                .any(|v|str_field(v,"source")=="DEMO")) {
+                matched.retain(|e|!variants(e.p).iter()
+                    .any(|v|str_field(v,"source")=="DEMO"));
+            }
+            entries=matched;
+        }
+    }
+    let mut branded_category=false;
+    if entries.is_empty() && aliases.is_empty() && known_brand {
+        entries=ps.iter().copied().filter(|p|
+            brand_matches(text,&brand_words(state,p)))
+            .map(|p|Entry{p,priority:0,span:(0,text.len())}).collect();
+        branded_category=true;
+    }
     let proof = qualifiers(text);
     entries.retain(|e| qualifies(e.p, &proof, &verified));
     let code_entries = entries.clone();
@@ -321,7 +436,8 @@ pub(crate) fn decide(text: &str, state: &Value, client_id: &str) -> Decision {
             }
         }
     }
-    let explicit = written_color(text);
+    let explicit = hint.as_ref().map(|(_,color,_)|color.clone())
+        .or_else(||written_color(text));
     let color_matched: Vec<_> = if let Some(ref color) = explicit {
         entries.iter().filter(|e| variants(e.p).iter()
             .any(|v| norm_color(str_field(v, "color")) == *color))
@@ -364,16 +480,16 @@ pub(crate) fn decide(text: &str, state: &Value, client_id: &str) -> Decision {
                 p, priority: 0, span: find_term(text, lead(p), true).unwrap_or((0,text.len()))
             }).collect::<Vec<_>>()
     } else if category_mismatch { exact.clone() } else { entries };
-    if alias_conflict || category_mismatch || broad { chosen = None; }
+    if alias_conflict || category_mismatch || broad || branded_category { chosen = None; }
     if broad { available.clear(); }
     if chosen.is_none() && available.len() == 1 && !alias_conflict
-        && !category_mismatch && !broad && color_matched.len() == 1 {
+        && !category_mismatch && !broad && !branded_category && color_matched.len() == 1 {
         chosen = available.first().cloned();
     }
     let ambiguous = chosen.is_none() && available.len() > 1;
     let kind = if alias_conflict { "CONFLICT" }
         else if category_mismatch { "CATEGORY_CONFLICT" }
-        else if broad || ambiguous { "CATEGORY" }
+        else if broad || ambiguous || branded_category { "CATEGORY" }
         else if let Some(ref e) = chosen {
             if exact.iter().any(|x| str_field(x.p,"id") == str_field(e.p,"id")) {
                 "NAME"
@@ -383,7 +499,7 @@ pub(crate) fn decide(text: &str, state: &Value, client_id: &str) -> Decision {
         } else { "UNKNOWN" };
     let reason = if alias_conflict { Some("정확한 SKU 후보와 등록된 별칭이 서로 다른 상품을 가리킵니다.".to_owned()) }
         else if category_mismatch { Some("모델 코드와 상품 종류의 일치 여부를 직원이 확인해야 합니다.".to_owned()) }
-        else if broad { Some("상품 종류는 인식했지만 모델명은 확정되지 않았습니다. 실제 상품을 선택하세요.".to_owned()) }
+        else if broad || branded_category { Some("상품 종류는 인식했지만 모델명은 확정되지 않았습니다. 실제 상품을 선택하세요.".to_owned()) }
         else if ambiguous { Some("여러 독립 상품 후보가 있습니다. 실제 상품과 색상을 확인하세요.".to_owned()) }
         else if chosen.is_none() { Some("등록된 모델명 또는 별칭과 일치하지 않습니다.".to_owned()) }
         else { None };
