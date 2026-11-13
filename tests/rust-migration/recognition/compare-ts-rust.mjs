@@ -23,7 +23,7 @@ const normalize=(v,key="")=>{
     return Object.fromEntries(Object.entries(v).map(([k,x])=>[k,normalize(x,k)]));
   return v;
 };
-const differences=[],countsByField=new Map(),caseSummaries=[],diagnostics=[];
+const differences=[],countsByField=new Map(),caseSummaries=[],diagnostics=[],standaloneChecks=[];
 let comparedLeaves=0;
 function compare(ts,rs,path,caseId){
   if(ts && rs && typeof ts==="object" && typeof rs==="object" &&
@@ -84,21 +84,17 @@ for(const entry of cases){
   const tsItems=items(fromTs),rustItems=items(entry.rust);
   const before=differences.length;
   compareAlignedItems(tsItems,rustItems,entry.id);
-  // The TypeScript original lacks a match_products entrypoint. Check fields
-  // shared with its actual parseEvidence-derived Item, separately.
-  if(entry.match && tsItems.length===1){
-    for(const field of [
-      "productId","variantId","name","color","recognitionReason","match"
-    ]) compare(tsItems[0][field],entry.match[field],"standaloneMatch."+field,entry.id);
-    if(entry.match.evidence){
-      const productSource=tsItems[0].sources?.find(s=>s.field==="product");
-      if(productSource){
-        compare(productSource.start,entry.match.evidence.start,
-          "standaloneMatch.evidence.start",entry.id);
-        compare(productSource.end,entry.match.evidence.end,
-          "standaloneMatch.evidence.end",entry.id);
-      }
-    }
+  // TS has no standalone match_products API. Comparing different input
+  // strings (name vs name+quantity) would be a false parity assertion.
+  // Keep standalone SKU consistency separate from the same-raw TS/Rust diff.
+  if(entry.match && rustItems.length===1){
+    standaloneChecks.push({
+      id:entry.id,
+      productId:entry.match.productId,
+      analyzedProductId:rustItems[0].productId,
+      variantId:entry.match.variantId,
+      analyzedVariantId:rustItems[0].variantId
+    });
   }
   if(entry.id==="corrected-01"){
     const productLine=entry.raw.split("\n")[0];
@@ -124,7 +120,7 @@ for(const entry of cases){
 const report={
   source:"src/parser.ts::parseEvidence (real TS)",
   target:"recognition::execute analyze_order (real Rust)",
-  comparison:"All parsed Item fields recursively; generated UUID-like identifiers normalized; overlapping standalone endpoint fields separately checked",
+  comparison:"All Item fields recursively on identical raw order inputs; generated UUID-like identifiers normalized; unlike-input standalone endpoint checked separately",
   cases:cases.length,
   casesWithDifferences:caseSummaries.filter(x=>x.mismatchCount>0).length,
   comparedLeaves,
@@ -133,6 +129,7 @@ const report={
     .map(([field,count])=>({field,count})),
   byCase:caseSummaries,
   diagnostics,
+  standaloneChecks,
   differences:differences.slice(0,1500),
   truncated:differences.length>1500
 };
