@@ -11,7 +11,8 @@
     "build:windows": "tauri build --no-bundle",
     "test": "node --test tests/*.test.mjs",
     "check:types": "tsc --noEmit",
-    "check:products": "python scripts/validate-product-seed.py"
+    "check:products": "python scripts/validate-product-seed.py",
+    "audit:ts-business": "node scripts/audit-ts-business-retirement.mjs"
   },
   "dependencies": {
     "cheerio": "^1.1.0",
