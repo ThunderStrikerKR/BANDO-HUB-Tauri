@@ -11,6 +11,7 @@ mod correction_rules;
 mod reception_operations;
 mod retail_operations;
 mod raw_corrections;
+mod reply_rules;
 mod legacy_migration;
 mod shipping;
 mod workflow;
@@ -48,6 +49,7 @@ pub fn execute(operation: &str, payload: Value) -> Result<Value, String> {
         ),
         "order_issues" => Ok(json!({"issues": issues::order_issues(req(&payload,"order")?)})),
         "apply_issue_action" => issues::issue_action(&payload),
+        "apply_reply_action" => reply_rules::apply(&payload),
         "apply_raw_correction" => raw_corrections::apply(&payload),
         "apply_retail_action" => retail_operations::apply(&payload),
         "apply_reception_action" => reception_operations::apply(&payload),
