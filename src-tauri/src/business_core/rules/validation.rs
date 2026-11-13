@@ -292,67 +292,185 @@ pub(super) fn validate(state: &Value, before: Option<&Value>) -> Result<(),Strin
     }
     Ok(())
 }
+// Mirrors the source retailIssues() order: regular order ACTION issues,
+// dispatch/freight/product/quantity per recipient, company sender and sale
+// state. Deduplicate titles, preserving the original first occurrence order.
+fn retail_issues(order:&Value,state:&Value)->Vec<String>{
+    let mut issues=super::issues::order_issues(order).into_iter()
+        .filter(|i|str_field(i,"severity")=="ACTION")
+        .map(|i|str_field(&i,"title").to_string()).collect::<Vec<_>>();
+    for row in rows(field(order,"recipients")){
+        if !["FACTORY","STORE"].contains(&str_field(row,"dispatchOrigin")){
+            issues.push("출고지를 선택하세요.".into());
+        }
+        let actual=field(row,"actualFreight");
+        if !actual.is_null()&&safe(actual).is_none(){
+            issues.push("실제 출고 운임을 확인하세요.".into());
+        }
+        for item in rows(field(row,"items")){
+            let found=rows(field(state,"products")).iter().any(|p|
+                str_field(p,"id")==str_field(item,"productId")&&
+                !has_value(field(p,"deletedAt"))&&
+                !has_value(field(p,"supersededBy"))&&
+                field(p,"active").as_bool()!=Some(false)&&
+                array_has(field(p,"variants"),str_field(item,"variantId")));
+            if !found {issues.push("등록된 상품과 옵션을 선택하세요.".into());}
+            if field(item,"quantityConfirmed").as_bool()!=Some(true){
+                issues.push("상품 수량을 직접 확정하세요.".into());
+            }
+        }
+    }
+    let settings=field(state,"settings");
+    if str_field(settings,"senderAddress").trim().is_empty(){
+        issues.push("설정의 반도스탠드 주소를 등록하세요.".into());
+    }
+    let preferred=if str_field(settings,"senderPhone").is_empty(){
+        str_field(settings,"senderMobile")
+    }else{str_field(settings,"senderPhone")};
+    if preferred.trim().is_empty(){
+        issues.push("설정의 반도스탠드 연락처를 등록하세요.".into());
+    }
+    for row in rows(field(order,"recipients")){
+        for item in rows(field(row,"items")){
+            let pid=str_field(item,"productId");
+            if pid.is_empty(){continue;}
+            let product=super::workflow_issues::historical_product(
+                state,pid,str_field(item,"variantId"));
+            let problem=if product.is_none(){"상품 연결 확인 필요"}
+                else{super::workflow_issues::sale_problem(product)};
+            if !problem.is_empty(){
+                issues.push(format!("{}: {} / {} — 판매 상태 확인 필요",
+                    if str_field(row,"name").is_empty(){"수취인"}else{str_field(row,"name")},
+                    str_field(item,"name"),problem));
+            }
+        }
+    }
+    let mut seen=HashSet::new();
+    issues.into_iter().filter(|issue|seen.insert(issue.clone())).collect()
+}
+fn snapshot_sender(order:&Value,state:&Value)->Value{
+    if ["DEALER","RETAIL"].contains(&str_field(order,"orderType")){
+        return super::reconciliation::company_client(state);
+    }
+    let client=find_by_id(field(state,"clients"),str_field(order,"clientId"));
+    let raw=field(order,"analysisRaw").as_str()
+        .unwrap_or_else(||str_field(order,"raw"));
+    client.and_then(|base|super::reconciliation::explicit_sender(raw,base))
+        .or_else(||client.cloned())
+        .unwrap_or(Value::Null)
+}
+fn company_party(state:&Value)->Value{
+    let mut company=super::reconciliation::company_client(state);
+    let _=super::set(&mut company,"name",serde_json::json!("반도스탠드"));
+    let _=super::set(&mut company,"displayName",serde_json::json!("반도스탠드"));
+    company
+}
+fn truthy(value:&Value)->bool {
+    match value {
+        Value::Null=>false,
+        Value::Bool(b)=>*b,
+        Value::Number(n)=>n.as_f64().is_some_and(|x|x!=0.0),
+        Value::String(s)=>!s.is_empty(),
+        _=>true
+    }
+}
 pub(super) fn validate_reception(before: &Value, state: &Value) -> Result<(),String> {
     for order in rows(field(state,"orders")) {
-        let previous = find_by_id(field(before,"orders"),str_field(order,"id"));
-        let order_type = str_field(order,"orderType");
-        if !order_type.is_empty() && !["AGENCY","DEALER","RETAIL"].contains(&order_type) {
+        let previous=find_by_id(field(before,"orders"),str_field(order,"id"));
+        let order_type=str_field(order,"orderType");
+        if !order_type.is_empty()&&!["AGENCY","DEALER","RETAIL"].contains(&order_type){
             return Err("주문 유형을 확인하세요.".into());
         }
-        if previous.is_none() && order_type=="RETAIL" &&
-            field(order,"receptionVersion").as_i64()!=Some(1) {
+        let fresh=previous.is_none();
+        let v1=field(order,"receptionVersion").as_i64()==Some(1);
+        if fresh&&order_type=="RETAIL"&&!v1 {
             return Err("소매 주문 전용 접수 절차를 사용하세요.".into());
         }
-        if previous.is_none() && field(order,"receptionVersion").as_i64()==Some(1) &&
-            (!has_value(field(order,"confirmedAt")) ||
-              !has_value(field(order,"confirmationSnapshot"))) {
+        if fresh&&v1&&(!truthy(field(order,"confirmedAt"))||
+            !truthy(field(order,"confirmationSnapshot"))){
             return Err("주문 확인 완료 전에는 정식 주문으로 저장할 수 없습니다.".into());
         }
-        if let Some(old) = previous {
-            if has_value(field(old,"confirmedAt")) &&
-                (field(old,"confirmedAt") != field(order,"confirmedAt") ||
-                 field(old,"raw") != field(order,"raw") ||
-                 field(old,"confirmationSnapshot") != field(order,"confirmationSnapshot")) {
+        if let Some(old)=previous{
+            if truthy(field(old,"confirmedAt"))&&
+                (field(old,"confirmedAt")!=field(order,"confirmedAt")||
+                 field(old,"raw")!=field(order,"raw")||
+                 field(old,"confirmationSnapshot")!=field(order,"confirmationSnapshot")){
                 return Err("최초 확정 원문 / 시각 / 주문 스냅샷은 변경할 수 없습니다.".into());
             }
-            if field(old,"orderType")!=field(order,"orderType") ||
-                field(old,"senderSnapshot")!=field(order,"senderSnapshot") {
+            if field(old,"orderType")!=field(order,"orderType")||
+                field(old,"senderSnapshot")!=field(order,"senderSnapshot"){
                 return Err("확정 주문의 유형과 송하인 스냅샷은 변경할 수 없습니다.".into());
             }
         }
-        if previous.is_none() && field(order,"receptionVersion").as_i64()==Some(1) {
-            let snapshot = field(order,"confirmationSnapshot");
-            if field(snapshot,"raw") != field(order,"raw") ||
-               field(field(snapshot,"data"),"id") != field(order,"id") ||
-               field(field(snapshot,"data"),"raw") != field(order,"raw") ||
-               field(field(snapshot,"data"),"recipients") != field(order,"recipients") ||
-               field(snapshot,"at") != field(order,"confirmedAt") ||
-               field(field(order,"receipt"),"original") != field(order,"raw") ||
-               field(field(order,"receipt"),"at") != field(order,"confirmedAt") ||
-               field(snapshot,"recipients") != field(order,"recipients") ||
-               field(field(snapshot,"client"),"id") != field(order,"clientId") {
-                return Err("정식 주문의 최초 확정 정보를 확인하세요.".into());
+        if !fresh||!v1{continue;}
+        let expected_sender=snapshot_sender(order,state);
+        if field(order,"senderSnapshot")!=&expected_sender{
+            return Err("주문 유형에 맞는 송하인 스냅샷을 확인하세요.".into());
+        }
+        if order_type=="RETAIL"&&field(order,"clientSnapshot")!=&company_party(state){
+            return Err("소매 주문의 주문처는 반도스탠드입니다.".into());
+        }
+        if order_type=="RETAIL"{
+            let problems=retail_issues(order,state);
+            if !problems.is_empty(){return Err(problems.join("\n"));}
+            if truthy(field(order,"clientId"))||truthy(field(order,"raw"))||
+                truthy(field(order,"analysisSnapshot"))||
+                rows(field(order,"recipients")).iter().any(|row|
+                    rows(field(row,"items")).iter().any(|item|
+                        !field(item,"unitPrice").is_null()))||
+                !truthy(field(order,"paid")){
+                return Err("소매 주문은 별도 판매금액 / 원문 분석 없이 접수하세요.".into());
             }
-            for row in rows(field(order,"recipients")) {
-                for item in rows(field(row,"items")) {
-                    let product = find_by_id(field(state,"products"),str_field(item,"productId"));
-                    if !product.is_some_and(|p|!has_value(field(p,"deletedAt")) &&
-                        field(p,"active").as_bool()!=Some(false) &&
-                        array_has(field(p,"variants"),str_field(item,"variantId"))) {
-                        return Err("등록된 독립 상품과 가격 기록을 확인하세요.".into());
-                    }
-                }
+        }
+        // Original source checks product registration BEFORE comparing the
+        // historical receipt and confirmation snapshot. Preserve priority.
+        for row in rows(field(order,"recipients")){
+            for item in rows(field(row,"items")){
+                let valid=rows(field(state,"products")).iter().any(|p|
+                    str_field(p,"id")==str_field(item,"productId") &&
+                    !has_value(field(p,"deletedAt")) &&
+                    field(p,"active").as_bool()!=Some(false) &&
+                    array_has(field(p,"variants"),str_field(item,"variantId")));
+                if !valid{return Err("등록된 독립 상품과 가격 기록을 확인하세요.".into());}
             }
-            let ships: Vec<&Value> = rows(field(field(state,"workflow"),"shipments")).iter()
-                .filter(|s|str_field(s,"orderId")==str_field(order,"id")
-                    && !flag(s,"legacyArchived")).collect();
-            if ships.is_empty() || ships.iter().any(|s|field(s,"step").as_i64().unwrap_or(0)<1) ||
-                !rows(field(field(state,"workflow"),"events")).iter().any(|e|
-                    str_field(e,"action")=="주문 확인 완료" &&
-                    rows(field(e,"shipmentIds")).iter().any(|v|
-                        ships.iter().any(|s|v.as_str()==Some(str_field(s,"id"))))) {
-                return Err("주문 확인 완료 기록이 없습니다.".into());
-            }
+        }
+        let snapshot=field(order,"confirmationSnapshot");
+        if field(snapshot,"raw")!=field(order,"raw")||
+            !truthy(field(snapshot,"data"))||
+            field(field(snapshot,"data"),"id")!=field(order,"id")||
+            field(field(snapshot,"data"),"raw")!=field(order,"raw")||
+            field(field(snapshot,"data"),"recipients")!=field(order,"recipients")||
+            field(snapshot,"at")!=field(order,"confirmedAt")||
+            field(field(order,"receipt"),"original")!=field(order,"raw")||
+            field(field(order,"receipt"),"at")!=field(order,"confirmedAt")||
+            field(snapshot,"recipients")!=field(order,"recipients")||
+            field(field(snapshot,"client"),"id")!=field(order,"clientId"){
+            return Err("정식 주문의 최초 확정 정보를 확인하세요.".into());
+        }
+        let ships=rows(field(field(state,"workflow"),"shipments")).iter()
+            .filter(|ship|str_field(ship,"orderId")==str_field(order,"id")&&
+                !flag(ship,"legacyArchived")).collect::<Vec<_>>();
+        let present=ships.iter().map(|ship|str_field(ship,"recipientId"))
+            .collect::<HashSet<_>>();
+        if rows(field(order,"recipients")).iter()
+            .any(|row|!present.contains(str_field(row,"id"))){
+            return Err("일부 배송 건을 제외하고 정식 주문으로 저장할 수 없습니다.".into());
+        }
+        let valid_event=rows(field(field(state,"workflow"),"events")).iter().any(|e|
+            str_field(e,"action")=="주문 확인 완료"&&
+            rows(field(e,"shipmentIds")).iter().any(|id|
+                ships.iter().any(|ship|id.as_str()==Some(str_field(ship,"id")))));
+        if ships.is_empty()||
+            ships.iter().any(|ship|field(ship,"step").as_f64().is_some_and(|n|n<1.0))||
+            !valid_event{
+            return Err("주문 확인 완료 기록이 없습니다.".into());
+        }
+        let mut seen=HashSet::new();
+        for ship in &ships {
+            let gid=str_field(ship,"groupId");
+            if !seen.insert(gid.to_string()){continue;}
+            let problems=super::workflow_issues::stage_issues(state,gid,1)?;
+            if !problems.is_empty(){return Err(problems.join("\n"));}
         }
     }
     Ok(())
