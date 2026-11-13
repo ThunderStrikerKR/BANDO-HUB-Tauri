@@ -2,13 +2,8 @@ import { validDeliveryAddress } from "./delivery-requirements";
 import { useState } from "react";
 import { sameValue } from "./shared/draft";
 import { confirmDiscardDraft } from "./shared/editor-flow";
-import {
-  confirmCorrection,
-  copiedCorrection,
-  correctionMessage,
-  correctionStatus,
-  requestCorrection,
-} from "./corrections";
+import { correctionMessage, correctionStatus } from "./corrections";
+import { nativeApplyCorrectionAction } from "./orders/native-rules";
 import { itemFromProduct } from "./domain";
 import { internalModel } from "./matching";
 import { ProductSearchDialog } from "./ProductSearchDialog";
@@ -140,7 +135,7 @@ export function CorrectionPanel({
             <button
               disabled={busy}
               onClick={() => void (async () => {
-                const result = await run(() => onSave(requestCorrection(state, sid, after)));
+                const result = await run(async () => onSave(await nativeApplyCorrectionAction(state, "request_correction", { shipmentId: sid, afterRecipient: after })));
                 if (result.ok) onClose();
               })()}
             >
@@ -170,7 +165,7 @@ export function CorrectionPanel({
                     onClick={() =>
                       void run(async () => {
                         await window.bando!.copy(correctionMessage(state, r.id));
-                        await onSave(copiedCorrection(state, r.id));
+                        await onSave(await nativeApplyCorrectionAction(state, "copied_correction", { requestId: r.id }));
                         onNotice(
                           "정정 문구를 복사했습니다. 실제 공장 반영은 아직 대기 상태입니다.",
                           "success",
@@ -184,7 +179,7 @@ export function CorrectionPanel({
                     disabled={
                       busy || status !== "PENDING_FACTORY" || !!ship.delivery || !!ship.collectedAt
                     }
-                    onClick={() => void run(() => onSave(confirmCorrection(state, r.id)))}
+                    onClick={() => void run(async () => onSave(await nativeApplyCorrectionAction(state, "confirm_correction", { requestId: r.id })))}
                   >
                     실제 공장 반영 확인
                   </button>
