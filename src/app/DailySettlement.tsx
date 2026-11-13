@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { won } from "../domain";
+import { won } from "./history-format";
 import type { NoticeSink } from "../shared/notices";
 import type { State } from "../types";
 
@@ -7,7 +7,7 @@ import { EmptyState, PageHeading } from "../ui/PageHeading";
 import { ManagementTable } from "../ui/ManagementTable";
 import { DateNavigator } from "./DateNavigator";
 import { HelpTooltip } from "../ui/HelpTooltip";
-import { orderHistory } from "./order-history";
+import type { HistoryRow } from "./settlement-report";
 import type { DailySettlementReport } from "./settlement-report";
 import { businessCoreCall } from "../tauri-bridge";
 
@@ -27,18 +27,18 @@ export function DailySettlement({
     const id = ++requestId.current;
     setLoaded(null);
     setFailure("");
-    try {
-      const historyRows = orderHistory(state, "", date);
-      void businessCoreCall<DailySettlementReport>("output", "prepare_settlement", {
+    void businessCoreCall<HistoryRow[]>("rules", "list_order_history", {
+      state, query: "", date,
+    }).then((historyRows) => {
+      if (requestId.current !== id) return null;
+      return businessCoreCall<DailySettlementReport>("output", "prepare_settlement", {
         state, date, historyRows,
-      }).then((report) => {
-        if (requestId.current === id) setLoaded({ state, date, report });
-      }).catch((error: unknown) => {
-        if (requestId.current === id) setFailure(String(error));
       });
-    } catch (error) {
+    }).then((report) => {
+      if (report && requestId.current === id) setLoaded({ state, date, report });
+    }).catch((error: unknown) => {
       if (requestId.current === id) setFailure(String(error));
-    }
+    });
     return () => { if (requestId.current === id) requestId.current++; };
   }, [state, date]);
   const report = loaded?.state === state && loaded.date === date ? loaded.report : null;

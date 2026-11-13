@@ -4,6 +4,7 @@ on:
     branches:
       - migration/03-integration
       - migration/05-factory-reply
+      - integration/06-history-settlement
   workflow_dispatch:
 permissions:
   contents: read
@@ -149,3 +150,17 @@ jobs:
           workspaces: src-tauri -> target
       - name: Exercise factory reply parser, automatic SQLite commit and conflict approval on Windows
         run: cargo test --manifest-path src-tauri/Cargo.toml --lib factory_ -- --test-threads=1
+
+  history-ts-rust-parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install original TypeScript history oracle
+        run: npm install --no-audit --no-fund --ignore-scripts
+      - name: Compare original TS order history and settlement to compiled Rust
+        run: node --test tests/rust-migration/rules/history-parity.test.mjs

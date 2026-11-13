@@ -12,7 +12,7 @@ import { clone } from "../ui";
 import type { WorkflowSelection } from "../WorkflowBoard";
 import { onlyDeletedGroups } from "../workspace-selection";
 import type { PageId } from "./navigation";
-import { seoulDate } from "./settlement-report";
+import { seoulDate } from "./seoul-date";
 export type OrderLeaveResult = { proceed: boolean; handledDraft: boolean };
 export function useAppModel() {
   const { notice, notify: setNotice, dismiss: dismissNotice } = useNotice();

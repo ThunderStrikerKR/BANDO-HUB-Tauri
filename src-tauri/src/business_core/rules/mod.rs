@@ -22,11 +22,26 @@ mod workflow_issues;
 mod workflow_preview;
 mod validation;
 mod order_save;
+mod history;
 
 const MAX_SAFE: i64 = 9_007_199_254_740_991;
 
 pub fn execute(operation: &str, payload: Value) -> Result<Value, String> {
     match operation {
+        "list_order_history" => history::list(
+            req(&payload,"state")?,
+            str_field(&payload,"query"),
+            str_field(&payload,"date"),
+        ),
+        "list_order_history_view" => history::list_view(
+            req(&payload,"state")?,
+            str_field(&payload,"query"),
+            str_field(&payload,"date"),
+            field(&payload,"trackingOrder"),
+        ),
+        "order_history_status" => Ok(json!({"status":history::status(
+            req(&payload,"state")?,required_str(&payload,"orderId")?,
+        )})),
         "save_order" => order_save::save(&payload),
         "calculate_price" => pricing::totals(req(&payload, "order")?, req(&payload, "client")?),
         "resolve_unit_price" => pricing::resolve_unit_price(
