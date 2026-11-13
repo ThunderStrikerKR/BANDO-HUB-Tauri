@@ -5,14 +5,14 @@ use serde_json::{json,Value};
 use unicode_normalization::UnicodeNormalization;
 use super::{field,items,normalized_color,validate_product,product_key};
 
-fn registry_key(text:&str)->String{
+pub(super) fn registry_key(text:&str)->String{
     text.nfkc().collect::<String>()
         .trim().chars().flat_map(char::to_lowercase)
         .collect::<String>()
         .split_whitespace().collect::<Vec<_>>().join(" ")
 }
 fn color(v:&Value)->String {normalized_color(field(v,"color"))}
-fn existing_matches(products:&[Value],product:&Value)->Vec<String>{
+pub(super) fn existing_matches(products:&[Value],product:&Value)->Vec<String>{
     let variant=items(product,"variants").first().unwrap_or(&Value::Null);
     products.iter().filter(|p|{
         let catalog=if field(p,"catalog").is_empty() {"BANDOSTAND"}else{field(p,"catalog")};
