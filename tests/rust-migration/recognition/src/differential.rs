@@ -260,6 +260,8 @@ fn compare_real_recipient_fields_addresses_contacts_and_all_evidence() {
     assert!(report["comparedLeaves"].as_u64().unwrap_or(0)>200,
         "recipient comparison did not inspect real fields");
     print_recipient_report("TS_RUST_RECIPIENT", &report);
+    assert_eq!(report["referenceFailuresRust"].as_array().map(Vec::len),Some(0),
+        "Rust source spans must not reference stale delivery or item IDs");
 }
 
 #[test]
@@ -303,6 +305,61 @@ fn compare_real_reanalysis_and_employee_confirmations() {
         let rust=recognition::execute("reanalyze_order",json!({
             "order":order,"state":state
         })).expect("real Rust reanalysis");
+        let case_id=case["id"].as_str().unwrap_or("");
+        let first=&rust["recipients"][0];
+        match case_id {
+            "reanalyze-manual"=>{
+                assert_eq!(rust,order,
+                    "manual classification must bypass all automatic reanalysis");
+            }
+            "reanalyze-staff-fields"=>{
+                assert_eq!(first["id"],order["recipients"][0]["id"]);
+                for key in ["name","address","phone","mobile","note",
+                    "addressStatus","addressParts","freightCode",
+                    "shippingCharges","vatDefault","vatOverride"] {
+                    assert_eq!(first[key],order["recipients"][0][key],
+                        "employee-confirmed field must be inherited: {key}");
+                }
+                assert_eq!(first["items"][0]["productId"],"staff-picked-sku");
+                assert_eq!(first["items"][0]["variantId"],"staff-picked-variant");
+                assert_eq!(first["items"][0]["manuallyConfirmed"],true);
+                assert_eq!(first["items"][0]["quantityApproval"],
+                    order["recipients"][0]["items"][0]["quantityApproval"]);
+            }
+            "reanalyze-edit-quantity"=>{
+                assert_eq!(first["id"],order["recipients"][0]["id"]);
+                assert_eq!(first["items"][0]["quantity"],3);
+                assert_ne!(first["items"][0]["productId"],"staff-picked-sku",
+                    "changed item raw must not carry manual SKU selection");
+                assert!(first["items"][0].get("quantityApproval").is_none(),
+                    "edited quantity must invalidate the former approval");
+                let stable=first["id"].as_str().expect("stable recipient ID");
+                for source in first["items"][0]["sources"].as_array().unwrap(){
+                    assert_eq!(source["recipientId"],stable,
+                        "edited item source must bind to stable delivery recipient");
+                }
+            }
+            "reanalyze-name-changed"=>{
+                assert_ne!(first["id"],order["recipients"][0]["id"],
+                    "different original recipient must not inherit staff data");
+                assert_ne!(first["items"][0]["productId"],"staff-picked-sku");
+            }
+            "reanalyze-new-destination"=>{
+                let rows=rust["recipients"].as_array().expect("delivery rows");
+                assert_eq!(rows.len(),2);
+                assert_eq!(rows[0]["id"],order["recipients"][0]["id"]);
+                assert_ne!(rows[1]["id"],order["recipients"][0]["id"]);
+                assert_eq!(rows[1]["items"][0]["quantity"],1);
+            }
+            "reanalyze-two-recipients"|"reanalyze-duplicate-name"=>{
+                let rows=rust["recipients"].as_array().expect("delivery rows");
+                assert_eq!(rows.len(),2);
+                assert_eq!(rows[0]["id"],order["recipients"][0]["id"]);
+                assert_eq!(rows[1]["id"],order["recipients"][1]["id"]);
+                assert_ne!(rows[0]["id"],rows[1]["id"]);
+            }
+            _=>{}
+        }
         case["rustReanalyzed"]=rust;
     }
     let report=run_node(
@@ -312,4 +369,6 @@ fn compare_real_reanalysis_and_employee_confirmations() {
     assert!(report["comparedLeaves"].as_u64().unwrap_or(0)>150,
         "reanalysis did not inspect actual fields");
     print_recipient_report("TS_RUST_REANALYSIS",&report);
+    assert_eq!(report["referenceFailuresRust"].as_array().map(Vec::len),Some(0),
+        "reanalysis must leave all Rust recipient and Item source links valid");
 }
