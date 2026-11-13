@@ -707,7 +707,8 @@ rawCase("already handed off store Excel blocked",
       origin:"STORE",status:"STORE_SENT",snapshot:{}});
   });
 rawCase("same name protects already paid recipient after contact correction",
-  "가상 수취인\n서울시 가상로 1\n010-2222-3333\n가상 상품 3개",s=>{
+  "김가상\n서울시 가상로 1\n010-2222-3333\n가상 상품 3개",s=>{
+    s.orders[0].recipients[0].name="김가상";
     s.workflow.payments.push({id:"payment-1",dealerId:"dealer-1",
       amount:1000,allocations:[{shipmentId:"shipment:o1:r1",amount:1000}]});
   });
