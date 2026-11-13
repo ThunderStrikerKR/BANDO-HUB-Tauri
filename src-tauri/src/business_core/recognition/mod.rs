@@ -829,7 +829,14 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
         // mixed recipient/phone row or all columns from a shipment table.
         // Its evidence span still points only to the actual matched token.
         if let Some(hit)=product_hits.last() {
-            let displayed=ts_product_display(hit,&events).0.to_owned();
+            // parser.ts::logicalLines splits model+quantity from an inline
+            // delivery-address line. Without a detected address it retains
+            // the original physical product line in candidate.value, even
+            // when the line also contains a contact/person. Do not shorten
+            // the top-level candidate solely because a phone was detected.
+            let displayed=if address.is_some() {
+                ts_product_display(hit,&events).0.to_owned()
+            } else {hit.raw.clone()};
             events[product_evidence].value=displayed;
         }
     }
