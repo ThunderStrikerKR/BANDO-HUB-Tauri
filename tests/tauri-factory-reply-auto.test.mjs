@@ -29,7 +29,16 @@ function load(path) {
     : nativeRequire(name), webcrypto, structuredClone);
   return output;
 }
-const { processWatchedFactoryReply } = load("factory-reply-auto");
+const { processWatchedFactoryReply: runWithEngine } = load("factory-reply-auto");
+// Retain the exact previous TS implementation as a differential oracle in
+// unit fixtures; the production API default is always the native Rust engine.
+const sourceOracle = load("factory-reply-workbook");
+const processWatchedFactoryReply = (api, source) =>
+  runWithEngine(api, source, {
+    analyze: sourceOracle.parseFactoryReplyWorkbook,
+    apply: async (state, preview) =>
+      sourceOracle.applyFactoryReplyPreview(state, preview),
+  });
 
 function sample() {
   const recipient = {
