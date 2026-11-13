@@ -144,6 +144,19 @@ GT-1 1개
   $bothModels=(@($labels|Where-Object {$_.name -match "709"}).Count -gt 0) -and
               (@($labels|Where-Object {$_.name -match "GT-1"}).Count -gt 0)
   Verify "Product tokens visible" $bothModels "Both product tokens must appear in the real UI"
+  # Source-column tokens do not prove recognition. Verify the right review.
+  $reviewRecipient=@($after | Where-Object {
+    $_.name -eq "김가상" -and $_.type -match "Text" -and $_.x -ge 560
+  }).Count -gt 0
+  Verify "Parsed recipient in review" $reviewRecipient "Right-hand review must show the recognized recipient"
+  $reviewProduct=@($after | Where-Object {
+    $_.name -match "^상품 수정.*709" -and $_.type -match "Button" -and $_.x -ge 560
+  }).Count -gt 0
+  Verify "Matched catalog product in review" $reviewProduct "Right-hand review must show the recognized 709 catalog product"
+  $nativeError=@($after | Where-Object {
+    $_.name -match "Rust 발주서 자동 분석 실패"
+  }).Count -gt 0
+  Verify "No Rust recognition error" (-not $nativeError) "Reception showed a native recognition error"
   $stillRunning=($null -ne (Get-Process -Id $ProcessId -ErrorAction SilentlyContinue))
   Verify "Native EXE survived reception" $stillRunning "Tauri process exited"
   $result.status="NATIVE_RECEPTION_UIA_PASSED"
