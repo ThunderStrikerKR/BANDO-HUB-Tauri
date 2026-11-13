@@ -310,6 +310,27 @@ pub(super) fn execute(operation:&str,payload:&Value)->Result<Value,String>{
             field(payload,"minor"),field(payload,"brand")).into_iter()),
         "category_ids"=>json!(category_ids(state,field(payload,"category"),
             field(payload,"minor")).into_iter().collect::<Vec<_>>()),
+        "management_products"=>{
+            let category=field(payload,"category");
+            let brand=field(payload,"brand");
+            let query=no_whitespace(field(payload,"query"));
+            let missing=payload.get("missing")==Some(&Value::Bool(true));
+            let permitted=classified(state,category,"",brand).into_iter()
+                .map(|p|field(p,"id").to_owned()).collect::<HashSet<_>>();
+            ids(items(state,"products").iter().filter(|p|{
+                field(p,"deletedAt").is_empty() &&
+                field(p,"supersededBy").is_empty() &&
+                field(p,"catalog")!="DEMO" &&
+                !items(p,"variants").iter().any(|v|field(v,"source")=="DEMO") &&
+                permitted.contains(field(p,"id")) &&
+                no_whitespace(&format!("{} {}",field(p,"name"),field(p,"subtitle")))
+                    .contains(&query) &&
+                (!missing || items(p,"variants").iter().any(|v|
+                    ["wholesale","semi","retail"].iter().any(|k|
+                        v.get(*k).is_none_or(|price|price.is_null() ||
+                            price.as_i64()==Some(0)))))
+            }))
+        }
         "search_products"=>{
             let major=field(payload,"major");
             let brand=field(payload,"brand");
