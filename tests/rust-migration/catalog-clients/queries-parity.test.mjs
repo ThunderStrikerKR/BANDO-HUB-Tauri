@@ -238,15 +238,19 @@ test("actual compiled Rust business reads and product editor equal original TS o
   assert.equal(run.status,0,run.stderr||run.error?.message);
   const actual=JSON.parse(run.stdout);
   assert.equal(actual.length,trials.length);
+  const mismatches=[];
   trials.forEach((t,i)=>{
     const actualCase=actual[i];
-    if(t.operation==="category_ids"&&actualCase.ok){
-      actualCase.value.sort();
-    }
-    if(t.operation==="upsert_product_from_editor"&&!t.oracle.ok){
-      assert.equal(actualCase.ok,false,t.name+": native must reject invalid product");
-    }else{
-      assert.deepEqual(actualCase,t.oracle,t.name+": original TS and Rust diverged");
+    if(t.operation==="category_ids"&&actualCase.ok)actualCase.value.sort();
+    try {
+      if(t.operation==="upsert_product_from_editor"&&!t.oracle.ok)
+        assert.equal(actualCase.ok,false);
+      else
+        assert.deepEqual(actualCase,t.oracle);
+    } catch {
+      mismatches.push(t.name+"\n  TS="+JSON.stringify(t.oracle).slice(0,800)
+        +"\n  Rust="+JSON.stringify(actualCase).slice(0,800));
     }
   });
+  assert.deepEqual(mismatches,[],"Original TS vs Rust discrepancies: "+mismatches.length);
 });
