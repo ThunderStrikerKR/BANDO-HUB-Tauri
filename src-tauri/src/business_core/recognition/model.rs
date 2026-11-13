@@ -102,8 +102,9 @@ pub(crate) fn find_term(text: &str, term: &str, is_model: bool) -> Option<(usize
     if term.trim().is_empty() { return None; }
     let re = RegexBuilder::new(&spell(term.trim(), is_model))
         .case_insensitive(true).build().ok()?;
-    re.find_iter(text).find(|m| is_boundary(text, m.start(), m.end()))
-        .map(|m| (m.start(), m.end()))
+    let found = re.find_iter(text).find(|m| is_boundary(text, m.start(), m.end()))
+        .map(|m| (m.start(), m.end()));
+    found
 }
 pub(crate) fn model_names(p: &Value) -> Vec<String> {
     let name = lead(p);
@@ -387,7 +388,8 @@ pub(crate) fn decide(text: &str, state: &Value, client_id: &str) -> Decision {
         else if chosen.is_none() { Some("등록된 모델명 또는 별칭과 일치하지 않습니다.".to_owned()) }
         else { None };
     let mut names = HashMap::<String, Value>::new();
-    for p in available.iter().map(|e| e.p) {
+    for e in &available {
+        let p = e.p;
         names.entry(str_field(p,"id").to_owned()).or_insert_with(|| json!({
             "id": format!("candidate:{}",str_field(p,"id")),
             "field": "product", "value": str_field(p,"id"), "label": str_field(p,"name"),
