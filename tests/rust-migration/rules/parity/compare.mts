@@ -589,6 +589,22 @@ wfCase("historical confirmed order skips missing product validation",s=>{
   s.orders[0].recipients[0].items[0].variantId="other-v";
 });
 
+
+wfCase("sender line with spaced 010 number",s=>{
+  s.clients[0].phone="";
+  s.orders[0].raw=[
+    "송하인명: 가상 발송자",
+    "전화번호 010 2345 6789",
+    "송하인주소: 서울시 종로구 가상로 17"
+  ].join("\n");
+});
+wfCase("sender marked with full-width colon",s=>{
+  s.clients[0].phone="";
+  s.orders[0].raw="보내는 사람：테스트 발송자\n휴대폰：010.2345.6789\n주소：서울시 종로구 가상로 17";
+});
+wfCase("sender marker with malformed address",s=>{
+  s.orders[0].raw="송하인: 테스트 발송자\n연락처: 010-2345-6789";
+});
 function normalized(v:unknown):string {
   if(Array.isArray(v))return "["+v.map(normalized).join(",")+"]";
   if(v&&typeof v==="object") {
