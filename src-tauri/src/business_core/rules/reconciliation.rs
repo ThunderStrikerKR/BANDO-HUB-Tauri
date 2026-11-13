@@ -178,14 +178,8 @@ pub(super) fn reconcile(payload:&Value)->Result<Value,String> {
                 !has_value(field(&order,"clientSnapshot"))) {
             continue;
         }
-        // TS reconcileWorkflow invokes synchronizeIssueDecisions on each
-        // active order. Preserve the shape even for zero current issues.
-        // Detailed issue evidence and resolution synchronization still require
-        // separate parity coverage before this can replace the TS engine.
-        if !field(&order,"issueResolutions").is_object() {
-            set(&mut order,"issueResolutions",json!({}))?;
-            state["orders"][oi]=order.clone();
-        }
+        super::issues::synchronize(&mut order)?;
+        state["orders"][oi]=order.clone();
         let source_id=format!("source:{order_id}");
         let root_id=format!("group:{order_id}");
         if !rows(field(&state["workflow"],"sources")).iter().any(|s|
