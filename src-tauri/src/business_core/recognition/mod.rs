@@ -293,6 +293,19 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
                 }
             }
         }
+        // A transcribed table can carry the recipient in its remarks column.
+        if line.text.contains('|') {
+            let table_recipient=Regex::new(r"\|\s*([가-힣]{2,5})\s*/")
+                .expect("table recipient");
+            if let Some(c)=table_recipient.captures(line.text) {
+                if let Some(name)=c.get(1) {
+                    if is_person(name.as_str()) && address.map_or(true,|a|name.end()<=a) {
+                        add_match(&mut events,line,name.start(),name.end(),"name",
+                            name.as_str().to_owned(),"표 비고란의 수취인");
+                    }
+                }
+            }
+        }
         // A parenthesized contact preceding a delivery address (case 7).
         if let Some(address_start) = address {
             let prefix = &line.text[..address_start];
@@ -467,8 +480,10 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
         !h.common && events[h.evidence].start < events[*a].start));
     for hit in &product_hits {
         let anchor_index = owner_index(&anchors,&events,events[hit.evidence].start);
-        let owner = if has_leading && !anchors.is_empty()
-            && events[hit.evidence].start < events[anchors[0]].start { 0 } else { anchor_index };
+        let owner = if has_leading && !anchors.is_empty() {
+            anchors.iter().position(|a| events[*a].start > events[hit.evidence].start)
+                .unwrap_or(anchors.len()-1)
+        } else { anchor_index };
         let attach_to: Vec<usize> = if hit.common {
             (0..recipients.len()).filter(|idx| recipients[*idx]["items"]
                 .as_array().map_or(true,|xs|xs.is_empty())).collect()
