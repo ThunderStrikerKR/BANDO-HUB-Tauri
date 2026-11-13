@@ -43,6 +43,8 @@ export function SignalLights({ step, notice = false }: { step: number; notice?: 
 }
 export function WorkflowBoard({
   state,
+  previewReady = true,
+  previewError = "",
   persistedState,
   selection,
   activeKey,
@@ -55,6 +57,8 @@ export function WorkflowBoard({
   onStageHover?: (v: { groupId: string; step: number } | undefined) => void;
   stageHover?: { groupId: string; step: number };
   state: State;
+  previewReady?: boolean;
+  previewError?: string;
   persistedState?: State;
   activeKey?: string;
   selection?: WorkflowSelection;
@@ -64,6 +68,7 @@ export function WorkflowBoard({
 }) {
   const [undoDelete, setUndoDelete] = useState<{ gid: string; at: string }>();
   const native = useNativeWorkflowBoard(state);
+  const ready = previewReady && native.ready;
   useEffect(() => {
     if (!undoDelete) return;
     const end = (e: Event) => {
@@ -130,7 +135,7 @@ export function WorkflowBoard({
     return () => clearInterval(timer);
   }, [latestDeadline]);
   const run = async (fn: () => Promise<State> | State, stageGroupId?: string) => {
-    if (inFlight.current || (stageGroupId && (stageDeadlines[stageGroupId] ?? 0) > Date.now()))
+    if (!ready || inFlight.current || (stageGroupId && (stageDeadlines[stageGroupId] ?? 0) > Date.now()))
       return;
     inFlight.current = true;
     setBusy(true);
@@ -177,6 +182,12 @@ export function WorkflowBoard({
         <b>발주서 묶음</b>
         <small>배송 건별 정보 / 묶음별 진행</small>
       </div>
+      {(previewError || native.error) && (
+        <p role="alert">업무 미리보기 계산 오류: {previewError || native.error}</p>
+      )}
+      {!ready && !previewError && !native.error && (
+        <p role="status" className="muted">주문 미리보기 계산 중</p>
+      )}
       {!groups.length && (
         <p className="muted">거래처와 발주 원문을 입력하면 수취인별 배송 건이 생성됩니다.</p>
       )}
@@ -230,18 +241,18 @@ export function WorkflowBoard({
                 <b>{first.client.displayName || first.client.name}</b>
               </span>
               <button
-                disabled={!native.ready || (first.order.receptionVersion === 1 && !first.order.confirmedAt)}
+                disabled={!ready || (first.order.receptionVersion === 1 && !first.order.confirmedAt)}
                 onClick={() => setManage(g.id)}
               >
                 묶음 관리
               </button>
               <button
                 className="trash-button"
-                disabled={!native.ready || (first.order.receptionVersion === 1 && !first.order.confirmedAt)}
+                disabled={!ready || (first.order.receptionVersion === 1 && !first.order.confirmedAt)}
                 aria-label={"주문 묶음 삭제 " + first.client.name}
                 onClick={async () => {
                   if (
-                    busy || !native.ready ||
+                    busy || !ready ||
                     !(await confirmAction(
                       first.client.name +
                         " / 배송 " +
@@ -286,7 +297,7 @@ export function WorkflowBoard({
                 )}
                 <button
                   className="primary"
-                  disabled={!native.ready || busy || remaining > 0 || ss.some((s) => s.transferred)}
+                  disabled={!ready || busy || remaining > 0 || ss.some((s) => s.transferred)}
                   aria-label={buttonLabel}
                   onMouseEnter={() => {
                     hoveredGroup.current = g.id;
@@ -324,7 +335,7 @@ export function WorkflowBoard({
                 </button>
                 <button
                   className="workflow-undo"
-                  disabled={!native.ready || busy || step === 0 || ss.some((s) => s.transferred)}
+                  disabled={!ready || busy || step === 0 || ss.some((s) => s.transferred)}
                   title="이전 단계 취소"
                   aria-label="이전 단계 취소"
                   onClick={() => void run(() =>
