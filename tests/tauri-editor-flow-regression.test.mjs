@@ -55,15 +55,20 @@ test("both freight editors refuse a no-op before versioning or history writes",(
     assert.ok(start>=0,path);
     const next=content.slice(start,start+190);
     assert.match(next,/if \(!editing \|\| !editingDirty\) return true;/);
-    const portion=content.slice(start);
+    // Restrict checks to the actual save handler. Looking at the rest of
+    // the component could accidentally pass by finding an unrelated RPC.
+    const end=content.indexOf(path.startsWith("Shipping")
+      ? "  usePageLeaveGuard(" : "  const copyGroupRule",start);
+    assert.ok(end>start,path+" save handler boundary");
+    const portion=content.slice(start,end);
     const guard=portion.indexOf("if (!editing || !editingDirty)");
     const nativeCall=portion.indexOf("businessCoreCall<");
     assert.ok(guard>=0 && nativeCall>guard,
       path+" must reject a no-op before calling native Rust");
     assert.match(portion,/apply_shipping_action/,
       path+" must save through the native Rust shipping rules");
-    assert.doesNotMatch(portion.slice(0,200),/history\.push/,
-      "The UI must not write version history before confirming an edit");
+    assert.doesNotMatch(portion,/history\.push|version:\s*crypto\.randomUUID\(\)/,
+      "The UI must not mutate tariff history or versions directly");
   }
 });
 
