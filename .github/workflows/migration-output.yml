@@ -1,0 +1,21 @@
+name: Rust output migration isolation
+on:
+  push:
+    branches:
+      - migration/03-integration
+    paths:
+      - src-tauri/src/business_core/output/**
+      - tests/rust-migration/output/**
+      - .github/workflows/migration-output.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  output-rust:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Compile and run independent Rust output tests
+        run: cargo test --manifest-path tests/rust-migration/output/Cargo.toml --locked
