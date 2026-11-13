@@ -1,5 +1,115 @@
 # TSBH Rust migration — session 2/3: Price, freight and workflow rules
 
+## Session 2 continuation: migrateWorkflow Rust migration — 2026-11-13
+
+**Latest verified source checkpoint**
+- Branch: `migration/02-rules`
+- Implementation and direct-comparison source SHA: `81037695496b7f56943dfed63c44c5e51864e608`
+- GitHub Actions: https://github.com/ThunderStrikerKR/TSBH/actions/runs/43372901079
+- **Real TypeScript vs compiled Rust: 285 / 285 named comparison cases PASS**
+- **Standalone Rust regression: 47 / 47 PASS**
+- **Windows Tauri/SQLite integration: SKIPPED, not yet verified**
+- The corpus expanded by 26 original-TS-to-Rust migration examples over the previous 259/259 checkpoint. CI enforces **the expected TypeScript success or failure**, not only equality of error messages.
+
+### Ported operation and migration contract
+
+`execute("migrate_workflow", {"state": State, "now": UTC_ISO_STRING, "eventIds": [UUID, ...]})`
+
+Implemented in `src-tauri/src/business_core/rules/legacy_migration.rs`
+and registered from `src-tauri/src/business_core/rules/mod.rs`. Returns
+`{"state": State}` or the exact original TypeScript business-rule error
+for the tested rejection case.
+
+- Calls the already-ported `reconciliation::reconcile` first, sharing a
+  single ordered event-ID stream with the subsequent legacy events.
+- Derives each shipment's legacy step: **4** for `paid`,
+  `postpaidApproved`, or legacy status `QUEUED`/`EXPORTED`; **3** for
+  `notified` if not already step 4; **0** otherwise. Sets
+  `legacyApproval = (step == 4)`.
+- Retains the stable source, group, order, recipient and shipment IDs.
+  Each shipment gets a sender snapshot from the original
+  `senderFor` precedence: saved `senderSnapshot` first, then company
+  sender for `DEALER`/`RETAIL`, otherwise an explicitly marked
+  sender in raw/analysisRaw, then frozen clientSnapshot, master
+  client, or company fallback. Handling of marked sender phone/address
+  was corrected after an actual TypeScript mismatch.
+- For a single-recipient order with a valid historical shippingFee,
+  sets chargeMode `MANUAL`, setting the specific amount only when all
+  items share exactly one origin. Applies confirmedFreightVersion
+  at step >=2 and the historical billingSignature at step >=3.
+- For status `EXPORTED`, sets `transferred` and `legacyArchived`
+  without inventing an Excel queue record.
+- For non-EXPORTED orders in the original **State.queue** legacy
+  order-ID list, creates a `QUEUED` workflow Excel record for each
+  origin, with at-time item-filtered recipient snapshot, sender,
+  freight code, subtotal, shipping, VAT and total. This is different
+  from the new `State.workflow.queue`; do not confuse the two.
+- Appends one original-style audit event `기존 주문 상태 보존`
+  per migrated shipment, with its old order status, converted step,
+  and `receiptCreated:false`.
+- Existing payment allocations, confirmations, source records, queue
+  records, deliveries, change requests, audit events and pre-existing
+  account notices are **preserved**. None is recalculated, erased or
+  reassigned by the migration function.
+- TypeScript refuses to re-bill a group containing exclusively
+  legacyArchived shipments when migrating a financially completed
+  order. Rust reproduces that error: `묶음의 배송 건이 없습니다.`.
+  A REVIEW order with archived shipment remains a separately
+  tested successful case.
+
+### Migration-specific test cases
+
+`tests/rust-migration/rules/parity/compare.mts` executes the exact
+original `migrateWorkflow` and the compiled Rust operation on identical
+fully structured State. It freezes timestamp/UUIDs and compares **all**
+serialized resulting State fields, not only summarized status. Test
+categories cover:
+
+- REVIEW, notified, paid, postpaidApproved, QUEUED, EXPORTED
+- Legacy queue snapshot contents, mixed STORE/FACTORY, freight
+  collect 020, single STORE fee, missing historical fee and VAT
+- Single and multiple recipients, multiple independent orders,
+  separate paid and queued orders, multi-allocation payments
+- Pre-existing clientSnapshot, senderSnapshot, explicitly marked
+  sender, company sender, phone formats and full-width colons
+- Historical confirmations, invoice notices, payment allocations,
+  receipt/rawHistory, deliveries, change requests, audit IDs
+- Correct error for completed archived-only groups versus successful
+  archival preservation of REVIEW orders
+
+**In addition to Rust/TS equality**, for every pre-existing workflow
+payment, source, event, delivery, change request, confirmation and
+queue record, test code checks that the TypeScript migration retained
+the exact same ID and record content. It also checks existing
+group.notices. Because the final Rust State must equal the complete
+TypeScript State, the same preservation invariants apply to Rust.
+
+### Operational precautions and remaining session work
+
+- **Migration is one-time, not inherently idempotent**: the original
+  TypeScript appends new audit records and can append old-queue
+  conversion records on each invocation. Session 3 must use a
+  one-shot migration marker/transaction and a backup; do not call on
+  every launch, invent safety flags inside the pure Rust rule, or
+  silently duplicate historical records.
+- This pure module has **no SQLite mutation, UI wire-up or executable
+  Windows/Tauri test**, and no migration has been performed against
+  real business records. All examples are synthetic.
+- The 285 matched examples do **not** establish exhaustive semantic
+  parity. Unchecked inputs, arbitrary JSON ordering of frozen evidence,
+  some sender formatting and cross-history combinations remain possible
+  sources of divergence.
+- **Still incomplete in session 2:** exhaustive `validateWorkflow`
+  and `validateReceptionBoundary` branch parity, partial cancellation
+  and revalidation of historical payment confirmations, and some
+  edge cases for sender/account/billing signatures.
+- Session 3 must integrate the pure functions into native
+  SQLite/Tauri transactions, preserve authenticated historical data
+  and verify end-to-end Windows behavior. Do not activate production
+  migration or replace TypeScript validation solely based on these fixtures.
+
+---
+
 ## Session 2 continuation: applyOrderRawEdit Rust migration — 2026-11-13
 
 **Latest verified checkpoint**
@@ -91,7 +201,7 @@ arbitrary parser outputs, cross-group shipment histories, complex source
 evidence serialization and all native reception-boundary exceptions.
 
 **Session-2 work still outstanding beyond this task:**
-`migrateWorkflow`, remaining `validateWorkflow` and
+remaining `validateWorkflow` and
 `validateReceptionBoundary` branches and full historical-payment
 cancellation/revalidation parity. Do not represent the overall migration as
 complete.
