@@ -2,7 +2,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import { automaticMessage, withGreeting } from "./automatic-message";
 import { validProductUrl } from "./domain";
 import { groupOrder } from "./workflow";
-import { recordCopy } from "./message-model";
+import { nativeRecordMessageCopy } from "./native-message-audit";
 import { LinkedText, messageSpans } from "./LinkedText";
 import type { NoticeSink } from "./shared/notices";
 import type { Order, State } from "./types";
@@ -58,7 +58,7 @@ export function MessageWorkspace({
       await window.bando!.copy(greeting ? withGreeting(text) : text);
       if (latest.current.id !== order.id || latest.current.raw !== order.raw) return;
       if (order.confirmedAt)
-        await onSave(recordCopy(state, gid, request ? "REQUEST" : "PAYMENT", crypto.randomUUID()));
+        await onSave(await nativeRecordMessageCopy(state, gid, request ? "REQUEST" : "PAYMENT", crypto.randomUUID()));
       else if (request)
         onOrder({
           ...latest.current,
