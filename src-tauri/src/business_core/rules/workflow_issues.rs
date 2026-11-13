@@ -27,7 +27,7 @@ fn sale_problem(p:Option<&Value>)->&str{
         ""|"판매중"|"SELLING"|"판매 표시"=>"",other=>other
     }
 }
-fn sender_phone(raw:&str)->String{
+pub(super) fn sender_phone(raw:&str)->String{
     // Sender phone rules in src/explicit-sender.ts permit whitespace and
     // punctuation inside all three blocks of a telephone number.
     let chars=raw.chars().collect::<Vec<_>>();
