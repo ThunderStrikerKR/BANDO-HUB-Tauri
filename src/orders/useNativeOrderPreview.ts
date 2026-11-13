@@ -9,6 +9,7 @@ import type { Order, Price, State } from "../types";
 export type NativeOrderPreview = {
   orderId: string;
   shipmentCount: number;
+  lineAmounts: Array<{ recipientId: string; itemId: string; amount: Price }>;
   total: Price;
   vatLabel: string;
 };
