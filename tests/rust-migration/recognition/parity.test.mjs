@@ -34,6 +34,7 @@ function normalized(out){
       name:property(r,"name"),address:property(r,"address"),
       phone:property(r,"phone"),mobile:property(r,"mobile"),note:property(r,"note"),
       addressStatus:property(r,"addressStatus"),addressKind:property(r,"addressKind"),
+      addressParts:property(r,"addressParts"),
       items:(r.items??[]).map(i=>({
         raw:property(i,"raw"),name:property(i,"name"),quantity:property(i,"quantity"),
         quantityConfirmed:property(i,"quantityConfirmed"),
