@@ -286,7 +286,7 @@ pub fn execute(operation: &str, payload: Value) -> Result<Value, String> {
         "preview_client_rows" => client_preview::preview(&payload),
         "upsert_product_from_editor" => editor::execute(&payload),
         "client_candidates" | "classified_products" | "category_ids" |
-        "search_products" | "representative_products" | "suggest_group_representative" |
+        "management_products" | "search_products" | "representative_products" | "suggest_group_representative" |
         "official_links" => queries::execute(operation, &payload),
         "upsert_brand" | "validate_brands" => brands::execute(operation, &payload),
         "change_category" | "delete_category" | "legacy_add_category" |
