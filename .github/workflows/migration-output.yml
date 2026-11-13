@@ -30,6 +30,8 @@ jobs:
         run: npm install --no-audit --no-fund --ignore-scripts
       - name: Verify TypeScript and production bundle
         run: npm run build
+      - name: Inspect frontend source maps and residual business-core markers
+        run: node tests/rust-migration/output/audit-bundle.mjs
       - name: Existing frontend regressions
         run: npm test
   windows-native:
