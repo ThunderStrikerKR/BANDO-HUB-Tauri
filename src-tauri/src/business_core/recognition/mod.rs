@@ -378,7 +378,9 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
                 || phone.is_match(line.text)
                 || is_person(text) || is_institution(text)
                 || (quantity::extract(line.text).len()>0
-                    && model::category(line.text).is_some());
+                    && model::category(line.text).is_some())
+                || product_signal(line.text,
+                    &model::decision_json(&model::decide(line.text,state,client_id)),state);
             if !field && line.paragraph==events[i].paragraph {
                 events[i].end=line.start+line.text.len();
                 if !events[i].value.is_empty(){events[i].value.push('\n');}
@@ -590,7 +592,7 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
         // Never synthesize a new string and then treat its indexes as offsets
         // into raw: UTF-8/UTF-16 source-evidence contract must be lossless.
         let matched = model::decision_json(&model::decide(skip_until,state,client_id));
-        let quantity_values = if trimmed.contains('|') {
+        let mut quantity_values = if trimmed.contains('|') {
             let model_end=matched.get("evidence").and_then(Value::as_object)
                 .and_then(|o|o.get("end")).and_then(Value::as_u64)
                 .map(|v|v as usize);
@@ -601,6 +603,22 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
                 model::products(state).iter().any(|p|model::model_names(p).iter()
                     .any(|name|model::find_term(skip_until,name,true).is_some())))
         };
+        // parser.ts:537-552: a compound sale-unit phrase containing
+        // "2개" is part of the option name, not an order quantity.
+        if quantity_values.len()==1 {
+            if let Some(p)=matched.get("productId").and_then(Value::as_str)
+                .and_then(|pid|model::products(state).into_iter().find(|p|
+                    p.get("id").and_then(Value::as_str)==Some(pid))) {
+                let sale_unit=p.get("sellingUnit").and_then(Value::as_str);
+                let option=p.get("variants").and_then(Value::as_array)
+                    .and_then(|vs|vs.first())
+                    .and_then(|v|v.get("option")).and_then(Value::as_str);
+                if sale_unit==Some("2개 구성")
+                    && option.map_or(false,|o|!o.is_empty() && trimmed.contains(o)) {
+                    quantity_values.clear();
+                }
+            }
+        }
         let mut quantity_indexes = Vec::new();
         let offset = line.text.find(trimmed).unwrap_or(0);
         for q in quantity_values {
