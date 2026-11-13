@@ -1,7 +1,6 @@
 import { DateNavigator } from "./DateNavigator";
 import { useEffect, useRef, useState } from "react";
-import { won } from "../domain";
-import { internalModel } from "../matching";
+import { won, internalModel } from "./history-format";
 import type { State } from "../types";
 import { ManagementSearch } from "../ui/ManagementSearch";
 import { HelpTooltip } from "../ui/HelpTooltip";
