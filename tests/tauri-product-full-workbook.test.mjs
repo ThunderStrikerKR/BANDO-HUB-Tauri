@@ -194,7 +194,11 @@ test("safe approvals are backed up, revision-checked and wired to Tauri native S
   assert.match(bridge,/saveProductSyncWorkbook: \(bytes\)/);
   assert.match(manager,/<ProductSyncWorkbookTools onSave=\{onSave\}/);
   assert.match(ui,/await window\.bando!\.backup\(\)/);
-  assert.match(ui,/applyUnifiedProductWorkbook\(state, review\)/);
+  const nativeRules=read("src-tauri/src/business_core/catalog_clients.rs");
+  assert.match(ui,/"catalog_clients", "apply_product_workbook"/);
+  assert.doesNotMatch(ui,/const result = applyUnifiedProductWorkbook\(state, review\)/);
+  assert.match(nativeRules,/fn apply_product_workbook\(/);
+  assert.match(nativeRules,/검토 후 데이터가 변경되었습니다/);
   assert.match(ui,/await onSave\(result\.next\)/);
 });
 
