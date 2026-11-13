@@ -13,7 +13,7 @@ export function businessCoreCall<T>(
 }
 
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import type { Api, State, CatalogReport, OcrCapture } from "./types";
+import type { Api, State, CatalogReport, OcrCapture, OfficialLink } from "./types";
 import productImages from "./tauri-product-images.json";
 import { parseOfficialProductPage } from "./official-product-import";
 
@@ -95,9 +95,14 @@ const api: Api = {
   },
   // Suggests links from the bundled historical catalog; individual previews
   // still fetch their official product detail pages live.
-  officialList: async () => businessCoreCall("catalog_clients", "official_links", {
-    report: await invoke<CatalogReport>("catalog_report"),
-  }),
+  officialList: async () => {
+    const links = await businessCoreCall<OfficialLink[]>("catalog_clients", "official_links", {
+      report: await invoke<CatalogReport>("catalog_report"),
+    });
+    // Presentation-only sorting: business URL validation and deduplication
+    // are authoritative in Rust, matching the original Korean UI ordering.
+    return links.sort((a,b) => a.name.localeCompare(b.name,"ko"));
+  },
   mobileStart: async () => notReady("스마트폰 연동"),
   mobileStop: async () => notReady("스마트폰 연동"),
   mobileStatus: async () => ({ running: false, urls: [] }),
