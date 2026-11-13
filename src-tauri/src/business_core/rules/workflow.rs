@@ -312,6 +312,19 @@ fn append_event(state:&mut Value,payload:&Value,action:&str,ids:&[String],
     state["workflow"]["events"].as_array_mut().ok_or("업무 이벤트 목록 누락")?.push(event);
     Ok(())
 }
+fn append_extra_event(state:&mut Value,payload:&Value,id:&str,action:&str,
+    ship_ids:&[String],group_id:&str,before:Value,after:Value,actor:&str,reason:&str)
+    ->Result<(),String> {
+    if find_by_id(field(field(state,"workflow"),"events"),id).is_some() {
+        return Err("업무 이벤트 ID가 중복됩니다.".into());
+    }
+    let event=json!({"id":id,"at":required_str(payload,"now")?,
+        "actor":actor,"action":action,"shipmentIds":ship_ids,
+        "groupId":group_id,"before":before,"after":after,"reason":reason});
+    state["workflow"]["events"].as_array_mut()
+        .ok_or("업무 이벤트 목록 누락")?.push(event);
+    Ok(())
+}
 fn ensure_clock(payload:&Value)->Result<(),String>{
     if required_str(payload,"now")?.trim().is_empty(){return Err("현재 시각을 입력하세요.".into());}
     if required_str(payload,"eventId")?.trim().is_empty(){return Err("이벤트 ID를 입력하세요.".into());}
@@ -815,6 +828,69 @@ pub(super) fn apply(payload:&Value)->Result<Value,String> {
             append_event(&mut state,payload,"전달 후 변경 요청 기록",&[ship_id.to_string()],
                 Value::Null,json!(reason),&group_id)?;
             Ok(json!({"state":state,"changeRequestId":request_id}))
+        }
+        "set_group_account" => {
+            let group_id=required_str(payload,"groupId")?;
+            let (gi,ships)=group_indices(&state,group_id)?;
+            if ships.iter().any(|si|flag(&state["workflow"]["shipments"][*si],"transferred")) {
+                return Err("이관한 묶음의 계좌는 변경할 수 없습니다.".into());
+            }
+            let account_id=payload.get("accountId").and_then(Value::as_str);
+            if account_id.is_some_and(|id|find_by_id(field(field(&state,"settings"),"accounts"),id)
+                .is_none()) {
+                return Err("등록된 계좌를 선택하세요.".into());
+            }
+            let mode=if account_id.is_some() {"MANUAL"} else {"AUTO"};
+            let group_account=json!({"mode":mode,"id":account_id});
+            let first_id=str_field(&state["workflow"]["shipments"][ships[0]],"id").to_string();
+            let (_,oi,_ri)=shipment_indices(&state,&first_id)?;
+            set(&mut state["workflow"]["groups"][gi],"accountMode",json!(mode))?;
+            set(&mut state["workflow"]["groups"][gi],"accountId",json!(account_id))?;
+            if !state["orders"][oi]["groupAccounts"].is_object() {
+                set(&mut state["orders"][oi],"groupAccounts",json!({}))?;
+            }
+            set(&mut state["orders"][oi]["groupAccounts"],group_id,group_account)?;
+            let now=required_str(payload,"now")?.to_string();
+            let seed=required_str(payload,"eventId")?;
+            for si in &ships {
+                let old_step=field(&state["workflow"]["shipments"][*si],"step").as_i64().unwrap_or(0);
+                if old_step < 3 {continue;}
+                let ship_id=str_field(&state["workflow"]["shipments"][*si],"id").to_string();
+                let active_confirms=rows(field(&state["workflow"],"confirmations")).iter()
+                    .filter(|c| {
+                        rows(field(c,"shipmentIds")).iter().any(|sid|sid.as_str()==Some(&ship_id)) &&
+                        !rows(field(&state["workflow"],"events")).iter().any(|e|
+                            str_field(e,"action")=="입금 승인 재확인 필요" &&
+                            field(e,"before")==field(c,"id") &&
+                            rows(field(e,"shipmentIds")).iter().any(|sid|sid.as_str()==Some(&ship_id)))
+                    })
+                    .map(|c|str_field(c,"id").to_string())
+                    .collect::<Vec<_>>();
+                set(&mut state["workflow"]["shipments"][*si],"step",json!(2))?;
+                set(&mut state["workflow"]["shipments"][*si],"legacyApproval",json!(false))?;
+                set(&mut state["workflow"]["groups"][gi],"needsNotice",json!(true))?;
+                if !state["workflow"]["shipments"][*si]["rechecks"].is_array() {
+                    set(&mut state["workflow"]["shipments"][*si],"rechecks",json!([]))?;
+                }
+                state["workflow"]["shipments"][*si]["rechecks"].as_array_mut()
+                    .ok_or("재검증 이력 오류")?.push(json!({
+                        "at":now,"reason":"입금 계좌 변경","fromStage":old_step,"toStage":2
+                    }));
+                for confirmation_id in active_confirms {
+                    append_extra_event(&mut state,payload,
+                        &format!("{seed}:reconfirm:{ship_id}:{confirmation_id}"),
+                        "입금 승인 재확인 필요",&[ship_id.clone()],group_id,
+                        json!(confirmation_id),Value::Null,"시스템","입금 계좌 변경")?;
+                }
+                append_extra_event(&mut state,payload,
+                    &format!("{seed}:recheck:{ship_id}"),"재검증 필요",&[ship_id],
+                    group_id,json!(old_step),json!(2),"시스템","입금 계좌 변경")?;
+            }
+            let all_ids=ships.iter().map(|i|str_field(&state["workflow"]["shipments"][*i],"id")
+                .to_string()).collect::<Vec<_>>();
+            append_event(&mut state,payload,"묶음 입금 계좌 변경",&all_ids,
+                Value::Null,json!(account_id.unwrap_or("AUTO")),group_id)?;
+            Ok(json!({"state":state,"accountMode":mode,"accountId":account_id}))
         }
         _ => Err(format!("지원하지 않는 업무 action: {action}")),
     }
