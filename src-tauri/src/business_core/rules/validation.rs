@@ -24,7 +24,7 @@ fn shipment_for<'a>(state: &'a Value, ship: &Value) -> Result<(&'a Value,&'a Val
 pub(super) fn validate(state: &Value, before: Option<&Value>) -> Result<(),String> {
     let w = field(state,"workflow");
     if w.is_null() { return Ok(()) }
-    for name in ["sources","groups","shipments","payments","queue","events","deliveries","changeRequests","confirmations"] {
+    for name in ["sources","groups","shipments","payments","queue","events","deliveries","changeRequests"] {
         if !unique_id(field(w,name)) { return Err("업무 기록 ID가 중복됩니다.".into()); }
     }
     for s in rows(field(w,"shipments")) {
@@ -98,6 +98,9 @@ pub(super) fn validate(state: &Value, before: Option<&Value>) -> Result<(),Strin
             return Err("입금 확인 연결 / 금액 오류".into());
         }
     }
+    if !unique_id(field(w,"confirmations")) {
+        return Err("입금 확인 기록 중복".into());
+    }
     if let Some(old_state) = before {
         let old_w = field(old_state,"workflow");
         if !old_w.is_null() {
@@ -123,12 +126,19 @@ pub(super) fn validate(state: &Value, before: Option<&Value>) -> Result<(),Strin
                     let old_freight = field(field(old,"actualFreight"),origin);
                     let current_freight = field(field(current,"actualFreight"),origin);
                     if old_freight == current_freight {continue;}
+                    let old_recipient=shipment_for(old_state,old)?.1;
+                    let original_freight=if field(old,"actualFreight").get(origin).is_some() {
+                        old_freight
+                    } else {
+                        field(old_recipient,"actualFreight")
+                    };
                     let has_evidence = field(current,"actualFreight").get(origin).is_some() &&
                         rows(field(w,"events")).iter().any(|event| {
                             !array_has(field(old_w,"events"),str_field(event,"id")) &&
                             str_field(event,"action") == "실제 출고 운임 입력" &&
                             rows(field(event,"shipmentIds")).iter()
                                 .any(|id|id.as_str()==Some(str_field(old,"id"))) &&
+                            field(event,"before")==original_freight &&
                             str_field(field(event,"after"),"origin")==origin &&
                             field(field(event,"after"),"amount")==current_freight
                         });
@@ -157,17 +167,79 @@ pub(super) fn validate(state: &Value, before: Option<&Value>) -> Result<(),Strin
                 }
                 if ["EXPORTED","STORE_SENT"].contains(&str_field(old,"status")) &&
                     current != old {
-                    // Metadata-only factory hand-off or explicit re-print disposal
-                    // needs additional evidence from exported snapshots; reject by default.
-                    return Err("이미 전달한 엑셀 / 발송 기록은 보존해야 합니다.".into());
+                    // Both exceptions are explicit in the original TypeScript:
+                    // staff handoff confirmation and pre-delivery print disposal.
+                    let old_file_only=flag(old,"fileOnly");
+                    let old_delivered=has_value(field(old,"factoryDeliveredAt"));
+                    let current_delivered=has_value(field(current,"factoryDeliveredAt"));
+                    let metadata_only=old_file_only && !flag(current,"fileOnly") &&
+                        current_delivered &&
+                        ["id","shipmentId","origin","at","actor","status","snapshot",
+                         "exportId","exportedAt","legacy"].iter().all(|k|
+                            field(old,k)==field(current,k)) &&
+                        rows(field(w,"events")).iter().any(|e|
+                            str_field(e,"action")=="공장 전달 직원 확인" &&
+                            rows(field(e,"shipmentIds")).iter()
+                                .any(|sid|sid.as_str()==Some(str_field(old,"shipmentId"))));
+                    let reopened=old_file_only && !old_delivered &&
+                        str_field(current,"status")=="CANCELLED" &&
+                        rows(field(w,"events")).iter().any(|e|
+                            str_field(e,"action")=="전달 전 출력본 폐기 / 재작성" &&
+                            rows(field(e,"shipmentIds")).iter()
+                                .any(|sid|sid.as_str()==Some(str_field(old,"shipmentId")))) &&
+                        rows(field(state,"exports")).iter().any(|e|
+                            rows(field(e,"snapshots")).iter().any(|q|
+                                field(q,"id")==field(old,"id") &&
+                                field(q,"snapshot")==field(old,"snapshot")));
+                    if !metadata_only && !reopened {
+                        return Err("이미 전달한 엑셀 / 발송 기록은 보존해야 합니다.".into());
+                    }
                 }
             }
             for old in rows(field(old_w,"confirmations")) {
                 let current = find_by_id(field(w,"confirmations"),str_field(old,"id"));
-                if current != Some(old) {
-                    // The full TS revokeConfirmations rule requires allocation
-                    // reconciliation. Until wired, never silently delete evidence.
-                    return Err("확인 기록은 입금 확인 취소에서만 삭제할 수 있습니다.".into());
+                let old_ids=rows(field(old,"shipmentIds")).iter()
+                    .filter_map(Value::as_str).collect::<Vec<_>>();
+                if let Some(current)=current {
+                    if current==old {continue;}
+                    let current_ids=rows(field(current,"shipmentIds")).iter()
+                        .filter_map(Value::as_str).collect::<Vec<_>>();
+                    let removed=old_ids.iter().filter(|id|!current_ids.contains(id))
+                        .copied().collect::<Vec<_>>();
+                    let mut expected=old.clone();
+                    let surviving=old_ids.iter().filter(|id|current_ids.contains(id))
+                        .copied().collect::<Vec<_>>();
+                    let allocations=rows(field(old,"allocations")).iter()
+                        .filter(|a|surviving.contains(&str_field(a,"shipmentId")))
+                        .cloned().collect::<Vec<_>>();
+                    let mut amounts=serde_json::Map::new();
+                    for id in &surviving {
+                        let previous=field(field(old,"amounts"),id);
+                        amounts.insert((*id).to_string(),if previous.is_null() {
+                            serde_json::json!(0)
+                        } else {previous.clone()});
+                    }
+                    let total=amounts.values().filter_map(safe).collect::<Vec<_>>();
+                    let amount=checked_sum(total).ok_or("금액 합계를 확인하세요.")?;
+                    super::set(&mut expected,"shipmentIds",serde_json::json!(surviving))?;
+                    super::set(&mut expected,"allocations",serde_json::json!(allocations))?;
+                    super::set(&mut expected,"amounts",Value::Object(amounts))?;
+                    super::set(&mut expected,"amount",serde_json::json!(amount))?;
+                    let allowed=!removed.is_empty() && current==&expected &&
+                        removed.iter().all(|id|find_by_id(field(w,"shipments"),id)
+                            .is_some_and(|s|!flag(s,"transferred") &&
+                                field(s,"step").as_i64().unwrap_or(0)<4));
+                    if !allowed {
+                        return Err("확인 기록은 입금 확인 취소에서만 삭제할 수 있습니다.".into());
+                    }
+                } else {
+                    let allowed=old_ids.iter().all(|id|
+                        find_by_id(field(w,"shipments"),id)
+                            .is_some_and(|s|!flag(s,"transferred") &&
+                                field(s,"step").as_i64().unwrap_or(0)<4));
+                    if !allowed {
+                        return Err("이관 전 입금 확인 취소에서만 기록을 삭제할 수 있습니다.".into());
+                    }
                 }
             }
         }
