@@ -36,6 +36,8 @@ jobs:
         run: node --test tests/rust-migration/catalog-clients/brand-parity.test.mjs
       - name: Verify category tree mutations and product reassignment parity
         run: node --test tests/rust-migration/catalog-clients/category-parity.test.mjs
+      - name: Compare native live client search catalog queries and product editor with original TS
+        run: node --test tests/rust-migration/catalog-clients/queries-parity.test.mjs
       - name: Compare complete client workbook row previews with original TS
         run: node --test tests/rust-migration/catalog-clients/client-preview-parity.test.mjs
       - name: Compare product registration previews with original XLSX TS
