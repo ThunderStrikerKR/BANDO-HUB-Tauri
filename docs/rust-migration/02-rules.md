@@ -1,5 +1,64 @@
 # TSBH Rust migration — session 2/3: Price, freight and workflow rules
 
+## TypeScript-vs-Rust differential comparison — executed 2026-11-13 KST
+
+**Verified**: actual original TypeScript business functions and the compiled
+Rust `rules::execute` runner received the same JSON fixtures on a GitHub
+Actions Ubuntu runner. The Rust integration test
+`tests/rust-migration/rules/tests/ts_parity.rs` installs dependencies with
+`npm ci --ignore-scripts --no-audit --no-fund`, runs original sources via
+`node --import tsx` and the Rust `json_rules` binary, and compares success,
+errors, numeric values, JSON fields, and snapshots recursively.
+
+**Latest verified comparison: 27 / 27 PARITY PASS, 0 mismatches.**
+**Independent Rust regression: 47 / 47 PASS.**
+GitHub Actions run:
+https://github.com/ThunderStrikerKR/TSBH/actions/runs/43360550428
+Source commit tested: `88db940d02660882842443890e0873ffabaa2a05`.
+
+Actual failing baseline runs and fixes:
+- 17-case suite initially **16 PASS / 1 FAIL**, with
+  `reconcileWorkflow` missing `issueResolutions` and TS-only
+  `undefined` key incorrectly compared across the JSON boundary.
+  Fixed by preserving the decision map and JSON-roundtripping TS results.
+  Subsequent run **17 PASS / 0 FAIL**:
+  https://github.com/ThunderStrikerKR/TSBH/actions/runs/43359910058
+- Expanded to 27 cases and obtained **24 PASS / 3 FAIL**:
+  negative quantity freight reason;
+  missing recipient-name decision evidence;
+  obsolete issue decision not marked resolved.
+  TypeScript original results were used as the reference.
+- Fixed shipping negative quantity parity and added
+  `src-tauri/src/business_core/rules/issues.rs` for order issue
+  decision synchronization (current evidence, stale decision closure,
+  option/model/quantity/contact candidates). An intermediate Rust test
+  exposed a UTF-8 slicing panic on Korean product names; removed the
+  faulty helper. **27 PASS / 0 FAIL** now confirmed in the link above.
+
+**Important scope qualification**: The 27 fixtures cover price/VAT,
+tier overrides, combinations/epochs, tariff rules, shipping recipients and
+origins, frozen snapshots, selected workflow validation errors, and
+selected reconciliation issue-decision paths. They do **not** cover
+all TypeScript workflows, arbitrary recognition candidates,
+sender-raw parsing, complete factory reply flows, every event history
+variant, or real Tauri/SQLite/Windows integration. Overall session-2
+migration remains **INCOMPLETE**; do not replace the TS production
+approval gate solely on these results.
+
+The exact executable comparison is now part of the branch's actual
+Cargo test run, not a test file waiting to be executed. Local manual
+invocation after npm install:
+`node --import tsx tests/rust-migration/rules/parity/compare.mts`.
+
+**Caveats for extending the corpus**: Rust JSON maps may reorder object
+keys before storing strings that represent `JSON.stringify` evidence;
+source-span, candidate-match and historical issue payloads need additional
+differential coverage. The Rust issue synchronization is not a substitute
+for the full `orderIssues` and `workflowIssues` implementations or their
+display-level issue objects.
+
+---
+
 ## Current continuation checkpoint — 2026-11-13
 
 **Latest CI status:** 47 / 47 independent Rust tests passed, 0 failed, source
@@ -46,12 +105,10 @@ the repository's npm dependencies are installed:
 
     npx tsx tests/rust-migration/rules/parity/compare.mts
 
-**Differential harness execution: NOT_RUN.** No Cargo or local repo
-worktree is available in the chat executor; the branch GitHub Actions CI
-currently runs the independent Rust crates only. The harness was added and
-the Rust CLI compiled under Cargo CI, but the actual TS-vs-Rust comparison
-has not been performed. Never substitute the 47 Rust PASS results for
-a 47-case TS parity statement.
+**Superseded checkpoint:** The TypeScript differential harness has since been
+executed under the Cargo test integration runner; see the 27/27 PASS
+section above. This older unexecuted-harness checkpoint is retained only
+for historical chronology.
 
 **Known parity gaps and blockers still open:**
 1. `reconcile_workflow` does not yet faithfully execute
@@ -84,7 +141,8 @@ a 47-case TS parity statement.
    by another concurrent writer as previously documented. Session 2
    did not modify that CI file.
 
-Classification: **Rust standalone PASS**, **TS parity NOT_RUN**,
+Classification (current): **Rust standalone PASS**, **27/27 named TS
+fixture parity PASS**, **full TypeScript feature parity UNVERIFIED**,
 **Windows integration SKIPPED**, **overall migration INCOMPLETE**.
 Do not merge these rules as a replacement for the full TypeScript authority
 until differential failures are closed.
