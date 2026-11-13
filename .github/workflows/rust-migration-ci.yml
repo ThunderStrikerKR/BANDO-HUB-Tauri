@@ -46,6 +46,13 @@ jobs:
             echo "::error::Required test crate missing: $required. This session is not verified."
             exit 1
           fi
+      - name: Check recognition's existing order fixtures
+        if: github.ref == 'refs/heads/migration/01-recognition'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f src-tauri/src/business_core/recognition/mod.rs
+          test -f tests/audit-20-order-samples.test.mjs
       - name: Run every present Rust migration test crate
         shell: bash
         run: |
