@@ -132,23 +132,33 @@ try{
     }catch(e){report.diagnostics.desktopProbeError=String(e);}
     const nativeUia=execFileSync("pwsh.exe",[
       "-NoProfile","-Sta","-ExecutionPolicy","Bypass",
-      "-File",resolve("scripts/migration03-reception-native-uia.ps1"),
+      "-File",resolve("scripts/windows-final-native-uia.ps1"),
       "-ProcessId",String(app.pid),"-OutDir",out,
-    ],{encoding:"utf8",timeout:150000,maxBuffer:8*1024*1024});
+    ],{encoding:"utf8",timeout:360000,maxBuffer:10*1024*1024});
     report.diagnostics.uiaLogTail=nativeUia.slice(-2500);
     const uia=JSON.parse(await fs.readFile(
-      join(out,"native-reception-uia.json"),"utf8"));
+      join(out,"native-uia-audit.json"),"utf8"));
+    const nativeMenus=uia.passes.filter(x=>x.kind==="menu").length;
+    const settingsScreens=uia.passes.filter(x=>x.kind==="subtab"&&x.label.startsWith("설정-")).length;
     report.diagnostics.uia={
-      status:uia.status,checks:uia.checks,captures:uia.captures,
-      initialNodes:uia.initialNodes,finalNodes:uia.finalNodes,
+      status:uia.status,menus:nativeMenus,settings:settingsScreens,
+      screenshots:uia.passes.length,sqliteChecks:uia.sqliteChecks,
+      failures:uia.failures,
     };
-    assert.equal(uia.status,"FINAL_NATIVE_GUI_UIA_PASSED",
-      "WebView2 CDP unavailable and actual Windows UIAutomation failed");
-    report.status="FINAL_NATIVE_GUI_UIA_PASSED_CDP_UNAVAILABLE";
+    assert.equal(uia.status,"FINAL_NATIVE_UIA_TEST_DB_PASSED",
+      "WebView2 CDP unavailable and full Windows UIAutomation incomplete");
+    assert.equal(nativeMenus,8,"Every native main screen must be visited");
+    assert.equal(settingsScreens,5,"Every native Settings tab must be visited");
+    for(const check of ["unchanged_settings_no_write","settings_ui_persisted",
+      "settings_ui_reopen","client_ui_persisted","test_db_separate_process_reopen"]){
+      assert.ok(uia.sqliteChecks?.some(x=>x.check===check&&x.status==="PASS"),
+        "Missing native SQLite UI acceptance: "+check);
+    }
+    report.status="REAL_WINDOWS_NATIVE_UIA_SCREENS_AND_SQLITE_PASSED";
     report.limitations=[
       "Real Tauri screen and UIAutomation passed; no fake browser or IPC",
       "CDP unavailable: direct per-operation native IPC trace unverified",
-      "Only GitHub Windows runner 1024x768 geometry verified"
+      "Only CI Windows UIAutomation 1024x768 layout tested; physical desktop DPI and manual visual signoff pending"
     ];
     console.log("FINAL_NATIVE_GUI_UIA_PASS",JSON.stringify(report.diagnostics.uia));
     await persist();
