@@ -91,6 +91,62 @@ fn client_id(client: Option<&Value>) -> &str {
 fn utf16(raw: &str, byte_index: usize) -> usize {
     raw[..byte_index].encode_utf16().count()
 }
+/// Copy source order-evidence.ts reason contracts rather than exporting
+/// internal Rust recognition diagnostics into the UI evidence list.
+fn ts_evidence_reason(raw: &str,e:&Evidence) -> String {
+    let start=raw[..e.start].rfind('\n').map_or(0,|i|i+1);
+    let end=e.end+raw[e.end..].find('\n').unwrap_or(raw.len()-e.end);
+    let line=raw[start..end].trim();
+    let base=match (e.kind,e.reason) {
+        ("product",_)=>"상품 코드 / 별칭 / 옵션 인식 결과; 귀속은 별도 판정",
+        ("quantity","독립 수량 원문; 상품 연결은 별도 판정")
+          |("quantity","상품 행에 명시된 수량")
+            =>"원문 전체 수량 후보 독립 추출",
+        ("address","배송주소 원문 구간")
+            =>"해당 원문 행에서 독립 추출",
+        ("name","주소 앞 괄호의 수취인")
+            =>"배송주소 앞 괄호 안 수취인 이름",
+        ("name","직함 앞 독립 수취인 이름")
+            =>"수취 기관 또는 직함을 포함한 이름",
+        ("name","상품 수량 뒤의 독립 수취인명")
+            =>"상품 수량 뒤의 독립 수취인명",
+        ("name","독립 수취인 또는 기관명") if
+            regex::Regex::new(
+                r"^[가-힣A-Za-z0-9 ()]{2,30}(?:학교|교회|성당|병원|학원|월드|목사)$"
+            ).expect("institution").is_match(line)
+            =>"수취 기관 또는 직함을 포함한 이름",
+        ("name","수취인명과 부연 문구") if
+            regex::Regex::new(r"^[가-힣]{2,5}\s+[가-힣]{2,5}님$")
+                .expect("multiple recipient name").is_match(line)
+            =>"수취인 복수 표기 이름",
+        ("name","이름과 연락처가 같은 행") if
+            regex::Regex::new(r"^[가-힣]{2,5}(?:님)?\s+0[\d\s().-]{3,}$")
+                .expect("inline contact").is_match(line)
+            =>"이름과 연락처 모양이 같은 행에 있음",
+        ("name","명시적 수취인 이름") if
+            regex::Regex::new(
+                r"(?:수취인명|수령자)\s*[:：]?\s*[가-힣]{2,10}\s*(?:연락처|전화|휴대)"
+            ).expect("explicit name").is_match(line)
+            =>"명시적 수취인 이름",
+        ("name",_)=>"같은 행의 대안 후보; 직원 확인 필요",
+        ("phone","연락처 원문 구간")
+          |("mobile","연락처 원문 구간")=>{
+            if regex::Regex::new(r"^[가-힣]{2,5}(?:님)?\s+0[\d\s().-]{3,}$")
+                .expect("same line phone").is_match(line) {
+                "같은 행의 연락처 원문 보존; 유효성은 별도 검증"
+            } else if regex::Regex::new(
+                r"(?i)^(?:(?:휴대폰|핸드폰|전화(?:번호)?|연락처|TEL)\s*[:：]?\s*)?\d[\d\s().-]*$"
+            ).expect("standalone phone").is_match(line) {
+                "연락처 모양의 원문 보존; 유효성은 별도 검증"
+            } else {"전화번호 구간 독립 추출"}
+        },
+        _=>e.reason,
+    };
+    if e.recipient.is_some() && e.kind!="product" && e.kind!="quantity" {
+        format!("{base} / 배송 건 원문 경계와 연결")
+    } else {base.to_owned()}
+}
+
 fn e_json(raw: &str, e: &Evidence) -> Value {
     let start = utf16(raw, e.start);
     let end = utf16(raw, e.end);
@@ -99,7 +155,7 @@ fn e_json(raw: &str, e: &Evidence) -> Value {
         "text": &raw[e.start..e.end],
         "start": start, "end": end,
         "line": e.line, "paragraph": e.paragraph,
-        "kind": e.kind, "value": e.value, "reason": e.reason,
+        "kind": e.kind, "value": e.value, "reason": ts_evidence_reason(raw,e),
     });
     if let Some(recipient) = e.recipient {
         result["recipientId"] = json!(format!("recognition:recipient:{recipient}"));
