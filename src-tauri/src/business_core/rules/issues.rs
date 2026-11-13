@@ -102,7 +102,7 @@ pub(super) fn synchronize(order:&mut Value)->Result<(),String>{
         for key in ["name","address","phone","mobile"]{
             let relevant=rows(field(row,"candidates")).iter().filter(|candidate|
                 str_field(candidate,"field")==key).cloned().collect::<Vec<_>>();
-            let unique=relevant.iter().map(|c|field(c,"value").clone())
+            let unique=relevant.iter().map(|c|serde_json::to_string(field(c,"value")).unwrap_or_default())
                 .collect::<HashSet<_>>();
             let confirmed=rows(field(row,"confirmedFields")).iter()
                 .any(|value|value.as_str()==Some(key));
