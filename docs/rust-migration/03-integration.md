@@ -1,5 +1,33 @@
 # Session 3: Output and integration handoff (2026-11-13)
 
+## Latest runtime status: automatic message Rust UI connection
+
+This section supersedes older pending-message remarks below.
+
+- `src/MessageWorkspace.tsx` now invokes
+  `output.render_automatic_message` through `src/native-automatic-message.ts`;
+  it no longer imports or calls `src/automatic-message.ts` for business text.
+  A fingerprint and cancellation guard prevent late IPC results from
+  overwriting a newer state; staff-edited request drafts are preserved.
+- The native output core renders inquiry/request and payment, amount and VAT
+  text, conditional model/color notices, product URLs and the payment
+  signature. Copy-only greeting formatting is `decorate_automatic_copy`.
+- `src/WorkflowBoard.tsx` checks `output.payment_copy_status` against the
+  historical stored signature. `nativeRecordMessageCopy` receives the
+  precomputed Rust signature before the Rust audit reducer saves the event.
+- `tests/rust-migration/output/full-automatic-parity.test.mjs` compares
+  **18** real original TS scenarios to the compiled Rust response, plus the
+  original legacy signature and edited copy greeting. The workflow runs this
+  check as `output-ts-rust-parity`. The retirement audit asserts the
+  `automatic-message.ts` oracle remains on disk but not in the active app
+  import graph.
+- **Do not delete TypeScript oracle modules yet**; test coverage is synthetic,
+  and installed Windows GUI/SQLite end-to-end proof is not complete.
+- Separate window docking failures are outside this output domain; do not
+  describe all Windows CI as passing until these are resolved.
+
+
+
 ## 2026-11-13 continued integration: native output ledger, copy audit and TS retirement gate
 
 **This updates the runtime routing facts below. It is not a finished whole-app
