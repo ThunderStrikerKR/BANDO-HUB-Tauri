@@ -1,6 +1,7 @@
 //! TSBH output-domain business core.
 //! JSON is deliberately kept compatible with the preexisting State snapshots.
 mod export;
+mod export_history;
 mod messages;
 mod settlement;
 
@@ -21,6 +22,7 @@ pub fn execute(operation: &str, payload: Value) -> Result<Value, String> {
             payload.get("ids").unwrap_or(&Value::Null),
             "STORE",
         ),
+        "finalize_export" => export_history::finalize(&payload),
         "render_messages" => messages::execute(&payload),
         "prepare_settlement" => settlement::prepare(
             payload.get("state").unwrap_or(&Value::Null),
