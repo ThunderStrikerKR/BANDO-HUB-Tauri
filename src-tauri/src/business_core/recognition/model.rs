@@ -149,7 +149,7 @@ pub(crate) fn norm_color(source: &str) -> String {
         _ => source.trim()
     }.to_owned()
 }
-fn written_color(text: &str) -> Option<String> {
+pub(crate) fn written_color(text: &str) -> Option<String> {
     // Color suffix must belong to the numeric model; a naked G is not evidence.
     let suffix = Regex::new(r"(?i)(?:BD[\s-]*)?\d{3}(?:-1)?\s*(BR|BK|G|W)(?:\b|$)").ok()?;
     if let Some(cap) = suffix.captures(text) {
