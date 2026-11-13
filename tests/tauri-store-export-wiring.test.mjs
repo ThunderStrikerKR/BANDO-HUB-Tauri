@@ -32,6 +32,13 @@ test("a printed store workbook stays pending until a separately confirmed shipme
  assert.match(ui,/nativeApplyWorkflowAction\(state, "mark_store_sent", \{ queueId: q!\.id \}\)/);
  const native=read("src-tauri/src/business_core/rules/workflow.rs");
  assert.match(native,/"mark_store_sent" =>/);
+ // The native reducer must reject non-store or already completed queues.
+ assert.match(native,/if str_field\(q,"origin"\)!="STORE" \|\| !\["QUEUED","EXPORTED"\]\.contains\(&status\)/);
+ // An exported file is not sufficient unless it belongs to this queue entry.
+ assert.match(native,/if status=="EXPORTED"/);
+ assert.match(native,/해당 매장 Excel 출력 이력을 확인할 수 없습니다\./);
+ // A separate staff confirmation marks the shipment as sent.
+ assert.match(native,/set\(&mut state\["workflow"\]\["queue"\]\[qi\],"status",json!\("STORE_SENT"\)\)/);
  assert.match(native,/set\(&mut state\["workflow"\]\["queue"\]\[qi\],"fileOnly",json!\(false\)\)/);
  assert.ok(work.includes('!["QUEUED", "EXPORTED"].includes(q.status)'));
  assert.match(work,/q\.fileOnly = false/);
