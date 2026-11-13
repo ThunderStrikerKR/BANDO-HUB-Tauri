@@ -62,6 +62,27 @@ public static class BandoNativeSettings {
   }
   function ClickNative([string]$label){
     $target=Visible $label "Button|TabItem"
+    if($null -eq $target){
+      # The native settings pane is scrollable; its save button begins
+      # below the 1024x768 Windows viewport. Focus it to reveal it, then
+      # re-query visibility before clicking, preserving the real UI action.
+      $nodes=Elements
+      $hidden=@($nodes | Where-Object {
+        $_.name -eq $label -and $_.control -match "Button|TabItem" -and $_.w -gt 0
+      } | Select-Object -First 1)
+      if($hidden.Count){
+        try { $hidden[0].el.SetFocus(); Start-Sleep -Milliseconds 500 } catch {}
+        $target=Visible $label "Button|TabItem"
+        if($null -eq $target){
+          # Allow UIAutomation InvokePattern on focused offscreen elements,
+          # which WebView2 can invoke without coordinate clicking.
+          try{
+            $invoke=$hidden[0].el.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern)
+            if($null -ne $invoke){$invoke.Invoke();Start-Sleep -Milliseconds 550;return}
+          }catch{}
+        }
+      }
+    }
     if($null -eq $target){throw "No native visible button: $label"}
     $clicked=$false
     try {
