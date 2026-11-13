@@ -18,4 +18,4 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - name: Compile and run independent Rust output tests
-        run: cargo test --manifest-path tests/rust-migration/output/Cargo.toml --locked
+        run: cargo test --manifest-path tests/rust-migration/output/Cargo.toml
