@@ -116,3 +116,28 @@ test("live catalog search, native model guidance and official link browsing have
   assert.doesNotMatch(bridge,/officialLinksFromSnapshot\(/);
   assert.match(hook,/return \(\) => \{ active = false; \}/);
 });
+
+test("active alias editor, SKU model group save and official HTML preview are native",()=>{
+  const alias=read("src/AliasManager.tsx");
+  const groups=read("src/ColorGuidanceManager.tsx");
+  const bridge=read("src/tauri-bridge.ts");
+  const backend=read("src-tauri/src/business_core/catalog_clients.rs");
+  const html=read("src-tauri/src/business_core/catalog_clients/official_html.rs");
+  const settings=read("src-tauri/src/lib.rs");
+  assert.match(alias,/"catalog_clients","save_alias"/);
+  assert.match(alias,/"alias_problems"/);
+  assert.doesNotMatch(alias,/saveAlias\(state,/);
+  assert.doesNotMatch(alias,/aliasProblems\(a,/);
+  assert.match(groups,/"catalog_clients","validate_model_groups"/);
+  assert.doesNotMatch(groups,/validateModelGroups\(draft\)/);
+  assert.match(settings,/"validate_model_groups", json!\(\{"state":&state\}\)/);
+  assert.match(bridge,/"catalog_clients", "preview_official_product_html"/);
+  assert.doesNotMatch(bridge,/parseOfficialProductPage\(url, html, state\)/);
+  assert.match(html,/Html::parse_document\(html\)/);
+  assert.match(html,/fn option_evidence\(/);
+  assert.match(html,/fn model_code\(/);
+  for(const command of [
+    "save_alias","alias_problems","validate_model_groups",
+    "preview_official_product_html",
+  ])assert.match(backend,new RegExp('"'+command+'"'));
+});
