@@ -175,3 +175,39 @@
 - **아직 완료로 보고하면 안 되는 범위:** TypeScript parseEvidence와 Rust analyze_order가 모든 JSON 출력 필드(상품ID, 색상, 모델 후보, 발주서 특수 형식, 가격, note/근거 등)에서 동일한지 양측 엔진을 구동해 비교한 전체 differential test는 미실시. 모델 색상/별칭/브랜드 우선순위와 일부 특수 문서의 완전한 함수 단위 동등성도 미검증. 20건 수량 테스트 통과만으로 전체 알고리즘의 완전 동등성을 주장할 수 없음.
 - Windows Tauri 앱 빌드, UI 연동, 전역 serde_json/regex 의존성 및 주문 워크플로 통합은 세션 3 담당. 이 세션에서는 다른 세션의 파일을 변경하지 않음.
 - 이 섹션과 이후 추가 작업은 반드시 TypeScript 소스 대비 차이를 명시하고, 단순히 기존 Rust 추정 규칙을 기준으로 새 업무 판단을 추가하지 말 것.
+
+
+## 2026-11-13 P0: TypeScript 원본 기준 불일치 수정 및 47개 Rust 회귀 통과
+
+### 작업 범위 및 확인된 기준선
+
+- 기준 브랜치: migration/01-recognition. 작업 시작 시 SHA: eae9881c244bbc64e1a65e89c8998b9e2a8fa529.
+- 기준 소스: src/parser.ts, src/order-evidence.ts, src/product-name-match.ts, src/domain.ts::itemFromProduct, src/product-registry.ts::brandTerms.
+- 수정 파일: src-tauri/src/business_core/recognition/model.rs, mod.rs, quantity.rs 및 tests/rust-migration/recognition/src/lib.rs. 테스트 기대값, 원본 TypeScript, 다른 세션 파일 및 공통 Cargo.toml은 수정하지 않았다.
+- 임의의 업무 규칙을 더하지 않고 기존 TypeScript의 결정 조건을 Rust로 이식했다. 표본 20건 모두 동일 원문을 그대로 사용한다.
+
+### 변경 사항
+
+1. order-evidence.ts common/each 규칙: 공동 상품의 총수량을 배송건마다 복제하지 않고 명시적인 '각각', '씩' 표현 또는 배송건별 독립 수량 근거가 있을 때만 해당 배송건 수량을 확정한다.
+2. domain.ts::itemFromProduct 및 parser.ts: requiresOption=true / 복수 variant면 임의 variantId를 선택하지 않는다. 단일 variant도 명시적 색상과 충돌하면 확정하지 않는다. 기본 색상, defaulted, url, catalog, origin, 상품 표시명 및 issues를 TypeScript 계약에 맞게 생성한다.
+3. parser.ts::parseLegacy 필터: 브랜드/브랜드 별칭이 발주서에 있을 때 brandTerms로 등록 상품을 제한한다. BANDOMALL에 대한 코드 우선순위와 DEMO 상품 제외 우선순위를 추가했다.
+4. parser.ts::modelColorHint, registeredColorHint: 숫자형 모델의 B, BK, BR, C, W, G 접두/접미 색상과 괄호 색상을 처리한다. 실제 등록된 모델 코드와 충돌하면 기존 모델을 보호한다.
+5. parser.ts::quantities: 치수 x10cm 및 x10mm, 단위 오탐 1EAS를 수량으로 인식하지 않고, 실제 수량 '* 1EA'는 추출하도록 경계 조건을 원본과 동등하게 분기한다. 판매단위 '2개 구성'은 별도 수량으로 확정하지 않는다.
+6. order-evidence.ts 메모/상품 경계: 메모 연속 행 다음에 등록 상품 코드가 나오면 상품 행으로 분석한다.
+7. 가격: itemFromProduct의 인식 결과 스냅샷을 복원하기 위해 src/domain.ts::resolvePrice와 동일한 거래처 등급 및 특별 단가 계산을 인식 출력용으로 구현했다. 별도 가격 및 운임 엔진은 세션 2 소유이며, 세션 3 통합 시 비교해야 한다.
+
+### 실제 Rust 회귀 테스트
+
+- 최종 검증 소스 SHA: df2fc32e708c9d07ccd195ab9105781d4e13443e
+- GitHub Actions: https://github.com/ThunderStrikerKR/TSBH/actions/runs/43359770110
+- Linux 독립 Rust Cargo test: **47 passed / 0 failed**. 빌드 성공. 발주서 표본 20건 **20 passed / 0 failed**.
+- 신규 P0 테스트 7개 모두 PASS: common_total_is_not_copied_to_every_recipient_without_each_evidence, source_requires_option_keeps_variant_unconfirmed, source_item_color_default_url_catalog_and_price_snapshot, original_brand_and_catalog_candidates_are_filtered, original_model_color_prefix_and_suffix, note_stops_when_next_line_is_registered_product, bundled_sale_unit_does_not_become_order_quantity.
+- quantity.rs에 추가한 original_type_script_quantity_boundaries 테스트도 PASS. 기존 quantity 테스트와 20건 본래 기대값을 변경하지 않았다.
+- 최초 시험 43359275893에서는 45 passed / 2 failed (x/EA 수량 필터 과제한). 수량 필터를 정정한 후 최종 43359770110에서 47 passed / 0 failed. 이전 실패 시험을 성공으로 덮어 쓰지 않는다.
+
+### 남은 제약과 통합 주의
+
+- 47개 회귀 통과는 정의된 테스트 조건의 통과이지 원본 TS/Rust 전 입력 및 전 JSON 필드 differential test 완료가 아니다.
+- 가격 스냅샷의 단가 원본과 세션 2 Rust 가격 엔진을 비교하는 통합 테스트, Windows Tauri 연동 및 EXE 빌드는 **미실행**.
+- 이 브랜치는 세션 1 인식 모듈만 수정했다. 다른 세션 파일의 병합, 앱 설정과 Cargo.toml 수정, 기존 TS 기준선 수정은 하지 않았다.
+- 임시 합성 데이터로 검사한 brand / catalog / requiresOption / 복수 옵션 관련 규칙은 초기 seed의 360개 단일 SKU만으로는 검증할 수 없으므로 별도 테스트를 유지해야 한다.
