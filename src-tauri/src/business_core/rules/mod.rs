@@ -8,6 +8,7 @@ mod issues;
 mod order_mutations;
 mod shipping;
 mod workflow;
+mod workflow_issues;
 mod validation;
 
 const MAX_SAFE: i64 = 9_007_199_254_740_991;
@@ -31,6 +32,11 @@ pub fn execute(operation: &str, payload: Value) -> Result<Value, String> {
             req(&payload, "state")?, required_str(&payload, "shipmentId")?,
         ),
         "evaluate_workflow" => workflow::evaluate(&payload),
+        "workflow_issues" => Ok(json!({"issues":workflow_issues::workflow_issues(
+            req(&payload,"state")?,required_str(&payload,"groupId")?)?})),
+        "stage_issues" => Ok(json!({"issues":workflow_issues::stage_issues(
+            req(&payload,"state")?,required_str(&payload,"groupId")?,
+            req(&payload,"next")?.as_i64().ok_or("진행 단계 숫자가 필요합니다.")?)?})),
         "evaluate_dispatch_state" => workflow::dispatch_state(
             req(&payload, "state")?, required_str(&payload, "orderId")?,
         ),
