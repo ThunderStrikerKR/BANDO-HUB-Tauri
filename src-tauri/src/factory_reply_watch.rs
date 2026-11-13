@@ -584,6 +584,36 @@ mod tests {
     }
 
     #[test]
+    fn unchanged_order_recipient_freight_is_valid_without_new_shipment_rate() {
+        let recipient=json!({"id":"r1","name":"박수하","address":"서울 서초구 123",
+            "phone":"010-1111-2222","mobile":"","actualFreight":4000,
+            "items":[{"origin":"FACTORY"}]});
+        let before=json!({"revision":5,"products":[],"settings":{},
+            "factoryReplies":[],"orders":[{"id":"o1","recipients":[recipient.clone()]}],
+            "workflow":{"queue":[{"shipmentId":"s1","origin":"FACTORY",
+                "status":"EXPORTED","snapshot":{"recipient":recipient}}],
+                "shipments":[{"id":"s1","orderId":"o1","recipientId":"r1",
+                    "tracking":{},"actualFreight":{}}],"events":[]}
+        });
+        let mut next=before.clone();
+        next["workflow"]["shipments"][0]["tracking"]["FACTORY"]=json!("001234567890");
+        next["factoryReplies"]=json!([{"id":"factory-reply-test","filename":"reply.xlsx",
+            "status":"APPLIED","rows":[{
+                "row":2,"name":"박수하","address":"서울 서초구 １２３",
+                "contacts":["010-1111-2222"],"tracking":"001234567890",
+                "actual":4000,"shipmentId":"s1","orderId":"o1","applied":true
+            }]}]);
+        next["workflow"]["events"]=json!([{"action":"공장 회신 반영",
+            "shipmentIds":["s1"]}]);
+        assert_eq!(validate_automatic_change(&before,&next,
+            "factory-reply-test","reply.xlsx").unwrap(),(1,0));
+        // A changed hidden actual fare must not be accepted by this guard.
+        next["orders"][0]["recipients"][0]["actualFreight"]=json!(5000);
+        assert!(validate_automatic_change(&before,&next,
+            "factory-reply-test","reply.xlsx").is_err());
+    }
+
+    #[test]
     fn invalid_automatic_reply_cannot_modify_unrelated_database_fields() {
         let before = json!({
             "revision":4, "products":[], "orders":[], "settings":{},
