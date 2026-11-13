@@ -2,6 +2,7 @@ import { HelpTooltip } from "./ui/HelpTooltip";
 import { useEffect, useRef, useState } from "react";
 import { confirmAction, promptText } from "./dialogs";
 import { clientCandidates, suggestClient, won } from "./domain";
+import { businessCoreCall } from "./tauri-bridge";
 import { applyCatalogPriceSync, previewCatalogPriceSync, type CatalogPricePreview } from "./catalog-price-sync";
 import type { NoticeSink } from "./shared/notices";
 import { useAsyncTask } from "./shared/useAsyncTask";
@@ -385,17 +386,13 @@ export function CategoriesPanel({
               return;
             }
             try {
-              await onSave({
-                ...state,
-                categories: [
-                  ...cats,
-                  {
-                    id: crypto.randomUUID(),
-                    name: name.trim(),
-                    parentId: parent || null,
-                  },
-                ],
-              });
+              const { state: next } = await businessCoreCall<{ state: State }>(
+                "catalog_clients", "legacy_add_category", {
+                  state, categoryId: crypto.randomUUID(),
+                  name, parentId: parent || null,
+                },
+              );
+              await onSave(next);
               setName("");
             } catch (e) {
               onError(String(e), "error");
@@ -418,18 +415,12 @@ export function CategoriesPanel({
                 const value = await promptText("새 분류명", c.name);
                 if (!value?.trim()) return;
                 try {
-                  await onSave({
-                    ...state,
-                    categories: cats.map((x) => (x.id === c.id ? { ...x, name: value.trim() } : x)),
-                    products: state.products.map((p) =>
-                      p.categories?.includes(c.id)
-                        ? {
-                            ...p,
-                            category: p.category.replace(c.name, value.trim()),
-                          }
-                        : p,
-                    ),
-                  });
+                  const { state: next } = await businessCoreCall<{ state: State }>(
+                    "catalog_clients", "legacy_rename_category", {
+                      state, categoryId: c.id, name: value,
+                    },
+                  );
+                  await onSave(next);
                 } catch (e) {
                   onError(String(e), "error");
                 }
