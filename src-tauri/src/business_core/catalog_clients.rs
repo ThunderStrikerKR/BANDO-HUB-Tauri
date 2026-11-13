@@ -278,6 +278,9 @@ fn archive_product(state: &Value, id: &str, at: &str) -> Result<Value, String> {
 }
 
 pub fn execute(operation: &str, payload: Value) -> Result<Value, String> {
+    // The official cached-link list is a read-only report query and does
+    // not require loading the user database state.
+    if operation == "official_links" { return queries::execute(operation, &payload); }
     let state = payload.get("state").ok_or("현재 상태가 없습니다.")?;
     match operation {
         "preview_client_rows" => client_preview::preview(&payload),
