@@ -759,7 +759,7 @@ rawCase("two paid recipients must preserve original recipient links",
 // Historical workflow conversion. The TypeScript baseline executes the REAL
 // migrateWorkflow, including reconciliation, and must produce a successful
 // State. Rust consumes the same initial State and the same UUID/time stream.
-function migrationCase(name:string,mutate:(state:any)=>void=()=>{}){
+function migrationCase(name:string,mutate:(state:any)=>void=()=>{},expectedOk=true){
   const legacy:any=copy(baseState);
   legacy.aliases=[];
   mutate(legacy);
@@ -785,7 +785,7 @@ function migrationCase(name:string,mutate:(state:any)=>void=()=>{}){
     }
     return {state:migrated};
   });
-  cases[cases.length-1].expectedOk=true;
+  cases[cases.length-1].expectedOk=expectedOk;
 }
 migrationCase("REVIEW with no prior workflow",s=>{
   delete s.workflow;
@@ -1015,11 +1015,20 @@ migrationCase("explicit sender with fullwidth label and spaced number",s=>{
     "주소：서울시 가상로 25 2층"
   ].join("\n");
 });
-migrationCase("already archived shipment and previous audit retained",s=>{
+migrationCase("exclusively archived legacy invoice cannot be re-billed",s=>{
   s.orders[0].status="EXPORTED";
   s.workflow.shipments[0].legacyArchived=true;
   s.workflow.events.push({
     id:"audit-archive",at:now,actor:"이전 직원",
+    action:"배송 이력 보존",shipmentIds:["shipment:o1:r1"],
+    groupId:"group:o1",after:{"reason":"예전 명세서"}
+  });
+},false);
+migrationCase("archived REVIEW shipment preserves original audit",s=>{
+  s.orders[0].status="REVIEW";
+  s.workflow.shipments[0].legacyArchived=true;
+  s.workflow.events.push({
+    id:"audit-archive-review",at:now,actor:"이전 직원",
     action:"배송 이력 보존",shipmentIds:["shipment:o1:r1"],
     groupId:"group:o1",after:{"reason":"예전 명세서"}
   });
