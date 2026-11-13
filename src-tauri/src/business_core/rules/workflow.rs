@@ -925,6 +925,117 @@ pub(super) fn apply(payload:&Value)->Result<Value,String> {
                 Value::Null,json!(account_id.unwrap_or("AUTO")),group_id)?;
             Ok(json!({"state":state,"accountMode":mode,"accountId":account_id}))
         }
+        "detach_shipment" => {
+            // Parity target: workflow.ts::detachShipment. IDs and clock are
+            // injected by the host to keep this module deterministic.
+            let id=required_str(payload,"shipmentId")?;
+            let (si,oi,_ri)=shipment_indices(&state,id)?;
+            if flag(&state["workflow"]["shipments"][si],"transferred") {
+                return Err("현재 관리 중인 배송 건을 선택하세요.".into());
+            }
+            let old_group_id=str_field(&state["workflow"]["shipments"][si],"groupId").to_string();
+            let (gi,ships)=group_indices(&state,&old_group_id)?;
+            if ships.len()<2 {return Err("이미 독립 관리 중입니다.".into());}
+            let new_group_id=required_str(payload,"newGroupId")?;
+            if new_group_id.trim().is_empty() ||
+                find_by_id(field(&state["workflow"],"groups"),new_group_id).is_some() {
+                return Err("새로운 묶음 ID를 확인하세요.".into());
+            }
+            let old_group=state["workflow"]["groups"][gi].clone();
+            let order=state["orders"][oi].clone();
+            let client=party(&state,&order).ok_or("거래처 정보를 확인하세요.")?;
+            let account=account_for(&state,&old_group,&order,client).cloned();
+            let had_notices=!rows(field(&old_group,"notices")).is_empty();
+            let any_advanced=ships.iter().any(|i|
+                field(&state["workflow"]["shipments"][*i],"step").as_i64().unwrap_or(0)>=3);
+            let mut separated=old_group.clone();
+            set(&mut separated,"id",json!(new_group_id))?;
+            set(&mut separated,"createdAt",json!(required_str(payload,"now")?))?;
+            set(&mut separated,"notices",json!([]))?;
+            set(&mut separated,"needsNotice",json!(had_notices ||
+                field(&state["workflow"]["shipments"][si],"step").as_i64().unwrap_or(0)>=3))?;
+            if let Some(ref account)=account {
+                set(&mut separated,"accountMode",json!("MANUAL"))?;
+                set(&mut separated,"accountId",field(account,"id").clone())?;
+            }
+            state["workflow"]["groups"].as_array_mut()
+                .ok_or("주문 묶음 목록 누락")?.push(separated);
+            set(&mut state["workflow"]["shipments"][si],"groupId",json!(new_group_id))?;
+            if had_notices || any_advanced {
+                set(&mut state["workflow"]["groups"][gi],"needsNotice",json!(true))?;
+                if let Some(ref account)=account {
+                    set(&mut state["workflow"]["groups"][gi],"accountMode",json!("MANUAL"))?;
+                    set(&mut state["workflow"]["groups"][gi],"accountId",field(account,"id").clone())?;
+                }
+            }
+            append_event(&mut state,payload,"묶음 해제",&[id.to_string()],
+                json!(old_group_id),json!(new_group_id),new_group_id)?;
+            Ok(json!({"state":state,"groupId":new_group_id}))
+        }
+        "regroup_shipment" => {
+            // Parity target: workflow.ts::regroupShipment.
+            let id=required_str(payload,"shipmentId")?;
+            let target_id=required_str(payload,"targetGroupId")?;
+            let (si,oi,_ri)=shipment_indices(&state,id)?;
+            if flag(&state["workflow"]["shipments"][si],"transferred") {
+                return Err("엑셀 이관 배송 건은 일반 다시 묶기에서 제외됩니다.".into());
+            }
+            let old_id=str_field(&state["workflow"]["shipments"][si],"groupId").to_string();
+            let (old_gi,_old_ships)=group_indices(&state,&old_id)?;
+            let (target_gi,target_ships)=group_indices(&state,target_id)?;
+            if old_id==target_id {return Err("이미 같은 묶음입니다.".into());}
+            let old_group=state["workflow"]["groups"][old_gi].clone();
+            let target_group=state["workflow"]["groups"][target_gi].clone();
+            if field(&old_group,"sourceId")!=field(&target_group,"sourceId") ||
+                field(&old_group,"dealerId")!=field(&target_group,"dealerId") {
+                return Err("같은 최초 발주서 / 거래처의 배송 건만 다시 묶을 수 있습니다.".into());
+            }
+            let step=field(&state["workflow"]["shipments"][si],"step");
+            if target_ships.iter().any(|i|flag(&state["workflow"]["shipments"][*i],"transferred") ||
+                field(&state["workflow"]["shipments"][*i],"step")!=step) {
+                return Err("진행 단계가 같고 이관되지 않은 배송 건만 다시 묶을 수 있습니다.".into());
+            }
+            let order=&state["orders"][oi];
+            let client=party(&state,order).ok_or("거래처 정보를 확인하세요.")?;
+            let key=|account:Option<&Value>|->Value {
+                if let Some(a)=account {
+                    json!([field(a,"id"),str_field(a,"bank").trim(),
+                        str_field(a,"number").trim(),str_field(a,"holder").trim()])
+                } else {Value::Null}
+            };
+            let old_account=account_for(&state,&old_group,order,client);
+            let target_account=account_for(&state,&target_group,order,client);
+            if key(old_account)!=key(target_account) {
+                return Err("입금 계좌가 다른 묶음은 합칠 수 없습니다.".into());
+            }
+            let affected_ids=std::iter::once(id.to_string()).chain(
+                target_ships.iter().map(|i|
+                    str_field(&state["workflow"]["shipments"][*i],"id").to_string())
+            ).collect::<Vec<_>>();
+            let payments_affected=rows(field(&state["workflow"],"payments")).iter()
+                .any(|p|rows(field(p,"allocations")).iter().any(|a|
+                    affected_ids.iter().any(|sid|sid==str_field(a,"shipmentId"))));
+            let warned=step.as_i64().unwrap_or(0)>=3 ||
+                !rows(field(&old_group,"notices")).is_empty() ||
+                !rows(field(&target_group,"notices")).is_empty() ||
+                payments_affected;
+            if warned && !flag(payload,"ack") {
+                return Err("기존 안내 금액과 입금 배분을 확인한 뒤 다시 묶기를 승인하세요.".into());
+            }
+            set(&mut state["workflow"]["shipments"][si],"groupId",json!(target_id))?;
+            if warned {
+                set(&mut state["workflow"]["groups"][old_gi],"needsNotice",json!(true))?;
+                set(&mut state["workflow"]["groups"][target_gi],"needsNotice",json!(true))?;
+            }
+            let actor=if str_field(payload,"actor").trim().is_empty() {
+                "직원(이름 미설정)"
+            } else {str_field(payload,"actor")};
+            let event_id=required_str(payload,"eventId")?.to_string();
+            append_extra_event(&mut state,payload,&event_id,"다시 묶기",
+                &[id.to_string()],target_id,json!(old_id),json!(target_id),
+                actor,"배송 ID / 단계 / 입금 배분 유지")?;
+            Ok(json!({"state":state,"groupId":target_id}))
+        }
         "complete_delivery" => {
             let shipment_id=required_str(payload,"shipmentId")?;
             let (si,oi,ri)=shipment_indices(&state,shipment_id)?;
