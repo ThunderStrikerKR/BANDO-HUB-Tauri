@@ -212,6 +212,25 @@ mod regressions {
     }
 
     #[test]
+    fn mixed_address_and_contact_reproduce_legacy_phone_masking() {
+        // parser.ts::parseLegacy first masks the phone before matching the
+        // address, so inline numbers never become part of the address value.
+        let fixtures=samples();
+        for id in [7_usize,8] {
+            let raw=fixtures[id-1]["raw"].as_str().unwrap();
+            let result=recognition::execute("analyze_order",json!({
+                "raw":raw,"state":seed()
+            })).unwrap();
+            let row=&result["recipients"][0];
+            let address=row["address"].as_str().unwrap_or("");
+            assert!(!address.contains("010-1234-5678"),
+                "order {id}: address contains a separately recognized phone");
+            assert_eq!(row["mobile"],"010-1234-5678",
+                "order {id}: mobile number must remain a contact field");
+        }
+    }
+
+    #[test]
     fn source_multiline_address_and_parenthetical_note_are_retained() {
         // Source: order-evidence.ts:140-188; samples 08 and 09.
         let samples=samples();
