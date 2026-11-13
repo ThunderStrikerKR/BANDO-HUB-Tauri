@@ -273,13 +273,17 @@ fn payment_due(state:&Value,ship:&Value,order:&Value,client:&Value)->Result<Opti
             account.is_some_and(|a|key(field(p,"account"))==key(a)))
         .flat_map(|p|rows(field(p,"allocations")).iter())
         .filter(|a|str_field(a,"shipmentId")==str_field(ship,"id"))
-        .filter_map(|a|safe(field(a,"amount"))).sum::<i64>();
+        .filter_map(|a|safe(field(a,"amount")))
+        .try_fold(0_i64, |sum, value| sum.checked_add(value))
+        .ok_or("입금액 / 배분액 오류")?;
     let acknowledged=rows(field(field(state,"workflow"),"confirmations")).iter()
         .filter(|p|str_field(p,"dealerId")==str_field(order,"clientId") &&
             account.is_some_and(|a|key(field(p,"announcedAccount"))==key(a)))
         .flat_map(|p|rows(field(p,"allocations")).iter())
         .filter(|a|str_field(a,"shipmentId")==str_field(ship,"id"))
-        .filter_map(|a|safe(field(a,"amount"))).sum::<i64>();
+        .filter_map(|a|safe(field(a,"amount")))
+        .try_fold(0_i64, |sum, value| sum.checked_add(value))
+        .ok_or("입금액 / 배분액 오류")?;
     Ok(total.map(|t|(t-paid-acknowledged.min((t-paid).max(0))).max(0)))
 }
 pub(super) fn evaluate(payload:&Value)->Result<Value,String> {
@@ -791,6 +795,26 @@ pub(super) fn apply(payload:&Value)->Result<Value,String> {
             append_event(&mut state,payload,"매장 발송 확인",&[shipment_id],
                 Value::Null,Value::Null,&group_id)?;
             Ok(json!({"state":state,"status":"STORE_SENT"}))
+        }
+        "record_change_request" => {
+            let ship_id=required_str(payload,"shipmentId")?;
+            let reason=required_str(payload,"text")?.trim();
+            if reason.is_empty(){return Err("배송 건과 변경 요청 내용을 확인하세요.".into());}
+            let (si,_oi,_ri)=shipment_indices(&state,ship_id)?;
+            let group_id=str_field(&state["workflow"]["shipments"][si],"groupId").to_string();
+            let request_id=required_str(payload,"changeRequestId")?;
+            if find_by_id(field(&state["workflow"],"changeRequests"),request_id).is_some(){
+                return Err("변경 요청 ID가 중복됩니다.".into());
+            }
+            let actor=if str_field(payload,"actor").is_empty() {"직원(이름 미설정)"}
+                else {str_field(payload,"actor")};
+            let entry=json!({"id":request_id,"shipmentId":ship_id,"text":reason,
+                "actor":actor,"at":required_str(payload,"now")?});
+            state["workflow"]["changeRequests"].as_array_mut()
+                .ok_or("변경 요청 이력 목록 오류")?.push(entry);
+            append_event(&mut state,payload,"전달 후 변경 요청 기록",&[ship_id.to_string()],
+                Value::Null,json!(reason),&group_id)?;
+            Ok(json!({"state":state,"changeRequestId":request_id}))
         }
         _ => Err(format!("지원하지 않는 업무 action: {action}")),
     }
