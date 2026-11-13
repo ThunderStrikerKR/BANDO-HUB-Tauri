@@ -91,6 +91,10 @@ export type HistoryWorkbookRow = HistoryRow & {
 export async function exportOrderHistoryWorkbook(
   _state: State, historyRows: HistoryWorkbookRow[],
 ): Promise<number[]> {
+  if (!historyRows.every((row) =>
+    typeof row.display?.paymentEvidenceMissing === "boolean")) {
+    throw Error("주문 이력 Excel 작성 전에 Rust 조회 결과를 확인하세요.");
+  }
   const Excel = (await import("exceljs")).default;
   const book = new Excel.Workbook();
   const sheet = book.addWorksheet("주문 내역");
