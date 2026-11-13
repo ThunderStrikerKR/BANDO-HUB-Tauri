@@ -6,6 +6,7 @@ mod pricing;
 mod reconciliation;
 mod issues;
 mod order_mutations;
+mod legacy_migration;
 mod shipping;
 mod workflow;
 mod workflow_issues;
@@ -44,6 +45,7 @@ pub fn execute(operation: &str, payload: Value) -> Result<Value, String> {
         "apply_issue_action" => issues::issue_action(&payload),
         "delete_order" => order_mutations::delete_order(&payload),
         "apply_order_raw_edit" => order_mutations::apply_raw_edit(&payload),
+        "migrate_workflow" => legacy_migration::migrate(&payload),
         "validate_workflow" => {
             validation::validate(req(&payload, "state")?, payload.get("before"))?;
             Ok(json!({"valid": true}))
