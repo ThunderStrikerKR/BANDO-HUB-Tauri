@@ -8,7 +8,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: rust-output-migration03
+  group: rust-output-migration03-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   output-rust:
