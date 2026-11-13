@@ -20,6 +20,10 @@ mod categories;
 mod queries;
 #[path = "catalog_clients/editor.rs"]
 mod editor;
+#[path = "catalog_clients/aliases.rs"]
+mod aliases;
+#[path = "catalog_clients/model_groups.rs"]
+mod model_groups;
 use unicode_normalization::UnicodeNormalization;
 use url::Url;
 
@@ -285,6 +289,8 @@ pub fn execute(operation: &str, payload: Value) -> Result<Value, String> {
     match operation {
         "preview_client_rows" => client_preview::preview(&payload),
         "upsert_product_from_editor" => editor::execute(&payload),
+        "save_alias" | "alias_problems" | "alias_problems_one" => aliases::execute(operation,&payload),
+        "validate_model_groups" | "validate_model_group_products" => model_groups::execute(operation,&payload),
         "client_candidates" | "classified_products" | "category_ids" |
         "management_products" | "search_products" | "representative_products" | "suggest_group_representative" |
         "official_links" => queries::execute(operation, &payload),
