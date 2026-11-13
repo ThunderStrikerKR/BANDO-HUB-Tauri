@@ -320,7 +320,7 @@ pub(super) fn execute(operation:&str,payload:&Value)->Result<Value,String>{
                 field(payload,"clientId"),field(payload,"category"));
             ids(candidates.into_iter().filter(|p|
                 permitted.as_ref().is_none_or(|set|set.contains(field(p,"id"))) &&
-                (!payload.get("excludeDemo").is_some_and(Value::as_bool) ||
+                (payload.get("excludeDemo")!=Some(&Value::Bool(true)) ||
                  (field(p,"catalog")!="DEMO"&&
                   !items(p,"variants").iter().any(|v|field(v,"source")=="DEMO")))))
         }
