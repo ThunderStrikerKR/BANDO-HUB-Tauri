@@ -35,12 +35,17 @@ pub(crate) fn extract(text: &str) -> Vec<Quantity> {
         // x10 mm and false unit prefixes such as 1EAS. Rust regex does
         // not support look-ahead, so validate the following bytes explicitly.
         let following = &text[whole.end()..];
-        if capture.get(2).is_some()
-            && Regex::new(r"(?i)^\s*(?:cm|mm)\b").expect("dimension guard")
-                .is_match(following) {
-            continue;
-        }
-        if following.chars().next().map_or(false,|c|c.is_ascii_alphabetic()) {
+        if capture.get(2).is_some() {
+            // Parser.ts lets "* 1EA" count as one unit. Only a
+            // following digit or dimensional cm/mm suffix is excluded.
+            if Regex::new(r"(?i)^\s*(?:cm|mm)\b").expect("dimension guard")
+                    .is_match(following)
+                || following.chars().next().map_or(false,|c|c.is_ascii_digit()) {
+                continue;
+            }
+        } else if following.chars().next()
+                .map_or(false,|c|c.is_ascii_alphabetic()) {
+            // A fully spelled unit must stop at its boundary: not 1EAS.
             continue;
         }
         // A model identifier must not be interpreted as a quantity.
