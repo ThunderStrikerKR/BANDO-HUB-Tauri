@@ -211,3 +211,87 @@ fn registered_model_suffix_is_not_a_fabricated_color() {
             "full registered code was mistaken for color abbreviation: {input}, {kind}");
     }
 }
+
+
+/// Run a source-guarded dry-run of the 15 catalog corrections. Recognition
+/// must match the independently registered SKU once *both* color fields
+/// agree; editing only one field is insufficient under TypeScript rules.
+/// The committed production seed and operational SQLite remain untouched.
+#[test]
+fn fifteen_registered_title_colors_become_matchable_after_validated_data_repair() {
+    let original=seed();
+    let mut corrected=original.clone();
+    let manifest:Value=serde_json::from_str(include_str!(
+        "../catalog-color-corrections-15.json"
+    )).expect("audited color correction manifest");
+    let changes=manifest["corrections"].as_array()
+        .expect("color corrections array");
+    assert_eq!(changes.len(),15);
+    let mut updated=BTreeSet::<String>::new();
+    {
+        let products=corrected["products"].as_array_mut().expect("products");
+        for change in changes {
+            let id=change["productId"].as_str().expect("registered productId");
+            let variant_id=change["variantId"].as_str().expect("registered variantId");
+            let name=change["expectedName"].as_str().expect("full registered name");
+            let desired=change["color"].as_str().expect("canonical color");
+            assert!(matches!(desired,"Black"|"Silver"|"Red"),
+                "unreviewed color {desired}");
+            assert!(updated.insert(id.to_owned()),"duplicate correction ID: {id}");
+            let product=products.iter_mut().find(|p|p["id"]==id)
+                .unwrap_or_else(||panic!("missing product: {id}"));
+            assert_eq!(product["active"],true,"inactive product must not change");
+            assert_eq!(product["name"],name,"name was edited since source review");
+            assert_eq!(product["defaultColor"],change["expectedDefaultColor"],
+                "unexpected previous defaultColor for {id}");
+            let declared_color_word=match desired {
+                "Black"=>"블랙","Silver"=>"실버","Red"=>"레드",_=>unreachable!()
+            };
+            assert!(name.split('/').skip(1).any(|part|
+                part.trim()==declared_color_word),
+                "product name does not explicitly support color for {id}");
+            assert_eq!(product["variants"].as_array().unwrap().len(),1,
+                "do not combine distinct sale variants");
+            let variant=&mut product["variants"][0];
+            assert_eq!(variant["id"],variant_id);
+            assert_eq!(variant["color"],change["expectedVariantColor"],
+                "unexpected previous variant color for {id}");
+            assert_eq!(variant["url"],change["registeredSourceUrl"]);
+            // Correct the existing catalog fields, not the recognition
+            // rules, so TypeScript and Rust both use their existing logic.
+            product["defaultColor"]=json!(desired);
+            variant["color"]=json!(desired);
+        }
+    }
+    assert_eq!(updated.len(),15);
+    let before=original["products"].as_array().unwrap();
+    let after=corrected["products"].as_array().unwrap();
+    assert_eq!(before.len(),after.len());
+    for (a,b) in before.iter().zip(after.iter()) {
+        let id=a["id"].as_str().unwrap();
+        if !updated.contains(id) {
+            assert_eq!(a,b,"unexpected change to unrelated product {id}");
+        }
+    }
+    for change in changes {
+        let text=change["expectedName"].as_str().unwrap();
+        let id=change["productId"].as_str().unwrap();
+        let (actual,kind)=match_id(text,&corrected);
+        assert_eq!(actual.as_deref(),Some(id),
+            "repaired full registered SKU still did not match: {text}, {kind}");
+        let result=recognition::execute("match_products",json!({
+            "text":text,"state":corrected
+        })).unwrap();
+        assert_eq!(result["variantId"],change["variantId"],
+            "single selected variant must be restored for {id}");
+        assert_eq!(result["color"],change["color"],
+            "explicit source color must remain unchanged for {id}");
+        println!("CATALOG_COLOR_REPAIRED {} {} {}",id,
+            change["color"],text);
+    }
+    println!("CATALOG_COLOR_REPAIR_SUMMARY {}",json!({
+        "sourceSeedUnchanged":true,"correctedInMemory":updated.len(),
+        "fullNameMatchesAfterCorrection":updated.len(),
+        "otherProductsUnmodified":before.len()-updated.len()
+    }));
+}
