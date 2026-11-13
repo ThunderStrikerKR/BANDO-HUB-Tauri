@@ -142,6 +142,16 @@ test("shared busy guard blocks navigation even when dirty flag clears mid-save",
     section.indexOf("if (!guard.hasChanges())"));
 });
 
+test("the product confirmation wizard and retail settings navigation guard drafted choices",()=>{
+  const issue=src("IssueResolver.tsx");
+  const retail=src("orders/RetailOrderDialog.tsx");
+  assert.match(issue,/const hasUnsavedSelection =/);
+  assert.match(issue,/confirmDiscardDraft\("상품 확인 절차",hasUnsavedSelection,onClose,busy\)/);
+  assert.match(issue,/onClose=\{closeDraft\} busy=\{busy\}/);
+  assert.match(issue,/onClick=\{closeDraft\}>닫기/);
+  assert.match(retail,/!sameValue\(order,initial\.current\),onSettings,busy/);
+});
+
 test("draft-only modal Close, X and Escape use the same discard guard",()=>{
   const cases=[
     ["orders/RetailOrderDialog.tsx","onClose={closeDraft}"],

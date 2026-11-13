@@ -1,4 +1,5 @@
 import { selectionHistory } from "./product-history";
+import { confirmDiscardDraft } from "./shared/editor-flow";
 import { useState } from "react";
 import { ProductSearchDialog } from "./ProductSearchDialog";
 import { resolveProduct } from "./issue-actions";
@@ -67,9 +68,11 @@ export function IssueResolver({
     chosen.id === representativeCandidate.id &&
     chosen.variants.some(v => v.id === variant);
   const uncertain = ["CATEGORY", "UNKNOWN"].includes(item.match?.kind ?? "UNKNOWN");
+  const hasUnsavedSelection = !!chosen || !!variant || scope !== "once" || confirmed || useRepresentativeModel;
+  const closeDraft = () => void confirmDiscardDraft("상품 확인 절차",hasUnsavedSelection,onClose,busy);
   return (
     <>
-      <Modal title={step === 3 ? "선택한 상품 기억하기" : "상품 / 수량 확인 절차"} onClose={onClose}>
+      <Modal title={step === 3 ? "선택한 상품 기억하기" : "상품 / 수량 확인 절차"} onClose={closeDraft} busy={busy}>
         {item.temporary && (
           <button className="danger" onClick={onRemove}>
             중복 / 오독 항목 제거
@@ -219,6 +222,7 @@ export function IssueResolver({
           )}
         </ol>
         <div className="resolver-actions">
+          <button type="button" disabled={busy} onClick={closeDraft}>닫기</button>
           {step === 3 && (
             <button
               className="primary"

@@ -210,7 +210,9 @@ export function RetailOrderDialog({
                 {companySenderMissing(state.settings).map((text) => (
                   <p key={text}>{text}</p>
                 ))}
-                {onSettings && <button onClick={onSettings}>반도스탠드 정보 설정</button>}
+                {onSettings && <button onClick={() => void confirmDiscardDraft(
+                  "직접 입력 주문", !sameValue(order,initial.current),onSettings,busy,
+                )}>반도스탠드 정보 설정</button>}
               </div>
             )}
             <Field label="출고지">
