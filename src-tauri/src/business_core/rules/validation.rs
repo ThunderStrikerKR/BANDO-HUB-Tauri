@@ -295,7 +295,7 @@ pub(super) fn validate(state: &Value, before: Option<&Value>) -> Result<(),Strin
 // Mirrors the source retailIssues() order: regular order ACTION issues,
 // dispatch/freight/product/quantity per recipient, company sender and sale
 // state. Deduplicate titles, preserving the original first occurrence order.
-fn retail_issues(order:&Value,state:&Value)->Vec<String>{
+pub(super) fn retail_issues(order:&Value,state:&Value)->Vec<String>{
     let mut issues=super::issues::order_issues(order).into_iter()
         .filter(|i|str_field(i,"severity")=="ACTION")
         .map(|i|str_field(&i,"title").to_string()).collect::<Vec<_>>();
