@@ -16,9 +16,10 @@ test("Tauri can save a store Excel independently of factory and only after previ
  assert.match(rust, /format!\("\{stamp\}\(\{\}\{number\}\)\.xlsx", kind\.stem\(\)\)/);
  assert.match(rust, /\.create_new\(true\)/);
  assert.match(rust,/save_factory_workbook, save_store_workbook, save_settlement_workbook/);
- assert.match(ui,/previewStoreExport\(current, chosen\)/);
+ assert.match(ui,/businessCoreCall<StoreExportPreview>\("output", "prepare_store_export", \{ state: current, ids: chosen \}\)/);
  assert.match(ui,/createStoreWorkbook\(preview\)/);
- assert.match(ui,/recordStoreExport\(latest, preview, savedPath\)/);
+ assert.match(ui,/businessCoreCall<StoreExportPreview>\("output", "prepare_store_export", \{ state: latest, ids: preview.ids \}\)/);
+ assert.match(ui,/recordStoreExportPrepared\(latest, preview, savedPath, fresh\)/);
  assert.match(ui,/saveStoreWorkbook\(bytes\)/);
  assert.match(ui,/선택 " \+ chosen.length \+ "건 매장 Excel 작성"/);
  assert.doesNotMatch(ui,/매장 Excel 출력 미이식/);
