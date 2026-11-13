@@ -17,7 +17,7 @@ export function WorkflowFreightRows({
   onCode,
   activeKey,
 }: FreightProps) {
-  const { order, recipient, client } = shipmentContext(state, shipment),
+  const { recipient, client } = shipmentContext(state, shipment),
     origins = [...new Set(recipient.items.map((item) => item.origin))],
     disabled = shipment.transferred,
     collect = freightCode === "020";
@@ -109,7 +109,6 @@ export function WorkflowFreightRows({
   );
 }
 export function WorkflowFooter({
-  state,
   shipment,
   vatIncluded,
   onVat,
