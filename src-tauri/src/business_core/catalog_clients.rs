@@ -6,6 +6,8 @@ use serde_json::{json, Value};
 mod client_preview;
 #[path = "catalog_clients/registration.rs"]
 mod registration;
+#[path = "catalog_clients/registration_preview.rs"]
+mod registration_preview;
 use unicode_normalization::UnicodeNormalization;
 use url::Url;
 
@@ -268,6 +270,7 @@ pub fn execute(operation: &str, payload: Value) -> Result<Value, String> {
     match operation {
         "preview_client_rows" => client_preview::preview(&payload),
         "prepare_registration_commit" => registration::commit(&payload),
+        "preview_registration_rows" => registration_preview::preview(&payload),
         "archive_client" => archive_client(
             state, field(&payload, "clientId"), field(&payload, "at")),
         "archive_product" => archive_product(
