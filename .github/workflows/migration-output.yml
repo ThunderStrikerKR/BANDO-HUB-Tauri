@@ -77,3 +77,12 @@ jobs:
         run: npm install --no-audit --no-fund --ignore-scripts
       - name: Compare full latest TypeScript rules against actual compiled Rust
         run: npx tsx tests/rust-migration/rules/parity/compare.mts
+
+  integrated-rust-core:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Execute actual three-domain Rust dispatcher tests
+        run: cargo test --manifest-path tests/rust-migration/integration/Cargo.toml -- --nocapture
