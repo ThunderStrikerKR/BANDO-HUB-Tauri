@@ -146,6 +146,36 @@ export async function nativeApplyCorrectionAction(
   return updated;
 }
 
+/** Confirm a direct-entry retail order with the existing Rust reducer.
+ * New-order form construction stays synchronous in React; the confirmed order
+ * and all workflow/audit transitions come exclusively from native Rust.
+ */
+export async function nativeConfirmRetail(
+  state: State,
+  draft: Order,
+): Promise<State> {
+  const count = Math.max(
+    256,
+    12 * (state.workflow?.shipments.length ?? 0) + 8 * state.orders.length + 64,
+  );
+  if (count > 15000) throw Error("재검증 이벤트가 너무 많습니다. 발주 묶음을 나누어 확인하세요.");
+  const ids = () => Array.from({ length: count }, () => crypto.randomUUID());
+  const { state: updated } = await businessCoreCall<{ state: State }>(
+    "rules", "apply_retail_action", {
+      state, draft, action: "confirm_retail",
+      now: new Date().toISOString(),
+      receiptEventId: crypto.randomUUID(),
+      processEventId: crypto.randomUUID(),
+      reconcileEventIds: ids(),
+      processReconcileEventIds: ids(),
+    },
+  );
+  await businessCoreCall<{ valid: boolean }>(
+    "rules", "validate_workflow", { state: updated, before: state },
+  );
+  return updated;
+}
+
 /** Soft deletion/restoration of a shipment group is also an audited Rust rule.
  * This keeps its event history and protects payment/exported groups.
  */
