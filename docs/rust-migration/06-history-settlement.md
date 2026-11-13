@@ -66,7 +66,7 @@
 ### 계속 남겨 두는 TypeScript
 
 - `src/app/order-history.ts` 및 `settlement-report.ts`: **원본 TS와 비교하기 위한 코드**. 운영 화면에서 실행하지 않으며, 화면의 `import type`은 런타임 JS에 포함되지 않음
-- `src/app/report-workbook.ts`: 보류 중인 Excel 출력기. 실제 Excel 셀 표현 및 입금 표시 안내문 같은 로직은 TS로 남아 있지만 현재 다운로드 UI는 비활성. **추후 Excel 출력 재활성 시 별도 이전·검수 필수**
+- `src/app/report-workbook.ts`: 보류 중인 Excel 출력기는 셀 작성과 문자열 이스케이프만 TS로 유지. **입금 표시 주의 판정은 Rust `list_order_history_view`의 `display.paymentEvidenceMissing`을 전달받아 사용**하도록 수정. 미리보기가 아니라 원본 TS 계산으로 재판정하지 않음. Excel 다운로드 UI 활성화는 여전히 보류.
 - `OrderHistory.tsx`의 상품명 축약, 금액 로케일 표시, 표의 펼치기/필터, 일부 라벨 분기는 **사용자 화면 표시**이며 상태 변경/가격/입금 집계가 아님
 - `useAppModel.ts`의 다른 업무에 필요한 `orderClient` 의존성 등 **애플리케이션 전체** TS 제거는 본 세션의 범위가 아님
 
@@ -78,3 +78,11 @@
 - **최신 HEAD에서의 Rust 컴파일, 신규 TS/Rust 차등 테스트 및 Windows 실행 확인: 미완료.** GitHub Actions의 신규 브랜치 push workflow 실행이 job 0개로 종료되어 결과를 얻지 못함. 앞선 통과 CI는 후속 수정 전의 소스이므로 새 변경의 PASS 근거로 사용하지 않음
 - 공유 `.github/workflows/migration-output.yml`은 변경 사항을 원상복구했으며, 병렬 통합 브랜치는 미변경
 - PR #6은 이 검증이 끝날 때까지 Draft로 유지한다
+
+## 추가 검수 시도 및 현재 차단 사유
+
+- 현재 분기에서 `migration-output.yml`의 임시 작업 트리거를 추가한 후 GitHub Actions 실행 시도: [43439119940](https://github.com/ThunderStrikerKR/TSBH/actions/runs/43439119940) 등의 실행이 **job 0개인 즉시 실패** 상태로 종료. 테스트 실패 로그나 에러 메시지가 없어 기능 오류인지 CI 서비스 설정/제한인지 구분 불가.
+- 동일 실패 실행의 failed-jobs 재시도 API는 `403 This workflow run cannot be retried`를 반환. **브랜치 HEAD 소스에 대한 컴파일 및 차등 검증을 완료하지 못함**.
+- 다른 브랜치의 공동 작업과 충돌하지 않도록 공유 `.github/workflows/migration-output.yml`은 다시 원상복구.
+- 후속 수정 사항: 보류 Excel 출력의 입금표시 경고도 Rust 뷰 결과를 소비하도록 수정, 해당 출력 테스트에 Rust와 동일한 정형 데이터 전달.
+- **정적 코드 경로 검사 20개 중 실제 런타임 검사 19개 통과, 나머지 1개는 의도한 TypeScript `import type`로서 JS 실행에 포함되지 않음.** 최신 HEAD Rust 컴파일/원본 TS 비교와 Windows 최종 시험까지 검증 절차를 마친 후에만 PR #6을 Ready로 전환할 것.
