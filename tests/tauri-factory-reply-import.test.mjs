@@ -199,7 +199,12 @@ test("native archive and conflict UI are wired with backup and review, not legac
   assert.match(rust,/Sha256::digest/);
   assert.match(bridge,/archiveFactoryReply: \(id, bytes\)/);
   assert.match(bridge,/openFactoryFile: \(id\) => invoke<void>/);
-  assert.match(ui,/applyFactoryReplyPreview\(latest, review\)/);
+  assert.match(ui,/nativeApplyFactoryReplyPreview\(latest, review\)/);
+  assert.match(ui,/nativeAnalyzeFactoryReply\(current, selected\)/);
+  assert.doesNotMatch(ui,/[^A-Za-z]applyFactoryReplyPreview\(latest, review\)/);
+  const native = read("src/native-factory-reply.ts");
+  assert.match(native,/"rules", "analyze_factory_reply"/);
+  assert.match(native,/"rules", "apply_factory_reply"/);
   assert.match(ui,/await api\.backup\(\)/);
   assert.match(ui,/await api\.archiveFactoryReply/);
   assert.match(ui,/await onSave\(next\)/);
