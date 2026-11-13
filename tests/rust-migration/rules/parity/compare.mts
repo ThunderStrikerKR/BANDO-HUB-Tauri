@@ -16,6 +16,7 @@ import {
   editableShippingRule,
   combinationVersions,
   combinationCurrent,
+  upgradeShipping,
 } from "../../../../src/shipping.ts";
 import { shipmentTotals, validateWorkflow, reconcileWorkflow, deleteOrder } from "../../../../src/workflow.ts";
 import { orderIssues, approveMissingQuantity, pendingIssue } from "../../../../src/validation.ts";
@@ -365,6 +366,22 @@ const removeStepTwo:any=copy(baseState);
 add("delete step-two order writes recheck and deletion audit","delete_order",{
   state:removeStepTwo,orderId:"o1",now:actionNow,eventId:"delete-2",eventIds:["recheck-2"]
 },()=>({state:deterministicIds(["recheck-2","delete-2"],()=>deleteOrder(removeStepTwo,"o1"))}));
+
+
+const upgradeVersions=Object.fromEntries(
+  ["music","microphone"].flatMap(prefix=>[1,2,3]
+    .map(i=>[prefix+"-type-"+i,prefix+"-version-"+i]))
+);
+const upgradeIds=["music-version-1","music-version-2","music-version-3",
+  "microphone-version-1","microphone-version-2","microphone-version-3"];
+add("upgrade missing legacy shipping classification groups","apply_shipping_action",{
+  action:"upgrade",shipping,now:actionNow,groupVersions:upgradeVersions
+},()=>({shipping:deterministicIds(upgradeIds,()=>upgradeShipping(shipping as any))}));
+const upgradedShipping:any=deterministicIds(upgradeIds,
+  ()=>upgradeShipping(shipping as any));
+add("upgrade existing classifications is idempotent","apply_shipping_action",{
+  action:"upgrade",shipping:upgradedShipping,now:actionNow,groupVersions:{}
+},()=>({shipping:upgradeShipping(upgradedShipping)}));
 
 function normalized(v:unknown):string {
   if(Array.isArray(v))return "["+v.map(normalized).join(",")+"]";
