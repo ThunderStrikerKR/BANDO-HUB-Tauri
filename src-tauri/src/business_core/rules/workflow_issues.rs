@@ -27,6 +27,46 @@ fn sale_problem(p:Option<&Value>)->&str{
         ""|"판매중"|"SELLING"|"판매 표시"=>"",other=>other
     }
 }
+fn sender_phone(raw:&str)->String{
+    // Sender phone rules in src/explicit-sender.ts permit whitespace and
+    // punctuation inside all three blocks of a telephone number.
+    let chars=raw.chars().collect::<Vec<_>>();
+    let is_sep=|ch:char|ch.is_whitespace()||['(',')','.','-'].contains(&ch);
+    for start in 0..chars.len(){
+        if chars[start]!='0'||(start>0&&chars[start-1].is_ascii_digit()){continue;}
+        for prefix_len in [4,3,2]{
+            if start+prefix_len>chars.len(){continue;}
+            let prefix=chars[start..start+prefix_len].iter().collect::<String>();
+            let valid=match prefix_len{
+                4=>prefix.starts_with("050")&&prefix.chars().nth(3)
+                    .is_some_and(|ch|ch.is_ascii_digit()),
+                3=>prefix.starts_with("01")&&matches!(prefix.chars().nth(2),
+                      Some('0'|'1'|'6'|'7'|'8'|'9'))
+                    ||prefix=="070"||prefix=="080"
+                    ||prefix.starts_with('0')&&matches!(prefix.chars().nth(1),
+                      Some('3'|'4'|'5'|'6'))&&prefix.chars().nth(2)
+                          .is_some_and(|ch|ch.is_ascii_digit()),
+                2=>prefix=="02",_=>false
+            };
+            if !valid{continue;}
+            let mut first=start+prefix_len;
+            while first<chars.len()&&is_sep(chars[first]){first+=1;}
+            for middle_length in [3,4]{
+                let mid_end=first+middle_length;
+                if mid_end>chars.len()||!chars[first..mid_end].iter().all(|c|c.is_ascii_digit()){
+                    continue;
+                }
+                let mut last=mid_end;
+                while last<chars.len()&&is_sep(chars[last]){last+=1;}
+                let end=last+4;
+                if end>chars.len()||!chars[last..end].iter().all(|c|c.is_ascii_digit())
+                    ||end<chars.len()&&chars[end].is_ascii_digit(){continue;}
+                return chars[start..end].iter().collect();
+            }
+        }
+    }
+    String::new()
+}
 fn sender_field<'a>(order:&'a Value,state:&'a Value,key:&str)->String{
     let snapshot=field(order,"senderSnapshot");
     if snapshot.is_object(){return str_field(snapshot,key).to_string();}
@@ -85,16 +125,7 @@ fn sender_field<'a>(order:&'a Value,state:&'a Value,key:&str)->String{
             return address;
         }
         if key=="mobile"{return String::new();}
-        if key=="phone"{
-            let mut candidate=String::new();
-            for chunk in raw.split(|c:char|c.is_whitespace() || c==',' || c==':' || c=='：'){
-                let chars:String=chunk.chars().filter(|c|c.is_ascii_digit()).collect();
-                if chunk.starts_with('0')&&chars.len()>=9&&chars.len()<=11{
-                    candidate=chunk.to_string();break;
-                }
-            }
-            return candidate;
-        }
+        if key=="phone"{return sender_phone(raw);}
     }
     str_field(base,key).to_string()
 }
