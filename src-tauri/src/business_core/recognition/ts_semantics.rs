@@ -127,6 +127,68 @@ pub(super) fn model_before_address(prefix: &str, state: &serde_json::Value) -> b
     unknown && !super::quantity::extract(prefix).is_empty()
 }
 
+/// Port of src/order-evidence.ts:609-650 (matchingRecipient).
+/// Names are identified by *original evidence*, not by mutable display text.
+/// A previously confirmed field is inherited only when the delivery
+/// identity is unique in both the previous and incoming documents.
+fn source_names(row: &serde_json::Value) -> Vec<String> {
+    let mut found=Vec::new();
+    for source in row.get("sources").and_then(serde_json::Value::as_array)
+        .into_iter().flatten() {
+        if source["field"]!="name" { continue; }
+        if let Some(value)=source["text"].as_str() {
+            let name=value.trim().to_owned();
+            if !found.contains(&name) { found.push(name); }
+        }
+    }
+    found
+}
+fn same_source_identity(a: &serde_json::Value, b: &serde_json::Value) -> bool {
+    let a_names=source_names(a);
+    let b_names=source_names(b);
+    if a_names.len()==1 && b_names.len()==1 {
+        return a_names[0]==b_names[0];
+    }
+    a_names.is_empty() && b_names.is_empty()
+        && a["address"]==b["address"] && a["mobile"]==b["mobile"]
+        && a["phone"]==b["phone"]
+}
+pub(super) fn matching_recipient(
+    incoming: &serde_json::Value, previous: &[serde_json::Value],
+    used: &std::collections::HashSet<usize>,
+    incoming_rows: &[serde_json::Value],
+) -> Option<usize> {
+    let eligible:Vec<usize>=(0..previous.len()).filter(|i|!used.contains(i)).collect();
+    let anchor=incoming.pointer("/evidence/anchorId").and_then(serde_json::Value::as_str)
+        .filter(|s|!s.is_empty());
+    if let Some(anchor)=anchor {
+        let exact:Vec<usize>=eligible.iter().copied().filter(|i|
+            previous[*i].pointer("/evidence/anchorId").and_then(serde_json::Value::as_str)
+                == Some(anchor) && same_source_identity(incoming,&previous[*i])
+        ).collect();
+        if exact.len()==1 {return exact.first().copied();}
+    }
+    let original_name=incoming.get("sources").and_then(serde_json::Value::as_array)
+        .and_then(|xs|xs.iter().find(|s|s["field"]=="name"));
+    if let Some(name)=original_name {
+        let by_source:Vec<usize>=eligible.iter().copied().filter(|i|{
+            let old=&previous[*i];
+            source_names(old).len()==1 && old.get("sources")
+                .and_then(serde_json::Value::as_array).map_or(false,|sources|
+                    sources.iter().any(|s|
+                        s["field"]=="name" && s["start"]==name["start"]
+                        && s["text"]==name["text"]))
+        }).collect();
+        if by_source.len()==1 {return by_source.first().copied();}
+    }
+    let candidates:Vec<usize>=eligible.iter().copied().filter(|i|
+        same_source_identity(incoming,&previous[*i])).collect();
+    if candidates.len()!=1 {return None;}
+    let identity_count=incoming_rows.iter().filter(|row|
+        same_source_identity(incoming,row)).count();
+    if identity_count==1 {candidates.first().copied()} else {None}
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
