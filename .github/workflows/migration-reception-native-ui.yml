@@ -5,6 +5,7 @@ on:
       - migration/03-integration
     paths:
       - scripts/migration03-reception-native-ui.mjs
+      - scripts/migration03-reception-native-uia.ps1
       - .github/workflows/migration-reception-native-ui.yml
   workflow_dispatch:
 permissions:
