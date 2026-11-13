@@ -344,26 +344,26 @@ function deterministicIds<T>(ids:string[],fn:()=>T):T {
 }
 const missingDelete:any=copy(baseState);
 add("delete missing order is rejected","delete_order",{
-  state:missingDelete,orderId:"absent",now,eventId:"delete-1",eventIds:[]
+  state:missingDelete,orderId:"absent",now:actionNow,eventId:"delete-1",eventIds:[]
 },()=>({state:deleteOrder(missingDelete,"absent")}));
 const transferredDelete:any=copy(baseState);
 transferredDelete.workflow.shipments[0].transferred=true;
 add("transferred order ordinary delete blocked","delete_order",{
-  state:transferredDelete,orderId:"o1",now,eventId:"delete-1",eventIds:[]
+  state:transferredDelete,orderId:"o1",now:actionNow,eventId:"delete-1",eventIds:[]
 },()=>({state:deleteOrder(transferredDelete,"o1")}));
 const deletedOrder:any=copy(baseState);
 deletedOrder.orders[0].deletedAt=now;
 add("already deleted order no-op","delete_order",{
-  state:deletedOrder,orderId:"o1",now,eventId:"delete-1",eventIds:[]
+  state:deletedOrder,orderId:"o1",now:actionNow,eventId:"delete-1",eventIds:[]
 },()=>({state:deleteOrder(deletedOrder,"o1")}));
 const removeDraft:any=copy(baseState);
 removeDraft.workflow.shipments[0].step=0;
 add("delete unsent draft preserves receipt state","delete_order",{
-  state:removeDraft,orderId:"o1",now,eventId:"delete-1",eventIds:[]
+  state:removeDraft,orderId:"o1",now:actionNow,eventId:"delete-1",eventIds:[]
 },()=>({state:deterministicIds(["delete-1"],()=>deleteOrder(removeDraft,"o1"))}));
 const removeStepTwo:any=copy(baseState);
 add("delete step-two order writes recheck and deletion audit","delete_order",{
-  state:removeStepTwo,orderId:"o1",now,eventId:"delete-2",eventIds:["recheck-2"]
+  state:removeStepTwo,orderId:"o1",now:actionNow,eventId:"delete-2",eventIds:["recheck-2"]
 },()=>({state:deterministicIds(["recheck-2","delete-2"],()=>deleteOrder(removeStepTwo,"o1"))}));
 
 function normalized(v:unknown):string {
