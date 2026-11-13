@@ -201,30 +201,32 @@ fn address_info(value: &str) -> (String, String, Value) {
     let province = Regex::new(r"^(?:서울특별시|서울|부산광역시|부산|대구광역시|대구|인천광역시|인천|광주광역시|광주|대전광역시|대전|울산광역시|울산|세종특별자치시|세종|경기도|경기|강원특별자치도|강원도|강원|충청북도|충청남도|전북특별자치도|전라북도|전라남도|경상북도|경상남도|제주특별자치도|제주도|제주|충북|충남|전북|전남|경북|경남)")
         .expect("province").find(value).map(|m| m.as_str().to_owned());
     let mut parts = json!({});
+    let rest = province.as_ref().and_then(|p|value.strip_prefix(p))
+        .map(str::trim).unwrap_or(value);
     if let Some(p) = province { parts["province"] = json!(p); }
     for (field, pattern) in [
         ("city", r"(?:^|\s)([가-힣]+(?:시|군))(?:\s|$)"),
         ("district", r"(?:^|\s)([가-힣]+구)(?:\s|$)"),
         ("town", r"(?:^|\s)([가-힣0-9]+(?:읍|면|동|리))(?:\s|$)"),
     ] {
-        if let Some(c)=Regex::new(pattern).expect("administrative component").captures(value) {
+        if let Some(c)=Regex::new(pattern).expect("administrative component").captures(rest) {
             if let Some(m)=c.get(1){parts[field]=json!(m.as_str());}
         }
     }
     let road=Regex::new(r"([가-힣A-Za-z0-9.]+(?:대로|로|길))\s+(\d+(?:-\d+)?)")
-        .expect("road component").captures(value);
+        .expect("road component").captures(rest);
     if let Some(m)=road {
         parts["road"] = json!(&m[1]);
         parts["building"] = json!(&m[2]);
         if let Some(full)=m.get(0){
-            let detail=value[full.end()..].trim();
+            let detail=rest[full.end()..].trim();
             if !detail.is_empty(){parts["detail"]=json!(detail);}
         }
     } else if let Some(m)=Regex::new(r"[동리읍면]\s+(?:산\s*)?(\d+(?:-\d+)?)")
-        .expect("lot number").captures(value) {
+        .expect("lot number").captures(rest) {
         parts["building"]=json!(&m[1]);
         if let Some(full)=m.get(0){
-            let detail=value[full.end()..].trim();
+            let detail=rest[full.end()..].trim();
             if !detail.is_empty(){parts["detail"]=json!(detail);}
         }
     }
@@ -233,7 +235,7 @@ fn address_info(value: &str) -> (String, String, Value) {
 fn blank_recipient(id: &str, name: &str, anchor: Option<&Evidence>, raw: &str) -> Value {
     let mut value = json!({
         "id":id, "name":name, "address":"", "phone":"", "mobile":"", "note":"",
-        "items":[], "sources":[], "candidates":[], "confirmedFields":[],
+        "items":[], "sources":[], "candidates":[],
     });
     if let Some(a) = anchor {
         value["evidence"] = json!({"anchorId": format!("{}:{}:{}",a.kind,utf16(raw,a.start),utf16(raw,a.end)),
@@ -986,9 +988,14 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
         }
     }
     // Attach evidence to the outer rows, but do not fabricate product/quantity ownership.
-    let mut unassigned = Vec::new();
-    for e in &events {
-        if e.recipient.is_none() { unassigned.push(e_json(raw,e)["id"].clone()); }
+    // Source order-evidence.ts sorts all evidence by source position before
+    // assigning and returning candidates. A quantity inserted ahead of its
+    // corresponding product in Rust must not reverse the public array order.
+    let mut ordered=events.iter().collect::<Vec<_>>();
+    ordered.sort_by_key(|e|(e.start,e.end));
+    let mut unassigned=Vec::new();
+    for e in &ordered {
+        if e.recipient.is_none(){unassigned.push(e_json(raw,e)["id"].clone());}
     }
     for e in &events {
         if (e.kind=="product" || e.kind=="quantity") && e.recipient.is_none() {
@@ -999,7 +1006,7 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
             }
         }
     }
-    let candidates: Vec<Value> = events.iter().map(|e| {
+    let candidates: Vec<Value> = ordered.iter().map(|e| {
         let mut candidate=e_json(raw,e);
         if let Some(idx) = e.recipient {
             candidate["recipientId"]=recipients[idx]["id"].clone();
@@ -1050,12 +1057,16 @@ fn reanalyze(payload: &Value) -> Result<Value, String> {
             recipient_rewrites.insert(from.to_owned(),to.to_owned());
         }
         row["id"]=old_row["id"].clone();
-        for key in ["shippingCharges","freightCode","vatDefault","vatOverride","dispatchOrigin"] {
+        for key in ["shippingCharges","freightCode","vatDefault","vatOverride"] {
             if let Some(v)=old_row.get(key) {row[key]=v.clone();}
         }
         let confirmed=old_row.get("confirmedFields").and_then(Value::as_array)
             .cloned().unwrap_or_default();
-        row["confirmedFields"]=json!(confirmed);
+        if let Some(v)=old_row.get("confirmedFields") {
+            row["confirmedFields"]=v.clone();
+        } else if let Some(object)=row.as_object_mut(){
+            object.remove("confirmedFields");
+        }
         for field in confirmed.iter().filter_map(Value::as_str) {
             if ["name","address","phone","mobile","note"].contains(&field) {
                 if let Some(value)=old_row.get(field) { row[field]=value.clone(); }
