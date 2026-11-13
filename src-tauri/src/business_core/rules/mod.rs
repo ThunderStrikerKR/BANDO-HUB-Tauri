@@ -6,6 +6,7 @@ mod pricing;
 mod reconciliation;
 mod issues;
 mod product_confirmation;
+mod message_audit;
 mod order_mutations;
 mod group_operations;
 mod correction_rules;
@@ -64,6 +65,7 @@ pub fn execute(operation: &str, payload: Value) -> Result<Value, String> {
         "order_issues" => Ok(json!({"issues": issues::order_issues(req(&payload,"order")?)})),
         "apply_issue_action" => issues::issue_action(&payload),
         "apply_product_action" => product_confirmation::apply(&payload),
+        "record_message_copy" => message_audit::record(&payload),
         "apply_reply_action" => reply_rules::apply(&payload),
         "apply_raw_correction" => raw_corrections::apply(&payload),
         "apply_retail_action" => retail_operations::apply(&payload),
