@@ -33,7 +33,7 @@ fn fields(doc:&Html)->HashMap<String,String>{
         let selection=Selector::parse(selector).unwrap();
         for item in doc.select(&selection){
             let title=descendants_text(item,heading)
-                .replace([' ',':','：'],"");
+                .replace(&[' ',':','：'][..],"");
             let value=descendants_text(item,detail);
             if !title.is_empty()&&!value.is_empty(){
                 out.entry(title).or_insert(value);
@@ -184,7 +184,7 @@ fn price(raw:&str)->Option<u64>{
     if !rx(r"^(?:₩\s*)?\d+(?:,\d{3})*(?:\.00)?\s*(?:원)?$").is_match(&text){
         return None
     }
-    let text=text.replace([',','₩','원',' '],"");
+    let text=text.replace(&[',','₩','원',' '][..],"");
     let value=text.parse::<f64>().ok()?;
     if value>0.0&&value<=9007199254740991.0&&value.fract()==0.0{
         Some(value as u64)
@@ -268,7 +268,7 @@ pub(super) fn preview(payload:&Value)->Result<Value,String>{
     let evidence=option_evidence(&doc);
     let selectable=!evidence.is_empty();
     let unclear=rx(r"(?i)(?:색상|컬러|사이즈|규격|옵션|바퀴|가방)\s*(?:선택|옵션)")
-        .is_match(&name) || read("모델명").contains([',','/',';','+']) ||
+        .is_match(&name) || read("모델명").contains(&[',','/',';','+'][..]) ||
         rx(r"(?i)\bBD\s*\d{3,4}[A-Z0-9-]*\s*(?:/|,|\+)\s*(?:BD\s*)?\d{3,4}[A-Z0-9-]*")
             .is_match(&name)||
         rx(r"(?i)\bBD\s*\d{3,4}[A-Z0-9-]*\s+\d{3,4}[A-Z][A-Z0-9-]*")
