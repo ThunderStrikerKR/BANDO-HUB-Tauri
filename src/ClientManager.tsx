@@ -451,9 +451,11 @@ export function ClientManager({
                   )
                     return;
                   try {
-                    const next = clone(state);
-                    next.clients.find((c) => c.id === edit.id)!.deletedAt =
-                      new Date().toISOString();
+                    const { state: next } = await businessCoreCall<{ state: State }>(
+                      "catalog_clients", "archive_client", {
+                        state, clientId: edit.id, at: new Date().toISOString(),
+                      },
+                    );
                     await onSave(next);
                     setEdit(undefined);
                     onNotice("거래처를 삭제하고 기존 주문 기록을 보존했습니다.");
