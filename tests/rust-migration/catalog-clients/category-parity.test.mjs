@@ -9,8 +9,10 @@ import {spawnSync} from "node:child_process";
 import {fileURLToPath} from "node:url";
 import {tsImport} from "tsx/esm/api";
 
-const {changeCategory,deleteCategory,validateCategories} =
+const {changeCategory,deleteCategory,validateCategories,categoryProducts} =
   await tsImport("../../../src/category-tree.ts",import.meta.url);
+const {catalogFromCategory} =
+  await tsImport("../../../src/category-roots.ts",import.meta.url);
 const manifest=fileURLToPath(new URL("./Cargo.toml",import.meta.url));
 const root=fileURLToPath(new URL("../../../",import.meta.url));
 const state=()=>({
@@ -156,6 +158,56 @@ addValidate("category duplicate without historical baseline",s=>{
   s.categories.push({id:"a1",name:"복제",parentId:"a"});
 },false);
 addValidate("valid category tree without historical baseline",()=>{},false);
+
+
+function addGuard(name,categoryId,parentId,mutate=()=>{},
+  guardError="분류 소속이 다른 상품이 있습니다. 상품 연결을 먼저 확인하세요."){
+  const s=state();
+  s.categories.push(
+    {id:"catalog-root:BANDOSTAND",name:"반도스탠드",parentId:null},
+    {id:"catalog-root:BANDOMALL",name:"반도몰",parentId:null}
+  );
+  s.categories.find(c=>c.id==="a").parentId="catalog-root:BANDOSTAND";
+  s.categories.find(c=>c.id==="b").parentId="catalog-root:BANDOMALL";
+  s.products.filter(p=>["p1","p2","p4"].includes(p.id)).forEach(p=>p.catalog="BANDOSTAND");
+  s.products.find(p=>p.id==="p3").catalog="BANDOMALL";
+  mutate(s);
+  const source=s.categories.find(c=>c.id===categoryId);
+  const newName=source?.name??"신규";
+  const oracle=oracleRunGuard(()=>{
+    const destinationCatalog=catalogFromCategory(s.categories,parentId);
+    const linked=categoryProducts(s,categoryId);
+    if(destinationCatalog && linked.some(p=>
+      p.catalog && p.catalog!=="DEMO" && p.catalog!==destinationCatalog)){
+      throw Error(guardError);
+    }
+    return {state:changeCategory(s,categoryId,newName,parentId)};
+  });
+  trials.push({name,oracle,operation:"change_category",payload:{
+    state:s,categoryId,name:newName,parentId,transfer:false,
+    guardCatalogMove:true,guardError
+  }});
+}
+function oracleRunGuard(fn){
+  try{return {ok:true,value:fn()}}
+  catch(error){return {ok:false,error:error instanceof Error?error.message:String(error)}}
+}
+addGuard("moving BANDOSTAND category under BANDOMALL is blocked","a1","b");
+addGuard("moving BANDOMALL category under BANDOSTAND is blocked","b1","a");
+addGuard("moving category within BANDOSTAND is allowed","a1","a2");
+addGuard("moving category within BANDOMALL is allowed","b1","b");
+addGuard("DEMO products do not block a move","a1","b",s=>{
+  s.products.find(p=>p.id==="p1").catalog="DEMO";
+});
+addGuard("uncategorized product does not block a move","a1","b",s=>{
+  s.products.find(p=>p.id==="p1").catalog="";
+});
+addGuard("archived product does not block a move","a1","b",s=>{
+  s.products.find(p=>p.id==="p1").deletedAt="2026-11-01";
+});
+addGuard("subtree with linked products of mismatched brand is rejected","a","b");
+addGuard("custom original UI error retained","a1","b",()=>{},
+  "이 분류에는 이동할 최상위 구분과 다른 상품이 연결되어 있습니다. 상품 소속을 먼저 확인하세요.");
 
 test("original TS and compiled Rust category mutations agree on full state and errors",()=>{
   const cases=trials.map(({operation,payload})=>({operation,payload}));
