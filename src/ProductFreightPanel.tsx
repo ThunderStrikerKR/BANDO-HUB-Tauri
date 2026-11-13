@@ -87,6 +87,22 @@ export function ProductFreightPanel({
       return false;
     }
   };
+  const copyGroupRule = async (groupId: string, productIds: string[]): Promise<void> => {
+    if (!state.shipping || !productIds.length) return;
+    try {
+      const versionIds = Object.fromEntries(productIds.map((id) => [id, crypto.randomUUID()]));
+      const { shipping } = await businessCoreCall<{ shipping: NonNullable<State["shipping"]> }>(
+        "rules", "apply_shipping_action", {
+          action: "copy_group_rule",
+          shipping: state.shipping, groupId, productIds,
+          versionIds, now: new Date().toISOString(),
+        },
+      );
+      await save({ ...state, shipping }, "선택 상품에 확인된 공통 운임 기준을 복사했습니다.");
+    } catch (error) {
+      onNotice(error instanceof Error ? error.message : String(error), "error");
+    }
+  };
   const editingDirty = !!editing && !!initialRule && !sameFreightEditor(editing.rule, initialRule);
   usePageLeaveGuard({
     label: "상품별 운임",
@@ -161,23 +177,8 @@ export function ProductFreightPanel({
                 ))
               )
                 return;
-              const next = clone(state);
-              next.shipping!.productRules ??= {};
-              next.shipping!.productHistory ??= {};
-              for (const id of selected) {
-                const old = next.shipping!.productRules![id];
-                if (old)
-                  next.shipping!.productHistory![id] = [
-                    ...(next.shipping!.productHistory![id] ?? []),
-                    old,
-                  ];
-                next.shipping!.productRules![id] = {
-                  ...clone(group.current),
-                  version: crypto.randomUUID(),
-                  at: new Date().toISOString(),
-                };
-              }
-              void save(next, "선택 상품에 확인된 공통 운임 기준을 복사했습니다.");
+              void copyGroupRule(template, selected);
+
             }}
           >
             상품별 기준으로 복사
