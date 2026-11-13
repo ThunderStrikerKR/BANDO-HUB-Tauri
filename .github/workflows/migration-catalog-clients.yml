@@ -38,6 +38,8 @@ jobs:
         run: node --test tests/rust-migration/catalog-clients/registration-preview-parity.test.mjs
       - name: Compare final product registration batch audits and historical snapshots
         run: node --test tests/rust-migration/catalog-clients/registration-commit-parity.test.mjs
+      - name: Compare complete original TS product and price Excel previews
+        run: node --test tests/rust-migration/catalog-clients/product-sync-preview-parity.test.mjs
 
   frontend-regression:
     runs-on: ubuntu-latest
