@@ -3,7 +3,8 @@ import { categoryFilterLevels } from "./category-filter-levels";
 import { sameValue } from "./shared/draft";
 import { requestEditorLeave, usePageLeaveGuard } from "./shared/page-leave";
 import { CategoriesPanel } from "./ManagementUI";
-import { classifiedProducts, type Brand } from "./product-registry";
+import type { Brand } from "./product-registry";
+import { useNativeProductIds } from "./native-catalog-queries";
 import { businessCoreCall } from "./tauri-bridge";
 import type { NoticeSink } from "./shared/notices";
 import type { Product, State } from "./types";
@@ -21,7 +22,10 @@ export function ClassificationFilters({
   onChange: (category: string, brand: string) => void;
 }) {
   const levels = categoryFilterLevels(state.categories ?? [], category);
-  const available = new Set(classifiedProducts(state, category).map((p) => p.brandId));
+  const { products: classified, error: classificationError } = useNativeProductIds(
+    state, "classified_products", { category }, [category],
+  );
+  const available = new Set(classified.map((p) => p.brandId));
   return (
     <>
       <div className="product-category-filter" role="group" aria-label="상품 카테고리 필터">
@@ -46,6 +50,7 @@ export function ClassificationFilters({
           </button>
         )}
       </div>
+      {classificationError && <span role="alert">{classificationError}</span>}
       <select
         aria-label="상품 브랜드"
         value={brand}
