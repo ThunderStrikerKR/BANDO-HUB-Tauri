@@ -481,11 +481,11 @@ export function OrderDesk(props: OrderDeskProps) {
                                         className="item-row-edit item-amount"
                                         onClick={() => setItemEditing({ rid: r.id, iid: i.id })}
                                       >
-                                        {i.unitPrice !== null &&
-                                        i.quantity !== null &&
-                                        i.productId &&
-                                        i.variantId
-                                          ? won(i.unitPrice * i.quantity)
+                                        {flowSummaryReady && orderPreview
+                                          ? won(orderPreview.lineAmounts.find(
+                                              (entry) => entry.recipientId === r.id &&
+                                                entry.itemId === i.id,
+                                            )?.amount ?? null)
                                           : "확인 필요"}
                                       </button>
                                     </Linked>
