@@ -44,6 +44,20 @@ function moduleFor(path) {
 const { seoulDate, dailySettlement } = moduleFor("settlement-report");
 const { orderHistory } = moduleFor("order-history");
 const { exportDailySettlementWorkbook, exportOrderHistoryWorkbook } = moduleFor("report-workbook");
+test("screen-only date and money formatters preserve legacy output",()=>{
+  const {seoulDate:dateLabel}=moduleFor("seoul-date");
+  const {won:wonLabel,internalModel:modelLabel}=moduleFor("history-format");
+  for (const stamp of ["2026-11-07T23:59:59+09:00",
+    "2026-11-06T15:01:00Z","2026-11-07","",undefined,"invalid"]) {
+    assert.equal(dateLabel(stamp),seoulDate(stamp));
+  }
+  assert.equal(wonLabel(1000),"1,000원");
+  assert.equal(wonLabel(null),"확인 필요");
+  assert.equal(modelLabel("[가상] BD 709"),"709");
+  assert.equal(modelLabel("BD 709"),"709");
+  assert.equal(modelLabel("Desk TS"),"Desk TS");
+});
+
 const DAY = "2026-11-07";
 const other = "2026-11-06";
 
