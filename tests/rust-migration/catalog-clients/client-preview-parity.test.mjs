@@ -113,6 +113,25 @@ add("two edited clients collide after file changes",(s,r)=>{
   r.push({row:3,cells:cells("c2","같은상호","02-3333-6666")});
 });
 
+
+add("distinct edited entries sharing a numeric row marker still collide",(s,r)=>{
+  s.clients=[
+    old("c1","기존A","02-1111-3333"),
+    old("c2","기존B","02-2222-4444"),
+  ];
+  r[0].cells=cells("c1","변경된상호","02-1111-3333");
+  r.push({row:2,cells:cells("c2","변경된상호","02-2222-4444")});
+});
+add("both edited rows must be checked even when row numbers repeat",(s,r)=>{
+  s.clients=[
+    old("c1","원래상호A","02-1111-3333"),
+    old("c2","원래상호B","02-2222-4444"),
+  ];
+  r[0].cells=cells("c1","같은상호","02-1111-3333");
+  r.push({row:2,cells:cells("c2","같은상호","02-2222-4444")});
+  r.push({row:3,cells:cells("","새로운상호","02-7777-9999")});
+});
+
 function canonical(result,rows) {
   // JSON is the real Tauri IPC transport: undefined fields are omitted.
   const copy=JSON.parse(JSON.stringify(result));
