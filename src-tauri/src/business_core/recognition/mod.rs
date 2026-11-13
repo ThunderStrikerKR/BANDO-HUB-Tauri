@@ -321,13 +321,22 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
         }
 
         let address = address_begin(line.text);
-        // Names inside the delivery address, including a church/school, remain address text.
+        // parser.ts::parseLegacy masks complete phone numbers *before*
+        // interpreting a mixed address/phone row. A phone is a distinct
+        // contact field, not part of the recipient's delivery address.
         if let Some(start) = address {
-            let value = line.text[start..].trim();
+            let original=&line.text[start..];
+            let mut without_phones=original.to_owned();
+            let spans:Vec<_>=phone.find_iter(original)
+                .map(|m|(m.start(),m.end())).collect();
+            for (from,to) in spans.into_iter().rev() {
+                without_phones.replace_range(from..to,&" ".repeat(to-from));
+            }
+            let value=without_phones.trim();
             if !value.is_empty() {
-                let end = start + line.text[start..].trim_end().len();
-                add_match(&mut events, line, start, end, "address",
-                    value.to_owned(), "배송주소 원문 구간");
+                let end=start+without_phones.trim_end().len();
+                add_match(&mut events,line,start,end,"address",
+                    value.to_owned(),"배송주소 원문 구간");
             }
         }
 
