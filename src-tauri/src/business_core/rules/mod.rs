@@ -43,6 +43,7 @@ pub fn execute(operation: &str, payload: Value) -> Result<Value, String> {
         "order_issues" => Ok(json!({"issues": issues::order_issues(req(&payload,"order")?)})),
         "apply_issue_action" => issues::issue_action(&payload),
         "delete_order" => order_mutations::delete_order(&payload),
+        "apply_order_raw_edit" => order_mutations::apply_raw_edit(&payload),
         "validate_workflow" => {
             validation::validate(req(&payload, "state")?, payload.get("before"))?;
             Ok(json!({"valid": true}))
