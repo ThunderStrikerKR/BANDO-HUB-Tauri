@@ -42,7 +42,7 @@ fn party<'a>(state:&'a Value,order:&'a Value)->Option<&'a Value> {
     find_by_id(field(state,"clients"),str_field(order,"clientId"))
         .or_else(||order.get("clientSnapshot"))
 }
-fn company_client(state:&Value)->Value{
+pub(super) fn company_client(state:&Value)->Value{
     let settings=field(state,"settings");
     let name=if str_field(settings,"senderName").trim().is_empty() {"반도스탠드"}
         else{str_field(settings,"senderName").trim()};
@@ -83,7 +83,7 @@ fn explicit_sender_address(text:&str)->String{
     }
     String::new()
 }
-fn explicit_sender(raw:&str,base:&Value)->Option<Value>{
+pub(super) fn explicit_sender(raw:&str,base:&Value)->Option<Value>{
     let mut offset=0;
     for line in raw.split_inclusive('\n'){
         if let Some(name)=explicit_sender_name(line.trim_end_matches('\n').trim_end_matches('\r')){
