@@ -32,6 +32,48 @@ function difference(caseId,path,ts,rust){
   const field=path.replace(/\[\d+\]/g,"[]");
   byField.set(field,(byField.get(field)||0)+1);
 }
+// Evidence arrays may contain an extra candidate or may be emitted in
+// different discovery order. Align by immutable source coordinates first,
+// never by array index. Report unmatched source records explicitly so that
+// missing candidates are not hidden by index-wise cascades.
+function evidenceKind(v){return v?.field??v?.kind??"";}
+function chooseEvidence(v,list,used){
+  const indices=list.map((_,i)=>i).filter(i=>!used.has(i));
+  const exact=indices.find(i=>v?.id && v.id===list[i]?.id);
+  if(exact!==undefined)return exact;
+  const sameSpan=indices.find(i=>v?.start===list[i]?.start &&
+    v?.end===list[i]?.end && evidenceKind(v)===evidenceKind(list[i]));
+  if(sameSpan!==undefined)return sameSpan;
+  const sameCoordinates=indices.find(i=>v?.start===list[i]?.start &&
+    v?.end===list[i]?.end);
+  if(sameCoordinates!==undefined)return sameCoordinates;
+  const sameText=indices.find(i=>v?.text && v.text===list[i]?.text &&
+    evidenceKind(v)===evidenceKind(list[i]));
+  if(sameText!==undefined)return sameText;
+  return undefined;
+}
+function compareEvidenceArray(caseId,path,ts,rust){
+  if(ts.length!==rust.length)
+    difference(caseId,path+".length",ts.length,rust.length);
+  const used=new Set();
+  for(let i=0;i<ts.length;i++){
+    const candidate=chooseEvidence(ts[i],rust,used);
+    if(candidate===undefined){
+      difference(caseId,path+".missingRust["+i+"]",canonical(ts[i]),"<MISSING>");
+    }else{
+      used.add(candidate);
+      compare(caseId,path+"["+i+"]",ts[i],rust[candidate]);
+    }
+  }
+  for(let j=0;j<rust.length;j++)if(!used.has(j)){
+    difference(caseId,path+".missingTs["+j+"]","<MISSING>",canonical(rust[j]));
+  }
+}
+function isEvidencePath(path,ts,rust){
+  return (/(?:^|\.)candidates$|(?:^|\.)analysisEvidence$|(?:^|\.)sources$/.test(path))
+    && ts.some(x=>x && typeof x==="object")
+    && rust.some(x=>x && typeof x==="object");
+}
 function compare(caseId,path,a,b){
   if(a!==null && b!==null && typeof a==="object" && typeof b==="object" &&
       !Array.isArray(a)&&!Array.isArray(b)){
@@ -40,6 +82,10 @@ function compare(caseId,path,a,b){
     return;
   }
   if(Array.isArray(a)&&Array.isArray(b)){
+    if(isEvidencePath(path,a,b)){
+      compareEvidenceArray(caseId,path,a,b);
+      return;
+    }
     if(a.length!==b.length)difference(caseId,path+".length",a.length,b.length);
     for(let i=0;i<Math.max(a.length,b.length);i++)
       compare(caseId,path+"["+i+"]",a[i],b[i]);
