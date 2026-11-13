@@ -81,8 +81,15 @@ export async function exportDailySettlementWorkbook(data: ReportWorkbookData): P
   return Array.from(new Uint8Array(bytes as ArrayBuffer));
 }
 
+/** XLSX serialization only. The Rust history-view operation supplies
+ * payment-evidence decisions; exporting must never recalculate business rules.
+ * The State argument is retained for the dormant workbook API signature.
+ */
+export type HistoryWorkbookRow = HistoryRow & {
+  display: { paymentEvidenceMissing: boolean };
+};
 export async function exportOrderHistoryWorkbook(
-  state: State, historyRows: HistoryRow[],
+  _state: State, historyRows: HistoryWorkbookRow[],
 ): Promise<number[]> {
   const Excel = (await import("exceljs")).default;
   const book = new Excel.Workbook();
@@ -98,8 +105,7 @@ export async function exportOrderHistoryWorkbook(
       row.status, safeCell(row.recipients.map((r) => r.name).join(", ")),
       currency(row.billing.subtotal), currency(row.billing.shipping),
       currency(row.billing.vat), currency(row.billing.total), row.shipmentIds.length,
-      row.order.paid && !state.workflow?.payments.some((p) => p.allocations.some((a) =>
-        row.shipmentIds.includes(a.shipmentId))) ? "입금 표시만 있고 실제 입금 기록 없음" : "",
+      row.display.paymentEvidenceMissing ? "입금 표시만 있고 실제 입금 기록 없음" : "",
     ]);
   }
   style(sheet, [40, 21, 31, 27, 43, 18, 23, 18, 18, 16, 46]);
