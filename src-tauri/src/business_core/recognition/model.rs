@@ -158,7 +158,7 @@ fn written_color(text: &str) -> Option<String> {
             return Some(norm_color(cap.get(1)?.as_str()));
         }
     }
-    for word in ["rose gold", "로즈골드", "cosmo black", "코스모블랙", "chrom", "크롬",
+    for word in ["rose gold", "로즈골드", "cosmo black", "코스모블랙",
         "black", "블랙", "검정", "gray", "grey", "그레이", "회색", "white",
         "화이트", "흰색", "brown", "브라운", "silver", "실버", "gold", "골드",
         "blue", "블루", "red", "레드", "clear", "클리어"] {
@@ -401,19 +401,24 @@ pub(crate) fn decide(text: &str, state: &Value, client_id: &str) -> Decision {
     }
     let candidates: Vec<_> = available.iter()
         .filter_map(|e| names.remove(str_field(e.p,"id"))).take(20).collect();
-    let (product_id, variant_id, name, origin) = if let Some(ref entry) = chosen {
+    // The original parser defaults a matched one-variant product to that
+    // immutable sale variant's color. Missing explicit color is not "".
+    let (product_id, variant_id, name, origin, selected_color) = if let Some(ref entry) = chosen {
         let p = entry.p;
         let selected_variant = variants(p).into_iter().find(|v|
             explicit.as_ref().map_or(true, |c| norm_color(str_field(v,"color")) == *c));
         (Some(str_field(p,"id").to_owned()),
             selected_variant.map(|v| str_field(v,"id").to_owned()),
             str_field(p,"name").to_owned(),
-            str_field(p,"origin").to_owned())
-    } else { (None,None,text.trim().to_owned(),"FACTORY".to_owned()) };
+            str_field(p,"origin").to_owned(),
+            selected_variant.map(|v| str_field(v,"color").to_owned())
+                .unwrap_or_else(||explicit.clone().unwrap_or_default()))
+    } else { (None,None,text.trim().to_owned(),"FACTORY".to_owned(),
+        explicit.clone().unwrap_or_default()) };
     let span = chosen.as_ref().map(|e|e.span)
         .or_else(|| available.first().map(|e|e.span));
     Decision {
-        product_id, variant_id, name, color: explicit.unwrap_or_default(),
+        product_id, variant_id, name, color: selected_color,
         origin, kind: kind.to_owned(),
         term: first_alias.map(|a| str_field(a,"text").to_owned())
             .unwrap_or_else(|| span.map(|(a,b)| text[a..b].to_owned())
