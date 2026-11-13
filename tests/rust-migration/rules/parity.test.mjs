@@ -7,6 +7,8 @@ import {tsImport} from "tsx/esm/api";
 const {resolvePrice,totals,repriceOrder}=await tsImport("../../../src/domain.ts",import.meta.url);
 const {shouldRefreshUncommittedOrderPricing}=await tsImport("../../../src/orders/passive-pricing.ts",import.meta.url);
 const {recommendShipping}=await tsImport("../../../src/shipping.ts",import.meta.url);
+const {shipmentTotals,stageIssues,groupStep,groupShipments}=
+  await tsImport("../../../src/workflow.ts",import.meta.url);
 const root=fileURLToPath(new URL("../../../",import.meta.url));
 const manifest=fileURLToPath(new URL("./Cargo.toml",import.meta.url));
 const cases=[];
@@ -135,6 +137,82 @@ checkShipping("combination old epoch",(o,s)=>{
     versions:{"group:music":"v1","assignment:p1":"music"},charge:4500,
     actual:4000,at:"2026-11-12T12:00:00+09:00",active:true});
 });
+
+
+function workflowState(){
+  const c=client("wholesale");
+  c.payment="POSTPAID";
+  c.preferredAccountId="account-1";
+  const o=order(1,30000);
+  o.confirmedAt="2026-11-13T09:00:00+09:00";
+  o.pricesLocked=true;
+  o.clientSnapshot=structuredClone(c);
+  o.senderSnapshot=structuredClone(c);
+  o.status="STATEMENT";
+  const state=shippingState();
+  state.clients=[c];
+  state.orders=[o];
+  state.settings={
+    accounts:[{id:"account-1",bank:"가상은행",number:"123-456",holder:"가상상호"}],
+    defaultAccountId:"account-1",operatorName:"직원",
+  };
+  state.workflow={
+    sources:[{id:"source:o1",orderId:"o1",dealerId:"dealer-1"}],
+    groups:[{id:"group:o1",sourceId:"source:o1",dealerId:"dealer-1",
+      notices:[],needsNotice:false}],
+    shipments:[{id:"shipment:o1:r1",sourceId:"source:o1",
+      orderId:"o1",recipientId:"r1",groupId:"group:o1",
+      step:3,completedAt:{"1":"2026-11-13T09:00:00+09:00",
+      "2":"2026-11-13T09:00:00+09:00","3":"2026-11-13T09:00:00+09:00"},
+      charges:{FACTORY:3000},chargeMode:"MANUAL",freightVersion:"v1",
+      infoSignature:"stable",transferred:false}],
+    queue:[],payments:[],confirmations:[],events:[],deliveries:[],changeRequests:[],
+  };
+  return state;
+}
+function checkShipment(name,mutate=()=>{}){
+  const state=workflowState();
+  mutate(state);
+  const shipmentId="shipment:o1:r1";
+  add("shipmentTotals "+name,"calculate_shipment_totals",{state,shipmentId},
+    ()=>shipmentTotals(state,state.workflow.shipments[0]));
+}
+checkShipment("normal");
+checkShipment("recipient VAT override off",s=>{s.orders[0].recipients[0].vatOverride=false;});
+checkShipment("recipient VAT override on",s=>{s.orders[0].recipients[0].vatOverride=true;});
+checkShipment("recipient freight collect",s=>{s.orders[0].recipients[0].freightCode="020";});
+checkShipment("freight missing",s=>{s.workflow.shipments[0].charges={};});
+checkShipment("frozen snapshot used",s=>{
+  s.workflow.shipments[0].transferred=true;
+  s.workflow.queue=[{id:"q1",shipmentId:"shipment:o1:r1",origin:"FACTORY",
+    status:"EXPORTED",snapshot:{subtotal:15000,shipping:5000,vat:2000,total:22000}}];
+});
+checkShipment("frozen overridden by latestRecipient",s=>{
+  s.workflow.shipments[0].transferred=true;
+  s.workflow.shipments[0].latestRecipient={id:"r1"};
+  s.workflow.queue=[{id:"q1",shipmentId:"shipment:o1:r1",origin:"FACTORY",
+    status:"EXPORTED",snapshot:{subtotal:15000,shipping:5000,vat:2000,total:22000}}];
+});
+function checkWorkflow(name,mutate=()=>{}){
+  const state=workflowState();
+  mutate(state);
+  const groupId="group:o1";
+  add("workflow evaluate "+name,"evaluate_workflow",{state,groupId},()=>{
+    const step=groupStep(state,groupId);
+    const members=groupShipments(state,groupId);
+    const needsNotice=state.workflow.groups[0].needsNotice===true;
+    const nextStep=needsNotice&&step>=2?3:step+1;
+    const issues=nextStep<=4?stageIssues(state,groupId,nextStep):[];
+    return {step,nextStep,issues,shipmentsCount:members.length,
+      needsNotice,transferred:members.some(x=>x.transferred===true)};
+  });
+}
+checkWorkflow("postpaid step 3");
+checkWorkflow("prepaid step 3",s=>{
+  s.clients[0].payment="PREPAID";
+  s.orders[0].clientSnapshot.payment="PREPAID";
+});
+checkWorkflow("needs new notice",s=>{s.workflow.groups[0].needsNotice=true;});
 
 test("actual TS price, freight and refresh decisions match staged Rust rules",()=>{
   const proc=spawnSync("cargo",["run","--quiet","--manifest-path",manifest,
