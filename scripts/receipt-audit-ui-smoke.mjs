@@ -1591,7 +1591,67 @@ try {
   await navMenu.getByRole("button", {name:"거래처 관리"}).click();
   await leave.getByRole("button", {name:"저장 안 함"}).click();
   assert.equal((await mockState()).state.settings.colorGuidanceGroups?.length ?? 0,0);
-  console.log("PASS: unregistered color-group name cannot vanish or auto-create");
+  console.log("PASS: unregistered model-group name cannot vanish or auto-create");
+
+  // A real model-group save must survive the following Close action. Group
+  // ordering also follows name -> add products -> registered products.
+  await navMenu.getByRole("button", {name:"상품 관리",exact:true}).click();
+  await productSubnav.getByRole("button", {name:"모델군 관리",exact:true}).click();
+  const modelGroupTitle="CI 709 모델군 저장 확인";
+  await navPage.locator("#new-color-group").fill(modelGroupTitle);
+  await navPage.getByRole("button",{name:"그룹 생성",exact:true}).click();
+  const editorSection=navPage.locator(".family-editor-scroll");
+  const editorOrder=await editorSection.evaluate(root=>{
+    const name=root.querySelector("#color-group-name");
+    const blocks=[...root.querySelectorAll(".family-members-section")];
+    const add=blocks.find(block=>block.querySelector("h3")?.textContent?.trim()==="상품 추가");
+    const members=blocks.find(block=>block.querySelector("h3")?.textContent?.trim()==="등록한 상품");
+    return {
+      name:name?.getBoundingClientRect().top ?? -1,
+      add:add?.getBoundingClientRect().top ?? -1,
+      members:members?.getBoundingClientRect().top ?? -1,
+      dropdown:root.querySelector("#representative-product") !== null,
+    };
+  });
+  assert.ok(editorOrder.name>=0&&editorOrder.add>editorOrder.name&&
+    editorOrder.members>editorOrder.add&&!editorOrder.dropdown,
+    "Model-group editor order must be name / add / members: "+JSON.stringify(editorOrder));
+  const memberSearch=navPage.getByRole("textbox",{name:"모델군 상품 검색"});
+  for(const exactName of ["BD 709 / 블랙 / 타공 상판","BD 709-1 / 블랙 / 비타공 상판"]){
+    await memberSearch.fill(exactName);
+    const match=navPage.locator(".family-search-results .family-member").filter({hasText:exactName});
+    await match.getByRole("button",{name:"추가",exact:true}).click();
+  }
+  const repRow=navPage.locator(".family-member-table .family-member")
+    .filter({hasText:"BD 709 / 블랙 / 타공 상판"});
+  await repRow.getByRole("button",{name:"대표 지정",exact:true}).click();
+  assert.equal(await repRow.locator(".family-representative-tag").innerText(),"대표모델");
+  assert.equal(await navPage.locator(".family-member-table .family-member").count(),2);
+  const editorFooter=navPage.locator(".family-editor-footer");
+  assert.equal(await editorFooter.getByRole("button",{name:"변경 취소",exact:true}).count(),0);
+  await editorFooter.getByRole("button",{name:"변경사항 저장",exact:true}).click();
+  await navPage.waitForFunction(name=>Object.values(
+    window.__navSaved().state.settings.colorGuidanceGroups ?? {},
+  ).some(group=>group.name===name&&group.productIds?.length===2&&group.representativeProductId),
+  modelGroupTitle);
+  assert.equal(await editorFooter.getByRole("button",{name:"변경 취소",exact:true}).count(),0);
+  assert.equal(await editorFooter.getByRole("button",{name:"변경사항 저장",exact:true}).count(),0);
+  await editorFooter.getByRole("button",{name:"닫기",exact:true}).click();
+  const savedGroup=()=>navPage.locator(".family-list-row").filter({hasText:modelGroupTitle});
+  await savedGroup().click();
+  assert.equal(await navPage.locator(".family-member-table .family-member").count(),2,
+    "Closing a saved model-group editor must not roll back registered products");
+  assert.equal(await navPage.locator(".family-member-table .family-representative-tag").count(),1);
+  // Unsaved changes must prompt, and discarding them must use the last
+  // committed baseline rather than resetting freshly saved data.
+  await navPage.locator("#color-group-name").fill("CI 709 모델군 임시 수정");
+  await editorFooter.getByRole("button",{name:"닫기",exact:true}).click();
+  await checkPrompt("model group close with unsaved changes");
+  await leave.getByRole("button",{name:"저장 안 함",exact:true}).click();
+  await savedGroup().click();
+  assert.equal(await navPage.locator("#color-group-name").inputValue(),modelGroupTitle);
+  assert.equal(await navPage.locator(".family-member-table .family-representative-tag").count(),1);
+  console.log("PASS: MODEL_GROUP_EDITOR_ORDER_REPRESENTATIVE_SAVE_CLOSE_PERSISTENCE");
 
   await navMenu.getByRole("button", {name:"운임 관리"}).click();
   await navPage.getByRole("button", {name:"동급 그룹 운임표"}).click();

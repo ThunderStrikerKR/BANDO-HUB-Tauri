@@ -104,8 +104,10 @@ test("model-group UI, employee resolver, Rust persistence and messages use produ
   const ui = source("src/ColorGuidanceManager.tsx");
   const resolver = source("src/IssueResolver.tsx");
   const native = source("src-tauri/src/lib.rs");
-  assert.match(ui, /value=\{active\.representativeProductId/);
-  assert.match(ui, /<option key=\{id\} value=\{id\}>\{product\.name\}/);
+  assert.match(ui, /active\.representativeProductId===id/);
+  assert.match(ui, /g\[activeId\]\.representativeProductId=id/);
+  assert.match(ui, /대표 지정/);
+  assert.match(ui, /className="family-representative-tag"/);
   assert.match(ui, /validateModelGroups/);
   assert.doesNotMatch(ui, /id="representative-color"/);
   assert.match(resolver, /suggestGroupRepresentative/);
@@ -116,6 +118,22 @@ test("model-group UI, employee resolver, Rust persistence and messages use produ
   assert.match(source("src/hub-messages.ts"), /appliedRepresentativeModelNotice/);
   assert.match(source("src/automatic-message.ts"), /appliedRepresentativeModelNotice/);
   assert.match(source("src/ProductManager.tsx"), /"모델군 관리"/);
+});
+
+test("model-group editor places group name, add search and members in order with a safe Save / Close flow", () => {
+  const ui = source("src/ColorGuidanceManager.tsx");
+  const editor = ui.slice(ui.indexOf('className="family-editor-scroll"'));
+  const groupName = editor.indexOf('<Field label="그룹 이름">');
+  const add = editor.indexOf('<h3>상품 추가</h3>');
+  const members = editor.indexOf('<h3>등록한 상품</h3>');
+  assert.ok(groupName >= 0 && groupName < add && add < members);
+  assert.doesNotMatch(ui, /변경 취소|id="representative-product"/);
+  assert.match(ui, /<Button disabled=\{busy\} onClick=\{\(\)=>void closeEditor\(\)\}>닫기<\/Button>/);
+  assert.match(ui, /\{unsaved && <Button variant="primary" disabled=\{busy\}/);
+  assert.match(ui, /requestEditorLeave\(leaveGuard, setStatus\)/);
+  assert.match(ui, /setDraft\(structuredClone\(baseline\)\)/);
+  assert.doesNotMatch(ui, /setDraft\(structuredClone\(state\)\);setBaseline\(structuredClone\(state\)\);setSelected\(" "\)/);
+  assert.match(ui, /const activeId=selected && groups\[selected\]\?selected:""/);
 });
 
 test("employee applying a representative model records exact product identity and a declarative notice", async () => {

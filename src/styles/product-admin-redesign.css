@@ -214,8 +214,13 @@
 .family-member-name strong { font-size: 14px; }
 .family-member-name span { color: #a8b2ba; margin-left: 9px; font-size: 12px; }
 .family-member-name small { display: block; color: #a8b2ba; font-size: 11px; margin-top: 4px; }
-.family-representative-choice { display: flex; align-items: center; gap: 7px; font-size: 12px; cursor: pointer; }
-.family-representative-choice input { accent-color: #6499bb; width: 16px; height: 16px; }
+.family-representative-tag {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: var(--control-compact); padding: 6px 10px;
+  border: 1px solid #567f9a; border-radius: 5px;
+  color: #bcdced; font-size: 12px; font-weight: 600;
+  white-space: nowrap; flex: none;
+}
 .family-help { font-size: 12px; color: #aeb9c3; line-height: 1.55; }
 .family-editor-footer { border-top: 1px solid #454545; background: #222; padding: 13px 25px; display: flex; justify-content: space-between; gap: 9px; align-items: center; flex: none; }
 .family-footer-actions { display: flex; gap: 9px; }

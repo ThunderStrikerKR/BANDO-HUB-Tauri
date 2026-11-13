@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { usePageLeaveGuard } from "./shared/page-leave";
+import { requestEditorLeave, usePageLeaveGuard } from "./shared/page-leave";
 import { sameValue } from "./shared/draft";
 import { confirmAction } from "./dialogs";
 import { uid } from "./domain";
@@ -23,7 +23,7 @@ export function ColorGuidanceManager({state,onRefresh,query="",onQueryChange}: {
   const [busy,setBusy]=useState(false);
   const groups=draft.settings.colorGuidanceGroups ?? {};
   const rows=Object.entries(groups).map(([id,g])=>({id,...g}));
-  const activeId=groups[selected]?selected:(rows[0]?.id??"");
+  const activeId=selected && groups[selected]?selected:"";
   const active=groups[activeId];
   const unsaved=!sameValue(draft.settings.colorGuidanceGroups??{},
     baseline.settings.colorGuidanceGroups??{});
@@ -73,26 +73,41 @@ export function ColorGuidanceManager({state,onRefresh,query="",onQueryChange}: {
       );
       setDraft(structuredClone(updated));setBaseline(structuredClone(updated));
       await onRefresh(updated);
-      setStatus("모델군 설정만 저장했습니다. 기존 상품과 주문은 변경하지 않았습니다.");
+      setStatus("모델군 설정을 저장했습니다. 기존 상품과 주문은 변경하지 않았습니다.");
       return true;
     }catch(error){setStatus(String(error));return false;}
     finally{setBusy(false);}
   };
-  usePageLeaveGuard({
+  const discardDraft = () => {
+    // The last confirmed save is the baseline. The state prop may still be
+    // older while a refresh is finishing, so never use it to undo a saved edit.
+    setDraft(structuredClone(baseline));
+    setSelected("");
+    setName("");
+    setSearch("");
+    setStatus("");
+  };
+  const leaveGuard = {
     label: "모델군 관리",
     hasChanges: () => unsaved || name.trim().length > 0,
     busy: () => busy,
     save: async () => {
       if (name.trim().length > 0) {
-        setStatus("새 그룹 이름을 입력했습니다. 그룹 생성으로 등록하거나 저장 안 함을 선택하세요.");
+        setStatus("새 그룹 이름은 먼저 그룹 생성으로 등록하세요.");
         return false;
       }
       return save();
     },
-    discard: () => {
-      setDraft(structuredClone(state));setBaseline(structuredClone(state));setSelected("");setName("");setStatus("");
-    },
-  });
+    discard: discardDraft,
+  };
+  usePageLeaveGuard(leaveGuard);
+  const closeEditor = async () => {
+    const result = await requestEditorLeave(leaveGuard, setStatus);
+    if (!result.proceed) return;
+    setSelected("");
+    setSearch("");
+    setStatus("");
+  };
   return <section className="family-admin-workspace" aria-label="모델군 관리">
     <aside className="family-list-panel">
       <header className="family-list-heading">
@@ -139,42 +154,9 @@ export function ColorGuidanceManager({state,onRefresh,query="",onQueryChange}: {
               <input id="color-group-name" value={active.name}
                 onChange={e=>edit(g=>{g[activeId].name=e.target.value;})}/>
             </Field>
-            <Field label="대표모델">
-              <select id="representative-product" value={active.representativeProductId ?? ""}
-                onChange={e=>edit(g=>{
-                  g[activeId].representativeProductId=e.target.value;
-                  delete g[activeId].representativeColor;
-                })}>
-                <option value="">모델군에 등록한 상품 중 대표모델 선택</option>
-                {active.productIds.map(id=>{
-                  const product=draft.products.find(p=>p.id===id);
-                  return product ? <option key={id} value={id}>{product.name}</option> : null;
-                })}
-              </select>
-            </Field>
-            {active.representativeColor && !active.representativeProductId && (
-              <p className="family-help">이전 대표색상 설정({colorLabel(active.representativeColor)})을 사용 중입니다. 이제 색상이 아닌 실제 대표 상품을 직접 선택해 저장하세요.</p>
-            )}
-            <p className="family-help">대표모델은 모호한 발주서에서 직원이 선택할 수 있는 기본 후보입니다. 동일 색상이나 동일 가격은 요구하지 않으며, 실제 주문에 자동 적용되지 않습니다.</p>
           </div>
           <div className="family-members-section">
-            <div className="family-section-heading"><h3>등록한 상품</h3><span>{active.productIds.length}개</span></div>
-            <div className="family-member-table">
-              {active.productIds.map(id=>{
-                const p=draft.products.find(p=>p.id===id);
-                return <div className="family-member" key={id}>
-                  <div className="family-member-name"><strong>{p?.name??"확인할 상품"}</strong><span>{p?.subtitle}</span></div>
-                  <Button size="compact" disabled={busy} onClick={()=>edit(g=>{
-                    g[activeId].productIds=g[activeId].productIds.filter(x=>x!==id);
-                    if(g[activeId].representativeProductId===id)g[activeId].representativeProductId="";
-                  })}>제외</Button>
-                </div>;
-              })}
-              {!active.productIds.length&&<p className="muted">상품을 검색해 추가하세요.</p>}
-            </div>
-          </div>
-          <div className="family-members-section">
-            <div className="family-section-heading"><h3>모델군에 상품 추가</h3></div>
+            <div className="family-section-heading"><h3>상품 추가</h3></div>
             <input aria-label="모델군 상품 검색" value={search}
               placeholder="상품명으로 찾아서 추가"
               onChange={e=>setSearch(e.target.value)}/>
@@ -191,18 +173,42 @@ export function ColorGuidanceManager({state,onRefresh,query="",onQueryChange}: {
               {search.trim()&&!choices.length&&<p className="muted">일치하는 상품이 없습니다.</p>}
             </div>
           </div>
+          <div className="family-members-section">
+            <div className="family-section-heading"><h3>등록한 상품</h3><span>{active.productIds.length}개</span></div>
+            {active.representativeColor && !active.representativeProductId && (
+              <p className="family-help">이전 대표색상 설정({colorLabel(active.representativeColor)})이 있습니다. 아래 상품의 '대표 지정' 버튼으로 실제 대표모델을 선택하세요.</p>
+            )}
+            <div className="family-member-table">
+              {active.productIds.map(id=>{
+                const p=draft.products.find(p=>p.id===id);
+                const isRepresentative=active.representativeProductId===id;
+                return <div className="family-member" key={id}>
+                  <div className="family-member-name"><strong>{p?.name??"확인할 상품"}</strong><span>{p?.subtitle}</span></div>
+                  {isRepresentative
+                    ? <span className="family-representative-tag">대표모델</span>
+                    : <Button size="compact" disabled={busy||!p} onClick={()=>edit(g=>{
+                        g[activeId].representativeProductId=id;
+                        delete g[activeId].representativeColor;
+                      })}>대표 지정</Button>}
+                  <Button size="compact" disabled={busy} onClick={()=>edit(g=>{
+                    g[activeId].productIds=g[activeId].productIds.filter(x=>x!==id);
+                    if(g[activeId].representativeProductId===id)g[activeId].representativeProductId="";
+                  })}>제외</Button>
+                </div>;
+              })}
+              {!active.productIds.length&&<p className="muted">위에서 상품을 검색해 추가하세요.</p>}
+            </div>
+          </div>
         </div>
       </>:<p className="muted">모델군을 만든 다음 상품을 추가하고 대표모델을 직접 지정하세요.</p>}
-      <footer className="family-editor-footer">
+      {active && <footer className="family-editor-footer">
         <span role="status" className="muted">{status||(unsaved?"저장하지 않은 변경사항 있음":"변경사항 없음")}</span>
         <div className="family-footer-actions">
-          <Button disabled={!unsaved||busy} onClick={()=>{
-            setDraft(structuredClone(state));setBaseline(structuredClone(state));setSelected("");setStatus("");
-          }}>변경 취소</Button>
-          <Button variant="primary" disabled={!unsaved||busy}
-            onClick={()=>void save()}>{busy?"저장 중":"변경사항 저장"}</Button>
+          <Button disabled={busy} onClick={()=>void closeEditor()}>닫기</Button>
+          {unsaved && <Button variant="primary" disabled={busy}
+            onClick={()=>void save()}>{busy?"저장 중":"변경사항 저장"}</Button>}
         </div>
-      </footer>
+      </footer>}
     </div>
   </section>;
 }
