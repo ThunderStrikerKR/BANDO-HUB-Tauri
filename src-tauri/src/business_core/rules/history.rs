@@ -59,7 +59,7 @@ fn date_seoul(raw:&str)->String{
     }
     String::new()
 }
-fn status(state:&Value,order_id:&str)->String{
+pub(super) fn status(state:&Value,order_id:&str)->String{
     let order=find_by_id(field(state,"orders"),order_id);
     let ships=active_shipments(state,order_id);
     if ships.is_empty(){
