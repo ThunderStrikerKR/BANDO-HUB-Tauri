@@ -405,6 +405,12 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
             // A bare building continuation is left attached to the previous address later.
         }
 
+        // parser.ts::logicalLines gives the address the whole line unless
+        // a recognized/quantity-qualified SKU precedes the address.
+        // Never infer a product from an address's five-digit postal code.
+        if let Some(begin)=address {
+            if !ts_semantics::model_before_address(&line.text[..begin],state) {continue;}
+        }
         let product_part = address.map_or(line.text, |begin| &line.text[..begin]);
         let trimmed = product_part.trim();
         if trimmed.is_empty() || is_money_or_header(trimmed)
@@ -416,8 +422,15 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
         // create a product even when its digits match a generic model regex.
         let trim_phones: Vec<(usize,usize)> = phone.find_iter(trimmed)
             .map(|m|(m.start(),m.end())).collect();
-        if ts_semantics::only_contact_or_identity(trimmed,&trim_phones) { continue; }
         let decision = model::decision_json(&model::decide(trimmed,state,client_id));
+        // parser.ts::parseLegacy: a full contact may share the same physical
+        // line with a valid product and quantity; filter contact-only rows,
+        // not valid joint records such as "709 민판 한개 이가상 010-...".
+        if ts_semantics::only_contact_or_identity(trimmed,&trim_phones)
+            && quantity::extract(trimmed).is_empty()
+            && decision.pointer("/match/kind").and_then(Value::as_str)==Some("UNKNOWN") {
+            continue;
+        }
         if !product_signal(trimmed, &decision, state) { continue; }
         // Require model/category evidence, not a value made solely from a date or contact.
         if trimmed.contains("발주일") || trimmed.contains("발송일") { continue; }
