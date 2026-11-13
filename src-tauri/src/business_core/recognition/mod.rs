@@ -245,6 +245,104 @@ fn owner_index(anchors: &[usize], events: &[Evidence], offset: usize) -> usize {
     anchors.iter().enumerate().rev().find(|(_, i)| events[**i].start <= offset)
         .map(|(idx,_)|idx).unwrap_or(0)
 }
+/// Original TypeScript resolvePrice for the recognition Item shape.
+/// The separate pricing migration remains authoritative for business rules.
+fn legacy_recognition_price(v: &Value,client: Option<&Value>) -> Value {
+    let Some(client)=client.filter(|c|
+        c.get("id").and_then(Value::as_str).map_or(false,|id|!id.is_empty()))
+    else {return Value::Null;};
+    let tier=client.get("tier").and_then(Value::as_str).unwrap_or("");
+    let price=if tier=="special" {
+        let overrides=client.get("overrides");
+        let variant_id=v.get("id").and_then(Value::as_str).unwrap_or("");
+        let override_price=overrides.and_then(|o|o.get(variant_id))
+            .filter(|x|!x.is_null());
+        let prior=v.get("legacyIds").and_then(Value::as_array)
+            .into_iter().flatten().find_map(|id|
+                overrides.and_then(|o|o.get(id.as_str().unwrap_or("")))
+                    .filter(|x|!x.is_null()));
+        override_price.or(prior).or_else(||v.get("wholesale"))
+    } else {v.get(tier)};
+    let chosen=price.cloned().unwrap_or(Value::Null);
+    if chosen.as_f64()==Some(0.0) {Value::Null} else {chosen}
+}
+/// Port of src/domain.ts::itemFromProduct and parser.ts single-sale-unit rule.
+/// No inferred sale option or color without registered evidence.
+fn apply_registered_item(
+    item: &mut Value,state: &Value,client: Option<&Value>,explicit: &str
+) {
+    let Some(pid)=item.get("productId").and_then(Value::as_str) else {return;};
+    let Some(p)=model::products(state).into_iter()
+        .find(|p|p.get("id").and_then(Value::as_str)==Some(pid)) else{return;};
+    let variants=p.get("variants").and_then(Value::as_array);
+    let selectable=variants.map_or(false,|xs|xs.len()==1)
+        && p.get("requiresOption").and_then(Value::as_bool)!=Some(true);
+    let default_color=p.get("defaultColor").and_then(Value::as_str).unwrap_or("");
+    let selected_color=if explicit.is_empty(){default_color}else{explicit};
+    let color=model::norm_color(selected_color);
+    let chosen=if selectable {
+        variants.and_then(|vs|vs.iter().find(|v|
+            model::norm_color(v.get("color").and_then(Value::as_str).unwrap_or(""))==color))
+    } else {None};
+    let mut name=p.get("name").and_then(Value::as_str)
+        .or_else(||p.get("code").and_then(Value::as_str)).unwrap_or("")
+        .trim_start_matches("반도스탠드").trim().to_owned();
+    if variants.map_or(false,|v|v.len()>1) {
+        if let Some(option)=chosen.and_then(|v|v.get("option")).and_then(Value::as_str)
+            .filter(|s|!s.trim().is_empty()){
+            name.push_str(" / ");
+            name.push_str(option.trim());
+        }
+    }
+    if variants.map_or(false,|xs|xs.iter().any(|v|
+        v.get("source").and_then(Value::as_str)==Some("DEMO")))
+        && !name.starts_with("[가상] ") {
+        name=format!("[가상] {name}");
+    }
+    item["name"]=json!(name);
+    item["color"]=json!(color);
+    item["variantId"]=chosen.and_then(|v|v.get("id"))
+        .cloned().unwrap_or(Value::Null);
+    item["defaulted"]=json!(explicit.is_empty());
+    item["url"]=json!(chosen.and_then(|v|v.get("url"))
+        .and_then(Value::as_str).unwrap_or(""));
+    item["origin"]=p.get("origin").cloned()
+        .unwrap_or(json!("FACTORY"));
+    if let Some(catalog)=p.get("catalog"){item["catalog"]=catalog.clone();}
+    item["unitPrice"]=chosen.map_or(Value::Null,|v|legacy_recognition_price(v,client));
+    let mut issues:Vec<String>=item.get("issues").and_then(Value::as_array)
+        .into_iter().flatten().filter_map(Value::as_str)
+        .map(str::to_owned).collect();
+    let invalid_color=p.get("colorStatus").and_then(Value::as_str)==Some("MISSING")
+        || (p.get("saleUnit").and_then(Value::as_bool)!=Some(true)
+            && ["색상 미표기",""].contains(&default_color));
+    let missing_configuration=chosen.map_or(false,|v| {
+        ["가방","바퀴"].iter().any(|token| {
+            let pattern=regex::Regex::new(&format!(
+                r"{token}\s*(?:미포함|포함|미장착|장착|없음|있음)"
+            )).expect("configuration label");
+            variants.into_iter().flatten().any(|other|
+                pattern.is_match(other.get("option").and_then(Value::as_str).unwrap_or("")))
+            && !pattern.is_match(v.get("option").and_then(Value::as_str).unwrap_or(""))
+        })
+    });
+    let issue=if chosen.is_some() {
+        if explicit.is_empty() && invalid_color {
+            Some("기본 색상 확인 필요")
+        } else if missing_configuration {
+            Some("가방 또는 바퀴 포함 / 미포함 정보 확인 필요")
+        } else {None}
+    } else if p.get("requiresOption").and_then(Value::as_bool)==Some(true) {
+        Some("상품 구성 미확정 / 판매 구성을 확인하세요")
+    } else {
+        Some("등록된 독립 상품을 다시 선택하세요")
+    };
+    if let Some(issue)=issue {
+        if !issues.iter().any(|s|s==issue){issues.push(issue.to_owned());}
+    }
+    item["issues"]=json!(issues);
+}
+
 fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, String> {
     let client_id = client_id(client);
     let lines = physical_lines(raw);
@@ -671,6 +769,8 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
                 "url":"","match":term,
                 "productCandidates":products,"sources":[],
             });
+            apply_registered_item(&mut item,state,client,
+                hit.decision.get("color").and_then(Value::as_str).unwrap_or(""));
             let mut sources = vec![source_json(raw,&events[hit.evidence],&rid,&id)];
             if let Some(qi)=selected_qty {
                 sources.push(source_json(raw,&events[qi],&rid,&id));
