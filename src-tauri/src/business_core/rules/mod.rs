@@ -5,6 +5,7 @@ use serde_json::{json, Value};
 mod pricing;
 mod reconciliation;
 mod issues;
+mod order_mutations;
 mod shipping;
 mod workflow;
 mod validation;
@@ -35,6 +36,7 @@ pub fn execute(operation: &str, payload: Value) -> Result<Value, String> {
         ),
         "order_issues" => Ok(json!({"issues": issues::order_issues(req(&payload,"order")?)})),
         "apply_issue_action" => issues::issue_action(&payload),
+        "delete_order" => order_mutations::delete_order(&payload),
         "validate_workflow" => {
             validation::validate(req(&payload, "state")?, payload.get("before"))?;
             Ok(json!({"valid": true}))
