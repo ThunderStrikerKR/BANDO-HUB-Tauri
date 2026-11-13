@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { type WorkflowSelection } from "../WorkflowBoard";
 import {
@@ -7,12 +7,12 @@ import {
   normalizeColor,
   orderClient,
   repriceOrder,
-  resolvePrice,
   unassignedClient,
 } from "../domain";
 import type { StaffBlock } from "../hub-messages";
 import { hubMessages } from "../hub-messages";
-import { addressParts, mergeParsedItem, parseEvidence } from "../parser";
+import { businessCoreCall } from "../tauri-bridge";
+import { applyRustReceptionAnalysis, assertRustReceptionAnalysis, receptionAnalysisAllowed } from "./rust-reception";
 import { registeredProducts, sortProducts } from "../product-models";
 import { billingSnapshot } from "../replies";
 import type { NoticeSink } from "../shared/notices";
@@ -21,7 +21,6 @@ import type { Item, Order, Product, State } from "../types";
 import { clone } from "../ui";
 import { pendingIssue } from "../validation";
 import { shouldRefreshUncommittedOrderPricing } from "./passive-pricing";
-import { matchingRecipient, rebindEvidence } from "../order-evidence";
 import { groupMessages, groupShipments, reconcileWorkflow } from "../workflow";
 type SaveMode = "save" | "notify" | "pay" | "queue" | "wait";
 export type OrderDeskProps = {
@@ -179,109 +178,111 @@ export function useOrderDesk({
       };
     });
   }, [state.shipping, state.products, draft.recipients, liveClient?.shippingFeeExcluded, passivePricingAllowed]);
+  // Every native response is associated with a specific draft, raw text,
+  // client and catalog revision. A completed previous request must never
+  // replace newer typing, a newly selected order or employee corrections.
+  const recognitionRequest = useRef(0);
+  const latestReceptionInput = useRef({
+    orderId: draft.id,
+    clientId: draft.clientId,
+    source,
+    saved,
+    manual: !!draft.manualClassification,
+    products: state.products,
+    aliases: state.aliases,
+    client: liveClient,
+  });
+  latestReceptionInput.current = {
+    orderId: draft.id,
+    clientId: draft.clientId,
+    source,
+    saved,
+    manual: !!draft.manualClassification,
+    products: state.products,
+    aliases: state.aliases,
+    client: liveClient,
+  };
   useEffect(() => {
+    const request = ++recognitionRequest.current;
     if (
       viewMode === "details" ||
       saved ||
-      (draft.manualClassification && draft.analysisRaw === source) ||
-      (draft.analysisRaw === source && draft.analysisClientId === draft.clientId)
-    )
-      return;
+      !!draft.manualClassification ||
+      !receptionAnalysisAllowed(draft, source, pricingClient.id)
+    ) return;
+    const orderId = draft.id;
+    const clientId = draft.clientId;
     const timer = setTimeout(() => {
-      onChange((previous) => {
-        const evidence = source.trim()
-          ? parseEvidence(source, liveClient, {
+      const pending: Promise<unknown> = source.trim()
+        ? businessCoreCall<unknown>("recognition", "analyze_order", {
+            raw: source,
+            client: liveClient ?? null,
+            state: {
               ...state,
               products: state.products.filter(
                 (p) => p.catalog !== "DEMO" && !p.variants.some((v) => v.source === "DEMO"),
               ),
-            })
-          : { recipients: [], candidates: [], unassigned: [] };
-        const parsed = evidence.recipients;
-        const originalParsed = clone(parsed);
-        const usedRecipients = new Set<string>();
-        for (const r of parsed) {
-          const old = matchingRecipient(r, previous.recipients, usedRecipients, parsed);
-          if (old) usedRecipients.add(old.id);
-          if (!old) continue;
-
-          rebindEvidence(evidence.candidates, "recipientId", r.id, old.id);
-          r.id = old.id;
-          const usedItems = new Set<string>();
-          for (const span of r.sources ?? []) {
-            span.targetId = r.id;
-            span.recipientId = r.id;
-          }
-          for (const field of old.confirmedFields ?? [])
-            if (["name", "address", "phone", "mobile", "note"].includes(field))
-              (r as unknown as Record<string, unknown>)[field] = (
-                old as unknown as Record<string, unknown>
-              )[field];
-          r.confirmedFields = old.confirmedFields;
-          r.dispatchOrigin = old.dispatchOrigin;
-          r.actualFreight = old.actualFreight;
-          r.freightCode = old.freightCode;
-          r.vatDefault = old.vatDefault;
-          r.vatOverride = old.vatOverride;
-          r.shippingCharges = old.shippingCharges;
-          if (old.confirmedFields?.includes("address")) {
-            r.addressStatus = old.addressStatus;
-            r.addressParts = old.addressParts ?? addressParts(old.address);
-          }
-          for (const item of r.items) {
-            const prior = old.items.find((i) => i.raw === item.raw && !usedItems.has(i.id));
-            if (prior) {
-              usedItems.add(prior.id);
-
-              rebindEvidence(evidence.candidates, "itemId", item.id, prior.id);
-              item.id = prior.id;
-              Object.assign(item, mergeParsedItem(item, prior));
-              const product = state.products.find((p) => p.id === item.productId);
-              if (product && item.variantId)
-                item.unitPrice = resolvePrice(product, item.variantId, pricingClient);
-              for (const span of item.sources ?? []) {
-                span.targetId = item.id;
-                span.recipientId = r.id;
-              }
-            }
-          }
-        }
-        if (previous.orderType)
-          for (const row of parsed) {
-            row.dispatchOrigin ??= "FACTORY";
-            row.items.forEach((item) => (item.origin = row.dispatchOrigin!));
-          }
-        const next = {
-          ...previous,
-          analysisEvidence: evidence.candidates,
-          analysisSnapshot:
-            previous.analysisSnapshot?.raw === source
-              ? previous.analysisSnapshot
-              : {
-                  at: new Date().toISOString(),
-                  raw: source,
-                  ruleVersion: "parser-v0808",
-                  recipients: originalParsed,
-                },
-          raw: source,
-          analysisRaw: source,
-          analysisClientId: pricingClient.id,
-          recipients: parsed,
-          pricesLocked: false,
-          notified: false,
-          paid: false,
-          postpaidApproved: false,
-          status: "REVIEW" as const,
-        };
-        const reco = recommendShipping(next, state);
-        next.shippingFee = pricingClient.shippingFeeExcluded ? 0 : reco.total;
-        next.shippingMode = "AUTO";
-        next.shippingVersion = reco.version;
-        return next;
+            },
+          })
+        : Promise.resolve({ recipients: [], candidates: [], unassigned: [] });
+      void pending.then((result) => {
+        const latest = latestReceptionInput.current;
+        if (
+          request !== recognitionRequest.current ||
+          latest.orderId !== orderId ||
+          latest.clientId !== clientId ||
+          latest.source !== source ||
+          latest.saved || latest.manual ||
+          latest.products !== state.products ||
+          latest.aliases !== state.aliases ||
+          latest.client !== liveClient
+        ) return;
+        assertRustReceptionAnalysis(result, source);
+        onChange((previous) => {
+          const active = latestReceptionInput.current;
+          if (
+            request !== recognitionRequest.current ||
+            active.orderId !== orderId ||
+            active.clientId !== clientId ||
+            active.source !== source ||
+            active.saved || active.manual ||
+            active.products !== state.products ||
+            active.aliases !== state.aliases ||
+            active.client !== liveClient ||
+            previous.id !== orderId ||
+            previous.clientId !== clientId ||
+            !receptionAnalysisAllowed(previous, source, pricingClient.id)
+          ) return previous;
+          return applyRustReceptionAnalysis(previous, result, {
+            raw: source,
+            state,
+            pricingClient,
+            at: new Date().toISOString(),
+          });
+        });
+      }).catch((error: unknown) => {
+        const latest = latestReceptionInput.current;
+        if (
+          request !== recognitionRequest.current ||
+          latest.orderId !== orderId ||
+          latest.clientId !== clientId ||
+          latest.source !== source ||
+          latest.saved || latest.manual
+        ) return;
+        onNotice("Rust 발주서 자동 분석 실패: " +
+          (error instanceof Error ? error.message : String(error)), "error");
       });
     }, 350);
-    return () => clearTimeout(timer);
-  }, [source, draft.clientId, viewMode]);
+    return () => {
+      clearTimeout(timer);
+      if (recognitionRequest.current === request) recognitionRequest.current++;
+    };
+  }, [
+    source, draft.id, draft.clientId, draft.analysisRaw, draft.analysisClientId,
+    draft.manualClassification, draft.confirmedAt, draft.pricesLocked,
+    viewMode, saved, pricingClient.id, liveClient,
+    state.products, state.aliases,
+  ]);
   const run = async (fn: () => Promise<unknown> | unknown) => {
     try {
       await fn();
