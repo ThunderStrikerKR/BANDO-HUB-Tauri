@@ -1,0 +1,545 @@
+{
+  "schema": "tsbh-recognition-real-ts-rust-reanalysis-v1",
+  "date": "2026-11-13",
+  "branch": "migration/01-recognition",
+  "sourceCommit": "cc5a73a4bbe3996a2856ab548a4d7a4db877652b",
+  "githubActionsRun": "43381317874",
+  "githubActionsJob": "131739581028",
+  "method": "reanalysis: 9 same-order scenarios, full order/Item fields and stable ID/source-link checks",
+  "runner": "original src/parser.ts::parseEvidence and reanalyzeWithAliases run via tsx/esm/api; actual Rust analyze_order/reanalyze_order",
+  "normalization": "Fresh generated IDs canonicalized, stable employee-defined recipient/item IDs preserved. Evidence arrays aligned by immutable ID or source span; unmatched entries reported; evidence array ordering differences themselves are not counted as separate errors.",
+  "interpretation": "CI passes invariant tests and completes audit, NOT full TS/Rust JSON parity. Remaining differences are not all approved exceptions.",
+  "result": {
+    "cases": 9,
+    "casesWithDifferences": 1,
+    "comparedLeaves": 1738,
+    "mismatchCount": 5
+  },
+  "byField": [
+    {
+      "count": 2,
+      "field": "reanalyzed.recipients[].items[].sources[].recipientId"
+    },
+    {
+      "count": 2,
+      "field": "referenceIntegrity[]"
+    },
+    {
+      "count": 1,
+      "field": "referenceIntegrity.length"
+    }
+  ],
+  "byCase": [
+    {
+      "id": "reanalyze-base",
+      "mismatchCount": 0,
+      "mode": "base",
+      "old": [
+        {
+          "id": "stable-recipient-0-0",
+          "items": [
+            {
+              "id": "stable-item-0-0-0",
+              "productId": "bando-site-337",
+              "quantity": 2
+            }
+          ]
+        }
+      ],
+      "rust": [
+        {
+          "id": "stable-recipient-0-0",
+          "items": [
+            {
+              "id": "stable-item-0-0-0",
+              "productId": "bando-site-337",
+              "quantity": 2
+            }
+          ]
+        }
+      ],
+      "ts": [
+        {
+          "id": "stable-recipient-0-0",
+          "items": [
+            {
+              "id": "stable-item-0-0-0",
+              "productId": "bando-site-337",
+              "quantity": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "reanalyze-staff-fields",
+      "mismatchCount": 0,
+      "mode": "confirmed-freight-staff-item",
+      "old": [
+        {
+          "id": "stable-recipient-1-0",
+          "items": [
+            {
+              "id": "stable-item-1-0-0",
+              "manuallyConfirmed": true,
+              "productId": "staff-picked-sku",
+              "quantity": 2,
+              "quantityApproval": {
+                "actor": "employee",
+                "at": "2026-11-13T00:00:00.000Z",
+                "quantity": 2
+              }
+            }
+          ]
+        }
+      ],
+      "rust": [
+        {
+          "id": "stable-recipient-1-0",
+          "items": [
+            {
+              "id": "stable-item-1-0-0",
+              "manuallyConfirmed": true,
+              "productId": "staff-picked-sku",
+              "quantity": 2,
+              "quantityApproval": {
+                "actor": "employee",
+                "at": "2026-11-13T00:00:00.000Z",
+                "quantity": 2
+              }
+            }
+          ]
+        }
+      ],
+      "ts": [
+        {
+          "id": "stable-recipient-1-0",
+          "items": [
+            {
+              "id": "stable-item-1-0-0",
+              "manuallyConfirmed": true,
+              "productId": "staff-picked-sku",
+              "quantity": 2,
+              "quantityApproval": {
+                "actor": "employee",
+                "at": "2026-11-13T00:00:00.000Z",
+                "quantity": 2
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "reanalyze-edit-quantity",
+      "mismatchCount": 5,
+      "mode": "confirmed-freight-staff-item-qty-edit",
+      "old": [
+        {
+          "id": "stable-recipient-2-0",
+          "items": [
+            {
+              "id": "stable-item-2-0-0",
+              "manuallyConfirmed": true,
+              "productId": "staff-picked-sku",
+              "quantity": 2,
+              "quantityApproval": {
+                "actor": "employee",
+                "at": "2026-11-13T00:00:00.000Z",
+                "quantity": 2
+              }
+            }
+          ]
+        }
+      ],
+      "rust": [
+        {
+          "id": "stable-recipient-2-0",
+          "items": [
+            {
+              "id": "recognition:item:0:0",
+              "productId": "bando-site-337",
+              "quantity": 3
+            }
+          ]
+        }
+      ],
+      "ts": [
+        {
+          "id": "stable-recipient-2-0",
+          "items": [
+            {
+              "id": "62235e4f-a75e-4723-a191-2dab1bf0bba2",
+              "productId": "bando-site-337",
+              "quantity": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "reanalyze-manual",
+      "mismatchCount": 0,
+      "mode": "manual",
+      "old": [
+        {
+          "id": "stable-recipient-3-0",
+          "items": [
+            {
+              "id": "stable-item-3-0-0",
+              "productId": "bando-site-337",
+              "quantity": 2
+            }
+          ]
+        }
+      ],
+      "rust": [
+        {
+          "id": "stable-recipient-3-0",
+          "items": [
+            {
+              "id": "stable-item-3-0-0",
+              "productId": "bando-site-337",
+              "quantity": 2
+            }
+          ]
+        }
+      ],
+      "ts": [
+        {
+          "id": "stable-recipient-3-0",
+          "items": [
+            {
+              "id": "stable-item-3-0-0",
+              "productId": "bando-site-337",
+              "quantity": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "reanalyze-two-recipients",
+      "mismatchCount": 0,
+      "mode": "confirmed-freight",
+      "old": [
+        {
+          "id": "stable-recipient-4-0",
+          "items": [
+            {
+              "id": "stable-item-4-0-0",
+              "productId": "bando-site-337",
+              "quantity": 2
+            }
+          ]
+        },
+        {
+          "id": "stable-recipient-4-1",
+          "items": [
+            {
+              "id": "stable-item-4-1-0",
+              "productId": "bando-site-334",
+              "quantity": 1
+            }
+          ]
+        }
+      ],
+      "rust": [
+        {
+          "id": "stable-recipient-4-0",
+          "items": [
+            {
+              "id": "stable-item-4-0-0",
+              "productId": "bando-site-337",
+              "quantity": 2
+            }
+          ]
+        },
+        {
+          "id": "stable-recipient-4-1",
+          "items": [
+            {
+              "id": "stable-item-4-1-0",
+              "productId": "bando-site-334",
+              "quantity": 1
+            }
+          ]
+        }
+      ],
+      "ts": [
+        {
+          "id": "stable-recipient-4-0",
+          "items": [
+            {
+              "id": "stable-item-4-0-0",
+              "productId": "bando-site-337",
+              "quantity": 2
+            }
+          ]
+        },
+        {
+          "id": "stable-recipient-4-1",
+          "items": [
+            {
+              "id": "stable-item-4-1-0",
+              "productId": "bando-site-334",
+              "quantity": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "reanalyze-name-changed",
+      "mismatchCount": 0,
+      "mode": "confirmed-freight-staff-item",
+      "old": [
+        {
+          "id": "stable-recipient-5-0",
+          "items": [
+            {
+              "id": "stable-item-5-0-0",
+              "manuallyConfirmed": true,
+              "productId": "staff-picked-sku",
+              "quantity": 2,
+              "quantityApproval": {
+                "actor": "employee",
+                "at": "2026-11-13T00:00:00.000Z",
+                "quantity": 2
+              }
+            }
+          ]
+        }
+      ],
+      "rust": [
+        {
+          "id": "recognition:recipient:0",
+          "items": [
+            {
+              "id": "recognition:item:0:0",
+              "productId": "bando-site-337",
+              "quantity": 2
+            }
+          ]
+        }
+      ],
+      "ts": [
+        {
+          "id": "7b9dd77c-22b7-44bc-9f3e-35fe912e3d4c",
+          "items": [
+            {
+              "id": "9d4e93cd-27ea-4f87-86b5-c45021ca72b2",
+              "productId": "bando-site-337",
+              "quantity": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "reanalyze-new-destination",
+      "mismatchCount": 0,
+      "mode": "confirmed-freight",
+      "old": [
+        {
+          "id": "stable-recipient-6-0",
+          "items": [
+            {
+              "id": "stable-item-6-0-0",
+              "productId": "bando-site-337",
+              "quantity": 2
+            }
+          ]
+        }
+      ],
+      "rust": [
+        {
+          "id": "stable-recipient-6-0",
+          "items": [
+            {
+              "id": "stable-item-6-0-0",
+              "productId": "bando-site-337",
+              "quantity": 2
+            }
+          ]
+        },
+        {
+          "id": "recognition:recipient:1",
+          "items": [
+            {
+              "id": "recognition:item:68:1",
+              "productId": "bando-site-334",
+              "quantity": 1
+            }
+          ]
+        }
+      ],
+      "ts": [
+        {
+          "id": "stable-recipient-6-0",
+          "items": [
+            {
+              "id": "stable-item-6-0-0",
+              "productId": "bando-site-337",
+              "quantity": 2
+            }
+          ]
+        },
+        {
+          "id": "13bb7b86-75dd-4e71-a39d-e89a8851b36f",
+          "items": [
+            {
+              "id": "90d08ea9-fe8e-4756-8d3d-fb4511b9035d",
+              "productId": "bando-site-334",
+              "quantity": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "reanalyze-confirmed-address",
+      "mismatchCount": 0,
+      "mode": "confirmed-freight",
+      "old": [
+        {
+          "id": "stable-recipient-7-0",
+          "items": [
+            {
+              "id": "stable-item-7-0-0",
+              "productId": "sku:bando-site-48:bando-48-P00000BV000B",
+              "quantity": 2
+            }
+          ]
+        }
+      ],
+      "rust": [
+        {
+          "id": "stable-recipient-7-0",
+          "items": [
+            {
+              "id": "stable-item-7-0-0",
+              "productId": "sku:bando-site-48:bando-48-P00000BV000B",
+              "quantity": 2
+            }
+          ]
+        }
+      ],
+      "ts": [
+        {
+          "id": "stable-recipient-7-0",
+          "items": [
+            {
+              "id": "stable-item-7-0-0",
+              "productId": "sku:bando-site-48:bando-48-P00000BV000B",
+              "quantity": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "reanalyze-duplicate-name",
+      "mismatchCount": 0,
+      "mode": "confirmed-freight",
+      "old": [
+        {
+          "id": "stable-recipient-8-0",
+          "items": [
+            {
+              "id": "stable-item-8-0-0",
+              "productId": "sku:bando-site-48:bando-48-P00000BV000B",
+              "quantity": 1
+            }
+          ]
+        },
+        {
+          "id": "stable-recipient-8-1",
+          "items": [
+            {
+              "id": "stable-item-8-1-0",
+              "productId": "bando-site-290",
+              "quantity": 1
+            }
+          ]
+        }
+      ],
+      "rust": [
+        {
+          "id": "stable-recipient-8-0",
+          "items": [
+            {
+              "id": "stable-item-8-0-0",
+              "productId": "sku:bando-site-48:bando-48-P00000BV000B",
+              "quantity": 1
+            }
+          ]
+        },
+        {
+          "id": "stable-recipient-8-1",
+          "items": [
+            {
+              "id": "stable-item-8-1-0",
+              "productId": "bando-site-290",
+              "quantity": 1
+            }
+          ]
+        }
+      ],
+      "ts": [
+        {
+          "id": "stable-recipient-8-0",
+          "items": [
+            {
+              "id": "stable-item-8-0-0",
+              "productId": "sku:bando-site-48:bando-48-P00000BV000B",
+              "quantity": 1
+            }
+          ]
+        },
+        {
+          "id": "stable-recipient-8-1",
+          "items": [
+            {
+              "id": "stable-item-8-1-0",
+              "productId": "bando-site-290",
+              "quantity": 1
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "differences": [
+    {
+      "caseId": "reanalyze-edit-quantity",
+      "path": "reanalyzed.recipients[0].items[0].sources[0].recipientId",
+      "rust": "stable-recipient-2-0",
+      "ts": "<GENERATED_ID>"
+    },
+    {
+      "caseId": "reanalyze-edit-quantity",
+      "path": "reanalyzed.recipients[0].items[0].sources[1].recipientId",
+      "rust": "stable-recipient-2-0",
+      "ts": "<GENERATED_ID>"
+    },
+    {
+      "caseId": "reanalyze-edit-quantity",
+      "path": "referenceIntegrity.length",
+      "rust": 0,
+      "ts": 2
+    },
+    {
+      "caseId": "reanalyze-edit-quantity",
+      "path": "referenceIntegrity[0]",
+      "rust": "<MISSING>",
+      "ts": "item[0,0].sources[0].recipientId"
+    },
+    {
+      "caseId": "reanalyze-edit-quantity",
+      "path": "referenceIntegrity[1]",
+      "rust": "<MISSING>",
+      "ts": "item[0,0].sources[1].recipientId"
+    }
+  ]
+}
