@@ -2,7 +2,7 @@ import { selectionHistory } from "./product-history";
 import { confirmDiscardDraft } from "./shared/editor-flow";
 import { useState } from "react";
 import { ProductSearchDialog } from "./ProductSearchDialog";
-import { resolveProduct } from "./issue-actions";
+import { nativeResolveProduct } from "./orders/native-rules";
 import { suggestGroupRepresentative } from "./model-groups";
 import { internalModel } from "./matching";
 import { colorLabel } from "./product-models";
@@ -232,7 +232,7 @@ export function IssueResolver({
                 setBusy(true);
                 try {
                   const applyRepresentative = useRepresentativeModel && chosenIsRepresentative;
-                  const result = resolveProduct(
+                  const result = await nativeResolveProduct(
                     state,
                     order,
                     recipient.id,
