@@ -750,15 +750,13 @@ export function ShippingManager({
               }
             />
           </label>
-          <button
-            className="primary"
-            disabled={busy}
-            onClick={async () => {
-              await saveEditedRule();
-            }}
-          >
-            확인한 운임 저장
-          </button>
+          <div className="actions">
+            <button type="button" disabled={busy} onClick={() => void closeEditing()}>닫기</button>
+            <button type="button" className="primary" disabled={busy || !editingDirty}
+              onClick={() => void saveEditedRule()}>
+              확인한 운임 저장
+            </button>
+          </div>
         </Modal>
       )}
     </div>

@@ -63,6 +63,14 @@ test("both freight editors refuse a no-op before versioning or history writes",(
   }
 });
 
+test("both freight editors display Close and disable Save when unchanged",()=>{
+  for (const path of ["ShippingManager.tsx","ProductFreightPanel.tsx"]) {
+    const content=src(path);
+    assert.match(content,/disabled=\{busy \|\| !editingDirty\}/);
+    assert.match(content,/onClick=\{\(\) => void closeEditing\(\)\}>닫기/);
+  }
+});
+
 test("prices require Enter to save and blur cannot persist silently",()=>{
   const s=src("PriceCell.tsx");
   assert.match(s,/if \(e.key === "Enter"\) \{\s*e.preventDefault\(\);\s*void save\(\);/);
