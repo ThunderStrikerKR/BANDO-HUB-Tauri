@@ -412,6 +412,8 @@ pub(super) fn preview(payload:&Value)->Result<Value,String>{
                 &format!("{}|{}",locator,option_id),cell(&cells,3),"ERROR",vec![],vec![msg]))
         }
     }
+    // The final duplicate decision is based on the completed candidate set.
+    let duplicate_candidates=next.clone();
     for p in &mut next{
         let original=initial.iter().find(|old|field(old,"id")==field(p,"id"));
         if original.is_some_and(|old|old==p){continue}
@@ -437,7 +439,7 @@ pub(super) fn preview(payload:&Value)->Result<Value,String>{
                 return Err("옵션 색상 또는 가격을 확인하세요.".into())
             }
             if original.is_none(){
-                let duplicates=next.iter().filter(|other|
+                let duplicates=duplicate_candidates.iter().filter(|other|
                     field(other,"id")!=field(p,"id")&&!archived(other)
                     &&identity(other)==identity(p)&&field(other,"name").trim()==field(p,"name").trim())
                     .collect::<Vec<_>>();
