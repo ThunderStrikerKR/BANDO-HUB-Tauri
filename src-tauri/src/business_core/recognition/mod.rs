@@ -192,43 +192,64 @@ fn source_json(raw: &str, e: &Evidence, recipient_id: &str, target_id: &str) -> 
     })
 }
 fn address_info(value: &str) -> (String, String, Value) {
-    let road = Regex::new(r"[로길]\s*\d+(?:-\d+)?").expect("road").is_match(value);
-    let lot = Regex::new(r"[동리읍면]\s+(?:산\s*)?\d+(?:-\d+)?").expect("lot").is_match(value);
-    let kind = if road { "ROAD" } else if lot { "LOT" } else { "UNKNOWN" };
-    let status = if (road || lot) && !value.contains('#') && !value.contains('@') {
+    // src/parser.ts::addressInfo and ::addressParts are separate.
+    // Match the original parser's province boundary, and match city/town
+    // on the remainder: treating "서울특별시" as a city or matching "전남"
+    // inside "전남광주통합특별시" would silently invent address data.
+    let road_kind = Regex::new(r"[로길]\s*\d+(?:-\d+)?").expect("road").is_match(value);
+    let lot_kind = Regex::new(r"[동리읍면]\s+(?:산\s*)?\d+(?:-\d+)?").expect("lot").is_match(value);
+    let kind=if road_kind { "ROAD" } else if lot_kind { "LOT" } else { "UNKNOWN" };
+    let status=if (road_kind || lot_kind) && !value.contains('#') && !value.contains('@') {
         "COMPLETE"
     } else { "INCOMPLETE" };
-    let province = Regex::new(r"^(?:서울특별시|서울|부산광역시|부산|대구광역시|대구|인천광역시|인천|광주광역시|광주|대전광역시|대전|울산광역시|울산|세종특별자치시|세종|경기도|경기|강원특별자치도|강원도|강원|충청북도|충청남도|전북특별자치도|전라북도|전라남도|경상북도|경상남도|제주특별자치도|제주도|제주|충북|충남|전북|전남|경북|경남)")
-        .expect("province").find(value).map(|m| m.as_str().to_owned());
-    let mut parts = json!({});
-    if let Some(p) = province { parts["province"] = json!(p); }
-    for (field, pattern) in [
-        ("city", r"(?:^|\s)([가-힣]+(?:시|군))(?:\s|$)"),
-        ("district", r"(?:^|\s)([가-힣]+구)(?:\s|$)"),
-        ("town", r"(?:^|\s)([가-힣0-9]+(?:읍|면|동|리))(?:\s|$)"),
+
+    let province_re=Regex::new(concat!(
+        r"^(서울특별시|서울|부산광역시|부산|대구광역시|대구|인천광역시|인천|광주광역시|광주|",
+        r"대전광역시|대전|울산광역시|울산|세종특별자치시|세종|경기도|경기|강원특별자치도|강원도|강원|",
+        r"충청북도|충청남도|전북특별자치도|전라북도|전라남도|경상북도|경상남도|제주특별자치도|제주도|제주|",
+        r"충북|충남|전북|전남|경북|경남)(?:\s|$)"
+    )).expect("province boundary");
+    let province=province_re.captures(value).and_then(|c|c.get(1));
+    let rest=province.as_ref().map_or(value,|m|value[m.end()..].trim());
+    let mut parts=json!({});
+    if let Some(p)=province {parts["province"]=json!(p.as_str());}
+    for (field,pattern) in [
+        ("city",r"(?:^|\s)([가-힣]+(?:시|군))(?:\s|$)"),
+        ("district",r"(?:^|\s)([가-힣]+구)(?:\s|$)"),
+        ("town",r"(?:^|\s)([가-힣0-9]+(?:읍|면|동|리))(?:\s|$)"),
     ] {
-        if let Some(c)=Regex::new(pattern).expect("administrative component").captures(value) {
-            if let Some(m)=c.get(1){parts[field]=json!(m.as_str());}
+        if let Some(c)=Regex::new(pattern).expect("administrative component").captures(rest) {
+            if let Some(m)=c.get(1) {parts[field]=json!(m.as_str());}
         }
     }
-    let road=Regex::new(r"([가-힣A-Za-z0-9.]+(?:대로|로|길))\s+(\d+(?:-\d+)?)")
-        .expect("road component").captures(value);
-    if let Some(m)=road {
-        parts["road"] = json!(&m[1]);
-        parts["building"] = json!(&m[2]);
-        if let Some(full)=m.get(0){
-            let detail=value[full.end()..].trim();
-            if !detail.is_empty(){parts["detail"]=json!(detail);}
+    let road_re=Regex::new(
+        r"([가-힣A-Za-z0-9·.]+(?:대로|로|길))\s+(\d+(?:-\d+)?)"
+    ).expect("road component");
+    let road=road_re.captures_iter(rest).find(|c|{
+        let end=c.get(2).map(|m|m.end()).unwrap_or(rest.len());
+        rest[end..].chars().next().map_or(true,|ch|
+            !ch.is_ascii_digit() && ch!='개' && ch!='대')
+    });
+    if let Some(c)=road {
+        parts["road"]=json!(&c[1]);
+        parts["building"]=json!(&c[2]);
+        if let Some(m)=c.get(0){
+            let detail=rest[m.end()..].trim();
+            if !detail.is_empty() {parts["detail"]=json!(detail);}
         }
-    } else if let Some(m)=Regex::new(r"[동리읍면]\s+(?:산\s*)?(\d+(?:-\d+)?)")
-        .expect("lot number").captures(value) {
-        parts["building"]=json!(&m[1]);
-        if let Some(full)=m.get(0){
-            let detail=value[full.end()..].trim();
-            if !detail.is_empty(){parts["detail"]=json!(detail);}
+    } else if let Some(town)=parts.get("town").and_then(Value::as_str) {
+        // The original TS lot search requires the *whole detected town*,
+        // not an arbitrary suffix such as the last '동' of '410동 804호'.
+        let pattern=format!(r"{}\s+(?:산\s*)?(\d+(?:-\d+)?)",regex::escape(town));
+        if let Some(c)=Regex::new(&pattern).expect("lot number").captures(rest) {
+            if let Some(number)=c.get(1) {parts["building"]=json!(number.as_str());}
+            if let Some(m)=c.get(0) {
+                let detail=rest[m.end()..].trim();
+                if !detail.is_empty(){parts["detail"]=json!(detail);}
+            }
         }
     }
-    (kind.into(), status.into(), parts)
+    (kind.into(),status.into(),parts)
 }
 fn blank_recipient(id: &str, name: &str, anchor: Option<&Evidence>, raw: &str) -> Value {
     let mut value = json!({
