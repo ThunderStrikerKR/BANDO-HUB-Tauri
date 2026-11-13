@@ -53,7 +53,10 @@ public static class BandoNativeSettings {
     return ,$records
   }
   function Visible([string]$label,[string]$kind){
-    $matches=@(Elements|Where-Object {$_.name -eq $label -and $_.control -match $kind -and !$_.offscreen -and $_.w -gt 0})
+    # Elements returns the native UIAutomation element array as a single
+    # PowerShell pipeline value. Assign before filtering to enumerate it.
+    $nodes=Elements
+    $matches=@($nodes|Where-Object {$_.name -eq $label -and $_.control -match $kind -and !$_.offscreen -and $_.w -gt 0})
     if($matches.Count){return $matches[0]}
     return $null
   }
