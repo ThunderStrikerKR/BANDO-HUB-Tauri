@@ -1502,6 +1502,25 @@ validationCase("actualFreight incorrect old legacy fallback rejected",s=>{
     before:null,after:{origin:"FACTORY",amount:3500}});
 },false);
 
+
+validationCase("shipment linked to nonexistent dealer without snapshot",unchanged,s=>{
+  s.clients=[];
+  delete s.orders[0].clientSnapshot;
+},false);
+validationCase("retail company without linked dealer is valid",unchanged,s=>{
+  s.orders[0].orderType="RETAIL";
+  s.orders[0].clientId="";
+  s.clients=[];
+  s.workflow.groups[0].dealerId="";
+  s.workflow.shipments[0].transferred=true;
+  s.workflow.shipments[0].step=4;
+},true);
+validationCase("missing dealer but frozen client snapshot remains valid",unchanged,s=>{
+  s.orders[0].confirmedAt=now;
+  s.orders[0].clientSnapshot=copy(s.clients[0]);
+  s.clients=[];
+},true);
+
 function normalized(v:unknown):string {
   if(Array.isArray(v))return "["+v.map(normalized).join(",")+"]";
   if(v&&typeof v==="object") {
