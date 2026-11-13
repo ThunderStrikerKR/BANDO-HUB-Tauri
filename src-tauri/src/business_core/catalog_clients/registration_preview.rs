@@ -67,8 +67,9 @@ fn label_color(color:&str)->String{
     }.to_owned()
 }
 fn identity(values:&Value,catalog:&str,color:&str)->String{
+    let label=label_color(color);
     let fields=[strval(values,"브랜드"),strval(values,"최종 등록명"),
-        &label_color(color),strval(values,"규격"),strval(values,"판매 단위")];
+        label.as_str(),strval(values,"규격"),strval(values,"판매 단위")];
     let data=fields.iter().map(|s|registry_key(s)).collect::<Vec<_>>().join("|");
     format!("{}|{}|{}",catalog,data,registry_key(strval(values,"최종 등록명")))
 }
