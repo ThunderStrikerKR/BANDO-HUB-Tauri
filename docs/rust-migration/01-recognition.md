@@ -1,6 +1,6 @@
 # TSBH Rust 이전 세션 1 — recognition 인계 기록
 
-**최신 판정 (2026-11-13): Rust 독립 CI 50/50 통과, 발주서 20/20 통과, 등록 상품 360건 전수 테스트 수행. 잘못된 활성 SKU 확정 0건. 활성 상품 16건은 데이터/표기 모호성으로 미확정. TypeScript 전체 필드 동등성 및 Windows/Tauri 통합은 미검증.**
+**최신 판정 (2026-11-13): Rust 독립 CI 51/51 통과, 발주서 20/20 통과, 등록 상품 360건 전수 테스트 수행. 잘못된 활성 SKU 확정 0건. 중복 예외를 제외한 색상 불일치 15건은 정확한 원본 상품명 근거로 정정안을 작성하고, 메모리 내 정정 적용 후 15/15 SKU 및 variant 매칭 성공. 공용 seed 및 운영 SQLite 수정은 미실행. TypeScript 전체 필드 동등성 및 Windows/Tauri 통합은 미검증.**
 
 ## 저장소와 커밋
 - 저장소: ThunderStrikerKR/TSBH (Public 변경 없음)
@@ -286,3 +286,39 @@
 - 실제 주문에서 구분 근거가 부족할 때는 기존처럼 미확정 상태를 유지한다. **무시한다는 지시는 위험한 임의 SKU 확정 허용을 뜻하지 않는다.**
 - 360개 실측 분류: 활성 상품의 올바른 직접 확정 328건, 후속 활성 SKU 매핑 2건, 승인된 마이크물림쇠 중복 14건, 승인된 마우스트레이 중복 1건, **별도 조치가 필요한 색상 미표기 15건**. 합계 360건. 이 분류는 기존 CI 실측값을 변경하지 않은 사용자 결정에 따른 업무 분류이다.
 - 다음 세션 1 작업은 **색상 미표기 15건**, TypeScript/Rust 전 필드 결과 동등성 검증 및 다른 인식 예외를 대상으로 한다. 기존 50개 Rust 테스트와 중복 SKU 오확정 방지 테스트는 삭제하거나 완화하지 않는다.
+
+
+## 2026-11-13: 원본 기준 색상 불일치 15개 SKU 정정안 검증
+
+### 확인된 원인 및 데이터 기준
+
+- source: src-tauri/resources/state-seed.json (등록 제품명/variant ID/등록 상세페이지 URL 포함), TypeScript src/parser.ts, src/product-name-match.ts, src/domain.ts의 itemFromProduct, validateProduct.
+- 15개 상품의 이름에 각각 명시된 블랙, 실버, 레드 값이 defaultColor/variants[0].color 양쪽에서 모두 '색상 미표기'인 데이터 불일치다.
+- TypeScript도 실제 variant.color를 근거로 명시 색상과 대조하므로, **인식 로직에서 색상 불일치를 무시하거나 자동 추측해 확정하는 것은 TypeScript 동등성을 훼손**한다.
+- 정정 대상: Red 1개(bando-site-104); Black 8개(bando-site-337, 334, 321, 320, 319, 252, 251, 250); Silver 6개(bando-site-324, 323, 322, 249, 248, 247).
+- 색상 근거는 현재 **상품 원본 데이터에 기록된 정식 상품명**의 단독 슬래시 옵션(레드/블랙/실버)이다. 외부 상세페이지의 최신 현행 상태까지 확인했다는 뜻은 아니다.
+- 등록 SKU와 단일 variant ID, 원본 상품명, 기존 색상값, 등록 URL, 활성 상태까지 확인해야만 정정하도록 안전 검사한다.
+
+### 적용 가능한 결과물과 검증
+
+- JSON 정정 명세: tests/rust-migration/recognition/catalog-color-corrections-15.json (15개 SKU, expectedName 및 variantId, 색상 Before/After, 기존 source URL 명시).
+- 사전 확인/별도 데이터 소유 세션 적용 도구: tests/rust-migration/recognition/apply-catalog-colors.mjs
+  - 검사만: node tests/rust-migration/recognition/apply-catalog-colors.mjs --check
+  - 실제 seed 반영: node tests/rust-migration/recognition/apply-catalog-colors.mjs --apply
+  - 스크립트의 seed 정정은 운영 SQLite 데이터 이관이 **아니다**. 운영 앱 데이터 정정과 동기화 책임은 별도로 확인해야 한다.
+- 실제 Rust CI 실행: https://github.com/ThunderStrikerKR/TSBH/actions/runs/43366087879
+- 테스트 대상 소스 SHA: f6fc17d3d7c13b9cf61fc66f4e2f8c41b7bdf573
+- cargo test 결과: **51 passed / 0 failed**. 기존 발주서 **20/20 PASS**.
+- 새 테스트 fifteen_registered_title_colors_become_matchable_after_validated_data_repair:
+  1. 원본 360개 데이터 복제 후 15개만 두 색상 필드를 수정하고 상품명·원본 옵션·URL·활성 여부가 여전히 일치하는지 확인
+  2. 정정한 SKU 15개 전부 원본 상품명을 입력하여 올바른 productId와 variantId, color를 받는지 검증 (**15/15 PASS**)
+  3. 나머지 **345개 상품 데이터 불변** 확인
+  4. 오리지널 seed 파일과 운영 SQLite는 시험 과정에서 **수정하지 않음**
+- 정정 후 실제 등록명 전수검사 360건 전체의 새로운 요약 통계는 계산하지 않았다. 기존 seed 기준 실측은 정상 확정 328, 대체 SKU 2, 중복 예외 14, 활성 미확정 16(그중 마우스트레이 1)이다. 정정안을 적용한 15개 별도 테스트가 전부 PASS인 사실과 혼동하지 않는다.
+
+### 세션 1 역할 경계 및 인계
+
+- 이번 세션은 인식 모델의 색상 후보 필터를 느슨하게 만들지 않고 **정정 목록과 검증 코드만 소유 경로에 추가**했다.
+- **현재 공용 src-tauri/resources/state-seed.json 파일은 변경하지 않았다.** 이는 병렬 세션 2/3 및 3/3의 공유 자원을 손대지 않는 원래 작업 경계 때문이다.
+- 실제 상품 원본 정정(단일 variant.color + defaultColor 각 15개)은 데이터 변경 권한을 가진 통합 담당자가 적용한 후 전체 CI/앱 통합 테스트에서 검증해야 한다.
+- 사용자 승인으로 제외한 마이크물림쇠/마우스트레이 중복은 이번 색상 정정에 포함하지 않았다.
