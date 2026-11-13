@@ -955,6 +955,76 @@ migrationCase("existing delivery and payment remain immutable",s=>{
   });
 });
 
+
+migrationCase("two historical orders retain separate paid and queued records",s=>{
+  s.orders[0].paid=true;
+  s.orders[0].status="PAID";
+  s.workflow.payments.push({
+    id:"historical-partial",dealerId:"dealer-1",
+    account:copy(s.settings.accounts[0]),amount:5000,
+    allocations:[{shipmentId:"shipment:o1:r1",amount:5000}]
+  });
+  const second=copy(s.orders[0]);
+  second.id="o2";second.paid=false;second.status="QUEUED";
+  second.notified=true;
+  second.raw="두번째 주문 원문";
+  second.recipients[0].id="r2";
+  second.recipients[0].name="별도 수취인";
+  second.recipients[0].items[0].id="item2";
+  s.orders.push(second);
+  s.queue=["o2"];
+});
+migrationCase("legacy status does not erase multiple payment allocations",s=>{
+  s.orders[0].status="QUEUED";
+  s.queue=["o1"];
+  s.workflow.payments.push({
+    id:"historical-multi-allocation",dealerId:"dealer-1",
+    account:copy(s.settings.accounts[0]),amount:42000,
+    allocations:[
+      {shipmentId:"shipment:o1:r1",amount:20000},
+      {shipmentId:"shipment:o1:r1",amount:22000}
+    ]
+  });
+});
+migrationCase("company sender for legacy dealer order",s=>{
+  delete s.workflow;
+  s.orders[0].orderType="DEALER";
+  s.orders[0].status="EXPORTED";
+  s.settings.senderName="가상 반도 본사";
+  s.settings.senderPostcode="11111";
+});
+migrationCase("clientSnapshot outranks edited master sender during migration",s=>{
+  delete s.workflow;
+  s.orders[0].status="STATEMENT";
+  s.orders[0].notified=true;
+  s.orders[0].clientSnapshot={
+    ...copy(s.clients[0]),name:"당시 업체",
+    displayName:"당시 업체",phone:"02-1111-2222",
+    address:"서울시 과거로 11"
+  };
+  s.clients[0].name="지금 업체";
+  s.clients[0].address="서울시 현재로 22";
+});
+migrationCase("explicit sender with fullwidth label and spaced number",s=>{
+  delete s.workflow;
+  s.orders[0].status="PAID";
+  s.orders[0].raw=[
+    "연락처: 02-9999-1234",
+    "송하인명：별도 발송사",
+    "연락처：010 2222 3333",
+    "주소：서울시 가상로 25 2층"
+  ].join("\n");
+});
+migrationCase("already archived shipment and previous audit retained",s=>{
+  s.orders[0].status="EXPORTED";
+  s.workflow.shipments[0].legacyArchived=true;
+  s.workflow.events.push({
+    id:"audit-archive",at:now,actor:"이전 직원",
+    action:"배송 이력 보존",shipmentIds:["shipment:o1:r1"],
+    groupId:"group:o1",after:{"reason":"예전 명세서"}
+  });
+});
+
 function normalized(v:unknown):string {
   if(Array.isArray(v))return "["+v.map(normalized).join(",")+"]";
   if(v&&typeof v==="object") {
