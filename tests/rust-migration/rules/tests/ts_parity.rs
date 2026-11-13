@@ -7,7 +7,7 @@ use std::process::Command;
 #[test]
 fn original_typescript_vs_rust_differential() {
     let root=PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../..").canonicalize()
+        .join("../../..").canonicalize()
         .expect("repository root");
     let install=Command::new("npm")
         .args(["ci","--ignore-scripts","--no-audit","--no-fund"])
