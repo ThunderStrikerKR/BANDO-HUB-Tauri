@@ -145,7 +145,8 @@ test("Tauri native Save As wired; canceled dialog does not mark export in UI", (
   assert.match(bridge,/saveFactoryWorkbook: \(bytes\)/);
   assert.match(queue,/const savedPath = await window\.bando!\.saveFactoryWorkbook\(bytes\)/);
   assert.match(queue,/if \(!savedPath\) return;/);
-  assert.match(queue,/recordFactoryExport\(latest, preview, savedPath\)/);
+  assert.match(queue,/businessCoreCall<FactoryExportPreview>\("output", "prepare_factory_export", \{ state: latest, ids: preview.ids \}\)/);
+  assert.match(queue,/recordFactoryExportPrepared\(latest, preview, savedPath, fresh\)/);
   assert.match(queue,/await onSave\(result\.next\)/);
   assert.match(queue,/await window\.bando!\.backup\(\)/);
   assert.match(queue,/실제 공장 전달은 별도로 확인/);
