@@ -18,7 +18,8 @@ import {
   combinationCurrent,
   upgradeShipping,
 } from "../../../../src/shipping.ts";
-import { shipmentTotals, validateWorkflow, reconcileWorkflow, deleteOrder, workflowIssues, stageIssues, applyOrderRawEdit, migrateWorkflow } from "../../../../src/workflow.ts";
+import { shipmentTotals, validateWorkflow, reconcileWorkflow, deleteOrder, workflowIssues, stageIssues, applyOrderRawEdit, migrateWorkflow, advanceGroup, undoGroup, setShipmentFreight, processGroup, confirmGroupPayment, recordPayment, restoreShipment, markStoreSent, recordChangeRequest, setGroupAccount, detachShipment, regroupShipment, completeDelivery } from "../../../../src/workflow.ts";
+import { recordActualFreight } from "../../../../src/actual-freight.ts";
 import { orderIssues, approveMissingQuantity, pendingIssue } from "../../../../src/validation.ts";
 import { validateReceptionBoundary } from "../../../../src/orders/reception.ts";
 import { companyClient, companyParty } from "../../../../src/order-types.ts";
@@ -2038,6 +2039,159 @@ receptionCase("new AGENCY v1 missing order records shipment event",s=>{
   const e=s.workflow.events.find((v:any)=>v.id==="confirm-order-new");
   e.action="접수";
 },false);
+
+
+// Session 2 direct workflow-action parity. The original TS reconciles
+// before each mutation. Both sides receive the SAME already-reconciled
+// starting State, and the injected UUIDs/time preserve audit order.
+// Rust's adapter also takes IDs as explicit host parameters; the source TS
+// functions retain their original implicit IDs. Do not replace original
+// action functions with a second Rust-shaped expected-value implementation.
+type WfState=any;
+const WFG="group:o1", WFS="shipment:o1:r1", WFA="가상 담당자";
+const workflowBase:WfState=deterministicIds(
+  Array.from({length:100},(_,i)=>"seeded-workflow-"+i),
+  ()=>reconcileWorkflow(copy(baseState) as any)
+);
+function twoShipped(s:WfState,separate=false){
+  const row=copy(s.orders[0].recipients[0]);
+  row.id="r2";row.name="두번째 수취인";row.items[0].id="item-2";
+  s.orders[0].recipients.push(row);
+  const sh=copy(s.workflow.shipments[0]);
+  sh.id="shipment:o1:r2";sh.recipientId="r2";
+  if(separate){
+    const group=copy(s.workflow.groups[0]);
+    group.id="group:o1:other";group.notices=[];group.needsNotice=false;
+    s.workflow.groups.push(group);sh.groupId=group.id;
+  }
+  s.workflow.shipments.push(sh);
+}
+function wfActionCase(
+  name:string,action:string,
+  mutate:(s:WfState)=>void,
+  params:(ids:string[])=>Record<string,unknown>,
+  source:(s:WfState)=>unknown,
+  expectOk:boolean
+){
+  const state=copy(workflowBase);
+  mutate(state);
+  const ids=Array.from({length:80},(_,i)=>"action-"+name.replace(/[^a-zA-Z0-9]/g,"-")+"-"+i);
+  // The operation's public return envelope is {state, ...adapter metadata}.
+  // Full State is always compared, adapter-only metadata is intentionally
+  // stripped for parity. Error messages remain exact byte comparisons.
+  add("workflow action: "+name,"apply_workflow_action",{
+    state,action,now:actionNow,actor:WFA,eventId:ids[0],...params(ids)
+  },()=>({state:deterministicIds(ids,()=>source(state))}));
+  cases[cases.length-1].expectedOk=expectOk;
+}
+const actionProps=(ids:string[])=>({groupId:WFG,shipmentId:WFS,
+  combinationIds:[ids[0]],deliveryIds:[ids[1]],
+  paymentId:ids[0],allocationIds:[ids[1]],confirmationId:ids[0],
+  newGroupId:ids[0],changeRequestId:ids[0],noticeId:ids[0]});
+wfActionCase("advance stage from zero","advance_group",
+  s=>{s.workflow.shipments[0].step=0;},
+  ids=>({...actionProps(ids),eventId:ids[0]}),
+  s=>advanceGroup(s,WFG,WFA),true);
+wfActionCase("advance transferred blocked","advance_group",
+  s=>{s.workflow.shipments[0].transferred=true;},
+  actionProps,s=>advanceGroup(s,WFG,WFA),false);
+wfActionCase("undo stage two","undo_group",()=>{},actionProps,
+  s=>undoGroup(s,WFG,WFA),true);
+wfActionCase("undo transferred blocked","undo_group",
+  s=>{s.workflow.shipments[0].transferred=true;},
+  actionProps,s=>undoGroup(s,WFG,WFA),false);
+wfActionCase("change shipment freight","set_shipment_freight",()=>{},
+  ids=>({...actionProps(ids),origin:"FACTORY",value:4500}),
+  s=>setShipmentFreight(s,WFS,"FACTORY",4500,WFA),true);
+wfActionCase("change shipment freight after transfer blocked","set_shipment_freight",
+  s=>{s.workflow.shipments[0].transferred=true;},
+  ids=>({...actionProps(ids),origin:"FACTORY",value:5000}),
+  s=>setShipmentFreight(s,WFS,"FACTORY",5000,WFA),false);
+wfActionCase("record actual freight","record_actual_freight",()=>{},
+  ids=>({...actionProps(ids),origin:"FACTORY",value:3500}),
+  s=>recordActualFreight(s,WFS,"FACTORY",3500),true);
+wfActionCase("actual freight invalid negative","record_actual_freight",()=>{},
+  ids=>({...actionProps(ids),origin:"FACTORY",value:-1}),
+  s=>recordActualFreight(s,WFS,"FACTORY",-1),false);
+wfActionCase("process approved group","process_group",
+  s=>{s.workflow.shipments[0].step=4;
+    s.workflow.shipments[0].legacyApproval=true;},
+  actionProps,s=>processGroup(s,WFG,WFA),true);
+wfActionCase("process incomplete group blocked","process_group",()=>{},
+  actionProps,s=>processGroup(s,WFG,WFA),false);
+wfActionCase("prepaid confirm after account notice","confirm_group_payment",
+  s=>{s.clients[0].payment="PREPAID";
+    s.workflow.shipments[0].step=3;
+    s.workflow.groups[0].notices=[{
+      id:"notice-for-payment",at:now,actor:WFA,
+      shipmentIds:[WFS],amounts:{[WFS]:70400},total:70400,
+      account:copy(settings.accounts[0]),message:"입금 안내"
+    }];},
+  ids=>({...actionProps(ids),eventId:ids[1]}),
+  s=>confirmGroupPayment(s,WFG,WFA),true);
+wfActionCase("prepaid confirm without prior notice blocked","confirm_group_payment",
+  s=>{s.clients[0].payment="PREPAID";s.workflow.shipments[0].step=3;},
+  actionProps,s=>confirmGroupPayment(s,WFG,WFA),false);
+wfActionCase("record customer payment","record_payment",()=>{},
+  ids=>({...actionProps(ids),eventId:ids[2],
+    paidAmount:5000,paidAt:actionNow,memo:"가상 입금",
+    allocations:[{shipmentId:WFS,amount:5000}]}),
+  s=>recordPayment(s,WFG,5000,[{shipmentId:WFS,amount:5000}],actionNow,"가상 입금",WFA),true);
+wfActionCase("record zero payment rejected","record_payment",()=>{},
+  ids=>({...actionProps(ids),paidAmount:0,paidAt:actionNow,memo:"",
+    allocations:[]}),
+  s=>recordPayment(s,WFG,0,[],actionNow,"",WFA),false);
+wfActionCase("restore queued shipment","restore_shipment",
+  s=>{s.workflow.shipments[0].transferred=true;
+    s.workflow.queue=[{id:"excel:restore:1",shipmentId:WFS,origin:"FACTORY",
+      status:"QUEUED",snapshot:{}}];},
+  actionProps,s=>restoreShipment(s,WFS,WFA),true);
+wfActionCase("restore nontransferred blocked","restore_shipment",()=>{},
+  actionProps,s=>restoreShipment(s,WFS,WFA),false);
+wfActionCase("mark store sent","mark_store_sent",
+  s=>{s.workflow.queue=[{id:"excel:store",shipmentId:WFS,
+    origin:"STORE",status:"QUEUED",at:now,actor:WFA,snapshot:{}}];},
+  ids=>({...actionProps(ids),queueId:"excel:store"}),
+  s=>markStoreSent(s,"excel:store",WFA),true);
+wfActionCase("mark store sent factory refused","mark_store_sent",
+  s=>{s.workflow.queue=[{id:"excel:factory",shipmentId:WFS,
+    origin:"FACTORY",status:"QUEUED",at:now,actor:WFA,snapshot:{}}];},
+  ids=>({...actionProps(ids),queueId:"excel:factory"}),
+  s=>markStoreSent(s,"excel:factory",WFA),false);
+wfActionCase("append change request","record_change_request",()=>{},
+  ids=>({...actionProps(ids),eventId:ids[1],text:"주소 정정 요청"}),
+  s=>recordChangeRequest(s,WFS,"주소 정정 요청",WFA),true);
+wfActionCase("blank change request refused","record_change_request",()=>{},
+  ids=>({...actionProps(ids),text:"  "}),
+  s=>recordChangeRequest(s,WFS,"  ",WFA),false);
+wfActionCase("change group payment account","set_group_account",()=>{},
+  ids=>({...actionProps(ids),accountId:"account-1"}),
+  s=>setGroupAccount(s,WFG,"account-1",WFA),true);
+wfActionCase("unknown group account blocked","set_group_account",()=>{},
+  ids=>({...actionProps(ids),accountId:"account-missing"}),
+  s=>setGroupAccount(s,WFG,"account-missing",WFA),false);
+wfActionCase("split two-shipment group","detach_shipment",
+  s=>twoShipped(s,false),
+  ids=>({...actionProps(ids),eventId:ids[1]}),
+  s=>detachShipment(s,WFS,WFA),true);
+wfActionCase("split already independent refused","detach_shipment",()=>{},
+  actionProps,s=>detachShipment(s,WFS,WFA),false);
+wfActionCase("recombine matching split groups","regroup_shipment",
+  s=>twoShipped(s,true),
+  ids=>({...actionProps(ids),targetGroupId:"group:o1:other",ack:true}),
+  s=>regroupShipment(s,WFS,"group:o1:other",true,WFA),true);
+wfActionCase("recombine same group rejected","regroup_shipment",
+  s=>twoShipped(s,false),
+  ids=>({...actionProps(ids),targetGroupId:WFG,ack:true}),
+  s=>regroupShipment(s,WFS,WFG,true,WFA),false);
+wfActionCase("complete delivered shipment","complete_delivery",
+  s=>{s.workflow.shipments[0].transferred=true;
+    s.workflow.shipments[0].step=4;},
+  ids=>({...actionProps(ids),eventId:ids[2],actual:{FACTORY:3500}}),
+  s=>completeDelivery(s,WFS,{FACTORY:3500},WFA),true);
+wfActionCase("complete undelivered shipment refused","complete_delivery",()=>{},
+  ids=>({...actionProps(ids),actual:{FACTORY:3500}}),
+  s=>completeDelivery(s,WFS,{FACTORY:3500},WFA),false);
 
 function normalized(v:unknown):string {
   if(Array.isArray(v))return "["+v.map(normalized).join(",")+"]";
