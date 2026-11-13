@@ -1,4 +1,4 @@
-import { paymentWasCopied } from "./automatic-message";
+import { nativePaymentWasCopied } from "./native-automatic-message";
 import { useEffect, useRef, useState } from "react";
 import { confirmAction } from "./dialogs";
 import { won } from "./domain";
@@ -301,7 +301,7 @@ export function WorkflowBoard({
                   onClick={async () => {
                     if (
                       (step === 2 || (g.needsNotice && step >= 2)) &&
-                      !paymentWasCopied(actionState(g.id), g.id) &&
+                      !(await nativePaymentWasCopied(actionState(g.id), g.id)) &&
                       !(await confirmAction(
                         "계좌 안내 메시지를 복사한 기록이 없습니다. 다른 방법으로 안내하셨나요?",
                         { cancel: "돌아가기", accept: "전달 완료로 처리" },
