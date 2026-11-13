@@ -4,7 +4,7 @@ use serde_json::{json,Value};
 use std::collections::HashSet;
 use super::{field,has_value,req,required_str,rows,set,str_field};
 
-fn new_reception(payload:&Value)->Result<Value,String> {
+pub(super) fn new_reception(payload:&Value)->Result<Value,String> {
     let now=required_str(payload,"now")?;
     let id=required_str(payload,"id")?;
     let client_id=str_field(payload,"clientId");
