@@ -1,0 +1,29 @@
+name: Recognition TypeScript vs Rust differential validation
+on:
+  push:
+    branches:
+      - migration/01-recognition-parity
+  workflow_dispatch:
+
+jobs:
+  parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install TypeScript dependencies
+        run: npm install --no-audit --no-fund --ignore-scripts
+      - name: Execute genuine TS and Rust on all 20 orders
+        run: node --test tests/rust-migration/recognition/parity.test.mjs
+  independent-rust:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Execute actual production Rust regression suite
+        run: cargo test --manifest-path tests/rust-migration/recognition/Cargo.toml -- --nocapture
