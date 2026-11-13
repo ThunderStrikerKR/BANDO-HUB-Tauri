@@ -132,6 +132,36 @@ add("both edited rows must be checked even when row numbers repeat",(s,r)=>{
   r.push({row:3,cells:cells("","새로운상호","02-7777-9999")});
 });
 
+// Deterministic cross-product of original TS column semantics. Test both new
+// clients and edits; empty cells are not interchangeable with [비우기] on edits.
+const columnMatrix=[
+  [1,"name",["","동 네 악 기","[비우기]","가".repeat(251)]],
+  [3,"sender-address",["","[비우기]","경기도 성남시 분당구 123","나".repeat(351)]],
+  [5,"phone",["","[비우기]","010 1234 5678","02-3456-7890"]],
+  [6,"mobile",["","[비우기]","010-1111-2222","1234567"]],
+  [9,"tier",["","wholesale","semi","retail","special","비회원"]],
+  [10,"payment",["","PREPAID","POSTPAID","후불","현금"]],
+  [11,"shipping-flag",["","TRUE","FALSE","거래중","거래중지","INVALID"]],
+  [12,"vat-flag",["","예","아니오","1","0","INVALID"]],
+  [13,"active-flag",["","거래중","거래중지","보관","INVALID"]],
+  [14,"short-names",["","[비우기]","동네","별칭1 별칭2"]],
+  [15,"identifiers",["","[비우기]","자동검색 12","식별자"]],
+  [16,"preferred-account",["","bank-1","bank-missing","[비우기]"]],
+  [17,"archive-protection",["","사용","보관","거래중지"]],
+];
+for(const [index,label,values] of columnMatrix){
+  for(const value of values){
+    add("new column matrix "+label+"="+JSON.stringify(value).slice(0,24),(_,rows)=>{
+      rows[0].cells[index]=value;
+    });
+    add("edit column matrix "+label+"="+JSON.stringify(value).slice(0,24),(s,rows)=>{
+      s.clients=[old("c1","기존악기","02-1111-2222")];
+      rows[0].cells=cells("c1","기존악기","02-1111-2222");
+      rows[0].cells[index]=value;
+    });
+  }
+}
+
 function canonical(result,rows) {
   // JSON is the real Tauri IPC transport: undefined fields are omitted.
   const copy=JSON.parse(JSON.stringify(result));
