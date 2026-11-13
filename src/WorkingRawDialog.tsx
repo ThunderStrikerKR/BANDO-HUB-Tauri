@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { confirmDiscardDraft } from "./shared/editor-flow";
 import type { Order, State } from "./types";
-import { correctWorkingRaw } from "./working-raw";
+import { nativeCorrectWorkingRaw } from "./orders/native-rules";
 import { Modal, Field } from "./ui";
 export function WorkingRawDialog({
   state,
@@ -32,6 +32,7 @@ export function WorkingRawDialog({
       <Field label="작업용 원문">
         <textarea
           rows={12}
+          disabled={busy}
           value={text}
           onChange={(e) => {
             setText(e.target.value);
@@ -41,6 +42,7 @@ export function WorkingRawDialog({
       </Field>
       <Field label="정정 사유">
         <input
+          disabled={busy}
           value={reason}
           onChange={(e) => {
             setReason(e.target.value);
@@ -79,12 +81,17 @@ export function WorkingRawDialog({
       <div className="product-edit-footer">
         <button onClick={closeDraft}>닫기</button>
         <button
-          onClick={() => {
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            setPreview(undefined);
             try {
-              setPreview(correctWorkingRaw(state, order, text, reason));
+              setPreview(await nativeCorrectWorkingRaw(state, order, text, reason));
               setError("");
             } catch (e) {
               setError(String(e));
+            } finally {
+              setBusy(false);
             }
           }}
         >
