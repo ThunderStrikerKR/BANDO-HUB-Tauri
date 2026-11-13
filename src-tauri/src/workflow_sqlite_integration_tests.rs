@@ -35,7 +35,7 @@ fn stage_three(base: &Value, payment: &str) -> Value {
     let product = &base["products"][0];
     let product_id = product["id"].as_str().unwrap().to_owned();
     let variant_id = product["variants"][0]["id"].as_str().unwrap().to_owned();
-    let mut client = json!({
+    let client = json!({
         "id":"synthetic-workflow-client", "name":"합성 테스트 거래처",
         "tier":"wholesale", "payment":payment, "shippingFeeExcluded":false,
         "address":"서울특별시 강남구 테헤란로 123", "phone":"02-1234-5678",
@@ -107,7 +107,6 @@ fn stage_three(base: &Value, payment: &str) -> Value {
             "groupId":"group:synthetic"
         }]
     });
-    client["name"] = json!("검증용"); // Only local fixture; no live DB mutation.
     state
 }
 
@@ -193,6 +192,55 @@ fn native_postpaid_stage_approval_audit_and_revision_survive_sqlite_reopen() {
     let reopened = initialize_database(&isolated.root.join("state.sqlite")).unwrap();
     assert_eq!(get_snapshot(&reopened).unwrap(), committed);
     assert_eq!(committed["workflow"]["shipments"][0]["step"], 4);
+    drop(reopened);
+}
+
+#[test]
+fn full_staff_stage_sequence_reuses_same_native_ids_and_persists_each_step() {
+    let (isolated, mut conn) = IsolatedDatabase::open();
+    let mut staged = stage_three(&get_snapshot(&conn).unwrap(), "POSTPAID");
+    staged["workflow"]["shipments"][0]["step"] = json!(1);
+    staged["workflow"]["shipments"][0]["completedAt"] =
+        json!({"1":"2026-11-13T12:00:00+09:00"});
+    let mut saved = write_snapshot(&mut conn, staged, 0, true).unwrap();
+    let id = saved["workflow"]["shipments"][0]["id"].clone();
+
+    for step in 2..=4 {
+        let at = format!("2026-11-13T12:{}:00+09:00", step * 10);
+        let mut args = json!({
+            "state":saved, "action":"advance_group",
+            "groupId":"group:synthetic",
+            "eventId":format!("event:advance-to-{step}"),
+            "now":at, "actor":"검증 담당자"
+        });
+        if step == 3 {
+            args["noticeId"] = json!("notice:synthetic");
+            args["paymentMessage"] = json!("가상 거래처 안내: 결제정보 검증용");
+        }
+        let result = rust("apply_workflow_action", args)
+            .unwrap_or_else(|reason|panic!("step {step} native action failed: {reason}"));
+        assert_eq!(result["step"], step);
+        assert_eq!(result["state"]["workflow"]["shipments"][0]["id"],id);
+        assert_eq!(result["state"]["workflow"]["shipments"][0]["step"],step);
+        rust("validate_workflow",json!({
+            "state":result["state"],"before":saved
+        })).unwrap_or_else(|reason|panic!("step {step} audit failed: {reason}"));
+        let revision = saved["revision"].as_u64().unwrap();
+        saved = write_snapshot(&mut conn,result["state"].clone(),revision,true)
+            .unwrap_or_else(|reason|panic!("step {step} SQLite failed: {reason}"));
+        assert_eq!(saved["revision"], revision+1);
+        assert_eq!(get_snapshot(&conn).unwrap(),saved);
+        let board = rust("preview_workflow",json!({"state":saved})).unwrap();
+        assert_eq!(board["groups"][0]["step"],step);
+    }
+    assert_eq!(saved["revision"],4);
+    assert_eq!(saved["workflow"]["groups"][0]["notices"].as_array().unwrap().len(),1);
+    assert_eq!(saved["workflow"]["groups"][0]["notices"][0]["id"],"notice:synthetic");
+    assert!(saved["workflow"]["events"].as_array().unwrap().iter()
+        .any(|event|event["action"]=="후불 출고 승인"));
+    drop(conn);
+    let reopened = initialize_database(&isolated.root.join("state.sqlite")).unwrap();
+    assert_eq!(get_snapshot(&reopened).unwrap(),saved);
     drop(reopened);
 }
 
