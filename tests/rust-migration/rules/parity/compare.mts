@@ -17,7 +17,7 @@ import {
   combinationVersions,
   combinationCurrent,
 } from "../../../../src/shipping.ts";
-import { shipmentTotals, validateWorkflow, reconcileWorkflow } from "../../../../src/workflow.ts";
+import { shipmentTotals, validateWorkflow, reconcileWorkflow, deleteOrder } from "../../../../src/workflow.ts";
 import { orderIssues, approveMissingQuantity, pendingIssue } from "../../../../src/validation.ts";
 
 const root=resolve(dirname(fileURLToPath(import.meta.url)),"../../../..");
@@ -323,6 +323,47 @@ add("customer question issue decision","apply_issue_action",{
 add("nonexistent issue is not recorded","apply_issue_action",{
   action:"pending_issue",order,issueId:"absent",actor:"검증직원",now
 },()=>({order:pendingIssue(order as any,"absent","검증직원")}));
+
+
+function deterministicIds<T>(ids:string[],fn:()=>T):T {
+  const descriptor=Object.getOwnPropertyDescriptor(globalThis,"crypto");
+  let index=0;
+  Object.defineProperty(globalThis,"crypto",{
+    configurable:true,
+    value:{randomUUID:()=>{
+      if(index>=ids.length)throw Error("Not enough injected UUIDs in baseline");
+      return ids[index++];
+    }}
+  });
+  try{return frozenDate(fn);}
+  finally{
+    if(descriptor)Object.defineProperty(globalThis,"crypto",descriptor);
+    else delete (globalThis as any).crypto;
+  }
+}
+const missingDelete:any=copy(baseState);
+add("delete missing order is rejected","delete_order",{
+  state:missingDelete,orderId:"absent",now,eventId:"delete-1",eventIds:[]
+},()=>({state:deleteOrder(missingDelete,"absent")}));
+const transferredDelete:any=copy(baseState);
+transferredDelete.workflow.shipments[0].transferred=true;
+add("transferred order ordinary delete blocked","delete_order",{
+  state:transferredDelete,orderId:"o1",now,eventId:"delete-1",eventIds:[]
+},()=>({state:deleteOrder(transferredDelete,"o1")}));
+const deletedOrder:any=copy(baseState);
+deletedOrder.orders[0].deletedAt=now;
+add("already deleted order no-op","delete_order",{
+  state:deletedOrder,orderId:"o1",now,eventId:"delete-1",eventIds:[]
+},()=>({state:deleteOrder(deletedOrder,"o1")}));
+const removeDraft:any=copy(baseState);
+removeDraft.workflow.shipments[0].step=0;
+add("delete unsent draft preserves receipt state","delete_order",{
+  state:removeDraft,orderId:"o1",now,eventId:"delete-1",eventIds:[]
+},()=>({state:deterministicIds(["delete-1"],()=>deleteOrder(removeDraft,"o1"))}));
+const removeStepTwo:any=copy(baseState);
+add("delete step-two order writes recheck and deletion audit","delete_order",{
+  state:removeStepTwo,orderId:"o1",now,eventId:"delete-2",eventIds:["recheck-2"]
+},()=>({state:deterministicIds(["recheck-2","delete-2"],()=>deleteOrder(removeStepTwo,"o1"))}));
 
 function normalized(v:unknown):string {
   if(Array.isArray(v))return "["+v.map(normalized).join(",")+"]";
