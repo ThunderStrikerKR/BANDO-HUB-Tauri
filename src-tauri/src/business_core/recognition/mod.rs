@@ -523,9 +523,38 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
         let p_end = if skip_until.is_char_boundary(p_end) { p_end } else { skip_until.len() };
         let product_evidence = add_match(&mut events,line,offset+p_start,offset+p_end,
             "product",trimmed.to_owned(),"상품명/모델명/별칭 인식 근거");
+        // parseLegacy first separates a recipient that shares a physical
+        // line with an item. The item.raw must exclude that recipient, while
+        // product evidence still points into the untouched original line.
+        let mut item_raw=trimmed.to_owned();
+        if !quantity_indexes.is_empty() {
+            if let Some(start_of_name)=events.iter()
+                .filter(|e|e.kind=="name" && e.line==line.number
+                    && e.start>line.start+offset)
+                .map(|e|e.start-line.start-offset).min() {
+                if start_of_name <= item_raw.len() && item_raw.is_char_boundary(start_of_name) {
+                    item_raw=item_raw[..start_of_name]
+                        .trim_end_matches(|ch:char|ch.is_whitespace() || ch=='ㅣ' || ch=='|')
+                        .trim().to_owned();
+                    // Original mixed-line parser drops a standalone Bando
+                    // prefix from a numeric-model item split before the name.
+                    if let Some(tail)=item_raw.strip_prefix("반도 ") {
+                        if tail.chars().next().is_some_and(|ch|ch.is_ascii_digit()) {
+                            item_raw=tail.to_owned();
+                        }
+                    }
+                }
+            }
+        }
+        // Bare EA suffixes are separate quantity evidence; unlike a
+        // parenthesized '(1ea)' they do not belong to the item label.
+        if let Some(q)=Regex::new(r"(?i)\s+\d+\s*EA$")
+            .expect("trailing EA").find(&item_raw) {
+            item_raw=item_raw[..q.start()].trim_end().to_owned();
+        }
         product_hits.push(ProductHit {
             evidence:product_evidence,source_start:line.start+offset,
-            line:line.number,raw:trimmed.to_owned(),
+            line:line.number,raw:item_raw,
             decision:matched,quantities:quantity_indexes,
             common:Regex::new(r"공통|모두|전부|전원|각\s*수취인|같은\s*상품")
                 .expect("common item").is_match(trimmed),
