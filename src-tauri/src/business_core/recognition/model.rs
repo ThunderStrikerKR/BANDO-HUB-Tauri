@@ -1,6 +1,7 @@
 use regex::{Regex, RegexBuilder};
 use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
+use std::sync::{Mutex, OnceLock};
 
 #[derive(Clone, Debug)]
 pub(crate) struct Decision {
@@ -100,11 +101,25 @@ fn spell(term: &str, is_model: bool) -> String {
 }
 pub(crate) fn find_term(text: &str, term: &str, is_model: bool) -> Option<(usize, usize)> {
     if term.trim().is_empty() { return None; }
-    let re = RegexBuilder::new(&spell(term.trim(), is_model))
-        .case_insensitive(true).build().ok()?;
-    let found = re.find_iter(text).find(|m| is_boundary(text, m.start(), m.end()))
-        .map(|m| (m.start(), m.end()));
-    found
+    // A full product catalog scan repeats the same registered model patterns
+    // hundreds of times. Cache the compiled *identical* regex so this changes
+    // CPU work, not matching semantics. Mutex ownership never escapes.
+    static PATTERNS: OnceLock<Mutex<HashMap<String, Regex>>> = OnceLock::new();
+    let pattern=spell(term.trim(),is_model);
+    let cache=PATTERNS.get_or_init(||Mutex::new(HashMap::new()));
+    let re={
+        let mut lock=cache.lock().ok()?;
+        if let Some(existing)=lock.get(&pattern) {
+            existing.clone()
+        } else {
+            let compiled=RegexBuilder::new(&pattern)
+                .case_insensitive(true).build().ok()?;
+            lock.insert(pattern,compiled.clone());
+            compiled
+        }
+    };
+    re.find_iter(text).find(|m| is_boundary(text,m.start(),m.end()))
+        .map(|m|(m.start(),m.end()))
 }
 pub(crate) fn model_names(p: &Value) -> Vec<String> {
     let name = lead(p);
