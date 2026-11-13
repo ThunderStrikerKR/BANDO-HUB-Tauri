@@ -120,6 +120,16 @@ add("reject pending alias conflicting with registered product",
     s.aliases.push({id:"existing",text:"709",clientId:"c1",
       productId:"other",variantId:"old"});
   });
+add("uppercase EA text trims alias like original regex", "resolve_product",
+  (_s,o) => {o.recipients[0].items[0].raw="보면대 2EA";
+    o.recipients[0].items[0].sources=[];}, "client");
+add("NFKC fullwidth model normalized before alias conflict detection",
+  "resolve_product", (s,o) => {
+    o.recipients[0].items[0].raw="７０９ 2개";
+    o.recipients[0].items[0].sources=[];
+    s.aliases.push({id:"other-alias",clientId:"c1",text:"709",
+      productId:"p1",variantId:"v1"});
+  }, "client");
 const requests = cases.map(c => ({
   domain:"rules",operation:"apply_product_action",payload:c.payload,
 }));
