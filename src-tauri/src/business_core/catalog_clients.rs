@@ -1,0 +1,247 @@
+//! Session D: native product and client management rules.
+//! XLSX byte parsing and React editor drafts remain UI concerns. A validated
+//! state transition is returned to the existing revision-checked SQLite saver.
+use serde_json::{json, Value};
+use unicode_normalization::UnicodeNormalization;
+use url::Url;
+
+fn field<'a>(v: &'a Value, name: &str) -> &'a str {
+    v.get(name).and_then(Value::as_str).unwrap_or("")
+}
+fn value_present(v: &Value, name: &str) -> bool {
+    !field(v, name).trim().is_empty()
+}
+fn items<'a>(v: &'a Value, name: &str) -> &'a [Value] {
+    v.get(name).and_then(Value::as_array).map(Vec::as_slice).unwrap_or(&[])
+}
+fn valid_money(value: &Value) -> bool {
+    value.is_null() || value.as_u64().is_some_and(|n| n <= 9_007_199_254_740_991)
+}
+fn normalized_name(value: &str) -> String {
+    value.nfkc().flat_map(char::to_lowercase)
+        .filter(|c| !c.is_whitespace()).collect()
+}
+fn normalized_color(value: &str) -> String {
+    let trimmed = value.trim();
+    let key = trimmed.to_lowercase();
+    match key.as_str() {
+        "gold" | "골드" => "Gold".into(),
+        "rose gold" | "로즈골드" => "Rose Gold".into(),
+        "cosmo black" | "cosmoblack" | "코스모블랙" => "Cosmo Black".into(),
+        "chrome" | "크롬" => "Chrome".into(),
+        "black" | "블랙" | "검정" | "검정색" => "Black".into(),
+        "gray" | "grey" | "그레이" | "회색" => "Gray".into(),
+        "white" | "화이트" | "흰색" => "White".into(),
+        "silver" | "실버" => "Silver".into(),
+        "red" | "빨강" => "Red".into(),
+        "blue" | "파랑" => "Blue".into(),
+        "brown" | "브라운" => "Brown".into(),
+        "clear" | "클리어" => "Clear".into(),
+        "frost" | "프로스트" => "Frost".into(),
+        _ => trimmed.into(),
+    }
+}
+fn product_url_ok(value: &str) -> bool {
+    let Ok(url) = Url::parse(value) else { return false };
+    url.scheme() == "https"
+        && ["bandostand.com", "www.bandostand.com",
+            "bandomall.co.kr", "www.bandomall.co.kr"]
+            .contains(&url.host_str().unwrap_or(""))
+        && url.path().starts_with("/product/")
+}
+fn validate_client(state: &Value, client: &Value) -> Result<(), String> {
+    if !value_present(client, "name") {
+        return Err("거래처명을 입력하세요.".into());
+    }
+    if !value_present(client, "address") {
+        return Err("거래처 주소를 입력하세요.".into());
+    }
+    if !value_present(client, "phone") && !value_present(client, "mobile") {
+        return Err("거래처 전화번호 또는 휴대폰 번호를 입력하세요.".into());
+    }
+    let account_id = field(client, "preferredAccountId");
+    if !account_id.is_empty()
+        && !items(state.get("settings").unwrap_or(&Value::Null), "accounts")
+            .iter().any(|a| field(a, "id") == account_id)
+    {
+        return Err("설정에 등록된 입금 계좌를 선택하세요.".into());
+    }
+    Ok(())
+}
+fn validate_product(state: &Value, product: &Value) -> Result<(), String> {
+    // src/domain.ts::productSchema and validateProduct: one sale unit only,
+    // valid immutable identity, nonnegative safe prices and trusted links.
+    for key in ["id", "code", "name", "defaultColor", "createdAt", "updatedAt"] {
+        if field(product, key).is_empty() {
+            return Err(format!("상품 필수 정보가 없습니다: {key}"));
+        }
+    }
+    if !product.get("category").is_some_and(Value::is_string) {
+        return Err("상품 카테고리 정보가 올바르지 않습니다.".into());
+    }
+    if !["STORE", "FACTORY"].contains(&field(product, "origin")) {
+        return Err("상품 출고구분이 올바르지 않습니다.".into());
+    }
+    if !product.get("active").is_some_and(Value::is_boolean) {
+        return Err("상품 거래 상태가 올바르지 않습니다.".into());
+    }
+    let variants = items(product, "variants");
+    if variants.len() != 1 {
+        return Err("상품은 한 가지 판매 구성으로만 등록할 수 있습니다. 기존 복수 구성은 각각 별도 상품으로 전환하세요.".into());
+    }
+    for variant in variants {
+        if !value_present(variant, "id") || !value_present(variant, "color") ||
+            !["DEMO", "MANUAL", "OFFICIAL"].contains(&field(variant, "source")) ||
+            !variant.get("url").is_some_and(Value::is_string) ||
+            !["wholesale", "semi", "retail"].iter().all(|key|
+                variant.get(*key).is_some_and(valid_money))
+        {
+            return Err("가격 기록의 필수 정보 또는 금액이 올바르지 않습니다.".into());
+        }
+    }
+    // Preserve the original TS semantics: duplicate detection only applies
+    // to a *new* product; editing an existing product is not blocked here.
+    let existing = items(state, "products");
+    let is_existing = existing.iter().any(|p| field(p, "id") == field(product, "id"));
+    if !is_existing {
+        let name = normalized_name(field(product, "name"));
+        if existing.iter().any(|other| {
+            field(other, "id") != field(product, "id")
+                && other.get("active") != Some(&Value::Bool(false))
+                && !value_present(other, "deletedAt")
+                && !value_present(other, "supersededBy")
+                && other.get("catalog") == product.get("catalog")
+                && normalized_name(field(other, "name")) == name
+        }) {
+            return Err("같은 상품명이 이미 있습니다. 판매 구성을 구별할 수 있게 이름을 수정하세요.".into());
+        }
+    }
+    if !variants.iter().any(|v|
+        normalized_color(field(v, "color")) == normalized_color(field(product, "defaultColor")))
+    {
+        return Err("상품 색상이 가격 기록과 일치하지 않습니다.".into());
+    }
+    for variant in variants {
+        let link = field(variant, "url");
+        if !link.is_empty() && !product_url_ok(link) {
+            return Err("상품 링크는 확인된 반도스탠드 / 반도몰 상세페이지 URL을 입력하세요.".into());
+        }
+    }
+    Ok(())
+}
+fn upsert(state: &Value, entity: &Value, collection: &str) -> Result<Value, String> {
+    let id = field(entity, "id");
+    if id.is_empty() {
+        return Err(format!("{collection} 항목 ID가 없습니다."));
+    }
+    let mut next = state.clone();
+    let collection_rows = next.get_mut(collection).and_then(Value::as_array_mut)
+        .ok_or_else(|| format!("{collection} 목록이 없습니다."))?;
+    if let Some(index) = collection_rows.iter().position(|row| field(row, "id") == id) {
+        collection_rows[index] = entity.clone();
+    } else {
+        collection_rows.push(entity.clone());
+    }
+    Ok(json!({"state":next}))
+}
+pub fn execute(operation: &str, payload: Value) -> Result<Value, String> {
+    let state = payload.get("state").ok_or("현재 상태가 없습니다.")?;
+    match operation {
+        "validate_client" => {
+            validate_client(state, payload.get("client").ok_or("거래처 정보가 없습니다.")?)?;
+            Ok(json!({"valid":true}))
+        }
+        "upsert_client" => {
+            let client = payload.get("client").ok_or("거래처 정보가 없습니다.")?;
+            validate_client(state, client)?;
+            upsert(state, client, "clients")
+        }
+        "validate_product" => {
+            validate_product(state, payload.get("product").ok_or("상품 정보가 없습니다.")?)?;
+            Ok(json!({"valid":true}))
+        }
+        "upsert_product" => {
+            let product = payload.get("product").ok_or("상품 정보가 없습니다.")?;
+            validate_product(state, product)?;
+            upsert(state, product, "products")
+        }
+        _ => Err(format!("지원하지 않는 상품/거래처 관리 업무입니다: {operation}")),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::execute;
+    use serde_json::json;
+    fn state() -> serde_json::Value {
+        json!({"revision":11,"clients":[],"products":[],"settings":{
+            "accounts":[{"id":"account-1"}]},"orders":[{"id":"old-order"}]})
+    }
+    fn client() -> serde_json::Value {
+        json!({"id":"client-1","name":"악기사","address":"서울 종로구",
+            "phone":"02-1234-5678","preferredAccountId":"account-1"})
+    }
+    fn product() -> serde_json::Value {
+        json!({"id":"product-1","code":"product-1","name":"BD 709 타공",
+            "category":"보면대","origin":"FACTORY","defaultColor":"Black",
+            "active":true,"createdAt":"2026-11-13","updatedAt":"2026-11-13",
+            "catalog":"BANDOSTAND","variants":[{
+                "id":"variant-1","color":"블랙","url":"","source":"MANUAL",
+                "wholesale":10000,"semi":11000,"retail":12000
+            }]})
+    }
+    #[test]
+    fn client_is_validated_and_unrelated_order_is_preserved() {
+        let s=state();
+        let result=execute("upsert_client",json!({"state":s,"client":client()})).unwrap();
+        assert_eq!(result["state"]["clients"][0]["id"],"client-1");
+        assert_eq!(result["state"]["orders"][0]["id"],"old-order");
+        assert_eq!(s["clients"].as_array().unwrap().len(),0);
+    }
+    #[test]
+    fn incomplete_client_and_stale_account_cannot_save() {
+        let mut c=client();
+        c["address"]=json!("");
+        assert!(execute("upsert_client",json!({"state":state(),"client":c}))
+            .unwrap_err().contains("주소"));
+        let mut c=client();
+        c["preferredAccountId"]=json!("missing");
+        assert!(execute("upsert_client",json!({"state":state(),"client":c}))
+            .unwrap_err().contains("계좌"));
+    }
+    #[test]
+    fn product_name_and_color_are_validated_without_editing_past_orders() {
+        let s=state();
+        let result=execute("upsert_product",json!({"state":s,"product":product()})).unwrap();
+        assert_eq!(result["state"]["products"][0]["variants"][0]["wholesale"],10000);
+        assert_eq!(result["state"]["orders"][0]["id"],"old-order");
+        let mut bad=product();
+        bad["defaultColor"]=json!("Rose Gold");
+        assert!(execute("upsert_product",json!({"state":s,"product":bad}))
+            .unwrap_err().contains("색상"));
+    }
+    #[test]
+    fn a_new_duplicate_product_is_rejected_but_edit_is_allowed() {
+        let mut s=state();
+        s["products"]=json!([product()]);
+        let mut new=product();
+        new["id"]=json!("product-2");
+        new["name"]=json!("ＢＤ ７０９ 타공");
+        assert!(execute("upsert_product",json!({"state":s,"product":new}))
+            .unwrap_err().contains("같은 상품명"));
+        let mut update=product();
+        update["name"]=json!("BD 709 타공 / 수정");
+        assert!(execute("upsert_product",json!({"state":s,"product":update})).is_ok());
+    }
+    #[test]
+    fn untrusted_url_and_negative_prices_are_rejected() {
+        let s=state();
+        let mut p=product();
+        p["variants"][0]["url"]=json!("https://evil.example/product/709");
+        assert!(execute("validate_product",json!({"state":s,"product":p}))
+            .unwrap_err().contains("링크"));
+        let mut p=product();
+        p["variants"][0]["retail"]=json!(-1);
+        assert!(execute("validate_product",json!({"state":s,"product":p})).is_err());
+    }
+}
