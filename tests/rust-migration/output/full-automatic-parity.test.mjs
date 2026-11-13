@@ -8,7 +8,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { tsImport } from "tsx/esm/api";
 
-const { automaticMessage, paymentSignature, paymentWasCopied } =
+const { automaticMessage, paymentSignature, paymentWasCopied, withGreeting } =
   await tsImport("../../../src/automatic-message.ts",import.meta.url);
 const { groupOrder } =
   await tsImport("../../../src/workflow.ts",import.meta.url);
@@ -173,4 +173,25 @@ test("an already-copied payment uses the identical stored original TS signature"
   if(r.error)throw r.error;
   assert.equal(r.status,0,r.stderr);
   assert.deepStrictEqual(JSON.parse(r.stdout),[{ok:true,value:{copied:true}}]);
+});
+
+test("Rust optional greeting keeps the original TS behavior on edited copy texts",()=>{
+  const texts=[
+    "", "받으실 분 연락처 부탁드려요.",
+    "안녕하세요 반도스탠드입니다.\n\n받으실 분 연락처 부탁드려요.",
+    "  안녕하세요 반도스탠드입니다.\n\n기존 인사말",
+    "안녕하세요.\n\n합계 : 10,000원 입니다.",
+  ];
+  const requests=texts.flatMap(text=>[false,true].map(includeGreeting=>({
+    operation:"decorate_automatic_copy",payload:{text,includeGreeting},
+  })));
+  const r=spawnSync("cargo",["run","--quiet","--manifest-path",manifest,
+    "--bin","parity_runner"],{cwd:root,input:JSON.stringify(requests),
+      encoding:"utf8",timeout:180000,maxBuffer:64*1024*1024});
+  if(r.error)throw r.error;
+  assert.equal(r.status,0,r.stderr);
+  const actual=JSON.parse(r.stdout);
+  assert.deepStrictEqual(actual,texts.flatMap(text=>[false,true].map(includeGreeting=>({
+    ok:true,value:{text:includeGreeting?withGreeting(text):text},
+  }))));
 });
