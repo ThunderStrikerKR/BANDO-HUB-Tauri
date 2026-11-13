@@ -284,8 +284,10 @@ fn stage_issues(state:&Value,group_id:&str,next:i64) -> Result<Vec<String>,Strin
         }
     }
     let _=prepay;
-    issues.sort();
-    issues.dedup();
+    // TypeScript's [...new Set(issues)] preserves first-seen issue order.
+    // Alphabetically sorting changes the priority shown to staff.
+    let mut seen = std::collections::HashSet::new();
+    issues.retain(|issue| seen.insert(issue.clone()));
     Ok(issues)
 }
 fn payment_due(state:&Value,ship:&Value,order:&Value,client:&Value)->Result<Option<i64>,String>{
