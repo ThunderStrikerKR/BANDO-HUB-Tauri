@@ -557,34 +557,50 @@ export function useOrderDesk({
         : "상품 가격 기록이 정확히 하나가 아닙니다. 상품 데이터를 확인하세요.", "error");
       return;
     }
-    if (iid)
-      itemEdit(rid, iid, (item) => {
-        const proposal = !item.productId || !!item.modelProposal?.required;
-        const old = {
-          id: item.id,
-          raw: item.raw,
-          sources: item.sources,
-          quantityConfirmed: item.quantityConfirmed,
-        };
-        Object.assign(item, itemFromProduct(p, pricingClient, undefined, item.quantity), old, {
-          manuallyConfirmed: true,
-        });
-        item.match = { kind: "NAME", term: p.name, productIds: [p.id] };
-        item.temporary = false;
-        delete item.pendingAlias;
-        if (proposal) {
-          item.modelProposal = { original: old.raw, required: true };
-          item.issues.push("추천 상품 고객 확인 필요");
-        }
-      });
-    else
-      recEdit(rid, (r) =>
-        r.items.push({
-          ...itemFromProduct(p, pricingClient, undefined, null),
-          quantityConfirmed: false,
-        }),
+    const orderId = draft.id;
+    const itemId = iid;
+    const variantId = p.variants[0].id;
+    void run(async () => {
+      const { unitPrice } = await businessCoreCall<{ unitPrice: number | null }>(
+        "rules", "resolve_unit_price", {
+          product: p, variantId, client: pricingClient,
+        },
       );
-    setProductSearch(undefined);
+      const current = latestRulesInput.current;
+      if (current.draft.id !== orderId || current.state !== state ||
+          current.rulesClientSignature !== rulesClientSignature ||
+          current.draft.deletedAt || current.draft.status === "EXPORTED")
+        return;
+      if (itemId) {
+        // The visible product name, old evidence and manually confirmed
+        // quantity survive; only the price comes from native Rust.
+        if (!current.draft.recipients.some((r) =>
+          r.id === rid && r.items.some((item) => item.id === itemId))) return;
+        itemEdit(rid, itemId, (item) => {
+          const proposal = !item.productId || !!item.modelProposal?.required;
+          const old = {
+            id: item.id, raw: item.raw, sources: item.sources,
+            quantityConfirmed: item.quantityConfirmed,
+          };
+          Object.assign(item, itemFromProduct(p, pricingClient, undefined, item.quantity), old, {
+            manuallyConfirmed: true, unitPrice,
+          });
+          item.match = { kind: "NAME", term: p.name, productIds: [p.id] };
+          item.temporary = false;
+          delete item.pendingAlias;
+          if (proposal) {
+            item.modelProposal = { original: old.raw, required: true };
+            item.issues.push("추천 상품 고객 확인 필요");
+          }
+        });
+      } else {
+        recEdit(rid, (r) => r.items.push({
+          ...itemFromProduct(p, pricingClient, undefined, null),
+          unitPrice, quantityConfirmed: false,
+        }));
+      }
+      setProductSearch(undefined);
+    });
   };
   return {
     highlight,
