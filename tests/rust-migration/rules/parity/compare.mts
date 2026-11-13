@@ -24,6 +24,7 @@ import { deleteGroup, restoreGroup } from "../../../../src/group-trash.ts";
 import { correctionStatus, requestCorrection, copiedCorrection, confirmCorrection, markFactoryDelivered, markCollected, reopenUnsentExport } from "../../../../src/corrections.ts";
 import { orderIssues, approveMissingQuantity, pendingIssue } from "../../../../src/validation.ts";
 import { validateReceptionBoundary, newReception, replaceReception, persistedReceptionState } from "../../../../src/orders/reception.ts";
+import { confirmRetail, newRetailOrder } from "../../../../src/orders/retail.ts";
 import { companyClient, companyParty } from "../../../../src/order-types.ts";
 import { explicitSender } from "../../../../src/explicit-sender.ts";
 
@@ -2625,6 +2626,88 @@ const noDraft=copy(baseState);
 receptionOperation("no draft is unchanged","persisted_reception_state",{
   before:noDraft,state:copy(noDraft)
 },()=>({state:persistedReceptionState(noDraft as any,copy(noDraft) as any)}));
+
+
+// Source retail order confirmation is an atomic composed workflow operation.
+// For successful fixtures capture UUID *order* from the actual TS source:
+// reconcile events -> confirmation event -> processGroup reconciliation/event.
+const retailNewIds=["retail-new-order","retail-new-recipient"];
+add("retail: initial two-UUID draft","apply_retail_action",{
+  action:"new_retail_order",orderId:retailNewIds[0],
+  recipientId:retailNewIds[1],now:actionNow
+},()=>({order:deterministicIds(retailNewIds,()=>newRetailOrder())}));
+cases[cases.length-1].expectedOk=true;
+function retailDraft(){
+  const draft:any=copy(order);
+  draft.id="retail-order";
+  draft.orderType="RETAIL";
+  draft.clientId="";
+  draft.raw="";
+  draft.status="RECEIVED";
+  draft.receptionVersion=1;
+  draft.recipients[0].id="retail-recipient";
+  draft.recipients[0].dispatchOrigin="FACTORY";
+  draft.recipients[0].items[0].id="retail-item";
+  draft.recipients[0].items[0].quantityConfirmed=true;
+  delete draft.confirmedAt;
+  delete draft.clientSnapshot;
+  delete draft.senderSnapshot;
+  return draft;
+}
+function retailCase(name:string,mutate:(state:any,draft:any)=>void,success:boolean){
+  const state:any=copy(baseState);
+  const draft:any=retailDraft();
+  mutate(state,draft);
+  const ids=Array.from({length:160},(_,i)=>
+    "retail-confirm-"+name.replace(/[^a-zA-Z0-9]/g,"-")+"-"+i);
+  let receiptEventId=ids[0],processEventId=ids[1];
+  let reconcileEventIds:string[]=[],processReconcileEventIds:string[]=[];
+  if(success){
+    const observed:any=deterministicIds(ids,()=>confirmRetail(state,draft));
+    const receipt=observed.workflow.events.find((e:any)=>e.action==="주문 확인 완료"&&
+      e.shipmentIds?.some((sid:string)=>sid.includes(draft.id)));
+    const transferred=observed.workflow.events.find((e:any)=>
+      e.action==="처리완료 / 엑셀 관리 목록 이관"&&
+      e.shipmentIds?.some((sid:string)=>sid.includes(draft.id)));
+    if(!receipt||!transferred)throw Error("Test fixture expected successful retail receipt and transfer");
+    const one=ids.indexOf(receipt.id),two=ids.indexOf(transferred.id);
+    if(one<0||two<=one)throw Error("Unexpected original TS UUID chronology");
+    receiptEventId=receipt.id;processEventId=transferred.id;
+    reconcileEventIds=ids.slice(0,one);
+    processReconcileEventIds=ids.slice(one+1,two);
+  }
+  add("retail: "+name,"apply_retail_action",{
+    action:"confirm_retail",state,draft,now:actionNow,
+    receiptEventId,processEventId,reconcileEventIds,processReconcileEventIds
+  },()=>({state:deterministicIds(ids,()=>confirmRetail(state,draft))}));
+  cases[cases.length-1].expectedOk=success;
+}
+retailCase("valid factory paid externally",()=>{},true);
+retailCase("valid store paid externally",(s,d)=>{
+  d.recipients[0].dispatchOrigin="STORE";
+  d.recipients[0].items[0].origin="STORE";
+},true);
+retailCase("already confirmed draft blocked",(_s,d)=>{
+  d.confirmedAt=now;
+},false);
+retailCase("unregistered order type blocked",(_s,d)=>{
+  d.orderType="AGENCY";
+},false);
+retailCase("same order ID already persisted blocked",(s,d)=>{
+  d.id="o1";
+},false);
+retailCase("blank recipient name blocked",(_s,d)=>{
+  d.recipients[0].name="";
+},false);
+retailCase("invalid quantity confirmation blocked",(_s,d)=>{
+  d.recipients[0].items[0].quantityConfirmed=false;
+},false);
+retailCase("missing sending address blocked",(s,d)=>{
+  s.settings.senderAddress="";
+},false);
+retailCase("deleted product blocked",(s,d)=>{
+  s.products[0].deletedAt=now;
+},false);
 
 function normalized(v:unknown):string {
   if(Array.isArray(v))return "["+v.map(normalized).join(",")+"]";
