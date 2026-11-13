@@ -28,7 +28,19 @@ test("clipboard copy writes audit via Rust only after native clipboard succeeds"
   assert.match(view,/await onSave\(await nativeRecordMessageCopy\(/);
   assert.doesNotMatch(view,/\brecordCopy\(state,/);
   assert.match(adapter,/"rules", "record_message_copy"/);
-  assert.match(adapter,/copyType === "PAYMENT" \? paymentSignature\(state, groupId\)/);
+  // The same Rust projection returns displayed text and its signed copy token.
+  // A TypeScript signature here would regress the native message migration.
+  const projection=read("src/native-automatic-message.ts");
+  const nativeMessage=read("src-tauri/src/business_core/output/automatic_full.rs");
+  assert.match(view,/nativeAutomaticMessage\(state, gid, includeLinks\)/);
+  assert.match(projection,/"output", "render_automatic_message"/);
+  assert.match(nativeMessage,/payment_signature\(&view,/);
+  assert.match(view,/request \? undefined : automatic\.signature/);
+  assert.match(adapter,/copyType === "PAYMENT" && signature === undefined/);
+  assert.match(adapter,/\.\.\.\(copyType === "PAYMENT" \? \{ signature \} : \{\}\)/);
+  assert.doesNotMatch(view,/\bpaymentSignature\(/);
+  assert.doesNotMatch(view,/\bautomaticMessage\(state,/);
+  assert.doesNotMatch(adapter,/\bpaymentSignature\(/);
   assert.match(rules,/"record_message_copy" => message_audit::record\(&payload\)/);
   assert.match(audit,/str_field\(field\(e,"after"\),"token"\)==token/);
   assert.match(audit,/!flag\(s,"legacyArchived"\)/);
