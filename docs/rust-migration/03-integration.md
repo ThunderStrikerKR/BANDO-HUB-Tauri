@@ -1,5 +1,20 @@
 # Session 3: Output and integration handoff (2026-11-13)
 
+## 2026-11-13 session 3 interrupted shipping-work checkpoint
+
+**Scope: finish the interrupted native freight-management operation, not the entire Rust migration.**
+Verified application/test source: `74965f84575f8f4a7965ff84495f520907039ba2`.
+The older sections below describe the initial output-only stage and are superseded for routing/price/shipping integration by this checkpoint.
+
+- Native domain dispatcher now activates **recognition, rules and output** in `src-tauri/src/business_core/mod.rs`; Tauri IPC is connected to React.
+- Freight management routes group and individual tariffs, product-group assignments, group-to-product rule copying, tariff basis changes, freight group create/rename, and exception-rate revisions through `rules::apply_shipping_action`.
+- Interrupted `revise_combination` is implemented in `src-tauri/src/business_core/rules/shipping.rs` and invoked by `src/ShippingManager.tsx`. Revised entries archive the old version and preserve historical actual prices and unrelated combinations.
+- Supplemental tests: `tests/rust-migration/rules/shipping-rate-parity.test.mjs`, commits `07ff3665e95d` and `6187047b37e1`. They call real TypeScript `src/shipping.ts::combinationVersions` with original state and compare the prior UI revision behavior against compiled Rust.
+- [Integration CI 43411435216](https://github.com/ThunderStrikerKR/TSBH/actions/runs/43411435216): tariff and exception parity **27/27 PASS**, full rules parity **678/678 PASS**, frontend **473 PASS / 2 intentionally skipped (legacy order samples 19,20) / 0 FAIL**, output, Rust dispatcher and React reception jobs PASS.
+- Windows-native Tauri tests on same source: **97 PASS, 2 FAIL, 1 ignored**. Only `kakao_dock::native::tests::native_layouts_do_not_treat_a_third_state_as_a_view` and `synthetic_win32_kakao_window_is_moved_and_restored` fail. Both also failed in the pre-migration [baseline CI 43342892142](https://github.com/ThunderStrikerKR/TSBH/actions/runs/43342892142). Therefore the Windows-native test job is **FAIL**, not a green result.
+- [Windows Release/portable candidate 43410853750](https://github.com/ThunderStrikerKR/TSBH/actions/runs/43410853750) succeeded from `4a8bdc9360b9`; artifact `TSBH-migration03-preview-NOT-FINAL`, ID `14030225793`. Git diff through `74965f84575f` shows test-only changes and no app-source changes. This is not an approved full demonstration release.
+- Still incomplete: UI message generation, remaining TS workflow/history/factory reply business logic, full TS algorithm removal, complete GUI/SQLite/backup/OCR E2E and on-site installation. Preserve the last known-good version; never claim whole Rust migration complete.
+
 ## Ownership and branch
 - Repository: `ThunderStrikerKR/TSBH`
 - Branch: `migration/03-integration`
