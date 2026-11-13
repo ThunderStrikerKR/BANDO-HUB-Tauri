@@ -238,10 +238,10 @@ pub(super) fn reconcile(payload:&Value)->Result<Value,String> {
                 let ship_ids=rows(field(&state["workflow"],"shipments")).iter()
                     .filter(|s|str_field(s,"groupId")==gid)
                     .map(|s|str_field(s,"id").to_string()).collect::<Vec<_>>();
-                let actor=str_field(field(&state,"settings"),"operatorName").trim();
+                let actor=str_field(field(&state,"settings"),"operatorName").trim().to_string();
                 audit.emit(&mut state,"거래처 변경",&ship_ids,&gid,
                     Some(json!(old_dealer)),Some(json!(dealer_id)),None,
-                    if actor.is_empty() {"직원"} else {actor})?;
+                    if actor.is_empty() {"직원"} else {&actor})?;
             }
             if let Some(edits)=order.get("groupMessageEdits") {
                 if let Some(value)=edits.get(&gid) {
