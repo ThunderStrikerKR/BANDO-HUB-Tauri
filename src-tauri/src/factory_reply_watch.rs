@@ -35,7 +35,7 @@ pub(super) struct InboxFile {
     bytes: Vec<u8>,
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct ImportResult {
     duplicate: bool,
