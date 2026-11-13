@@ -54,7 +54,15 @@ function sourceImports(file) {
     let module;
     if((ts.isImportDeclaration(node)||ts.isExportDeclaration(node))&&node.moduleSpecifier
         &&ts.isStringLiteral(node.moduleSpecifier)){
-      module=node.moduleSpecifier.text;
+      const typeOnly=ts.isImportDeclaration(node)
+        ? !!node.importClause?.isTypeOnly ||
+          (!!node.importClause&&!node.importClause.name&&
+           !!node.importClause.namedBindings&&
+           ts.isNamedImports(node.importClause.namedBindings)&&
+           node.importClause.namedBindings.elements.length>0&&
+           node.importClause.namedBindings.elements.every(x=>x.isTypeOnly))
+        : !!node.isTypeOnly;
+      if(!typeOnly)module=node.moduleSpecifier.text;
     }else if(ts.isCallExpression(node)&&node.arguments.length===1
         &&ts.isStringLiteral(node.arguments[0]) &&
         (node.expression.kind===ts.SyntaxKind.ImportKeyword ||
