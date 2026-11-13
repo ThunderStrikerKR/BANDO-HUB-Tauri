@@ -16,7 +16,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { Api, State, CatalogReport, OcrCapture } from "./types";
 import productImages from "./tauri-product-images.json";
 import { parseOfficialProductPage } from "./official-product-import";
-import { officialLinksFromSnapshot } from "./official-links";
+
 
 const notReady = (feature: string): never => {
   throw new Error(`${feature} 기능은 아직 구현되지 않았습니다.`);
@@ -95,7 +95,9 @@ const api: Api = {
   },
   // Suggests links from the bundled historical catalog; individual previews
   // still fetch their official product detail pages live.
-  officialList: async () => officialLinksFromSnapshot(await invoke<CatalogReport>("catalog_report")),
+  officialList: async () => businessCoreCall("catalog_clients", "official_links", {
+    report: await invoke<CatalogReport>("catalog_report"),
+  }),
   mobileStart: async () => notReady("스마트폰 연동"),
   mobileStop: async () => notReady("스마트폰 연동"),
   mobileStatus: async () => ({ running: false, urls: [] }),
