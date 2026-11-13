@@ -329,11 +329,16 @@ test("report screens keep live read-only views while Excel export buttons are de
   assert.match(daily, /report\.orderRows\.map/);
   assert.match(daily, /report\.paymentRows\.map/);
   assert.match(daily, /report\.warnings\.map/);
-  assert.match(history, /"rules", "list_order_history"/);
+  assert.match(history, /"rules", "list_order_history_view"/);
+  assert.match(history, /row\.display\.trackingMessage/);
+  assert.match(history, /row\.display\.paymentEvidenceMissing/);
+  assert.match(history, /row\.display\.references/);
+  assert.doesNotMatch(history, /trackingMessage\(state,/);
+  assert.doesNotMatch(history, /resolveHistoricalProductReference\(/);
   assert.doesNotMatch(history, /[^A-Za-z]orderHistory\(state, query, date\)/);
   assert.match(history, /value=\{query\} onChange=\{onQuery\}/);
   assert.doesNotMatch(history, /주문 열기|onOpen\(row\.order\)/);
-  assert.match(history, /trackingMessage\(state, row\.order\.id\)/);
+  assert.match(history, /copy\(row\.display\.trackingMessage\)/);
   assert.match(history, /setExpanded\(/);
   assert.match(history, /배송 건 \/ 상품 항목을 펼쳐 주문 내용을 확인합니다/);
   assert.doesNotMatch(app, /onOpen=\{model\.open\}/);
