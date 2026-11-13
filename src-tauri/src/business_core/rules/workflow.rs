@@ -296,6 +296,44 @@ fn append_extra_event(state:&mut Value,payload:&Value,id:&str,action:&str,
         .ok_or("업무 이벤트 목록 누락")?.push(event);
     Ok(())
 }
+// The receipt source positions are JavaScript UTF-16 offsets, not Rust byte
+// indices. Never slice a Korean address or product expression by byte offset.
+fn source_expression(raw:&str, start:&Value, end:&Value)->Option<String>{
+    let a=usize::try_from(start.as_u64()?).ok()?;
+    let b=usize::try_from(end.as_u64()?).ok()?;
+    let units=raw.encode_utf16().collect::<Vec<_>>();
+    if a>b || b>units.len(){return None;}
+    String::from_utf16(&units[a..b]).ok()
+}
+fn preserve_confirmed_selections(order:&mut Value)->Result<(),String>{
+    let raw=str_field(order,"raw").to_string();
+    let recipients=order.get_mut("recipients").and_then(Value::as_array_mut)
+        .ok_or("수취인 목록 오류")?;
+    for recipient in recipients {
+        let items=recipient.get_mut("items").and_then(Value::as_array_mut)
+            .ok_or("상품 목록 오류")?;
+        for item in items {
+            if !flag(item,"manuallyConfirmed") ||
+                str_field(item,"productId").is_empty() ||
+                str_field(item,"variantId").is_empty() {
+                continue;
+            }
+            let span=rows(field(item,"sources")).iter()
+                .find(|source|str_field(source,"field")=="product");
+            let Some(span)=span else {continue;};
+            let text=str_field(span,"text");
+            if text.is_empty() || source_expression(&raw,
+                field(span,"start"),field(span,"end")).as_deref()!=Some(text) {
+                continue;
+            }
+            set(item,"selectionEvidence",json!({
+                "expression":text,"productId":field(item,"productId"),
+                "variantId":field(item,"variantId")
+            }))?;
+        }
+    }
+    Ok(())
+}
 fn ensure_clock(payload:&Value)->Result<(),String>{
     if required_str(payload,"now")?.trim().is_empty(){return Err("현재 시각을 입력하세요.".into());}
     if required_str(payload,"eventId")?.trim().is_empty(){return Err("이벤트 ID를 입력하세요.".into());}
@@ -374,6 +412,9 @@ pub(super) fn apply(payload:&Value)->Result<Value,String> {
                 let sender=payload.get("sender").or_else(||state["orders"][oi].get("senderSnapshot"))
                     .ok_or("최초 주문 확인에 필요한 송하인 정보를 입력하세요.")?.clone();
                 let order=&mut state["orders"][oi];
+                // Preserve the explicit staff-to-source product selection
+                // before capturing the immutable first-receipt snapshot.
+                preserve_confirmed_selections(order)?;
                 set(order,"confirmedAt",json!(now))?;
                 set(order,"createdAt",json!(now))?;
                 let receipt_original=field(order,"raw").clone();
@@ -439,10 +480,12 @@ pub(super) fn apply(payload:&Value)->Result<Value,String> {
                     }
                 }
                 if next==3 {
-                    // Session 3 should feed the exact message/account billing
-                    // signature from the existing host logic before persistence.
-                    let signature=req(payload,"billingSignature")?.clone();
-                    set(&mut state["workflow"]["shipments"][*si],"billingSignature",signature)?;
+                    // Shipment signatures differ by recipient, freight and VAT.
+                    // Compute each using the Rust equivalent of TS billing(),
+                    // never reuse one group's signature across all recipients.
+                    let signature=super::reconciliation::billing(&state,*si)?;
+                    set(&mut state["workflow"]["shipments"][*si],
+                        "billingSignature",json!(signature))?;
                 }
                 if field(&state["workflow"]["shipments"][*si],"step").as_i64().unwrap_or(0)<next {
                     set(&mut state["workflow"]["shipments"][*si],"step",json!(next))?;
