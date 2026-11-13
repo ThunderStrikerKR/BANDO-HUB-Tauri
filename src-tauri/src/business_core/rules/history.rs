@@ -297,4 +297,68 @@ mod tests {
         assert_eq!(rows[0]["status"],"공장 회신 완료");
         assert_eq!(rows[0]["billing"]["total"],0);
     }
+
+    #[test]
+    fn read_only_view_preserves_copy_order_and_historical_product_link() {
+        let state=json!({
+            "orders":[{"id":"o1","clientId":"c1","raw":"709",
+                "createdAt":"2026-11-13","paid":true,
+                "recipients":[{"id":"r1","name":"박수취","items":[{
+                    "id":"i1","productId":"old","variantId":"v1"
+                }]}]}],
+            "clients":[{"id":"c1","name":"기존 거래처","tier":"wholesale"}],
+            "products":[{"id":"new","sourceProductId":"old",
+                "name":"현재 연결 상품","variants":[{"id":"v1"}]}],
+            "productMappings":{"old|v1":"new"},
+            "workflow":{"shipments":[{"id":"s1","orderId":"o1",
+                "recipientId":"r1","groupId":"g1","transferred":true,
+                "tracking":{"FACTORY":"11111111","STORE":"22222222"}}],
+                "groups":[{"id":"g1"}],
+                "queue":[{"shipmentId":"s1","origin":"FACTORY",
+                    "status":"EXPORTED","snapshot":{
+                        "subtotal":0,"shipping":0,"vat":0,"total":0}}],
+                "payments":[]}
+        });
+        let before=state.clone();
+        let keys=json!([{"shipmentId":"s1","keys":["STORE","FACTORY"]}]);
+        let view=list_view(&state,"","",&keys).unwrap();
+        assert_eq!(view[0]["display"]["trackingMessage"],
+            "박수취 22222222\n박수취 11111111");
+        assert_eq!(view[0]["display"]["paymentEvidenceMissing"],true);
+        assert_eq!(view[0]["display"]["references"][0]["link"]["via"],"HISTORICAL");
+        assert_eq!(view[0]["display"]["references"][0]["link"]["name"],"현재 연결 상품");
+        assert_eq!(state,before,"history view must never mutate saved state");
+    }
+
+    #[test]
+    fn historical_direct_product_mismatch_does_not_rebind_and_bank_evidence_hides_warning() {
+        let mut state=json!({
+            "orders":[{"id":"o1","clientId":"c1","raw":"709",
+                "createdAt":"2026-11-13","paid":true,
+                "recipients":[{"id":"r1","name":"박수취","items":[{
+                    "id":"i1","productId":"old","variantId":"v1"
+                }]}]}],
+            "clients":[{"id":"c1","tier":"wholesale"}],
+            "products":[
+                {"id":"old","name":"현재 직접 연결 실패","variants":[{"id":"other"}]},
+                {"id":"new","sourceProductId":"old","name":"연계 차단",
+                    "variants":[{"id":"v1"}]}
+            ],
+            "productMappings":{"old|v1":"new"},
+            "workflow":{"shipments":[],"groups":[],"queue":[],
+                "payments":[{"id":"p1","allocations":[{"shipmentId":"s1","amount":1}]}]}
+        });
+        assert_eq!(historical_link(&state,&state["orders"][0]["recipients"][0]["items"][0]),
+            Value::Null);
+        state["workflow"]["shipments"]=json!([{"id":"s1","orderId":"o1",
+            "recipientId":"r1","groupId":"g1","transferred":true,
+            "tracking":{} }]);
+        state["workflow"]["groups"]=json!([{"id":"g1"}]);
+        state["workflow"]["queue"]=json!([{"shipmentId":"s1","origin":"FACTORY",
+            "status":"EXPORTED","snapshot":{
+                "subtotal":0,"shipping":0,"vat":0,"total":0}}]);
+        let view=list_view(&state,"","",&Value::Null).unwrap();
+        assert_eq!(view[0]["display"]["references"][0]["link"],Value::Null);
+        assert_eq!(view[0]["display"]["paymentEvidenceMissing"],false);
+    }
 }
