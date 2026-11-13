@@ -259,8 +259,8 @@ fn fifteen_registered_title_colors_become_matchable_after_validated_data_repair(
             assert_eq!(variant["url"],change["registeredSourceUrl"]);
             // Correct the existing catalog fields, not the recognition
             // rules, so TypeScript and Rust both use their existing logic.
-            product["defaultColor"]=json!(desired);
             variant["color"]=json!(desired);
+            product["defaultColor"]=json!(desired);
         }
     }
     assert_eq!(updated.len(),15);
