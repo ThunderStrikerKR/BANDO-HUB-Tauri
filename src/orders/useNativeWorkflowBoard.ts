@@ -8,6 +8,7 @@ import type { Price, State, ValidationIssue } from "../types";
 
 export type NativeShipmentPreview = {
   shipmentId: string;
+  paid: number;
   totals: { subtotal: Price; shipping: Price; vat: Price; total: Price };
   freightCode: string;
   vatIncluded: boolean;
