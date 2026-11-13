@@ -163,11 +163,30 @@ pub(super) fn project_order(payload: &Value) -> Result<Value, String> {
         .map(|ship| workflow::shipment_totals(state, str_field(ship, "id")))
         .collect::<Result<Vec<_>, _>>()?;
     let recipients = rows(field(order, "recipients"));
+    let line_amounts = recipients.iter().flat_map(|recipient| {
+        rows(field(recipient, "items")).iter().map(|item| {
+            let amount = if str_field(item, "productId").is_empty()
+                || str_field(item, "variantId").is_empty() {
+                None
+            } else {
+                safe(field(item, "unitPrice"))
+                    .zip(field(item, "quantity").as_i64())
+                    .and_then(|(price, quantity)| price.checked_mul(quantity))
+                    .filter(|value| value.abs() <= super::MAX_SAFE)
+            };
+            json!({
+                "recipientId": field(recipient, "id"),
+                "itemId": field(item, "id"),
+                "amount": amount
+            })
+        })
+    }).collect::<Vec<_>>();
     let has_vat = recipients.iter().any(|row| vat_applies(order, row));
     let has_excluded = recipients.iter().any(|row| !vat_applies(order, row));
     Ok(json!({
         "orderId": order_id,
         "shipmentCount": ships.len(),
+        "lineAmounts": line_amounts,
         "total": sum_field(&amounts, "total"),
         "vatLabel": if has_vat && has_excluded { "부가세 포함/별도" }
             else if has_vat { "부가세 포함" } else { "부가세 별도" }
