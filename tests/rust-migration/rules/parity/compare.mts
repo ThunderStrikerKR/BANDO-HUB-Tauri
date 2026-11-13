@@ -27,6 +27,8 @@ import { validateReceptionBoundary, newReception, replaceReception, persistedRec
 import { confirmRetail, newRetailOrder } from "../../../../src/orders/retail.ts";
 import { rawCorrectableIssue, rawCorrectionAllowed, correctWorkingRaw } from "../../../../src/working-raw.ts";
 import { receiptOf, correctReceipt } from "../../../../src/receipt.ts";
+import { billingSnapshot, applyReply } from "../../../../src/replies.ts";
+import { addressInfo, addressParts } from "../../../../src/parser.ts";
 import { companyClient, companyParty } from "../../../../src/order-types.ts";
 import { explicitSender } from "../../../../src/explicit-sender.ts";
 
@@ -2825,6 +2827,106 @@ correctionWrapperCase("working correction valid preserved receipt","correct_work
 correctionWrapperCase("receipt correction valid audit","correct_receipt",
  ()=>{},"가상 수취인\n서울시 가상로 1\n010-1234-5678\n가상 상품 2개",
  "붙여넣기 오류",true);
+
+
+// Reply proposal extraction is owned by recognition; applyReply's state
+// transition is entirely business-rule driven and compared here using
+// identical structured proposals and original address parser outputs.
+function replyPreview(itemChange=false,recipientChange=false){
+  const before=copy(recipient);
+  const after=copy(before);
+  after.note="사전 확인한 배송 메모";
+  return {
+    raw:"가상 고객 회신",warnings:[],requiresReapproval:false,
+    changes:itemChange?[{
+      recipientId:"r1",itemId:"item1",before:copy(item),
+      after:{...copy(item),quantity:3,quantityConfirmed:true}
+    }]:[],
+    recipientChanges:recipientChange?[{
+      recipientId:"r1",
+      before:{name:before.name,address:before.address,phone:before.phone,
+        mobile:before.mobile,note:before.note},
+      after:{name:after.name,address:after.address,phone:after.phone,
+        mobile:after.mobile,note:after.note}
+    }]:[]
+  };
+}
+function replyCase(name:string,change:(state:any,o:any,preview:any)=>void,success:boolean,
+  itemChanged=true,recipientChanged=false,acknowledged=false){
+  const state:any=copy(baseState);
+  const o:any=copy(order);
+  const preview:any=replyPreview(itemChanged,recipientChanged);
+  change(state,o,preview);
+  const id="reply-"+name.replace(/[^a-zA-Z0-9]/g,"-");
+  const addresses:any={};
+  for(const change of preview.recipientChanges??[]){
+    if(change.before.address!==change.after.address){
+      const info=addressInfo(change.after.address);
+      addresses[change.recipientId]={kind:info.kind,
+        complete:info.complete,parts:addressParts(change.after.address)};
+    }
+  }
+  add("reply: "+name,"apply_reply_action",{
+    action:"apply_reply",state,order:o,preview,acknowledged,
+    now:actionNow,replyId:id,addresses
+  },()=>({order:deterministicIds([id],()=>
+    applyReply(o,preview,state,acknowledged))}));
+  cases[cases.length-1].expectedOk=success;
+}
+const billingState:any=copy(baseState);
+add("reply: standalone current billing snapshot","apply_reply_action",{
+  action:"billing_snapshot",state:billingState,order:order,
+  reason:"가상 회신 이전",now:actionNow
+},()=>({snapshot:frozenDate(()=>billingSnapshot(order as any,billingState as any,
+  "가상 회신 이전"))}));
+cases[cases.length-1].expectedOk=true;
+add("reply: billing without linked client rejected","apply_reply_action",{
+  action:"billing_snapshot",state:{...copy(baseState),clients:[]},
+  order:order,reason:"가상 회신 이전",now:actionNow
+},()=>({snapshot:billingSnapshot(order as any,
+  {...copy(baseState),clients:[]} as any,"가상 회신 이전")}));
+cases[cases.length-1].expectedOk=false;
+replyCase("apply one item quantity adjustment",()=>{},true);
+replyCase("apply recipient note adjustment",()=>{},true,false,true);
+replyCase("apply item and recipient note together",()=>{},true,true,true);
+replyCase("warning list prevents application",(_s,_o,p)=>{
+  p.warnings=["수량은 다시 확인하세요."];
+},false);
+replyCase("empty preview cannot be applied",(_s,_o,p)=>{
+  p.changes=[];p.recipientChanges=[];
+},false);
+replyCase("exported order is protected",(_s,o)=>{o.status="EXPORTED";},false);
+replyCase("reapproval required but not acknowledged",(_s,_o,p)=>{
+  p.requiresReapproval=true;
+},false);
+replyCase("acknowledged reapproval clears historical flags",(_s,o,p)=>{
+  p.requiresReapproval=true;
+  o.paid=true;o.notified=true;o.postpaidApproved=true;o.pricesLocked=true;
+},true,true,true,true);
+replyCase("stale item selection rejected",(_s,o)=>{
+  o.recipients[0].items[0].quantity=10;
+},false);
+replyCase("stale recipient selection rejected",(_s,o)=>{
+  o.recipients[0].note="이미 직원이 수정한 내역";
+},false,false,true);
+replyCase("confirmed recipient name changed",(_s,_o,p)=>{
+  p.changes=[];p.recipientChanges=[{
+    recipientId:"r1",
+    before:{name:recipient.name,address:recipient.address,phone:recipient.phone,
+      mobile:recipient.mobile,note:recipient.note},
+    after:{name:"김가상",address:recipient.address,phone:recipient.phone,
+      mobile:recipient.mobile,note:recipient.note}
+  }];
+},true,false,true);
+replyCase("recipient address change uses original parser",(_s,_o,p)=>{
+  p.changes=[];p.recipientChanges=[{
+    recipientId:"r1",
+    before:{name:recipient.name,address:recipient.address,phone:recipient.phone,
+      mobile:recipient.mobile,note:recipient.note},
+    after:{name:recipient.name,address:"서울특별시 가상로 23",phone:recipient.phone,
+      mobile:recipient.mobile,note:recipient.note}
+  }];
+},true,false,true);
 
 function normalized(v:unknown):string {
   if(Array.isArray(v))return "["+v.map(normalized).join(",")+"]";
