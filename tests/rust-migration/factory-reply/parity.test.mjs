@@ -127,6 +127,36 @@ scenario("missing factory item in original order",s=>{
   s.orders[0].recipients[0].items[0].origin="STORE";
 });
 
+// Boundary matrix exercises the genuine TS parser/reducer and the Rust
+// implementation with the same snapshots and concrete financial values.
+for (const amount of [0,1,3000,4000,5000,9_007_199_254_740_991,
+  9_007_199_254_740_992,-1,-1.5,0.5]) {
+  scenario("actual boundary "+amount,(_,r)=>{r.rows[0].actual=amount});
+}
+for (const number of ["00000000","12345678","0".repeat(30),"1234567",
+  "1".repeat(31),"123-45678","123 45678","", "１２３４５６７８"]) {
+  scenario("Q tracking length or format "+JSON.stringify(number),(_,r)=>{
+    r.rows[0].tracking=number;
+  });
+}
+for (const name of ["박수하","박 수 하","[박수하]","(박수하)", "박수하.",
+  "박수하-","다른수취인",""]) {
+  scenario("recipient normalized key "+JSON.stringify(name),(_,r)=>{
+    r.rows[0].name=name;
+  });
+}
+for (const contact of ["02-1234-5678","0212345678","02 1234 5678",
+  "(02) 1234.5678","010-2222-4444","01022224444","010-0000-0000",""]) {
+  scenario("contact normalized key "+JSON.stringify(contact),(_,r)=>{
+    r.rows[0].contacts=contact?[contact]:[];
+  });
+}
+for (const status of ["EXPORTED","QUEUED","CANCELLED",""]) {
+  scenario("frozen queue status "+JSON.stringify(status),s=>{
+    s.workflow.queue[0].status=status;
+  });
+}
+
 const header=Array.from({length:17},(_,i)=>"로젠 열 "+(i+1));
 function excelRow(){
   return ["박수하","","서울 서초구 123","02-1234-5678","010-2222-4444",
