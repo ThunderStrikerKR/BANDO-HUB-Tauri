@@ -1,8 +1,9 @@
 import { useRef, useState } from "react";
 import { confirmAction } from "./dialogs";
+import { previewNativeClientWorkbook } from "./native-client-workbook";
 import { businessCoreCall } from "./tauri-bridge";
 import {
-  exportClientWorkbook, previewClientWorkbook,
+  exportClientWorkbook,
   type ClientWorkbookPreview,
 } from "./client-workbook";
 import type { NoticeSink } from "./shared/notices";
@@ -43,7 +44,7 @@ export function ClientWorkbookTools({
       setPreview(undefined);
       setAccepted(false);
       const current = await window.bando!.load();
-      const result = await previewClientWorkbook(current, file);
+      const result = await previewNativeClientWorkbook(current, file);
       setPreview(result);
       setFileName(file.name);
     });
