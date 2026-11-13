@@ -6,6 +6,9 @@ import {fileURLToPath} from "node:url";
 import {tsImport} from "tsx/esm/api";
 const {orderHistory,orderHistoryStatus}=await tsImport("../../../src/app/order-history.ts",import.meta.url);
 const {dailySettlement}=await tsImport("../../../src/app/settlement-report.ts",import.meta.url);
+const {trackingMessage}=await tsImport("../../../src/factory-replies.ts",import.meta.url);
+const {resolveHistoricalProductReference}=await tsImport(
+  "../../../src/historical-product-reference.ts",import.meta.url);
 const manifest=fileURLToPath(new URL("./Cargo.toml",import.meta.url));
 const root=fileURLToPath(new URL("../../../",import.meta.url));
 const clone=x=>structuredClone(x);
@@ -247,4 +250,103 @@ test("same Rust history projections feed Rust settlement with full TS parity",()
     errors:errors.slice(0,8)},null,2));
   assert.equal(errors.length,0,String(errors.length)+" of "+requests.length+
     " TS/Rust end-to-end settlement scenarios differ");
+});
+
+
+test("Rust history view removes TS tracking, historical matching and payment algorithms",()=>{
+  const viewCases=[];
+  const expected=[];
+  function check(name,mutate=()=>{},query="",date=""){
+    const state=base();
+    mutate(state);
+    const trackingOrder=(state.workflow?.shipments??[]).map(ship=>({
+      shipmentId:ship.id,keys:Object.keys(ship.tracking??{}),
+    }));
+    const payload={state,query,date,trackingOrder};
+    const original=capture(()=>orderHistory(state,query,date).map(row=>({
+      ...row,
+      display:{
+        trackingMessage:trackingMessage(state,row.order.id),
+        paymentEvidenceMissing:!!row.order.paid &&
+          !(state.workflow?.payments??[]).some(p=>
+            p.allocations.some(a=>row.shipmentIds.includes(a.shipmentId))),
+        references:row.recipients.flatMap(recipient=>recipient.items.map(item=>{
+          const link=resolveHistoricalProductReference(state,item.productId,item.variantId);
+          return {recipientId:recipient.id,itemId:item.id,
+            link:link?{name:link.product.name,via:link.via}:null};
+        })),
+      },
+    })));
+    viewCases.push({operation:"list_order_history_view",payload});
+    expected.push({name,value:original});
+  }
+  check("no tracking");
+  check("factory waybill",s=>s.workflow.shipments[0].tracking.FACTORY="001234567890");
+  check("store waybill",s=>s.workflow.shipments[0].tracking.STORE="009988776655");
+  check("ordered reverse-origin waybills",s=>{
+    s.workflow.shipments[0].tracking={STORE:"009988776655",FACTORY:"001234567890"};
+  });
+  check("both origins forward order",s=>{
+    s.workflow.shipments[0].tracking={FACTORY:"001234567890",STORE:"009988776655"};
+  });
+  check("same name for two separate shipments",s=>{
+    const ship=clone(s.workflow.shipments[0]);ship.id="s2";
+    ship.tracking={STORE:"000011112222"};
+    s.workflow.shipments[0].tracking={FACTORY:"001234567890"};
+    s.workflow.shipments.push(ship);
+  });
+  check("direct current product linkage",s=>{
+    s.products.push({id:"p1",name:"현재 등록 상품",sourceProductId:null,
+      variants:[{id:"v1"}]});
+  });
+  check("historical parent and variant map",s=>{
+    s.products.push({id:"new-p",name:"현재 연계 상품",sourceProductId:"p1",
+      variants:[{id:"v1"}]});
+    s.productMappings={"p1|v1":"new-p"};
+  });
+  check("invalid historical mapping source",s=>{
+    s.products.push({id:"new-p",name:"잘못 연결된 상품",sourceProductId:"other",
+      variants:[{id:"v1"}]});
+    s.productMappings={"p1|v1":"new-p"};
+  });
+  check("direct product variant mismatch blocks old alias",s=>{
+    s.products.push({id:"p1",name:"직접 불일치",variants:[{id:"other"}]});
+    s.products.push({id:"new-p",name:"이전 모델",sourceProductId:"p1",
+      variants:[{id:"v1"}]});
+    s.productMappings={"p1|v1":"new-p"};
+  });
+  check("wrong number of price variants is not linked",s=>{
+    s.products.push({id:"p1",name:"옵션 2종",variants:[{id:"v1"},{id:"v2"}]});
+  });
+  check("missing product ID is not linked",s=>
+    s.orders[0].recipients[0].items[0].productId=null);
+  check("old paid flag without bank record",s=>{s.orders[0].paid=true});
+  check("old paid flag with matched bank allocation",s=>{
+    s.orders[0].paid=true;
+    s.workflow.payments=[{id:"bank-p1",allocations:[{shipmentId:"s1",amount:5000}]}];
+  });
+  check("old paid flag with unrelated bank allocation",s=>{
+    s.orders[0].paid=true;
+    s.workflow.payments=[{id:"bank-p1",allocations:[{shipmentId:"s3",amount:5000}]}];
+  });
+  check("past orders filtered",()=>{},"","2026-11-12");
+  check("deleted orders excluded",s=>{s.orders[0].deletedAt="2026-11-14"});
+  check("missing client error same as original",s=>{
+    s.clients=[];delete s.orders[0].clientSnapshot;s.orders[0].pricesLocked=false;
+  });
+  const proc=spawnSync("cargo",["run","--quiet","--manifest-path",manifest,
+    "--bin","parity_runner"],{cwd:root,encoding:"utf8",
+    input:JSON.stringify(viewCases),timeout:900000,maxBuffer:32*1024*1024});
+  if(proc.error)throw proc.error;
+  assert.equal(proc.status,0,proc.stderr);
+  const answers=JSON.parse(proc.stdout),different=[];
+  assert.equal(answers.length,viewCases.length);
+  for(let i=0;i<answers.length;i++){
+    try{assert.deepEqual(answers[i],expected[i].value)}
+    catch{different.push({name:expected[i].name,ts:expected[i].value,rust:answers[i]})}
+  }
+  if(different.length)console.error(JSON.stringify({cases:viewCases.length,
+    different:different.slice(0,8)},null,2));
+  assert.equal(different.length,0,String(different.length)+" of "+viewCases.length+
+    " original TS vs Rust history view cases differ");
 });
