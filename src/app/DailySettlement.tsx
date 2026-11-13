@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useRef, useState } from "react";
 import { won } from "../domain";
 import type { NoticeSink } from "../shared/notices";
 import type { State } from "../types";
@@ -8,7 +8,8 @@ import { ManagementTable } from "../ui/ManagementTable";
 import { DateNavigator } from "./DateNavigator";
 import { HelpTooltip } from "../ui/HelpTooltip";
 import { orderHistory } from "./order-history";
-import { dailySettlement } from "./settlement-report";
+import type { DailySettlementReport } from "./settlement-report";
+import { businessCoreCall } from "../tauri-bridge";
 
 const cash = (value: number | null) => value === null ? "확인 필요" : won(value);
 export function DailySettlement({
@@ -19,8 +20,28 @@ export function DailySettlement({
   onDate: (date: string) => void;
   onNotice: NoticeSink;
 }) {
-  const report = useMemo(() => dailySettlement(state, date, orderHistory(state, "", date)),
-    [state, date]);
+  const requestId = useRef(0);
+  const [loaded, setLoaded] = useState<{ state: State; date: string; report: DailySettlementReport } | null>(null);
+  const [failure, setFailure] = useState("");
+  useEffect(() => {
+    const id = ++requestId.current;
+    setLoaded(null);
+    setFailure("");
+    try {
+      const historyRows = orderHistory(state, "", date);
+      void businessCoreCall<DailySettlementReport>("output", "prepare_settlement", {
+        state, date, historyRows,
+      }).then((report) => {
+        if (requestId.current === id) setLoaded({ state, date, report });
+      }).catch((error: unknown) => {
+        if (requestId.current === id) setFailure(String(error));
+      });
+    } catch (error) {
+      if (requestId.current === id) setFailure(String(error));
+    }
+    return () => { if (requestId.current === id) requestId.current++; };
+  }, [state, date]);
+  const report = loaded?.state === state && loaded.date === date ? loaded.report : null;
   return (
     <section className="daily-settlement">
       <PageHeading title="일일 결산" />
@@ -28,6 +49,9 @@ export function DailySettlement({
         <span className="management-toolbar-label">결산 날짜</span>
         <DateNavigator label="결산 날짜" value={date} onChange={onDate}/>
       </div>
+      {failure && <section className="card" role="alert">{failure}</section>}
+      {!report && !failure && <section className="card" role="status">결산 자료 확인 중</section>}
+      {report && <>
       <section className="card">
         <div className="section-title">
           <h2 className="settings-help-heading">{date} / 일일 결산 조회 <HelpTooltip title="일일 결산" purpose="선택한 날짜에 접수한 주문의 청구 금액과 실제 계좌 입금 내역을 따로 확인합니다." when="하루 주문 금액과 실제 들어온 돈을 점검할 때 사용합니다." steps={["조회할 날짜를 선택합니다.", "접수 주문과 청구 합계를 확인합니다.", "아래 실제 입금 내역과 비교합니다.", "미확정 항목이나 확인할 내용이 있는지 점검합니다."]} result="해당 날짜의 주문과 입금 상태를 확인할 수 있습니다." caution="청구 금액은 주문 접수 날짜, 실제 입금액은 은행 입금 날짜를 기준으로 집계하므로 두 금액을 단순히 더하지 않습니다." /></h2>
@@ -111,6 +135,7 @@ export function DailySettlement({
           <ul>{report.warnings.map((notice) => <li key={notice}>{notice}</li>)}</ul>
         </section>
       )}
+      </>}
     </section>
   );
 }
