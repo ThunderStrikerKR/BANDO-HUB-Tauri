@@ -2065,6 +2065,14 @@ function twoShipped(s:WfState,separate=false){
     s.workflow.groups.push(group);sh.groupId=group.id;
   }
   s.workflow.shipments.push(sh);
+  // Source action functions call reconcileWorkflow on entry. Normalize
+  // second-recipient signatures and frozen recipient snapshots up front:
+  // otherwise this test accidentally compares reconciliation work against
+  // Rust's pure action route instead of comparing the same action.
+  Object.assign(s,deterministicIds(
+    Array.from({length:100},(_,i)=>"fixture-group-"+i),
+    ()=>reconcileWorkflow(s)
+  ));
 }
 function wfActionCase(
   name:string,action:string,
@@ -2119,18 +2127,27 @@ wfActionCase("process approved group","process_group",
   actionProps,s=>processGroup(s,WFG,WFA),true);
 wfActionCase("process incomplete group blocked","process_group",()=>{},
   actionProps,s=>processGroup(s,WFG,WFA),false);
+function preparedPrepaidStageThree(s:WfState){
+  s.clients[0].payment="PREPAID";
+  s.workflow.shipments[0].step=0;
+  const ready=deterministicIds(
+    Array.from({length:100},(_,i)=>"prepaid-preparation-"+i),
+    ()=>{
+      let state=reconcileWorkflow(s);
+      state=advanceGroup(state,WFG,WFA);
+      state=advanceGroup(state,WFG,WFA);
+      state=advanceGroup(state,WFG,WFA);
+      return state;
+    }
+  );
+  Object.assign(s,ready);
+}
 wfActionCase("prepaid confirm after account notice","confirm_group_payment",
-  s=>{s.clients[0].payment="PREPAID";
-    s.workflow.shipments[0].step=3;
-    s.workflow.groups[0].notices=[{
-      id:"notice-for-payment",at:now,actor:WFA,
-      shipmentIds:[WFS],amounts:{[WFS]:70400},total:70400,
-      account:copy(settings.accounts[0]),message:"입금 안내"
-    }];},
+  s=>preparedPrepaidStageThree(s),
   ids=>({...actionProps(ids),eventId:ids[1]}),
   s=>confirmGroupPayment(s,WFG,WFA),true);
 wfActionCase("prepaid confirm without prior notice blocked","confirm_group_payment",
-  s=>{s.clients[0].payment="PREPAID";s.workflow.shipments[0].step=3;},
+  s=>{preparedPrepaidStageThree(s);s.workflow.groups[0].notices=[];},
   actionProps,s=>confirmGroupPayment(s,WFG,WFA),false);
 wfActionCase("record customer payment","record_payment",()=>{},
   ids=>({...actionProps(ids),eventId:ids[2],
