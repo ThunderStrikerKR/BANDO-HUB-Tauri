@@ -38,6 +38,7 @@ struct ProductHit {
     decision: Value,
     quantities: Vec<usize>,
     common: bool,
+    each: bool,
 }
 
 /// The only public entrypoint. Returns an error instead of guessing on malformed input.
@@ -524,6 +525,10 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
             decision:matched,quantities:quantity_indexes,
             common:Regex::new(r"공통|모두|전부|전원|각\s*수취인|같은\s*상품")
                 .expect("common item").is_match(trimmed),
+            // order-evidence.ts:358-368: a common total is not a
+            // per-recipient quantity without explicit 'each' evidence.
+            each:Regex::new(r"(?i)(?:각각?|수취인마다|한\s*분당).*(?:\d+|한|두|세)\s*(?:개|대)|씩")
+                .expect("each-recipient quantity").is_match(trimmed),
         });
     }
     // A generic quantity line is evidence but cannot itself prove which SKU was ordered.
@@ -606,10 +611,25 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
         for idx in attach_to {
             let id = format!("recognition:item:{}:{}", utf16(raw,events[hit.evidence].start),idx);
             let rid = recipients[idx]["id"].as_str().unwrap_or("").to_owned();
-            let unique = hit.quantities.len()==1;
-            let quantity_value = if unique {
-                hit.quantities.first().and_then(|i|events[*i].value.parse::<i64>().ok())
+            // Direct port of order-evidence.ts:534-560:
+            // - non-common goods keep their own line quantity
+            // - common goods use a local detached quantity or an
+            //   explicitly per-recipient ('각각'/'씩') source quantity
+            // - a common document total must never be multiplied
+            let selected_qty = if hit.common {
+                events.iter().enumerate().find_map(|(qi,e)|
+                    (e.kind=="quantity" && e.item_id.is_none()
+                        && !hit.quantities.contains(&qi)
+                        && !product_hits.iter().any(|p|p.line==e.line)
+                        && owner_index(&anchors,&events,e.start)==idx).then_some(qi)
+                ).or_else(||(hit.each && hit.quantities.len()==1)
+                    .then(||hit.quantities[0]))
+            } else if hit.quantities.len()==1 {
+                Some(hit.quantities[0])
             } else {None};
+            let unique = selected_qty.is_some();
+            let quantity_value = selected_qty
+                .and_then(|i|events[i].value.parse::<i64>().ok());
             let chosen = hit.decision.get("productId").and_then(Value::as_str)
                 .filter(|s| !s.is_empty());
             let name = hit.decision.get("name").and_then(Value::as_str)
@@ -652,10 +672,10 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
                 "productCandidates":products,"sources":[],
             });
             let mut sources = vec![source_json(raw,&events[hit.evidence],&rid,&id)];
-            if unique {
-                sources.push(source_json(raw,&events[hit.quantities[0]],&rid,&id));
-                events[hit.quantities[0]].item_id=Some(id.clone());
-                events[hit.quantities[0]].recipient=Some(idx);
+            if let Some(qi)=selected_qty {
+                sources.push(source_json(raw,&events[qi],&rid,&id));
+                events[qi].item_id=Some(id.clone());
+                events[qi].recipient=Some(idx);
             }
             item["sources"] = json!(sources);
             recipients[idx]["items"].as_array_mut().expect("items").push(item);
