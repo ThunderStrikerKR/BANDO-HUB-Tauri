@@ -387,9 +387,18 @@ fn ts_product_display<'a>(
     if source.matches('|').count()>=4 {
         let bars:Vec<usize>=source.match_indices('|').map(|(i,_)|i).collect();
         if bars.len()>1 {
-            let (cell,offset)=trim_span(bars[0]+1,bars[1]);
-            if !cell.is_empty() && cell.chars().any(|c|c.is_alphabetic()) {
-                return (cell,offset);
+            // A numeric first column is only the line number. The TS
+            // source retains the entire order row in that format.
+            // A descriptive first column followed by a SKU in column 2
+            // denotes the actual product field (sample 19: BB-3).
+            let first=source[..bars[0]].trim();
+            let numbered=!first.is_empty()
+                && first.chars().all(|c|c.is_ascii_digit());
+            if !numbered {
+                let (cell,offset)=trim_span(bars[0]+1,bars[1]);
+                if !cell.is_empty() && cell.chars().any(|c|c.is_alphabetic()) {
+                    return (cell,offset);
+                }
             }
         }
     }
@@ -905,7 +914,36 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
             if !reason.is_null() {item["recognitionReason"]=reason;}
             apply_registered_item(&mut item,state,client,
                 hit.decision.get("color").and_then(Value::as_str).unwrap_or(""));
-            let mut sources = vec![source_json(raw,&events[hit.evidence],&rid,&id)];
+            let mut product_source=source_json(raw,&events[hit.evidence],&rid,&id);
+            // parser.ts::productNameEvidence returns the registered model
+            // token rather than the surrounding "(블랙)" color hint. Keep
+            // recognition's original evidence intact; correct only the
+            // Item-level source span consumed by UI highlighting.
+            if chosen.is_some() {
+                let evidence_text=product_source["text"].as_str().unwrap_or("");
+                if evidence_text.contains('(') && evidence_text.contains(')') {
+                    let original_len=evidence_text.encode_utf16().count();
+                    if let Some(p)=model::products(state).into_iter().find(|p|
+                        p.get("id").and_then(Value::as_str)==chosen) {
+                        let mut spans:Vec<_>=model::model_names(p).iter().filter_map(|name|
+                            model::find_term(&hit.raw,name,true)).collect();
+                        spans.retain(|(begin,end)| {
+                            *end>*begin && hit.raw[*begin..*end].encode_utf16().count()
+                                <original_len
+                        });
+                        spans.sort_by(|a,b|
+                            a.0.cmp(&b.0).then_with(||b.1.cmp(&a.1)));
+                        if let Some((begin,end))=spans.first().copied() {
+                            let start=hit.source_start+begin;
+                            let finish=hit.source_start+end;
+                            product_source["start"]=json!(utf16(raw,start));
+                            product_source["end"]=json!(utf16(raw,finish));
+                            product_source["text"]=json!(&hit.raw[begin..end]);
+                        }
+                    }
+                }
+            }
+            let mut sources=vec![product_source];
             if let Some(qi)=selected_qty {
                 sources.push(source_json(raw,&events[qi],&rid,&id));
                 events[qi].item_id=Some(id.clone());
