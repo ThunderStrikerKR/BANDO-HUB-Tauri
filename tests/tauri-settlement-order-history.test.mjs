@@ -44,6 +44,20 @@ function moduleFor(path) {
 const { seoulDate, dailySettlement } = moduleFor("settlement-report");
 const { orderHistory } = moduleFor("order-history");
 const { exportDailySettlementWorkbook, exportOrderHistoryWorkbook } = moduleFor("report-workbook");
+test("screen-only date and money formatters preserve legacy output",()=>{
+  const {seoulDate:dateLabel}=moduleFor("seoul-date");
+  const {won:wonLabel,internalModel:modelLabel}=moduleFor("history-format");
+  for (const stamp of ["2026-11-07T23:59:59+09:00",
+    "2026-11-06T15:01:00Z","2026-11-07","",undefined,"invalid"]) {
+    assert.equal(dateLabel(stamp),seoulDate(stamp));
+  }
+  assert.equal(wonLabel(1000),"1,000원");
+  assert.equal(wonLabel(null),"확인 필요");
+  assert.equal(modelLabel("[가상] BD 709"),"709");
+  assert.equal(modelLabel("BD 709"),"709");
+  assert.equal(modelLabel("Desk TS"),"Desk TS");
+});
+
 const DAY = "2026-11-07";
 const other = "2026-11-06";
 
@@ -300,10 +314,26 @@ test("actual xlsx roundtrip retains separate dated order billing and account rec
   assert.equal(receipts.getCell("G2").value,10000);
 });
 
+test("deferred history XLSX cannot silently replace a missing Rust payment verdict", async () => {
+  const state=base();
+  const legacyRows=orderHistory(state,"",DAY);
+  await assert.rejects(
+    exportOrderHistoryWorkbook(state,legacyRows),
+    /Rust 조회 결과를 확인하세요/,
+  );
+});
+
 test("real XLSX history export uses current filtered rows and never changes state", async () => {
   const state=base();
   const before=JSON.stringify(state);
-  const selected=orderHistory(state,"",DAY);
+  const selected=orderHistory(state,"",DAY).map((row) => ({
+    ...row,
+    // This is a serialization fixture only. Runtime verdicts are obtained
+    // from Rust list_order_history_view and compared in history-parity.test.
+    display:{paymentEvidenceMissing:!!row.order.paid &&
+      !(state.workflow?.payments??[]).some((p) =>
+        p.allocations.some((a) => row.shipmentIds.includes(a.shipmentId)))},
+  }));
   const bytes=await exportOrderHistoryWorkbook(state,selected);
   const book=new ExcelJS.Workbook();
   await book.xlsx.load(Buffer.from(bytes));
@@ -317,20 +347,42 @@ test("report screens keep live read-only views while Excel export buttons are de
   const app=read("src/App.tsx");
   const daily=read("src/app/DailySettlement.tsx");
   const history=read("src/app/OrderHistory.tsx");
+  const model=read("src/app/useAppModel.ts");
+  const reportWorkbook=read("src/app/report-workbook.ts");
+  const historyFormat=read("src/app/history-format.ts");
+  const dateFormat=read("src/app/seoul-date.ts");
   const native=read("src-tauri/src/lib.rs");
   const bridge=read("src/tauri-bridge.ts");
+  assert.match(history, /"rules", "list_order_history_view"/);
+  assert.match(history, /from "\.\/history-format"/);
+  assert.match(daily, /from "\.\/history-format"/);
+  assert.match(model, /from "\.\/seoul-date"/);
+  assert.match(reportWorkbook, /from "\.\/seoul-date"/);
+  assert.doesNotMatch(model, /from "\.\/settlement-report"/);
+  assert.doesNotMatch(reportWorkbook, /from "\.\/settlement-report"/);
+  assert.doesNotMatch(historyFormat, /^import /m);
+  assert.doesNotMatch(dateFormat, /^import /m);
+
   assert.match(app,/<DailySettlement state=\{state\}/);
   assert.match(daily,/businessCoreCall<DailySettlementReport>\("output", "prepare_settlement"/);
-  assert.match(daily,/const historyRows = orderHistory\(state, "", date\)/);
+  assert.match(daily, /"rules", "list_order_history"/);
+  assert.match(daily, /"output", "prepare_settlement"/);
+  assert.doesNotMatch(daily, /[^A-Za-z]orderHistory\(state, "", date\)/);
   assert.match(daily,/requestId\.current === id/);
   // Keep actual daily settlement and order-history queries, filters and warnings.
   assert.match(daily, /report\.orderRows\.map/);
   assert.match(daily, /report\.paymentRows\.map/);
   assert.match(daily, /report\.warnings\.map/);
-  assert.match(history, /orderHistory\(state, query, date\)/);
+  assert.match(history, /"rules", "list_order_history_view"/);
+  assert.match(history, /row\.display\.trackingMessage/);
+  assert.match(history, /row\.display\.paymentEvidenceMissing/);
+  assert.match(history, /row\.display\.references/);
+  assert.doesNotMatch(history, /trackingMessage\(state,/);
+  assert.doesNotMatch(history, /resolveHistoricalProductReference\(/);
+  assert.doesNotMatch(history, /[^A-Za-z]orderHistory\(state, query, date\)/);
   assert.match(history, /value=\{query\} onChange=\{onQuery\}/);
   assert.doesNotMatch(history, /주문 열기|onOpen\(row\.order\)/);
-  assert.match(history, /trackingMessage\(state, row\.order\.id\)/);
+  assert.match(history, /copy\(row\.display\.trackingMessage\)/);
   assert.match(history, /setExpanded\(/);
   assert.match(history, /배송 건 \/ 상품 항목을 펼쳐 주문 내용을 확인합니다/);
   assert.doesNotMatch(app, /onOpen=\{model\.open\}/);

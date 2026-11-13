@@ -8,5 +8,6 @@ publish = false
 unicode-normalization = "0.1"
 serde_json = "1"
 regex = "1"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
 
 [workspace]

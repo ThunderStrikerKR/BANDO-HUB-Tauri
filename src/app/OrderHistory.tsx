@@ -1,15 +1,13 @@
-import { trackingMessage } from "../factory-replies";
 import { DateNavigator } from "./DateNavigator";
-import { useMemo, useState } from "react";
-import { won } from "../domain";
-import { internalModel } from "../matching";
-import { resolveHistoricalProductReference } from "../historical-product-reference";
+import { useEffect, useRef, useState } from "react";
+import { won, internalModel } from "./history-format";
 import type { State } from "../types";
 import { ManagementSearch } from "../ui/ManagementSearch";
 import { HelpTooltip } from "../ui/HelpTooltip";
 import { EmptyState, PageHeading } from "../ui/PageHeading";
 import { ManagementTable } from "../ui/ManagementTable";
-import { orderHistory } from "./order-history";
+import type { orderHistory } from "./order-history";
+import { businessCoreCall } from "../tauri-bridge";
 import type { NoticeSink } from "../shared/notices";
 export function OrderHistory({
   state,
@@ -26,7 +24,43 @@ export function OrderHistory({
   onNotice: NoticeSink;
 }) {
   const [expanded, setExpanded] = useState<string[]>([]);
-  const rows = useMemo(() => orderHistory(state, query, date), [state, query, date]);
+  type HistoryRow = ReturnType<typeof orderHistory>[number] & {
+    display: {
+      trackingMessage: string;
+      paymentEvidenceMissing: boolean;
+      references: {
+        recipientId: string; itemId: string;
+        link: { name: string; via: "CURRENT" | "HISTORICAL" } | null;
+      }[];
+    };
+  };
+  const serial = useRef(0);
+  const [loaded, setLoaded] = useState<{
+    state: State; query: string; date: string; rows: HistoryRow[]
+  } | null>(null);
+  const [failure, setFailure] = useState("");
+  useEffect(() => {
+    const request = ++serial.current;
+    setLoaded(null);
+    setFailure("");
+    // JavaScript preserves Object.values insertion order; the key list is
+    // transport metadata only. Rust owns filtering and message decisions.
+    const trackingOrder = (state.workflow?.shipments ?? []).map((shipment) => ({
+      shipmentId: shipment.id,
+      keys: Object.keys(shipment.tracking ?? {}),
+    }));
+    void businessCoreCall<HistoryRow[]>("rules", "list_order_history_view", {
+      state, query, date, trackingOrder,
+    }).then((rows) => {
+      if (serial.current === request) setLoaded({ state, query, date, rows });
+    }).catch((error: unknown) => {
+      if (serial.current === request) setFailure(String(error));
+    });
+    return () => { if (serial.current === request) serial.current++; };
+  }, [state, query, date]);
+  const ready = loaded?.state === state && loaded.query === query &&
+    loaded.date === date;
+  const rows = ready ? loaded.rows : [];
   return (
     <>
       <PageHeading title="주문 내역" actions={<HelpTooltip title="주문 내역 조회" purpose="이전에 접수한 주문과 배송 처리 상태를 찾아 확인합니다." when="거래처 문의가 오거나 지난 발주 내용을 확인할 때 사용합니다." steps={["접수 날짜를 선택하거나 날짜 선택을 해제합니다.", "거래처명이나 주문 내용을 검색합니다.", "배송 건 / 상품 항목을 펼쳐 주문 내용을 확인합니다."]} result="해당 조건에 맞는 주문의 접수 내용과 처리 상태를 확인할 수 있습니다." caution="지난 주문을 조회하는 것만으로 당시 저장된 상품 및 금액 정보는 바뀌지 않습니다." />} />
@@ -38,6 +72,8 @@ export function OrderHistory({
             onChange={onDate} onClear={() => onDate("")} />
           <small className="result-count">{rows.length}건</small>
         </div>
+        {failure && <p role="alert" className="form-error">{failure}</p>}
+        {!ready && !failure && <p role="status">주문 이력을 확인 중입니다.</p>}
         <div className="table-scroll">
           <ManagementTable>
             <thead>
@@ -78,14 +114,14 @@ export function OrderHistory({
                         <div key={r.id}>
                           {r.name} / {r.address}
                           {r.items.map((item) => {
-                            const linked = resolveHistoricalProductReference(
-                              state, item.productId, item.variantId,
-                            );
+                            const linked = row.display.references.find((reference) =>
+                              reference.recipientId === r.id && reference.itemId === item.id
+                            )?.link;
                             return (
                               <p key={item.id}>
                                 주문 당시: {item.name} × {item.quantity ?? "수량 확인"}
                                 {linked?.via === "HISTORICAL" && (
-                                  <> / 현재 연결 상품: {linked.product.name}</>
+                                  <> / 현재 연결 상품: {linked.name}</>
                                 )}
                                 {!linked && item.productId && (
                                   <> / 상품 연결 확인 필요</>
@@ -129,15 +165,14 @@ export function OrderHistory({
                     {row.order.orderType === "RETAIL" && (
                       <small>소매 주문 / 결제 증빙 별도 확인</small>
                     )}
-                    {row.order.paid && !state.workflow?.payments.some((p) =>
-                      p.allocations.some((a) => row.shipmentIds.includes(a.shipmentId))) && (
+                    {row.display.paymentEvidenceMissing && (
                       <small>기존 입금 표시 / 실제 입금 기록 미확인</small>
                     )}
                   </td>
                   <td>
                     <button
-                      disabled={!trackingMessage(state, row.order.id)}
-                      onClick={() => void window.bando!.copy(trackingMessage(state, row.order.id))}
+                      disabled={!row.display.trackingMessage}
+                      onClick={() => void window.bando!.copy(row.display.trackingMessage)}
                     >
                       운송장 복사
                     </button>
@@ -147,7 +182,7 @@ export function OrderHistory({
             </tbody>
           </ManagementTable>
         </div>
-        {!rows.length && (
+        {ready && !rows.length && !failure && (
           <EmptyState compact
             title={query || date ? "조건에 맞는 주문이 없습니다." : "저장된 주문이 없습니다."}
             description={query || date ? "날짜나 검색어를 바꾸어 확인하세요." : undefined}
