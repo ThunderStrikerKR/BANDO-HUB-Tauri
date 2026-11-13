@@ -366,6 +366,53 @@ fn ts_candidate_color_label(value: &str) -> String {
     }
 }
 
+/// Recover the parseLegacy-local product row without reassigning any
+/// evidence. "name/phone" and table columns stay in original evidence,
+/// but are not part of the Product Item.raw field.
+fn ts_product_display<'a>(
+    hit: &'a ProductHit, events: &[Evidence]
+) -> (&'a str, usize) {
+    let source=hit.raw.as_str();
+    let trim_span=|begin:usize,end:usize|->(&'a str,usize) {
+        let end=end.min(source.len());
+        if begin>end || !source.is_char_boundary(begin) ||
+            !source.is_char_boundary(end) {return (source,0);}
+        let part=&source[begin..end];
+        let trimmed=part.trim();
+        let leading=part.find(trimmed).unwrap_or(0);
+        (trimmed,begin+leading)
+    };
+    // A normalized spreadsheet line: item code is the second pipe cell.
+    // The original parseLegacy creates that cell as a separate item line.
+    if source.matches('|').count()>=4 {
+        let bars:Vec<usize>=source.match_indices('|').map(|(i,_)|i).collect();
+        if bars.len()>1 {
+            let (cell,offset)=trim_span(bars[0]+1,bars[1]);
+            if !cell.is_empty() && cell.chars().any(|c|c.is_alphabetic()) {
+                return (cell,offset);
+            }
+        }
+    }
+    // The vertical column separator introduces recipient information.
+    if let Some(separator)=source.find('ㅣ') {
+        let (part,offset)=trim_span(0,separator);
+        if !part.is_empty(){return (part,offset);}
+    }
+    // Mixed product+quantity+recipient+phone on one line, as in
+    // original sample 18: only the product span through its quantity
+    // belongs to the local Item, not the separate recipient/contact.
+    let has_contact=regex::Regex::new(concat!(
+        r"(?:050\d|01[016789]|02|0[3-6]\d|070)[\s().-]*\d{3,4}[\s().-]*\d{4}"
+    )).expect("contact in mixed product").is_match(source);
+    if has_contact && hit.quantities.len()==1 {
+        let item_start=events[hit.evidence].start.saturating_sub(hit.source_start);
+        let quantity_end=events[hit.quantities[0]].end.saturating_sub(hit.source_start);
+        let (part,offset)=trim_span(item_start,quantity_end);
+        if !part.is_empty(){return (part,offset);}
+    }
+    (source,0)
+}
+
 fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, String> {
     let client_id = client_id(client);
     let lines = physical_lines(raw);
@@ -748,6 +795,7 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
                 .as_array().map_or(true,|xs|xs.is_empty())).collect()
         } else { vec![owner] };
         for idx in attach_to {
+            let (display_raw,display_start)=ts_product_display(hit,&events);
             let id = format!("recognition:item:{}:{}", utf16(raw,events[hit.evidence].start),idx);
             let rid = recipients[idx]["id"].as_str().unwrap_or("").to_owned();
             // Direct port of order-evidence.ts:534-560:
@@ -771,8 +819,17 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
                 .and_then(|i|events[i].value.parse::<i64>().ok());
             let chosen = hit.decision.get("productId").and_then(Value::as_str)
                 .filter(|s| !s.is_empty());
-            let name = hit.decision.get("name").and_then(Value::as_str)
-                .filter(|s|!s.is_empty()).unwrap_or(&hit.raw);
+            let decision_name=hit.decision.get("name").and_then(Value::as_str)
+                .filter(|s|!s.is_empty()).unwrap_or(display_raw);
+            // parser.ts::parseLegacy strips numeric quantity tokens from
+            // unregistered product display names (not registered SKU names).
+            let name=if chosen.is_none() && !regex::Regex::new(
+                    r"(?i)(?:BD\s*)?\d{3}[A-Za-z0-9-]*"
+                ).expect("legacy unknown model").is_match(display_raw) {
+                regex::Regex::new(r"(?i)\s*(?:\d+|세|삼)\s*(?:개|대|ea).*")
+                    .expect("legacy bare quantity")
+                    .replace(display_raw,"").trim().to_owned()
+            } else {decision_name.to_owned()};
             let reason = hit.decision.get("recognitionReason").cloned().unwrap_or(Value::Null);
             let mut issues: Vec<String> = Vec::new();
             if chosen.is_none() {
@@ -794,7 +851,13 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
                 // registered NAME matches (not the small regex evidence).
                 if term["kind"]=="NAME"
                     && term.get("aliasId").map_or(true,Value::is_null) {
-                    term["term"]=json!(hit.raw);
+                    // Source parser.ts chooses unknownModel before the
+                    // full line even when the registered SKU matched.
+                    let numeric=regex::Regex::new(
+                        r"(?i)(?:BD\s*)?\d{3}[A-Za-z0-9-]*"
+                    ).expect("legacy unknown term");
+                    term["term"]=json!(numeric.find(display_raw)
+                        .map(|m|m.as_str()).unwrap_or(display_raw));
                 }
                 // TypeScript omits undefined aliasId, not JSON null.
                 if term["aliasId"].is_null() {
@@ -805,9 +868,10 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
             if let Some(candidates)=products.as_array_mut() {
                 // This is the local parseLegacy(line) candidate contract.
                 // Full-document offsets belong only to source evidence.
-                let end=hit.raw.encode_utf16().count();
+                let begin=hit.raw[..display_start].encode_utf16().count();
+                let end=begin+display_raw.encode_utf16().count();
                 for candidate in candidates {
-                    candidate["start"]=json!(0);
+                    candidate["start"]=json!(begin);
                     candidate["end"]=json!(end);
                     if let Some(pid)=candidate.get("productId").and_then(Value::as_str) {
                         if let Some(p)=model::products(state).into_iter()
@@ -829,7 +893,7 @@ fn analyze(raw: &str, state: &Value, client: Option<&Value>) -> Result<Value, St
             }
             let mut item = json!({
                 "id":id,"productId":chosen,"variantId":hit.decision["variantId"],
-                "raw":hit.raw,"name":name,
+                "raw":display_raw,"name":name,
                 "color":hit.decision["color"],"quantity":quantity_value,
                 "quantityConfirmed":unique,"unitPrice":null,
                 "origin":hit.decision.get("origin").and_then(Value::as_str).unwrap_or("FACTORY"),
