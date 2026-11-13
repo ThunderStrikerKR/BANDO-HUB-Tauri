@@ -1,20 +1,16 @@
-name: Win32 Kakao native regression (migration 03 independent fix)
+name: Kakao Win32 native regression
+
 on:
   push:
     branches:
       - fix/03-kakao-native-ci-20261113
-  workflow_dispatch:
 
 permissions:
   contents: read
 
-concurrency:
-  group: kakao-native-regression-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  windows-kakao-and-app:
-    name: Real Windows Kakao Win32 fixture and complete Rust library
+  windows-native:
+    name: Windows Win32 synthetic Kakao and complete native library
     runs-on: windows-latest
     timeout-minutes: 45
     steps:
@@ -23,7 +19,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri -> target
-      - name: Verify Win32 Kakao fixture and layout on Windows
+      - name: Verify Win32 synthetic Kakao tests
         run: cargo test --manifest-path src-tauri/Cargo.toml --lib kakao_dock::native::tests:: -- --nocapture --test-threads=1
       - name: Verify entire production Tauri Rust library
         run: cargo test --manifest-path src-tauri/Cargo.toml --lib -- --nocapture
