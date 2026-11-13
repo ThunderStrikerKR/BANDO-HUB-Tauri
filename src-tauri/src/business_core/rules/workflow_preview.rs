@@ -118,6 +118,7 @@ pub(super) fn project(payload: &Value) -> Result<Value, String> {
                 "totals": amount,
                 "freightCode": freight_code,
                 "displayCharges": display_charges,
+                "freightEditingBlocked": freight_code == "020" || excluded,
                 "vatIncluded": vat
             }));
             totals.push(amount);
