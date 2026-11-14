@@ -47,6 +47,29 @@ fn pending_quantity(model: &Value) -> bool {
 }
 pub(super) fn apply(payload: &Value) -> Result<Value, String> {
     let action = required_str(payload, "action")?;
+    if action == "set_manual_recipient_field" {
+        let mut model = req(payload,"model")?.clone();
+        let cell = req(payload,"cell")?;
+        let field_name = required_str(cell,"field")?;
+        if !["name","phone","mobile","note"].contains(&field_name) {
+            return Err("입력 필드를 확인하세요.".into());
+        }
+        let rid = required_str(cell,"recipientId")?;
+        let value = required_str(payload,"value")?;
+        let row = model["rows"].as_array_mut().ok_or("배송 행을 선택하세요.")?
+            .iter_mut().find(|r|str_field(r,"id")==rid)
+            .ok_or("배송 행을 선택하세요.")?;
+        set(row,field_name,json!(value))?;
+        if !field(row,"confirmedFields").is_array() {
+            set(row,"confirmedFields",json!([]))?;
+        }
+        let confirmed = row["confirmedFields"].as_array_mut()
+            .ok_or("수취인 확인 목록 오류")?;
+        if !confirmed.iter().any(|v|v.as_str()==Some(field_name)) {
+            confirmed.push(json!(field_name));
+        }
+        return Ok(json!({"model":model}));
+    }
     if action == "parse_manual_quantity" {
         let input = required_str(payload, "value")?;
         let quantity = quantity_from_input(input);
@@ -165,6 +188,18 @@ pub(super) fn apply(payload: &Value) -> Result<Value, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn edits_recipient_only_without_changing_other_cells() {
+        let p=json!({"action":"set_manual_recipient_field",
+            "model":{"rows":[{"id":"r","name":"","items":[{"id":"i","quantity":3}]}],
+                "blocks":[],"assignments":{}},
+            "cell":{"recipientId":"r","field":"name"},
+            "value":"가상 고객"});
+        let result=apply(&p).unwrap();
+        assert_eq!(result["model"]["rows"][0]["name"],"가상 고객");
+        assert_eq!(result["model"]["rows"][0]["confirmedFields"],json!(["name"]));
+        assert_eq!(result["model"]["rows"][0]["items"][0]["quantity"],3);
+    }
     #[test]
     fn parses_original_manual_quantity_tokens() {
         for (input, expected) in [("3",json!(3)),(" 2 개 ",json!(2)),
