@@ -18,7 +18,7 @@ export type NativeFactoryReplyRecord = {
   notificationLabel: string;
   rows: NativeFactoryReplyRow[];
 };
-export function useNativeFactoryReplyReview(state: State) {
+export function useNativeFactoryReplyReview(state: State | undefined) {
   const [resolved, setResolved] = useState<{
     state: State;
     records: NativeFactoryReplyRecord[];
@@ -27,6 +27,10 @@ export function useNativeFactoryReplyReview(state: State) {
   useEffect(() => {
     let active = true;
     setError("");
+    if (!state) {
+      setResolved(undefined);
+      return () => { active = false; };
+    }
     void businessCoreCall<{ records: NativeFactoryReplyRecord[] }>(
       "output", "project_factory_reply_review", { state },
     ).then(({ records }) => {
@@ -39,6 +43,6 @@ export function useNativeFactoryReplyReview(state: State) {
     });
     return () => { active = false; };
   }, [state]);
-  const records = resolved?.state === state ? resolved.records : undefined;
+  const records = state && resolved?.state === state ? resolved.records : undefined;
   return { records, error, ready: !!records };
 }
