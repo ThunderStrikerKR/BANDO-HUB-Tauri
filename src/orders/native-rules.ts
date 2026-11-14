@@ -127,7 +127,12 @@ export async function nativeApplyWorkflowAction(
   // The immutable notice must use the full Rust-rendered payment text,
   // not the editable customer-message preview or a TypeScript formatter.
   // Render from the same reconciled state passed to the Rust rules reducer.
-  const paymentMessage = action === "advance_group" && typeof args.groupId === "string"
+  const nextStep = action === "advance_group" && typeof args.groupId === "string"
+    ? (await businessCoreCall<{ nextStep: number }>("rules", "evaluate_workflow", {
+        state: prepared, groupId: args.groupId,
+      })).nextStep
+    : undefined;
+  const paymentMessage = nextStep === 3 && typeof args.groupId === "string"
     ? (await businessCoreCall<{ payment: string }>("output", "render_payment_notice", {
         state: prepared, groupId: args.groupId,
       })).payment
