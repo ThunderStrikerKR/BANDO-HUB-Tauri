@@ -12,6 +12,9 @@ test("manual grid parses edited quantity using native Rust, never TS legacy pars
   assert.doesNotMatch(part, /setManualValue\(/);
   assert.match(part, /manualQuantityRequest\.current\[key\] !== request/);
   assert.match(source,/manualQuantityPending\.current\.has\(cellKey\(cell\)\)/);
+  const stepper = source.slice(source.indexOf("    const increment = (delta: number) => {"), source.indexOf("    return (",source.indexOf("    const increment = (delta: number) => {"));
+  assert.match(stepper, /action: "parse_manual_quantity", value: String\(value\)/);
+  assert.doesNotMatch(stepper, /setManualValue\(/);
 });
 test("manual quantity Rust implementation has executable original TS differential cases", () => {
   const core = read("src-tauri/src/business_core/rules/manual_classification.rs");
