@@ -259,6 +259,23 @@ fn payment_signature(view:&Value,payment_text:&str,account:Option<&Value>,
         format!(r#"{{"text":{text},"items":{item_text}}}"#)
     })
 }
+/** The immutable workflow notice stores the FULL payment text, including the
+ * greeting. The editable automatic-message preview deliberately removes that
+ * greeting, so never persist its preview "text" as an audit notice.
+ * Source oracle: workflow.ts::groupMessages(state, gid).payment. */
+pub(super) fn payment_notice(payload:&Value)->Result<Value,String>{
+    let state=payload.get("state").ok_or("메시지 생성 상태가 없습니다.")?;
+    let gid=string(payload,"groupId");
+    if gid.is_empty(){return Err("묶음을 선택하세요.".into());}
+    let (view,amounts,_)=group_view(state,gid)?;
+    let client=resolved_client(state,&view).cloned().unwrap_or_else(||json!({
+        "id":"","shippingFeeExcluded":false
+    }));
+    let account=account_for(state,&view,&client);
+    let rendered=payment(&payment_input(state,&view,&amounts,account,false)?,
+        &state["settings"])?;
+    Ok(json!({"payment":rendered["payment"]}))
+}
 /** Keep the original copy-only greeting helper in Rust too: request drafts
  * remain staff-editable, so this operation accepts the final edited text.
  */
