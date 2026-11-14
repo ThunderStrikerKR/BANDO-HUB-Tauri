@@ -10,7 +10,9 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: rust-output-migration03-${{ github.ref }}
+  # P1/P2 exact-EXE gate is isolated from long-running older branch attempts.
+  # All ordinary migration branches retain their original cancellation group.
+  group: ${{ github.ref_name == 'migration/26-p1-p2-runtime-closure' && format('rust-output-gate4-{0}', github.ref) || format('rust-output-migration03-{0}', github.ref) }}
   cancel-in-progress: true
 jobs:
   output-rust:
