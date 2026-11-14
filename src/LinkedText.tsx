@@ -145,7 +145,10 @@ export function LinkedText({
   editingRequested?: boolean;
 }) {
   const c = useContext(LinkContext),
-    [editing, setEditing] = useState(!text);
+    // Rust-generated request text arrives asynchronously. If the initial
+    // empty placeholder opened a textarea, the later response would stay in
+    // edit mode and never render hoverable linked spans until blur.
+    [editing, setEditing] = useState(!text && !directEdit);
   const wrapper = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!c.active || editing) return;
