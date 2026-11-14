@@ -525,7 +525,7 @@ export function ManualClassification({
             });
             return;
           }
-          if (["name", "phone", "mobile", "note"].includes(cell.field)) {
+          if (["name", "address", "phone", "mobile", "note"].includes(cell.field)) {
             const request = (manualTextRequest.current[key] ?? 0) + 1;
             manualTextRequest.current[key] = request;
             setEntry((old) => ({ ...old, [key]: value }));
@@ -542,8 +542,12 @@ export function ManualClassification({
                 const next = structuredClone(current);
                 const row = next.rows.find((row) => row.id === cell.recipientId);
                 if (!row) return current;
-                const field = cell.field as "name" | "phone" | "mobile" | "note";
+                const field = cell.field as "name" | "address" | "phone" | "mobile" | "note";
                 row[field] = changed[field];
+                if (field === "address") {
+                  row.addressParts = changed.addressParts;
+                  delete row.addressStatus;
+                }
                 row.confirmedFields = [...new Set([...(row.confirmedFields ?? []), field])];
                 return next;
               });
