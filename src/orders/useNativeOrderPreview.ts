@@ -4,12 +4,11 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { businessCoreCall } from "../tauri-bridge";
-import type { Order, Price, State, ValidationIssue } from "../types";
+import type { Order, Price, State } from "../types";
 
 export type NativeOrderPreview = {
   orderId: string;
   shipmentCount: number;
-  issues: ValidationIssue[];
   lineAmounts: Array<{ recipientId: string; itemId: string; amount: Price }>;
   total: Price;
   vatLabel: string;
