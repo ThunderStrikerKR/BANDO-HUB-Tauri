@@ -28,7 +28,8 @@ export function PriceCell({
     [error, setError] = useState("");
   const saving = useRef(false),
     expected = useRef(value),
-    input = useRef<HTMLInputElement>(null);
+    input = useRef<HTMLInputElement>(null),
+    lastReportedPending = useRef(false);
   const pendingRef = useRef(onPendingChange);
   pendingRef.current = onPendingChange;
 
@@ -39,9 +40,15 @@ export function PriceCell({
     if (!editing) setDraft(value === null ? "" : String(value));
   }, [value, editing]);
 
-  // Keep the enclosing page-leave guard aware of incomplete price entries.
-  useEffect(() => { pendingRef.current?.(pending); }, [pending]);
-  useEffect(() => () => { pendingRef.current?.(false); }, []);
+  // Report only transitions, not every unedited cell on initial table mount.
+  useEffect(() => {
+    if (lastReportedPending.current === pending) return;
+    lastReportedPending.current = pending;
+    pendingRef.current?.(pending);
+  }, [pending]);
+  useEffect(() => () => {
+    if (lastReportedPending.current) pendingRef.current?.(false);
+  }, []);
 
   const cancel = () => {
     if (saving.current) return;
