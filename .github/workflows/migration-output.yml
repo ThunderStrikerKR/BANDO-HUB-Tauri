@@ -87,6 +87,7 @@ jobs:
           BANDO_NATIVE_EXE: ${{ github.workspace }}\\src-tauri\\target\\release\\bando_hub.exe
           BANDO_NATIVE_OUT: native-p1p2-evidence
           BANDO_NATIVE_BIN_COMMIT: ${{ github.sha }}
+          BANDO_P1P2_AUDIT: "true"
         run: node scripts/migration03-reception-native-ui.mjs
       - name: Remove temporary WebView2 inspection policy
         if: always()
