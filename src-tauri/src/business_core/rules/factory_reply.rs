@@ -299,6 +299,24 @@ fn apply(payload:&Value)->Result<Value,String>{
 }
 // Historical review rows are resolved only by a later, successfully
 // applied correction. Source oracle: factory-replies.ts::replyNeedsReview.
+fn historical_row_resolved(state:&Value, record:&Value, row:&Value)->bool {
+    rows(state,"factoryReplies").iter().any(|later|
+        s(field(later,"resolves"),"id")==s(record,"id") &&
+        field(field(later,"resolves"),"row")==field(row,"row") &&
+        rows(later,"rows").iter().any(|result|field(result,"applied").as_bool()==Some(true)))
+}
+fn review_details(payload:&Value)->Result<Value,String>{
+    let state=payload.get("state").ok_or("공장 회신 상태 누락")?;
+    let reviews=rows(state,"factoryReplies").iter().map(|record|{
+        let row_details=rows(record,"rows").iter().map(|row|json!({
+            "row":field(row,"row"),
+            "resolved":historical_row_resolved(state,record,row)
+        })).collect::<Vec<_>>();
+        json!({"id":field(record,"id"),"needsReview":needs_review(state,record),
+            "rows":row_details})
+    }).collect::<Vec<_>>();
+    Ok(json!({"reviews":reviews}))
+}
 fn needs_review(state:&Value,record:&Value)->bool{
     if !s(record,"error").is_empty(){return true;}
     rows(record,"rows").iter().any(|row|{
@@ -319,6 +337,7 @@ fn review_list(payload:&Value)->Result<Value,String>{
 pub(super) fn execute(operation:&str,payload:&Value)->Result<Value,String>{
     match operation {
         "factory_reply_review_statuses"=>review_list(payload),
+        "factory_reply_review_details"=>review_details(payload),
         "analyze_factory_reply"=>analyze(payload),
         "preview_factory_reply"=>preview(
             payload.get("state").ok_or("공장 회신 상태 누락")?,
