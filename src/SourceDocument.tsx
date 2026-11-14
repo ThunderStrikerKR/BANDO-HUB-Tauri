@@ -41,6 +41,8 @@ export function SourceDocument({
   onManual?: () => void;
   onSettings?: () => void;
 }) {
+  const latestInputs = useRef({ order, text });
+  latestInputs.current = { order, text };
   const [retail, setRetail] = useState(false);
   const [ocrResult, setOcrResult] = useState<OcrCapture | null>(null);
   const [ocrBusy, setOcrBusy] = useState(false);
@@ -163,7 +165,7 @@ export function SourceDocument({
     setBusy(true);
     try {
       const next = await nativeReplaceReception(order, raw);
-      if (!alive.current) return;
+      if (!alive.current || latestInputs.current.order !== order || latestInputs.current.text !== text) return;
       onText(raw);
       onOrder(next);
       setOcrResult(null);
@@ -197,7 +199,7 @@ export function SourceDocument({
       } catch {
         /* Title lookup is optional; manual selection remains available. */
       }
-      if (!alive.current) return;
+      if (!alive.current || latestInputs.current.order !== order || latestInputs.current.text !== text) return;
       setWindows(chats);
       if (!order.clientId) {
         const id = rememberedTitleClient(state, chats),
@@ -352,7 +354,7 @@ export function SourceDocument({
                 setBusy(true);
                 try {
                   const cleared = await nativeReplaceReception(order, "");
-                  if (!alive.current) return;
+                  if (!alive.current || latestInputs.current.order !== order || latestInputs.current.text !== text) return;
                   onText("");
                   onOrder(cleared);
                   setError("");
