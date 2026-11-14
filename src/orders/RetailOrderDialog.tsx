@@ -2,14 +2,14 @@ import { useEffect, useRef, useState } from "react";
 import { sameValue } from "../shared/draft";
 import { confirmDiscardDraft } from "../shared/editor-flow";
 import { Modal, Field, MoneyInput } from "../ui";
-import { itemFromProduct } from "../domain";
+import { businessCoreCall } from "../tauri-bridge";
 import { companyClient, companySenderMissing } from "../order-types";
 import { deliveryRequirements } from "../delivery-requirements";
 import { contactProblem } from "../contact";
 import { ProductSearchDialog } from "../ProductSearchDialog";
 import { newRetailOrder } from "./retail";
 import { nativeConfirmRetail } from "./native-rules";
-import type { State } from "../types";
+import type { Item, State } from "../types";
 export function RetailOrderDialog({
   state,
   onSave,
@@ -31,6 +31,9 @@ export function RetailOrderDialog({
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
   const initial = useRef(structuredClone(order));
+  const addingProduct = useRef(false);
+  const alive = useRef(true);
+  useEffect(() => () => { alive.current = false; }, []);
   const closeDraft = () => void confirmDiscardDraft("직접 입력 주문", !sameValue(order, initial.current), onClose, busy);
   useEffect(() => onDraft?.(order), [order, onDraft]);
   const row = order.recipients[0],
@@ -262,14 +265,40 @@ export function RetailOrderDialog({
       {search && (
         <ProductSearchDialog
           state={state}
-          onClose={() => setSearch(false)}
-          onChoose={(p) => {
-            const item = itemFromProduct(p, companyClient(state.settings), p.variants[0].color, 1);
-            item.quantityConfirmed = false;
-            item.unitPrice = null;
-            item.origin = row.dispatchOrigin ?? "FACTORY";
-            change({ items: [...row.items, item] });
-            setSearch(false);
+          onClose={() => { if (!addingProduct.current) setSearch(false); }}
+          onChoose={(product) => {
+            if (addingProduct.current || busy) return;
+            addingProduct.current = true;
+            setBusy(true);
+            setError("");
+            const selectedVariant = product.variants[0];
+            void businessCoreCall<{ item: Item }>("rules", "create_catalog_item", {
+              product, client: companyClient(state.settings),
+              color: selectedVariant?.color,
+              variantId: product.variants.length === 1 ? selectedVariant?.id : undefined,
+              newItemId: crypto.randomUUID(), quantity: 1,
+            }).then(({ item: catalogItem }) => {
+              if (!alive.current) return;
+              if (!catalogItem.variantId) {
+                throw Error(catalogItem.issues[0] || "등록된 독립 상품을 선택하세요.");
+              }
+              const item: Item = {
+                ...catalogItem, quantityConfirmed: false, unitPrice: null,
+                origin: row.dispatchOrigin ?? "FACTORY",
+              };
+              // Functional updates preserve recipient edits made while Rust was executing.
+              setOrder((previous) => ({
+                ...previous,
+                recipients: previous.recipients.map((recipient, index) =>
+                  index === 0 ? { ...recipient, items: [...recipient.items, item] } : recipient),
+              }));
+              setSearch(false);
+            }).catch((cause) => {
+              if (alive.current) setError(cause instanceof Error ? cause.message : String(cause));
+            }).finally(() => {
+              addingProduct.current = false;
+              if (alive.current) setBusy(false);
+            });
           }}
         />
       )}
