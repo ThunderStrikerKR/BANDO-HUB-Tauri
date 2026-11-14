@@ -339,11 +339,33 @@ try{
   ].join("\n");
   await page.evaluate(async text=>window.bando.copy(text),raw);
   await page.getByRole("button",{name:"대리발송",exact:true}).click();
-  await page.waitForFunction(()=>{
-    const calls=window.__bandoNativeCalls||[];
-    return calls.some(x=>x.command==="business_core_call"&&
-      x.domain==="recognition"&&x.operation==="analyze_order");
-  },null,{timeout:50000});
+  try {
+    await page.waitForFunction(()=>{
+      const calls=window.__bandoNativeCalls||[];
+      return calls.some(x=>x.command==="business_core_call"&&
+        x.domain==="recognition"&&x.operation==="analyze_order");
+    },null,{timeout:18000});
+  }catch(error){
+    // Native reception may be blocked by a stale UI request before analysis.
+    // Capture real calls and visible source state instead of misclassifying
+    // this as a WebView2 or Rust compiler error.
+    const detail=await page.evaluate(()=>({
+      calls:window.__bandoNativeCalls||[],
+      sourceText:document.querySelector(".source-document")?.textContent?.slice(0,600),
+      sourcePane:document.querySelector(".source-pane")?.textContent?.slice(0,1000),
+      reviewText:document.querySelector(".review-pane")?.textContent?.slice(0,800),
+      alerts:[...document.querySelectorAll('[role="alert"],.source-error,.form-error')]
+        .map(e=>e.textContent?.slice(0,300)),
+      path:location.href,
+    }));
+    report.diagnostics.receptionAfterPaste=detail;
+    console.error("NATIVE_RECEPTION_PASTE_DIAGNOSTIC",JSON.stringify(detail));
+    await persist();
+    try{await snap(page,"05-native-reception-paste-diagnostic");}catch(e){
+      console.error("NATIVE_RECEPTION_DIAGNOSTIC_SCREENSHOT",String(e));
+    }
+    throw error;
+  }
   await page.waitForFunction(()=>{
     const el=document.querySelector(".source-document");
     return el && el.querySelectorAll(".linked-token").length>=5 &&
