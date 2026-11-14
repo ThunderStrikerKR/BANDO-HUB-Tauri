@@ -19,8 +19,8 @@ fn quantity_from_input(input: &str) -> Value {
             ("한",1),("두",2),("세",3),("네",4),("넷",4),("열",10),
             ("일",1),("이",2),("삼",3),("사",4),("오",5),
             ("육",6),("칠",7),("팔",8),("구",9),("십",10)];
-        let prefix = regex::Regex::new(r"(?i)^(\\d+|다섯|여섯|일곱|여덟|아홉|하나|둘|셋|넷|한|두|세|네|열|일|이|삼|사|오|육|칠|팔|구|십)\\s*(개|대|세트|ea|pcs)$").unwrap();
-        let multiplier = regex::Regex::new(r"^[x×*]\\s*(\\d+)$").unwrap();
+        let prefix = regex::Regex::new(r"(?i)^(\d+|다섯|여섯|일곱|여덟|아홉|하나|둘|셋|넷|한|두|세|네|열|일|이|삼|사|오|육|칠|팔|구|십)\s*(개|대|세트|ea|pcs)$").unwrap();
+        let multiplier = regex::Regex::new(r"^[x×*]\s*(\d+)$").unwrap();
         if let Some(caps) = prefix.captures(text) {
             let word = caps.get(1).unwrap().as_str();
             word.parse::<i64>().ok().or_else(||korean.iter()
