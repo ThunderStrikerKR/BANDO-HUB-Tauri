@@ -9,10 +9,12 @@ test("native factory conflict IPC is wired through both review surfaces", () => 
   const bridge=read("src/tauri-bridge.ts");
   const history=read("src/FactoryReplyHistory.tsx");
   const notification=read("src/FactoryNotifications.tsx");
+  const nativeReview=read("src/native-factory-conflict-review.ts");
+  assert.match(nativeReview, /"rules", "factory_conflict_confirmation"/);
   assert.match(lib,/factory_conflict::approve_factory_conflict/);
   assert.match(bridge,/invoke<void>\("approve_factory_conflict", \{ id, row, expectedRevision \}\)/);
   for(const ui of [history,notification]) {
-    assert.match(ui,/factoryConflictConfirmation\(/);
+    assert.match(ui,/nativeFactoryConflictConfirmation\(/);
     assert.match(ui,/approveFactoryConflict\(/);
     assert.doesNotMatch(ui,/await onSave\(next\)/);
     assert.doesNotMatch(ui,/await window\.bando!\.backup\(\)/);
