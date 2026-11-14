@@ -78,6 +78,8 @@ jobs:
         run: node --test tests/rust-migration/rules/manual-apply-parity.test.mjs
       - name: Compare factory review status and confirmation text against TypeScript
         run: node --test tests/rust-migration/output/factory-review-parity.test.mjs
+      - name: Compare native freight rate selection and history indicators with TS
+        run: node --test tests/rust-migration/rules/shipping-read-parity.test.mjs
       - name: Compare existing TypeScript price and freight with staged Rust rules
         run: node --test tests/rust-migration/rules/parity.test.mjs
 
