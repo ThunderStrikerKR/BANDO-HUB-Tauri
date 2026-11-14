@@ -79,12 +79,8 @@ jobs:
           Get-FileHash (Join-Path $dir "bando_hub.exe") -Algorithm SHA256
       - name: Install WebView2 inspection client (not browser emulator)
         run: npm install --no-save --no-package-lock --no-audit --no-fund playwright@1.55.1
-      - name: Enable loopback WebView2 inspection only for this disposable CI machine
-        shell: pwsh
-        run: |
-          $path="HKCU:\\Software\\Policies\\Microsoft\\Edge\\WebView2\\AdditionalBrowserArguments"
-          New-Item -Path $path -Force | Out-Null
-          New-ItemProperty -Path $path -Name "bando_hub.exe" -Value "--remote-debugging-port=19651 --remote-debugging-address=127.0.0.1" -PropertyType String -Force | Out-Null
+      # WebView2 CDP is enabled inside the test script after its synthetic
+      # SQLite bootstrap exits. Never assign the inspection port to bootstrap.
       - name: Boot real EXE, test isolated SQLite and native UI with actual Rust IPC
         env:
           BANDO_NATIVE_EXE: ${{ github.workspace }}\\src-tauri\\target\\release\\bando_hub.exe
@@ -92,12 +88,6 @@ jobs:
           BANDO_NATIVE_BIN_COMMIT: ${{ github.sha }}
           BANDO_P1P2_AUDIT: "true"
         run: node scripts/migration03-reception-native-ui.mjs
-      - name: Remove temporary WebView2 inspection policy
-        if: always()
-        shell: pwsh
-        run: |
-          $path="HKCU:\\Software\\Policies\\Microsoft\\Edge\\WebView2\\AdditionalBrowserArguments"
-          Remove-ItemProperty -Path $path -Name "bando_hub.exe" -ErrorAction SilentlyContinue
       - name: Preserve real EXE screenshot, native IPC and SQLite diagnostics
         if: always()
         uses: actions/upload-artifact@v4

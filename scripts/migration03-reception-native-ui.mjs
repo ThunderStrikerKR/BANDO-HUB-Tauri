@@ -70,6 +70,17 @@ try{
 }
 console.log("NATIVE_CI_BASELINE_CREATED",baseline);
 
+// Only the developer TEST process may own the WebView2 CDP port.
+// Bootstrap's WebView2 child may survive app.kill() briefly.
+const policyKey="HKCU\\Software\\Policies\\Microsoft\\Edge\\WebView2\\AdditionalBrowserArguments";
+const policyNames=[basename(exe),"com.bandostand.bandohub.tauri"];
+for(const name of policyNames){
+  execFileSync("reg.exe",["add",policyKey,"/v",name,"/t","REG_SZ",
+    "/d","--remote-debugging-port="+port+" --remote-debugging-address=127.0.0.1","/f"],
+    {stdio:"pipe",timeout:10000});
+}
+console.log("NATIVE_CDP_POLICY_APPLIED",JSON.stringify({policyNames,port}));
+
 const report={
   type:"real-Windows-Tauri-WebView2-IPC",
   automationCommit:process.env.GITHUB_SHA || "",
@@ -115,13 +126,32 @@ try{
         report.diagnostics.targets=targets.map(x=>({
           type:x.type,title:x.title,url:x.url
         }));
-        target=targets.find(x=>x.type==="page"&&/tauri|localhost/i.test(x.url||""));
+        target=targets.find(x=>x.type==="page"&&/tauri|localhost/i.test(x.url||""))
+          ?? targets.find(x=>x.type==="page");
         if(target)break;
       }
     }catch{/* startup */}
     await sleep(350);
   }
   if(!target){
+    // Retain forensic evidence for CDP failures; never fake an IPC result.
+    report.diagnostics.cdp={
+      port,appPid:app.pid,appExitCode:app.exitCode,
+      stdoutTail:stdout.slice(-2000),stderrTail:stderr.slice(-3000),
+      portConnections:[],
+    };
+    try {
+      report.diagnostics.cdp.portConnections=execFileSync("netstat.exe",["-ano"],
+        {encoding:"utf8",timeout:10000}).split(/\r?\n/).filter(x=>x.includes(":"+port));
+    }catch(e){report.diagnostics.cdp.portError=String(e);}
+    try {
+      const processes=execFileSync("pwsh.exe",["-NoProfile","-Command",
+        "Get-CimInstance Win32_Process | Where-Object { $_.Name -match 'msedgewebview2|bando_hub' } | Select-Object Name,ProcessId,ParentProcessId | ConvertTo-Json -Depth 3"],
+        {encoding:"utf8",timeout:12000});
+      report.diagnostics.cdp.processes=JSON.parse(processes);
+    }catch(e){report.diagnostics.cdp.processError=String(e);}
+    console.error("NATIVE_CDP_NOT_FOUND",JSON.stringify(report.diagnostics.cdp));
+    await persist();
     // UIAutomation-only fallback cannot prove the new P1/P2 Rust IPC actions.
     if (process.env.BANDO_P1P2_AUDIT === "true") {
       throw Error("P1/P2 native audit requires real WebView2 CDP and Rust IPC; UIA-only is not sufficient");
@@ -196,7 +226,8 @@ try{
     const original=api.invoke;
     api.invoke=function(command,args,...rest){
       window.__bandoNativeCalls.push({
-        command,domain:args?.domain,operation:args?.operation
+        command,domain:args?.domain,operation:args?.operation,
+        action:args?.payload?.action
       });
       return Reflect.apply(original,this,[command,args,...rest]);
     };
@@ -210,7 +241,8 @@ try{
     await page.waitForFunction(()=>
       (window.__bandoNativeCalls||[]).some(call=>
         call.command==="business_core_call"&&call.domain==="rules"&&
-        call.operation==="product_freight_view"),null,{timeout:60000});
+        call.operation==="apply_shipping_action"&&
+        call.action==="product_freight_view"),null,{timeout:60000});
     await snap(page,"04-native-p1p2-product-freight");
     const probes=await page.evaluate(async()=>{
       const call=(operation,payload)=>window.__TAURI_INTERNALS__.invoke(
@@ -244,31 +276,33 @@ try{
       if(item.item?.unitPrice!==30000||item.item?.variantId!=="v1"){
         throw Error("Native catalog item creation is inconsistent");
       }
-      const freight=await call("product_freight_view",{state});
-      if(freight.byProduct?.["p1-probe"]?.group?.id!=="probe-group"||
-        freight.byProduct?.["p1-probe"]?.editableRule?.fees?.["1"]!==3000){
+      const freight=await call("apply_shipping_action",{
+        action:"product_freight_view",state
+      });
+      if(freight.views?.["p1-probe"]?.group?.id!=="probe-group"||
+        freight.views?.["p1-probe"]?.editableRule?.fees?.["1"]!==3000){
         throw Error("Native effective/editable freight projection is inconsistent");
       }
-      const review=await call("factory_reply_review_details",{state});
+      const review=await call("factory_reply_review_statuses",{state});
       const original=review.reviews.find(x=>x.id==="review-1");
-      if(original?.needsReview!==false||original?.rows?.[0]?.resolved!==true){
+      if(original?.needsReview!==false||original?.resolvedRows?.[0]?.resolved!==true){
         throw Error("Native factory row resolution failed");
       }
-      const allowed=await call("validate_provisional_notices",{state});
+      const allowed=await call("validate_provisional_product_notices",{state});
       if(allowed.valid!==true)throw Error("Native provisional notice validation failed");
       let invalidRejected=false;
       try {
-        await call("validate_provisional_notices",{state:{
+        await call("validate_provisional_product_notices",{state:{
           ...state,settings:{provisionalProductNotices:{"missing-product":"안내"}}
         }});
       } catch {invalidRejected=true;}
       if(!invalidRejected)throw Error("Native notice validator allowed unknown product");
       const reset=await call("apply_shipping_action",{
-        action:"start_new_rule",shipping,groupId:"probe-group",productId:"p1-probe",
+        action:"reset_product_freight_rule",state,productId:"p1-probe",
         versionId:"v2",now:"2026-11-15T01:00:00Z"
       });
-      if(reset.shipping?.groups?.[0]?.current?.version!=="v2"||
-        reset.shipping?.groups?.[0]?.history?.[0]?.version!=="v1"||
+      if(reset.state?.shipping?.groups?.[0]?.current?.version!=="v2"||
+        reset.state?.shipping?.groups?.[0]?.history?.[0]?.version!=="v1"||
         shipping.groups[0].current.version!=="v1"){
         throw Error("Native freight change did not preserve previous tariff");
       }
@@ -278,10 +312,10 @@ try{
         throw Error("Pure P1/P2 Rust probes changed persisted test orders");
       }
       return {itemPrice:item.item.unitPrice,
-        effectiveFee:freight.byProduct["p1-probe"].editableRule.fees["1"],
-        historicalTariff:reset.shipping.groups[0].history[0].version,
-        savedTariff:reset.shipping.groups[0].current.version,
-        resolvedFactoryRow:original.rows[0].resolved,
+        effectiveFee:freight.views["p1-probe"].editableRule.fees["1"],
+        historicalTariff:reset.state.shipping.groups[0].history[0].version,
+        savedTariff:reset.state.shipping.groups[0].current.version,
+        resolvedFactoryRow:original.resolvedRows[0].resolved,
         noticeValidated:allowed.valid,invalidNoticeRejected:invalidRejected,
         databaseRevisionUnchanged:true};
     });
@@ -384,4 +418,9 @@ try{
   await persist();
   await browser?.close().catch(()=>{});
   if(app.exitCode===null)app.kill();
+  for(const name of policyNames){
+    try{execFileSync("reg.exe",["delete",policyKey,"/v",name,"/f"],
+      {stdio:"pipe",timeout:10000});}
+    catch(e){console.error("NATIVE_CDP_POLICY_CLEANUP_FAILED",name,String(e));}
+  }
 }
