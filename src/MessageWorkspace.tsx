@@ -126,7 +126,7 @@ export function MessageWorkspace({
           directEdit={request}
           label="복사용 자동 메시지 본문"
           text={text}
-          spans={messageSpans(text, order)}
+          spans={messageSpans(text, order, request ? "request" : "payment")}
           onChange={(value) => {
             if (gid && request) {
               // Optional links belong to the copy preview, not the editable request draft.
