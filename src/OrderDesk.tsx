@@ -198,6 +198,8 @@ export function OrderDesk(props: OrderDeskProps) {
               <div className="review-layout">
                 <StaffChecks
                   blocks={staffBlocks}
+                  loading={!flowSummaryReady && !flowSummaryError}
+                  error={!flowSummaryReady ? flowSummaryError : ""}
                   onSelect={selectIssue}
                   onCancelApproval={(b) => {
                     if (b.itemId)
