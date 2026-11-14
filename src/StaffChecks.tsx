@@ -4,6 +4,9 @@ export function StaffChecks({
   loading = false,
   error = "",
   onSelect,
+  onApproveOne,
+  canApproveOne,
+  approvingQuantity = false,
   onCancelApproval,
   onCandidate,
 }: {
@@ -11,6 +14,9 @@ export function StaffChecks({
   loading?: boolean;
   error?: string;
   onSelect: (block: StaffBlock) => void;
+  onApproveOne?: (block: StaffBlock) => void;
+  canApproveOne?: (block: StaffBlock) => boolean;
+  approvingQuantity?: boolean;
   onCancelApproval?: (b: StaffBlock) => void;
   onCandidate?: (b: StaffBlock, value: string) => void;
 }) {
@@ -80,7 +86,17 @@ export function StaffChecks({
               ))}
               {b.kind === "QUANTITY_MISSING" ? (
                 <>
-                  <button onClick={() => onSelect(b)}>수량 수정</button>
+                  <button type="button" onClick={() => onSelect(b)}>수량 수정</button>
+                  <button
+                    type="button"
+                    disabled={approvingQuantity || !canApproveOne?.(b)}
+                    title={!canApproveOne?.(b)
+                      ? "상품이 정확히 연결된 수량 미기재 건에만 1개 잠정 처리를 사용할 수 있습니다."
+                      : "직원 판단으로 1개를 잠정 적용합니다. 고객에게 보내는 안내문에 1개 발송 예정 문구가 포함됩니다."}
+                    onClick={() => onApproveOne?.(b)}
+                  >
+                    {approvingQuantity ? "처리 중" : "1개로 잠정 처리"}
+                  </button>
                 </>
               ) : (
                 <button onClick={() => onSelect(b)}>
@@ -117,13 +133,18 @@ export function StaffChecks({
         {others.map((b, n) => (
           <article className="staff-fact" key={b.issueId ?? n}>
             <div className="staff-fact-message">
-              <b>{b.title}</b>
+              <b>{b.kind === "QUANTITY_MISSING" && b.resolution === "PROVISIONALLY_APPROVED"
+                ? "수량 1개 잠정 처리됨"
+                : b.title}</b>
               <small>{b.detail}</small>
+              {b.kind === "QUANTITY_MISSING" && b.resolution === "PROVISIONALLY_APPROVED" && (
+                <small>1개 발송 예정 안내가 복사용 메시지에 포함됩니다. 실제 수량이 확인되면 수량을 수정하세요.</small>
+              )}
             </div>
             <div className="issue-actions">
               <button onClick={() => onSelect(b)}>입력 위치로 이동</button>
-              {b.kind === "QUANTITY_MISSING" && (
-                <button onClick={() => onCancelApproval?.(b)}>잠정 승인 취소</button>
+              {b.kind === "QUANTITY_MISSING" && b.resolution === "PROVISIONALLY_APPROVED" && (
+                <button type="button" onClick={() => onCancelApproval?.(b)}>잠정 승인 취소</button>
               )}
             </div>
           </article>
