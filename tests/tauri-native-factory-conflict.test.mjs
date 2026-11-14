@@ -12,7 +12,8 @@ test("native factory conflict IPC is wired through both review surfaces", () => 
   assert.match(lib,/factory_conflict::approve_factory_conflict/);
   assert.match(bridge,/invoke<void>\("approve_factory_conflict", \{ id, row, expectedRevision \}\)/);
   for(const ui of [history,notification]) {
-    assert.match(ui,/factoryConflictConfirmation\(/);
+    assert.match(ui,/useNativeFactoryReplyReview\(state\)/);
+    assert.doesNotMatch(ui,/factoryConflictConfirmation\(/);
     assert.match(ui,/approveFactoryConflict\(/);
     assert.doesNotMatch(ui,/await onSave\(next\)/);
     assert.doesNotMatch(ui,/await window\.bando!\.backup\(\)/);
@@ -31,4 +32,7 @@ test("user sees before and after values with one-row confirmation",()=>{
   assert.match(review,/기존:/);
   assert.match(review,/회신:/);
   assert.match(review,/이 한 행만 정정할까요/);
+  const native = read("src-tauri/src/business_core/output/factory_review.rs");
+  assert.match(native,/fn confirm\(/);
+  assert.match(native,/이 한 행만 정정할까요/);
 });
