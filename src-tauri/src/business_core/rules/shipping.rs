@@ -792,3 +792,42 @@ pub(super) fn shipping_action(payload: &Value) -> Result<Value, String> {
         _=>Err(format!("지원하지 않는 운임 action: {action}"))
     }
 }
+
+#[cfg(test)]
+mod p1_product_freight_tests {
+    use super::*;
+    #[test]
+    fn group_reset_keeps_historical_rate_and_unrelated_orders() {
+        let state=json!({
+            "products":[{"id":"p1","shippingGroupId":"g1"},{"id":"p2"}],
+            "orders":[{"id":"old-paid","shippingFee":3800,"paid":true}],
+            "shipping":{"epoch":2,"groups":[{"id":"g1","name":"가상 그룹",
+                "current":{"version":"original","fees":{"1":3800},
+                    "maxBundle":1,"maxConfirmed":true,"perItem":null,"notes":""},
+                "history":[]}],"productRules":{},"productHistory":{},
+                "combinations":[]}
+        });
+        let original=state["orders"].clone();
+        let r=shipping_action(&json!({"action":"reset_product_freight_rule",
+            "state":state,"productId":"p1",
+            "versionId":"new","now":"2026-11-15T00:00:00Z"})).unwrap();
+        assert_eq!(r["state"]["orders"],original);
+        assert_eq!(r["state"]["shipping"]["groups"][0]["history"][0]["version"],"original");
+        assert_eq!(r["state"]["shipping"]["groups"][0]["current"]["version"],"new");
+        assert_eq!(r["state"]["shipping"]["groups"][0]["current"]["fees"]["1"],Value::Null);
+    }
+    #[test]
+    fn individual_rate_reset_keeps_previous_rule(){
+        let state=json!({
+            "products":[{"id":"p1"}],
+            "shipping":{"groups":[],"productHistory":{},
+                "productRules":{"p1":{"version":"old","fees":{"1":6000},
+                    "maxBundle":1,"maxConfirmed":true,"perItem":null,"notes":""}}}
+        });
+        let r=shipping_action(&json!({"action":"reset_product_freight_rule",
+            "state":state,"productId":"p1",
+            "versionId":"new","now":"2026-11-15T00:00:00Z"})).unwrap();
+        assert_eq!(r["state"]["shipping"]["productHistory"]["p1"][0]["version"],"old");
+        assert_eq!(r["state"]["shipping"]["productRules"]["p1"]["version"],"new");
+    }
+}
