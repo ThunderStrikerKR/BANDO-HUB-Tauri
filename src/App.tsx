@@ -1,4 +1,4 @@
-import { replyNeedsReview } from "./factory-replies";
+import { useNativeFactoryReplyReview } from "./useNativeFactoryReplyReview";
 import { FactoryNotifications } from "./FactoryNotifications";
 import { FactoryReplyWatcher } from "./FactoryReplyWatcher";
 import { lazy, Suspense, useState } from "react";
@@ -43,6 +43,7 @@ export function App() {
   const [notifications, setNotifications] = useState(false);
   const model = useAppModel(),
     { state, draft, tab } = model;
+  const factoryReview = useNativeFactoryReplyReview(state);
   if (!state || !draft) {
     if (model.startup.phase === "ERROR" || model.startup.phase === "RETRYING") {
       return (
@@ -76,9 +77,7 @@ export function App() {
         />
         <AppHeader
           onNotifications={() => setNotifications(true)}
-          notificationCount={
-            state.factoryReplies?.filter((r) => replyNeedsReview(state, r)).length ?? 0
-          }
+          notificationCount={factoryReview.records?.filter((record) => record.needsReview).length ?? 0}
           page={tab}
           dock={model.dock}
           busy={model.dockBusy}
