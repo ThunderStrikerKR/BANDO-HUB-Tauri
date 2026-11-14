@@ -3,7 +3,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { type WorkflowSelection } from "../WorkflowBoard";
 import {
-  itemFromProduct,
   normalizeColor,
   orderClient,
   unassignedClient,
@@ -579,9 +578,10 @@ export function useOrderDesk({
     const itemId = iid;
     const variantId = p.variants[0].id;
     void run(async () => {
-      const { unitPrice } = await businessCoreCall<{ unitPrice: number | null }>(
-        "rules", "resolve_unit_price", {
+      const { item: catalogItem } = await businessCoreCall<{ item: Item }>(
+        "rules", "create_catalog_item", {
           product: p, variantId, client: pricingClient,
+          quantity: null, newItemId: crypto.randomUUID(),
         },
       );
       const current = latestRulesInput.current;
@@ -600,8 +600,10 @@ export function useOrderDesk({
             id: item.id, raw: item.raw, sources: item.sources,
             quantityConfirmed: item.quantityConfirmed,
           };
-          Object.assign(item, itemFromProduct(p, pricingClient, undefined, item.quantity, variantId, unitPrice), old, {
-            manuallyConfirmed: true, unitPrice,
+          const currentQuantity = item.quantity;
+          Object.assign(item, catalogItem, old, {
+            quantity: currentQuantity,
+            manuallyConfirmed: true, unitPrice: catalogItem.unitPrice,
           });
           item.match = { kind: "NAME", term: p.name, productIds: [p.id] };
           item.temporary = false;
@@ -613,8 +615,7 @@ export function useOrderDesk({
         });
       } else {
         recEdit(rid, (r) => r.items.push({
-          ...itemFromProduct(p, pricingClient, undefined, null, variantId, unitPrice),
-          unitPrice, quantityConfirmed: false,
+          ...catalogItem, quantityConfirmed: false,
         }));
       }
       setProductSearch(undefined);
