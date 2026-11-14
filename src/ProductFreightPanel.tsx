@@ -3,7 +3,7 @@ import { ManagementSearch } from "./ui/ManagementSearch";
 import { EmptyState } from "./ui/PageHeading";
 import { ManagementTable } from "./ui/ManagementTable";
 import { ShippingFeeRanges } from "./ShippingFeeRanges";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { businessCoreCall } from "./tauri-bridge";
 import { confirmAction } from "./dialogs";
 import { registeredProducts, sortProducts } from "./product-models";
@@ -12,12 +12,8 @@ import { useAsyncTask } from "./shared/useAsyncTask";
 import { sameFreightEditor } from "./shared/meaningful-changes";
 import { requestEditorLeave, usePageLeaveGuard } from "./shared/page-leave";
 
-import {
-  editableShippingRule,
-  effectiveShippingRule,
-  emptyProductRule,
-} from "./shipping";
-import type { ShippingRule, State } from "./types";
+import { emptyProductRule } from "./shipping";
+import type { ShippingRule, ShippingGroup, State } from "./types";
 import { Field, Modal, MoneyInput, clone } from "./ui";
 export function ProductFreightPanel({
   state,
@@ -40,7 +36,34 @@ export function ProductFreightPanel({
       name: string;
     }>();
   const [initialRule, setInitialRule] = useState<ShippingRule>();
-  const rows = sortProducts(
+  const [nativeFreight, setNativeFreight] = useState<{
+    state: State;
+    byProduct: Record<string, {
+      rule: ShippingRule | null;
+      group: ShippingGroup | null;
+      editableRule: ShippingRule | null;
+    }>;
+  }>();
+  const [nativeError, setNativeError] = useState("");
+  useEffect(() => {
+    let active = true;
+    setNativeError("");
+    void businessCoreCall<{
+      byProduct: Record<string, {
+        rule: ShippingRule | null;
+        group: ShippingGroup | null;
+        editableRule: ShippingRule | null;
+      }>;
+    }>("rules", "product_freight_view", { state }).then(({ byProduct }) => {
+      if (active) setNativeFreight({ state, byProduct });
+    }).catch(error => {
+      if (active) setNativeError("Rust 운임 조회 실패: " +
+        (error instanceof Error ? error.message : String(error)));
+    });
+    return () => { active = false; };
+  }, [state]);
+  const freightView = nativeFreight?.state === state ? nativeFreight.byProduct : undefined;
+  const rows = freightView ? sortProducts(
     registeredProducts(state.products).filter(
       (p) => p.catalog !== "DEMO" && !p.variants.some((v) => v.source === "DEMO"),
     ),
@@ -50,8 +73,8 @@ export function ProductFreightPanel({
         .toLowerCase()
         .replace(/\s/g, "")
         .includes(search.toLowerCase().replace(/\s/g, "")) &&
-      (!onlyMissing || !effectiveShippingRule(state, p.id).rule),
-  );
+      (!onlyMissing || !freightView[p.id]?.rule),
+  ) : [];
   const save = async (next: State, message: string) =>
     (
       await runSave(async () => {
@@ -128,6 +151,7 @@ export function ProductFreightPanel({
   return (
     <>
       <section className="shipping-card shipping-product-list">
+        {!freightView && <p role="status">{nativeError || "Rust 운임 기준 확인 중"}</p>}
         <div className="shipping-tools management-search-toolbar">
           <ManagementSearch label="상품별 운임 검색"
             placeholder="모델명 / 상품명 검색"
@@ -201,7 +225,7 @@ export function ProductFreightPanel({
             </thead>
             <tbody>
               {rows.map((p) => {
-                const { rule, group } = effectiveShippingRule(state, p.id);
+                const { rule, group, editableRule } = freightView![p.id];
                 return (
                   <tr key={p.id}>
                     <td>
@@ -239,7 +263,7 @@ export function ProductFreightPanel({
                         onClick={() => {
                           // A missing rule has a generated version ID. Create it
                           // once so an untouched editor is not falsely dirty.
-                          const initial = editableShippingRule(rule ?? emptyProductRule());
+                          const initial = editableRule ? clone(editableRule) : emptyProductRule();
                           setInitialRule(clone(initial));
                           setEditing({
                             productId: p.id,
