@@ -47,5 +47,5 @@ test("async native reception replacements reject replies for an obsolete order",
   assert.match(source, /const latestInputs = useRef\(\{ order, text \}\)/);
   assert.match(source, /latestInputs\.current\.order !== order \|\| latestInputs\.current\.text !== text/);
   const count = source.match(/latestInputs\.current\.order !== order/g) ?? [];
-  assert.equal(count.length, 3, "OCR, clipboard paste, and clearing must all reject stale replies");
+  assert.equal(count.length, 4, "OCR, paste and its remembered-title lookup, and clearing all reject stale replies");
 });
