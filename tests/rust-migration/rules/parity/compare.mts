@@ -3470,6 +3470,25 @@ shippingViewCase("individual product tariff",freightOwnRule);
 const freightDeletedGroup:any=copy(shippingViewState);
 freightDeletedGroup.shipping.groups[0].deletedAt=actionNow;
 shippingViewCase("deleted group falls back to product tariff",freightDeletedGroup);
+// An empty tombstone remains an active group in the original TS.
+const freightEmptyTombstone:any=copy(shippingViewState);
+freightEmptyTombstone.shipping.groups[0].deletedAt="";
+shippingViewCase("empty tombstone remains active",freightEmptyTombstone);
+
+// Optional/incomplete historical data: TS group?.current ?? product rule.
+const freightNullCurrent:any=copy(shippingViewState);
+freightNullCurrent.shipping.groups[0].current=null;
+freightNullCurrent.shipping.productRules={p1:{...copy(shipping.groups[0].current),
+  version:"product-fallback"}};
+add("product freight view: null group current falls back to individual",
+  "product_freight_view",{state:freightNullCurrent},()=>({
+    byProduct:Object.fromEntries(freightNullCurrent.products.map((p:any)=>{
+      const {rule,group}=effectiveShippingRule(freightNullCurrent,p.id);
+      return [p.id,{rule:rule??null,group:group??null,
+        editableRule:rule?editableShippingRule(rule):null}];
+    }))
+  }));
+
 
 // Resetting a tariff must archive the exact old rate and not touch past orders.
 function freightResetCase(name:string,mode:"group"|"product"){
