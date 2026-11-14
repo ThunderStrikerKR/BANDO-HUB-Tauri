@@ -122,6 +122,10 @@ try{
     await sleep(350);
   }
   if(!target){
+    // UIAutomation-only fallback cannot prove the new P1/P2 Rust IPC actions.
+    if (process.env.BANDO_P1P2_AUDIT === "true") {
+      throw Error("P1/P2 native audit requires real WebView2 CDP and Rust IPC; UIA-only is not sufficient");
+    }
     try{
       const outText=execFileSync("pwsh.exe",[
         "-NoProfile","-ExecutionPolicy","Bypass",
