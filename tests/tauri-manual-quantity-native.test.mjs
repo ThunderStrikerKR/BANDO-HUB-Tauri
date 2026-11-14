@@ -12,7 +12,8 @@ test("manual grid parses edited quantity using native Rust, never TS legacy pars
   assert.doesNotMatch(part, /setManualValue\(/);
   assert.match(part, /manualQuantityRequest\.current\[key\] !== request/);
   assert.match(source,/manualQuantityPending\.current\.has\(cellKey\(cell\)\)/);
-  const stepper = source.slice(source.indexOf("    const increment = (delta: number) => {"), source.indexOf("    return (",source.indexOf("    const increment = (delta: number) => {"));
+  const incrementStart = source.indexOf("    const increment = (delta: number) => {");
+  const stepper = source.slice(incrementStart, source.indexOf("    return (", incrementStart));
   assert.match(stepper, /action: "parse_manual_quantity", value: String\(value\)/);
   assert.doesNotMatch(stepper, /setManualValue\(/);
 });
