@@ -15,10 +15,9 @@ test("source header has four intake controls and no duplicated buttons below", (
 });
 test("OCR result requires user review before replacing a provisional order", () => {
   assert.match(source, /confirmAction\("기존 미확정 원문/);
-  // The actual OCR-reviewed replacement now uses the compiled Rust reducer.
-  assert.match(source, /const next = await nativeReplaceReception\(order, raw\)/);
-  assert.match(source, /"rules", "apply_reception_action", \{\s*action: "replace_reception"/);
-  assert.doesNotMatch(source, /\breplaceReception\(order, raw\)/);
+  assert.match(source, /await nativeReplaceReception\(order, raw\)/);
+  assert.match(source, /action: "replace_reception"/);
+  assert.match(source, /latestReception\.current\.order !== order/);
   assert.match(source, /setOcrResult\(null\)/);
   assert.match(source, /if \(formal\) return/);
   assert.doesNotMatch(ocr, /state_save/);

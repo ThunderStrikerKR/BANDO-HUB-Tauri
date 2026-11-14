@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { NoticeSink } from "./shared/notices";
 import { titleCandidates, titleKey } from "./title-clients";
-import { businessCoreCall } from "./tauri-bridge";
+import { nativeRememberTitle } from "./native-title-clients";
 import type { DockWindow, Order, State, Client } from "./types";
 import { Modal } from "./ui";
 export function KakaoClients({
@@ -37,16 +37,16 @@ export function KakaoClients({
     if (busy) return;
     setBusy(true);
     try {
-      if (chat) {
-        const { state: updated } = await businessCoreCall<{ state: State }>(
-          "rules", "remember_kakao_title_client", {
-            state, windows, handle: chat.handle, clientId: client.id,
-            actor: state.settings.operatorName || "직원",
-            now: new Date().toISOString(),
-          },
+      if (chat)
+        await onSave(
+          await nativeRememberTitle(
+            state,
+            windows,
+            chat.handle,
+            client.id,
+            state.settings.operatorName || "직원",
+          ),
         );
-        await onSave(updated);
-      }
       await onSelect(client.id);
       setOpen(false);
       setError("");

@@ -21,6 +21,56 @@ pub(super) fn billing(order:&Value,state:&Value,reason:&str,now:&str)->Result<Va
     }
     Ok(snapshot)
 }
+/// Commit-time native historical billing freeze. The editable React draft
+/// carries only the first edit's time/reason; all financial figures are derived
+/// from the unmodified saved order and its frozen client by compiled Rust.
+/// This operation has no SQLite write: state_save remains the sole transaction.
+pub(super) fn finalize_billing_history(payload:&Value)->Result<Value,String>{
+    let before=req(payload,"before")?;
+    let mut proposed=req(payload,"state")?.clone();
+    let previous_orders=rows(field(before,"orders"));
+    let previous_shipments=rows(field(field(before,"workflow"),"shipments"));
+    let orders=proposed.get_mut("orders").and_then(Value::as_array_mut)
+        .ok_or("주문 목록 누락")?;
+    for order in orders.iter_mut(){
+        let marker=order.get("pendingBillingSnapshot").cloned();
+        // A transient marker must never reach SQLite, even on new drafts.
+        if let Some(object)=order.as_object_mut(){
+            object.remove("pendingBillingSnapshot");
+        }
+        let Some(marker)=marker.filter(|v|!v.is_null()) else {continue};
+        let Some(previous)=previous_orders.iter()
+            .find(|old|str_field(old,"id")==str_field(order,"id")) else {continue};
+        // Never allow a stale React draft to overwrite an already frozen
+        // historical invoice, even if the first-edit marker survives a save.
+        let frozen=rows(field(previous,"billingHistory"));
+        let incoming=rows(field(order,"billingHistory"));
+        if incoming.len()<frozen.len() || !incoming.iter().zip(frozen).all(|(a,b)|a==b){
+            return Err("과거 청구 이력이 변경되었습니다. 최신 주문을 다시 불러오세요.".into());
+        }
+        if !flag(previous,"pricesLocked") ||
+            marker.get("activeGroupId").and_then(Value::as_str)
+                .is_some_and(|value|!value.is_empty()) ||
+            previous_shipments.iter().any(|ship|
+                str_field(ship,"orderId")==str_field(order,"id") &&
+                !flag(ship,"legacyArchived")) {
+            continue;
+        }
+        let reason=required_str(&marker,"reason")?;
+        let at=required_str(&marker,"at")?;
+        // Never calculate an old invoice from the edited order, current
+        // product prices, or the latest master-client pricing tier.
+        let snapshot=billing(previous,before,reason,at)?;
+        let history=order.as_object_mut()
+            .ok_or("정정 주문 정보가 없습니다.")?
+            .entry("billingHistory").or_insert_with(||json!([]));
+        if history.is_null(){*history=json!([]);}
+        history.as_array_mut().ok_or("청구 이력 형식을 확인하세요.")?
+            .push(snapshot);
+    }
+    Ok(json!({"state":proposed}))
+}
+
 pub(super) fn apply(payload:&Value)->Result<Value,String>{
     let action=required_str(payload,"action")?;
     let order=req(payload,"order")?;

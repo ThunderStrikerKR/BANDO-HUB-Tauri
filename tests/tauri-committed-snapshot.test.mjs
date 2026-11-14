@@ -8,7 +8,10 @@ test("native state_save returns the committed snapshot including revision", () =
   assert.match(block,/-> Result<Value, String>/);
   assert.match(block,/write_snapshot\(&mut \*lock_db\(&db\)\?, state, revision, true\)/);
   assert.doesNotMatch(block,/Ok\(\(\)\)/);
-  assert.match(read("src/tauri-bridge.ts"), /save: \(state\) => invoke<State>\("state_save"/);
+  const bridge=read("src/tauri-bridge.ts");
+  const save=bridge.match(/save: \(state\) => \{([\s\S]*?)\n  \},/)?.[1] ?? "";
+  assert.match(save,/return invoke<State>\("state_save", \{ state \}\)/);
+  assert.match(save,/auditNativeCall\("state_save"\)/);
 });
 test("common commit and workflow selection use the authoritative write response", () => {
   const source=read("src/app/useAppModel.ts");

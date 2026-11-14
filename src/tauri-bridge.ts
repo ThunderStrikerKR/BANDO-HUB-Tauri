@@ -3,12 +3,31 @@
  */
 import { invoke } from "@tauri-apps/api/core";
 
+/** CI-only native call audit. Vite drops this instrumentation from release builds. */
+function auditNativeCall(
+  command: string,
+  meta: { domain?: string; operation?: string; action?: unknown } = {},
+): void {
+  if (import.meta.env.VITE_BANDO_NATIVE_AUDIT !== "true" || typeof window === "undefined") return;
+  const trace = (window as Window & {
+    __bandoNativeCalls?: Array<{
+      command: string; domain?: string; operation?: string; action?: unknown;
+    }>;
+  }).__bandoNativeCalls;
+  if (Array.isArray(trace)) trace.push({ command, ...meta });
+}
+
 /** Shared Tauri IPC entry point; domain operations remain checked by Rust. */
 export function businessCoreCall<T>(
   domain: "recognition" | "rules" | "output" | "catalog_clients",
   operation: string,
   payload: unknown,
 ): Promise<T> {
+  auditNativeCall("business_core_call", {
+    domain, operation,
+    action: payload && typeof payload === "object" && "action" in payload
+      ? (payload as { action?: unknown }).action : undefined,
+  });
   return invoke<T>("business_core_call", { domain, operation, payload });
 }
 
@@ -43,12 +62,21 @@ const api: Api = {
   saveClientWorkbook: (bytes) => invoke<string | null>("save_client_workbook", { bytes }),
   saveRegistrationWorkbook: (kind, bytes) => invoke<string | null>("save_registration_workbook", { kind, bytes }),
   load: () => invoke<State>("state_load"),
-  save: (state) => invoke<State>("state_save", { state }),
+  save: (state) => {
+    auditNativeCall("state_save");
+    return invoke<State>("state_save", { state });
+  },
   patchSettings: (changes, expected) => invoke<State>("settings_patch", { changes, expected }),
   setPrice: (productId, variantId, tier, price, expected) =>
     invoke<State>("price_set", { productId, variantId, tier, price, expected }),
-  copy: (text) => invoke<void>("clipboard_write", { text }),
-  readClipboard: () => invoke<string>("clipboard_read"),
+  copy: (text) => {
+    auditNativeCall("clipboard_write");
+    return invoke<void>("clipboard_write", { text });
+  },
+  readClipboard: () => {
+    auditNativeCall("clipboard_read");
+    return invoke<string>("clipboard_read");
+  },
   captureOcr: () => invoke<OcrCapture>("capture_ocr"),
   openProduct: (url) => invoke<void>("product_open", { target: url }),
   catalogReport: () => invoke<CatalogReport>("catalog_report"),

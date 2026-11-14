@@ -43,6 +43,9 @@ export function ManualClassification({
   onNotice: NoticeSink;
 }) {
   const [model, setModel] = useState(() => initialManual(order));
+  const manualQuantityRequest = useRef<Record<string, number>>({});
+  const manualTextRequest = useRef<Record<string, number>>({});
+  const manualQuantityPending = useRef<Set<string>>(new Set());
   const latestInputs = useRef({ order, model });
   latestInputs.current = { order, model };
   const initial = useRef(JSON.stringify(model));
@@ -168,6 +171,10 @@ export function ManualClassification({
   const finishQuantity = (): boolean => {
     const cell = pendingRef.current;
     if (!cell) return true;
+    if (manualQuantityPending.current.has(cellKey(cell))) {
+      fail("입력 중인 수량을 확인하고 있습니다. 다시 완료해 주세요.", cell);
+      return false;
+    }
     const item = model.rows
       .find((row) => row.id === cell.recipientId)
       ?.items.find((item) => item.id === cell.itemId);
@@ -454,7 +461,7 @@ export function ManualClassification({
         ? (entry[key] ?? manualValue(model, cell))
         : cell.field === "quantity"
           ? (quantityText[key] ?? manualValue(model, cell))
-          : manualValue(model, cell);
+          : (entry[key] ?? manualValue(model, cell));
     const input = (
       <input
         data-cell={key}
@@ -484,14 +491,75 @@ export function ManualClassification({
             return;
           }
           if (cell.field === "quantity") {
+            const request = (manualQuantityRequest.current[key] ?? 0) + 1;
+            manualQuantityRequest.current[key] = request;
+            manualQuantityPending.current.add(key);
             setQuantityText((old) => ({ ...old, [key]: value }));
-            const next = setManualValue(model, cell, value, state, order);
-            next.rows
-              .find((row) => row.id === cell.recipientId)!
-              .items.find((item) => item.id === cell.itemId)!.quantityConfirmed = false;
             if (!pendingRef.current) beforeProduct.current = frame();
-            setModel(next);
             setPending(cell);
+            // Incomplete typing is a valid draft; only Rust interprets the quantity.
+            void businessCoreCall<{ quantity: number | null; quantityConfirmed: boolean }>(
+              "rules", "apply_manual_classification", {
+                action: "parse_manual_quantity", value,
+              },
+            ).then(({ quantity }) => {
+              if (manualQuantityRequest.current[key] !== request ||
+                  latestInputs.current.order !== order) return;
+              manualQuantityPending.current.delete(key);
+              setModel((current) => {
+                const next = structuredClone(current);
+                const item = next.rows.find((row) => row.id === cell.recipientId)
+                  ?.items.find((item) => item.id === cell.itemId);
+                if (!item) return current;
+                item.quantity = quantity;
+                item.quantityConfirmed = false;
+                delete item.quantityApproval;
+                item.issues = item.issues.filter((issue) => !issue.includes("수량"));
+                return next;
+              });
+            }).catch((e) => {
+              if (manualQuantityRequest.current[key] === request) {
+                manualQuantityPending.current.delete(key);
+                fail(e instanceof Error ? e.message : String(e), cell);
+              }
+            });
+            return;
+          }
+          if (["name", "address", "phone", "mobile", "note"].includes(cell.field)) {
+            const request = (manualTextRequest.current[key] ?? 0) + 1;
+            manualTextRequest.current[key] = request;
+            setEntry((old) => ({ ...old, [key]: value }));
+            void businessCoreCall<{ model: ManualModel }>(
+              "rules", "apply_manual_classification", {
+                action: "set_manual_recipient_field", model, cell, value,
+              },
+            ).then(({ model: updated }) => {
+              if (manualTextRequest.current[key] !== request ||
+                  latestInputs.current.order !== order) return;
+              const changed = updated.rows.find((row) => row.id === cell.recipientId);
+              if (!changed) throw Error("배송 행을 선택하세요.");
+              setModel((current) => {
+                const next = structuredClone(current);
+                const row = next.rows.find((row) => row.id === cell.recipientId);
+                if (!row) return current;
+                const field = cell.field as "name" | "address" | "phone" | "mobile" | "note";
+                row[field] = changed[field];
+                if (field === "address") {
+                  row.addressParts = changed.addressParts;
+                  delete row.addressStatus;
+                }
+                row.confirmedFields = [...new Set([...(row.confirmedFields ?? []), field])];
+                return next;
+              });
+              setEntry((old) => {
+                const next = { ...old };
+                delete next[key];
+                return next;
+              });
+            }).catch((e) => {
+              if (manualTextRequest.current[key] === request)
+                fail(e instanceof Error ? e.message : String(e), cell);
+            });
             return;
           }
           attempt(() => setModel(setManualValue(model, cell, value, state, order)), cell);
@@ -509,18 +577,45 @@ export function ManualClassification({
     );
     if (cell.field !== "quantity") return input;
     const increment = (delta: number) => {
-      if (!allowed(cell)) return;
+      if (!allowed(cell) || manualQuantityPending.current.has(key)) return;
       checkpoint();
       const value = Math.max(1, Number(manualValue(model, cell) || 0) + delta);
-      const next = setManualValue(model, cell, String(value), state, order);
-      next.rows
-        .find((r) => r.id === cell.recipientId)!
-        .items.find((i) => i.id === cell.itemId)!.quantityConfirmed = true;
-      setModel(next);
-      setQuantityText((old) => ({ ...old, [key]: String(value) }));
-      setPending(undefined);
-      setError(undefined);
-      requestAnimationFrame(() => focus(cell));
+      const request = (manualQuantityRequest.current[key] ?? 0) + 1;
+      manualQuantityRequest.current[key] = request;
+      manualQuantityPending.current.add(key);
+      void businessCoreCall<{ quantity: number | null; quantityConfirmed: boolean }>(
+        "rules", "apply_manual_classification", {
+          action: "parse_manual_quantity", value: String(value),
+        },
+      ).then(({ quantity, quantityConfirmed }) => {
+        if (manualQuantityRequest.current[key] !== request ||
+            latestInputs.current.order !== order) return;
+        manualQuantityPending.current.delete(key);
+        if (!quantityConfirmed || quantity == null) {
+          fail("수량을 1 이상의 정수로 입력하세요.", cell);
+          return;
+        }
+        setModel((current) => {
+          const next = structuredClone(current);
+          const item = next.rows.find((r) => r.id === cell.recipientId)
+            ?.items.find((i) => i.id === cell.itemId);
+          if (!item) return current;
+          item.quantity = quantity;
+          item.quantityConfirmed = true;
+          delete item.quantityApproval;
+          item.issues = item.issues.filter((issue) => !issue.includes("수량"));
+          return next;
+        });
+        setQuantityText((old) => ({ ...old, [key]: String(quantity) }));
+        setPending(undefined);
+        setError(undefined);
+        requestAnimationFrame(() => focus(cell));
+      }).catch((e) => {
+        if (manualQuantityRequest.current[key] === request) {
+          manualQuantityPending.current.delete(key);
+          fail(e instanceof Error ? e.message : String(e), cell);
+        }
+      });
     };
     return (
       <div className="manual-quantity-cell">
@@ -827,6 +922,7 @@ export function ManualClassification({
                 void businessCoreCall<{ order: Order }>(
                   "rules", "apply_manual_classification", {
                     action: "apply_manual", order: submittedOrder, model: submittedModel,
+                    assignmentOrder: Object.keys(submittedModel.assignments),
                   },
                 ).then(({ order: prepared }) => {
                   if (latestInputs.current.order !== submittedOrder ||

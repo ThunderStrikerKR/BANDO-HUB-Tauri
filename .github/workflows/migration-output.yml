@@ -3,13 +3,17 @@ on:
   push:
     branches:
       - migration/03-integration
+      - migration/26-p1-p2-runtime-closure
+      - migration/27-unified-rust
       - migration/05-factory-reply
       - integration/06-history-settlement
   workflow_dispatch:
 permissions:
   contents: read
 concurrency:
-  group: rust-output-migration03-${{ github.ref }}
+  # P1/P2 exact-EXE gate is isolated from long-running older branch attempts.
+  # All ordinary migration branches retain their original cancellation group.
+  group: ${{ github.ref_name == 'migration/27-unified-rust' && format('rust-output-gate4-{0}', github.ref) || format('rust-output-migration03-{0}', github.ref) }}
   cancel-in-progress: true
 jobs:
   output-rust:
@@ -48,6 +52,55 @@ jobs:
       - name: Compile actual Tauri Rust and SQLite tests on Windows
         run: cargo test --manifest-path src-tauri/Cargo.toml --lib
 
+  windows-p1p2-real-exe:
+    if: github.ref_name == 'migration/27-unified-rust' || github.ref_name == 'migration/03-integration'
+    runs-on: windows-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+      - name: Install frontend build dependencies
+        run: npm install --no-audit --no-fund
+      - name: Build real Windows EXE with CI-only WebView2 CDP config
+        # Same business source as production; UI audit hooks are Vite-gated.
+        # Production tauri.conf.json never enables WebView2 remote debugging.
+        env:
+          VITE_BANDO_NATIVE_AUDIT: "true"
+        run: npm run build:windows -- --config src-tauri/tauri.ci-cdp.conf.json
+      - name: Stage exact Windows binary and record SHA256
+        shell: pwsh
+        run: |
+          $dir="src-tauri/target/release"
+          $original=Join-Path $dir "bando_hub_tauri.exe"
+          if(!(Test-Path $original)){throw "Native EXE was not built"}
+          Copy-Item $original (Join-Path $dir "bando_hub.exe")
+          Get-FileHash (Join-Path $dir "bando_hub.exe") -Algorithm SHA256
+      - name: Install WebView2 inspection client (not browser emulator)
+        run: npm install --no-save --no-package-lock --no-audit --no-fund playwright@1.55.1
+      # CI-only Tauri config passes browser args directly to WebView2.
+      # Wry's default options bypass environment/registry CDP overrides.
+      - name: Boot real EXE, test isolated SQLite and native UI with actual Rust IPC
+        env:
+          BANDO_NATIVE_EXE: ${{ github.workspace }}\\src-tauri\\target\\release\\bando_hub.exe
+          BANDO_NATIVE_OUT: native-p1p2-evidence
+          BANDO_NATIVE_BIN_COMMIT: ${{ github.sha }}
+          BANDO_P1P2_AUDIT: "true"
+        run: node scripts/migration03-reception-native-ui.mjs
+      - name: Preserve real EXE screenshot, native IPC and SQLite diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: P1P2-real-Windows-Tauri-EXE-evidence
+          path: native-p1p2-evidence/
+          if-no-files-found: warn
+          retention-days: 7
+
   output-ts-rust-parity:
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -67,6 +120,18 @@ jobs:
         run: node --test tests/rust-migration/output/automatic-request-parity.test.mjs
       - name: Compare full automatic messages and legacy payment copy signatures
         run: node --test tests/rust-migration/output/full-automatic-parity.test.mjs
+      - name: Compare customer-visible correction text
+        run: node --test tests/rust-migration/output/correction-parity.test.mjs
+      - name: Compare Kakao title-client mapping
+        run: node --test tests/rust-migration/catalog-clients/title-clients-parity.test.mjs
+      - name: Compare commit-time billing snapshots
+        run: node --test tests/rust-migration/rules/billing-commit-parity.test.mjs
+      - name: Compare manually classified orders
+        run: node --test tests/rust-migration/rules/manual-apply-parity.test.mjs
+      - name: Compare factory review projection
+        run: node --test tests/rust-migration/output/factory-review-parity.test.mjs
+      - name: Compare Rust freight-read projection
+        run: node --test tests/rust-migration/rules/shipping-read-parity.test.mjs
       - name: Compare existing TypeScript price and freight with staged Rust rules
         run: node --test tests/rust-migration/rules/parity.test.mjs
 

@@ -5,7 +5,7 @@ import { requestEditorLeave, usePageLeaveGuard } from "./shared/page-leave";
 import { refreshAfterCommittedSave } from "./shared/committed-state";
 import { sameValue } from "./shared/draft";
 import { registeredProducts } from "./product-models";
-import { validateProvisionalProductNotices } from "./provisional-product-notices";
+import { businessCoreCall } from "./tauri-bridge";
 import type { NoticeSink } from "./shared/notices";
 import type { State } from "./types";
 
@@ -65,7 +65,10 @@ export function ProvisionalProductNoticeManager({
       const latest = await window.bando.load();
       const candidate = structuredClone(latest);
       candidate.settings.provisionalProductNotices = structuredClone(draft);
-      validateProvisionalProductNotices(candidate);
+      // The native validator is authoritative; no TS fallback on failure.
+      await businessCoreCall<{ valid: boolean }>(
+        "rules", "validate_provisional_product_notices", { state: candidate },
+      );
       await window.bando.backup();
       const updated = await window.bando.patchSettings(
         {provisionalProductNotices:draft},

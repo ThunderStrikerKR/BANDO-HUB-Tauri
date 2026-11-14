@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { confirmAction, promptText } from "./dialogs";
 import { money, won } from "./domain";
 import { businessCoreCall } from "./tauri-bridge";
+import { useNativeShippingRead } from "./useNativeShippingRead";
 import { internalModel } from "./matching";
 import { colorLabel, registeredProducts, sortProducts } from "./product-models";
 import { ProductFreightPanel } from "./ProductFreightPanel";
@@ -31,29 +32,10 @@ export function ShippingManager({
   const { busy, run: runSave } = useAsyncTask(onNotice);
   const [deleting, setDeleting] = useState("");
   const shipping = useMemo(() => state.shipping ?? initialShipping(), [state.shipping]);
-  const [nativeView, setNativeView] = useState<{
-    state: State;
-    shipping: ShippingState;
-    editableRules: Record<string, ShippingRule>;
-    currentCombinations: Record<string, boolean>;
-  }>();
-  useEffect(() => {
-    let active = true;
-    void businessCoreCall<{
-      editableRules: Record<string, ShippingRule>;
-      currentCombinations: Record<string, boolean>;
-    }>("rules", "shipping_manager_view", {
-      state: { ...state, shipping }, shipping,
-    }).then((result) => {
-      if (active) setNativeView({ state, shipping, ...result });
-    }).catch((error) => {
-      if (active) onNotice("Rust 운임 기준 조회 실패: " +
-        (error instanceof Error ? error.message : String(error)), "error");
-    });
-    return () => { active = false; };
-  }, [state, shipping, onNotice]);
-  const currentView = nativeView?.state === state &&
-    nativeView.shipping === shipping ? nativeView : undefined;
+  const effectiveState = useMemo(
+    () => state.shipping ? state : { ...state, shipping }, [state, shipping],
+  );
+  const freightRead = useNativeShippingRead(effectiveState);
   const [tab, setTab] = useState<"products" | "assign" | "rates" | "history">("products"),
     [query, setQuery] = useState(""),
     [filter, setFilter] = useState("all"),
@@ -297,7 +279,7 @@ export function ShippingManager({
         </article>
       </div>
       {tab === "products" && (
-        <ProductFreightPanel state={{ ...state, shipping }} onSave={onSave} onNotice={onNotice} />
+        <ProductFreightPanel state={effectiveState} onSave={onSave} onNotice={onNotice} />
       )}
       {tab === "assign" && (
         <section className="shipping-card shipping-assignment-list">
@@ -565,12 +547,14 @@ export function ShippingManager({
                         }}
                       >이름 수정</Button>
                       <Button size="compact"
-                        disabled={!currentView?.editableRules[g.id]}
                         onClick={() => {
-                          const initial = currentView?.editableRules[g.id];
-                          if (!initial) return;
+                          const initial = freightRead.group(g.id)?.editableRule;
+                          if (!initial) {
+                            onNotice("운임 기준이 아직 조회되지 않았습니다.", "error");
+                            return;
+                          }
                           setInitialEditing(structuredClone(initial));
-                          setEditing({ id: g.id, rule: structuredClone(initial) });
+                          setEditing({ id: g.id, rule: initial });
                         }}
                       >
                         운임 수정
@@ -601,6 +585,9 @@ export function ShippingManager({
       {tab === "history" && (
         <section className="shipping-card shipping-rates">
           <h3>확인된 배송 조합</h3>
+          {!freightRead.ready && !freightRead.error &&
+            <p role="status">운임 기준을 확인하고 있습니다.</p>}
+          {freightRead.error && <p role="alert" className="form-error">{freightRead.error}</p>}
           <ManagementTable>
             <thead>
               <tr>
@@ -629,8 +616,9 @@ export function ShippingManager({
                     <td>{won(c.charge)}</td>
                     <td>{won(c.actual)}</td>
                     <td>
-                      {currentView?.currentCombinations[c.id] === true ? "현재 유효" :
-                        currentView?.currentCombinations[c.id] === false ? "과거 이력" : "기준 확인 중"}
+                      {freightRead.combination(c.id)
+                        ? freightRead.combination(c.id)!.current ? "현재 유효" : "과거 이력"
+                        : "운임 기준 조회 중"}
                     </td>
                     <td>
                       <button

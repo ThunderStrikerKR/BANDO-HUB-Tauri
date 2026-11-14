@@ -3,6 +3,7 @@ import { confirmAction, askSaveChanges } from "../dialogs";
 import { orderClient } from "../domain";
 import { businessCoreCall } from "../tauri-bridge";
 import { newReception } from "../orders/reception";
+import { sameValue } from "../shared/draft";
 import { useHasPendingChanges } from "../shared/pending-changes";
 import { requestPageLeave } from "../shared/page-leave";
 import { useAsyncTask } from "../shared/useAsyncTask";
@@ -171,14 +172,20 @@ export function useAppModel() {
       const prepared = next.orders.find(
         (o) => o.id === draft?.id && o.receptionVersion === 1 && !o.confirmedAt,
       );
-      // Rust owns the authoritative draft/linked-workflow sanitization. A failed
-      // native validation must abort before the sole SQLite write below.
+      // First freeze the historical invoice from the BEFORE state in Rust,
+      // then filter temporary reception previews in Rust. Neither call writes
+      // SQLite; exactly one revision-checked save follows both transitions.
+      const { state: billed } = await businessCoreCall<{ state: State }>(
+        "rules", "finalize_billing_history", { before: state!, state: next },
+      );
       const { state: persistent } = await businessCoreCall<{ state: State }>(
         "rules", "apply_reception_action", {
-          action: "persisted_reception_state", before: state!, state: next,
+          action: "persisted_reception_state", before: state!, state: billed,
         },
       );
-      if (JSON.stringify(persistent) === JSON.stringify(state)) {
+      // serde_json may reorder object keys; compare semantic values rather than
+      // triggering a spurious financial database revision on a genuine no-op.
+      if (sameValue(persistent, state)) {
         lastCommitted.current = state;
         if (prepared) setDraft(clone(prepared));
         return;
@@ -250,9 +257,14 @@ export function useAppModel() {
     if (current.state !== sourceState || current.draft !== sourceDraft)
       throw Error("주문 정보가 변경되었습니다. 최신 내용을 확인한 뒤 다시 저장하세요.");
     await commit(result.state);
+    // The commit boundary can add the frozen historical invoice and remove
+    // ephemeral UI provenance. Reopen from the authoritative committed
+    // SQLite snapshot, never from the pre-finalization reducer response.
+    const committedOrder = lastCommitted.current?.orders.find((o) => o.id === result.order.id);
+    if (!committedOrder) throw Error("저장된 주문을 다시 확인할 수 없습니다.");
     // A newer draft may have opened while the native SQLite transaction
     // completed. A successful save must not replace that newer draft.
-    setDraft((currentDraft) => currentDraft === sourceDraft ? result.order : currentDraft);
+    setDraft((currentDraft) => currentDraft === sourceDraft ? clone(committedOrder) : currentDraft);
     setNotice(mode === "queue" ? "공장 목록에 추가했습니다." : "주문을 저장했습니다.");
   };
   // A new reception cannot be saved until the employee confirms the order.
