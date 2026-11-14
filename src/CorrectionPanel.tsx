@@ -1,8 +1,8 @@
 import { validDeliveryAddress } from "./delivery-requirements";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { sameValue } from "./shared/draft";
 import { confirmDiscardDraft } from "./shared/editor-flow";
-import { correctionMessage, correctionStatus } from "./corrections";
+
 import { nativeApplyCorrectionAction } from "./orders/native-rules";
 import { businessCoreCall } from "./tauri-bridge";
 import { itemFromProduct } from "./domain";
@@ -34,6 +34,27 @@ export function CorrectionPanel({
   const changed = !sameValue(after, ctx.recipient);
   const closeDraft = () => void confirmDiscardDraft("공장 전달 후 정정 요청", changed, onClose, busy);
   const requests = state.workflow!.changeRequests.filter((r) => r.shipmentId === sid);
+  const [nativeView, setNativeView] = useState<{
+    state: State;
+    requests: Record<string, { status: string; message: string | null }>;
+  }>();
+  useEffect(() => {
+    let active = true;
+    void businessCoreCall<{ requests: { id: string; status: string; message: string | null }[] }>(
+      "rules", "apply_correction_action", {
+        action: "correction_view", state, shipmentId: sid,
+      },
+    ).then(({ requests }) => {
+      if (active) setNativeView({
+        state, requests: Object.fromEntries(requests.map((entry) => [entry.id, entry])),
+      });
+    }).catch((error) => {
+      if (active) onNotice("Rust 정정 안내문 생성 실패: " +
+        (error instanceof Error ? error.message : String(error)), "error");
+    });
+    return () => { active = false; };
+  }, [state, sid, onNotice]);
+  const view = nativeView?.state === state ? nativeView.requests : undefined;
   const latestSelection = useRef({ state, search });
   latestSelection.current = { state, search };
   const setProduct = (p: Product) => {
@@ -163,7 +184,8 @@ export function CorrectionPanel({
           </>
         )}
         {requests.map((r) => {
-          const status = correctionStatus(state, r.id);
+          const status = view?.[r.id]?.status;
+          const message = view?.[r.id]?.message;
           return (
             <article className="correction-request" key={r.id}>
               <h3>
@@ -171,19 +193,20 @@ export function CorrectionPanel({
                   ? "공장 반영 직원 확인"
                   : status === "PENDING_FACTORY"
                     ? "공장 반영 대기"
-                    : "정정 요청 등록"}
+                    : status === "REGISTERED" ? "정정 요청 등록" : "상태 확인 중"}
               </h3>
               <small>
                 {r.at} / {r.actor}
               </small>
               {r.afterRecipient ? (
                 <>
-                  <pre>{correctionMessage(state, r.id)}</pre>
+                  {message != null ? <pre>{message}</pre> : <p>정정 안내문 확인 중</p>}
                   <button
-                    disabled={busy || status === "CONFIRMED"}
+                    disabled={busy || message == null || status === "CONFIRMED"}
                     onClick={() =>
                       void run(async () => {
-                        await window.bando!.copy(correctionMessage(state, r.id));
+                        if (message == null) throw Error("정정 안내문 확인이 완료되지 않았습니다.");
+                        await window.bando!.copy(message);
                         await onSave(await nativeApplyCorrectionAction(state, "copied_correction", { requestId: r.id }));
                         onNotice(
                           "정정 문구를 복사했습니다. 실제 공장 반영은 아직 대기 상태입니다.",
