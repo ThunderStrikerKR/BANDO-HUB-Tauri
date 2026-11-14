@@ -62,3 +62,19 @@ test("automatic message template validation is native before backup or SQLite pa
   assert.match(native, /text\.encode_utf16\(\)\.count\(\)>2000/);
   assert.match(parity, /message template validation: /);
 });
+
+test("selected catalog items in reception and correction come from Rust", () => {
+  const desk = read("src/orders/useOrderDesk.tsx");
+  const correction = read("src/CorrectionPanel.tsx");
+  const router = read("src-tauri/src/business_core/rules/mod.rs");
+  const parity = read("tests/rust-migration/rules/parity/compare.mts");
+  for (const source of [desk, correction]) {
+    assert.match(source, /"rules", "create_catalog_item"/);
+    assert.doesNotMatch(source, /\bitemFromProduct\(/);
+  }
+  assert.match(desk, /quantity: currentQuantity/);
+  assert.match(correction, /quantity: item\.quantity/);
+  assert.match(router, /"create_catalog_item" => catalog_item::make/);
+  assert.match(parity, /catalog item: /);
+  assert.match(parity, /itemFromProduct\(p,c,color,quantity,vid\)/);
+});
