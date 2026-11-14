@@ -257,9 +257,14 @@ export function useAppModel() {
     if (current.state !== sourceState || current.draft !== sourceDraft)
       throw Error("주문 정보가 변경되었습니다. 최신 내용을 확인한 뒤 다시 저장하세요.");
     await commit(result.state);
+    // The commit boundary can add the frozen historical invoice and remove
+    // ephemeral UI provenance. Reopen from the authoritative committed
+    // SQLite snapshot, never from the pre-finalization reducer response.
+    const committedOrder = lastCommitted.current?.orders.find((o) => o.id === result.order.id);
+    if (!committedOrder) throw Error("저장된 주문을 다시 확인할 수 없습니다.");
     // A newer draft may have opened while the native SQLite transaction
     // completed. A successful save must not replace that newer draft.
-    setDraft((currentDraft) => currentDraft === sourceDraft ? result.order : currentDraft);
+    setDraft((currentDraft) => currentDraft === sourceDraft ? clone(committedOrder) : currentDraft);
     setNotice(mode === "queue" ? "공장 목록에 추가했습니다." : "주문을 저장했습니다.");
   };
   // A new reception cannot be saved until the employee confirms the order.
