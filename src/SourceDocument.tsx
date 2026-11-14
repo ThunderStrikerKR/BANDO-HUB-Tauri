@@ -367,9 +367,20 @@ export function SourceDocument({
             <button
               disabled={busy}
               onClick={async () => {
-                if (await confirmAction("현재 미확정 원문과 분석 결과를 비울까요?")) {
+                if (pending.current || !(await confirmAction("현재 미확정 원문과 분석 결과를 비울까요?"))) return;
+                pending.current = true;
+                setBusy(true);
+                try {
+                  const cleared = await nativeReplaceReception(order, "");
+                  if (!alive.current || latestReception.current.order !== order ||
+                      latestReception.current.text !== text) return;
                   onText("");
-                  onOrder(replaceReception(order, ""));
+                  onOrder(cleared);
+                } catch (error) {
+                  if (alive.current) setError(String(error).replace(/^Error: /, ""));
+                } finally {
+                  pending.current = false;
+                  if (alive.current) setBusy(false);
                 }
               }}
             >
