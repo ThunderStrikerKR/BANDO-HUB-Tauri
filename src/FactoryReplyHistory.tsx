@@ -1,6 +1,6 @@
 import { confirmAction } from "./dialogs";
-import { factoryConflictConfirmation } from "./factory-conflict-review";
-import { replyNeedsReview } from "./factory-replies";
+
+import { useNativeFactoryReplyReview } from "./useNativeFactoryReplyReview";
 import { useAsyncTask } from "./shared/useAsyncTask";
 import type { NoticeSink } from "./shared/notices";
 import type { State } from "./types";
@@ -17,11 +17,15 @@ export function FactoryReplyHistory({
   onNotice: NoticeSink;
 }) {
   const { busy, run } = useAsyncTask(onNotice);
+  const { records: reviewRecords, error: reviewError } = useNativeFactoryReplyReview(state);
   const records = (state.factoryReplies ?? [])
     .filter((r) => (r.filename + " " + r.businessDate).includes(query))
     .slice().reverse();
   const correct = (id: string, row: number) => void run(async () => {
-    if (!(await confirmAction(factoryConflictConfirmation(state, id, row)))) return;
+    const confirmation = reviewRecords?.find((record) => record.id === id)
+      ?.rows.find((entry) => entry.row === row)?.confirmation;
+    if (!confirmation) throw Error("최신 공장 회신 검토 내용을 확인할 수 없습니다.");
+    if (!(await confirmAction(confirmation))) return;
     if (!window.bando?.approveFactoryConflict) {
       throw Error("공장 회신 충돌 승인 기능을 사용할 수 없습니다.");
     }
@@ -35,6 +39,7 @@ export function FactoryReplyHistory({
   return (
     <section className="factory-reply-history">
       <h3>공장 회신 이력</h3>
+      {reviewError && <p role="alert" className="form-error">{reviewError}</p>}
       {!records.length ? (
         <EmptyState compact title={query ? "검색 조건에 맞는 공장 회신 이력이 없습니다." : "공장 회신 이력이 없습니다."} />
       ) : (
@@ -60,7 +65,10 @@ export function FactoryReplyHistory({
                     </button>
                   )}
                 </td>
-                <td>{replyNeedsReview(state, r) ? "직원 확인 필요" : "반영 완료"}</td>
+                <td>{reviewRecords?.find((entry) => entry.id === r.id)
+                  ? reviewRecords.find((entry) => entry.id === r.id)!.needsReview
+                    ? "직원 확인 필요" : "반영 완료"
+                  : reviewError ? "회신 상태 조회 실패" : "회신 상태 조회 중"}</td>
                 <td>
                   {[...new Set(r.rows.map((row) => row.orderId).filter(Boolean))].map((id) => (
                     <button type="button" key={id} onClick={() => onOpen(id!)}>
@@ -73,15 +81,16 @@ export function FactoryReplyHistory({
                   <details>
                     <summary>회신 행 {r.rows.length}건 보기</summary>
                     {r.rows.map((row) => {
-                      const resolved = state.factoryReplies?.some((later) =>
-                        later.resolves?.id === r.id && later.resolves.row === row.row &&
-                        later.rows.some((result) => result.applied));
+                      const native = reviewRecords?.find((entry) => entry.id === r.id)
+                        ?.rows.find((entry) => entry.row === row.row);
                       return (
                         <div className="factory-reply-history-row" key={row.row}>
                           <strong>{row.row}행 / {row.name}</strong>
                           <span>{row.tracking || "운송장 미입력"} / {row.actual === null ? "실제 운임 미확인" : row.actual.toLocaleString("ko-KR") + "원"}</span>
-                          <span>{resolved ? "직원 정정 완료" : row.applied ? "반영 완료" : row.issue || "검토 필요"}</span>
-                          {!resolved && !row.applied && row.shipmentId && row.issue?.includes("충돌") && (
+                          <span>{!native ? "회신 상태 조회 중" :
+                            native.resolved ? "직원 정정 완료" :
+                            row.applied ? "반영 완료" : row.issue || "검토 필요"}</span>
+                          {!!native?.confirmation && (
                             <button type="button" disabled={busy} onClick={() => correct(r.id, row.row)}>
                               충돌 값 확인 후 정정
                             </button>
