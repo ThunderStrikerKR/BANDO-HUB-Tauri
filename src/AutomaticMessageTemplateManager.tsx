@@ -5,8 +5,9 @@ import { requestEditorLeave, usePageLeaveGuard } from "./shared/page-leave";
 import { refreshAfterCommittedSave } from "./shared/committed-state";
 import {
   AUTOMATIC_MESSAGE_TEMPLATES, AUTOMATIC_TEMPLATE_IDS,
-  previewAutomaticTemplate, validateAutomaticMessageTemplates,
+  previewAutomaticTemplate,
 } from "./automatic-message-templates";
+import { businessCoreCall } from "./tauri-bridge";
 import type { AutomaticTemplateId, AutomaticTemplateEdits } from "./automatic-message-templates";
 import type { State } from "./types";
 import type { NoticeSink } from "./shared/notices";
@@ -53,13 +54,15 @@ export function AutomaticMessageTemplateManager({
     if (busy || !dirty) return !dirty && !busy;
     setBusy(true);setStatus("");
     try{
-      validateAutomaticMessageTemplates(draft);
+      // Do not repeat the old TypeScript validator in React. Rust owns
+      // allowed placeholders, required variables and Unicode length limits.
+      await businessCoreCall<{ valid: boolean }>(
+        "rules", "validate_automatic_templates", {
+          edits: draft, orderedKeys: Object.keys(draft),
+        },
+      );
       if(!window.bando?.patchSettings)throw Error("설정 저장 기능을 사용할 수 없습니다.");
-      const latest=await window.bando.load();
       const expected=Object.keys(baseline).length ? baseline : null;
-      const candidate=structuredClone(latest);
-      candidate.settings.automaticMessageTemplates=structuredClone(draft);
-      validateAutomaticMessageTemplates(candidate.settings.automaticMessageTemplates);
       await window.bando.backup();
       const updated=await window.bando.patchSettings(
         {automaticMessageTemplates:draft},
