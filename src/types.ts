@@ -279,6 +279,10 @@ export interface Order {
   replies?: ReplyRecord[];
   messageEdits?: { payment?: string; options?: string };
   billingHistory?: BillingSnapshot[];
+  /** UI-only first-edit marker: Rust save_order creates the frozen audit
+   * snapshot from the authoritative persisted order and strips this field
+   * before SQLite persistence. Never store a TS-computed billing snapshot. */
+  pendingBillingSnapshot?: { at: string; reason: string };
   shippingVersion?: string;
 }
 export interface BillingSnapshot {
