@@ -230,19 +230,15 @@ try{
   record("actual Windows EXE and TEST SQLite started",report.diagnostics.native);
   await snap(page,"01-real-tauri-reception-initial");
 
-  // Instrument the genuine Tauri IPC function, but forward every call to the
-  // same original native dispatcher. This is NOT a mock or substitute.
+  // Tauri defines __TAURI_INTERNALS__.invoke as nonwritable and nonconfigurable.
+  // CI-only bridge instrumentation records actual React-bound calls immediately
+  // before forwarding them to that unmodified real Rust IPC dispatcher.
   await page.evaluate(()=>{
     window.__bandoNativeCalls=[];
-    const api=window.__TAURI_INTERNALS__;
-    const original=api.invoke;
-    api.invoke=function(command,args,...rest){
-      window.__bandoNativeCalls.push({
-        command,domain:args?.domain,operation:args?.operation,
-        action:args?.payload?.action
-      });
-      return Reflect.apply(original,this,[command,args,...rest]);
-    };
+    const descriptor=Object.getOwnPropertyDescriptor(window.__TAURI_INTERNALS__,"invoke");
+    if(descriptor?.writable!==false || descriptor?.configurable!==false){
+      throw Error("Unexpected Tauri native invoke descriptor; audit bridge contract changed");
+    }
   });
 
   if (process.env.BANDO_P1P2_AUDIT === "true") {

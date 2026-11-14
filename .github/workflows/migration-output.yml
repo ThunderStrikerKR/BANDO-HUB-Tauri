@@ -53,7 +53,7 @@ jobs:
         run: cargo test --manifest-path src-tauri/Cargo.toml --lib
 
   windows-p1p2-real-exe:
-    if: github.ref_name == 'migration/27-unified-rust'
+    if: github.ref_name == 'migration/27-unified-rust' || github.ref_name == 'migration/03-integration'
     runs-on: windows-latest
     timeout-minutes: 75
     steps:
@@ -68,7 +68,10 @@ jobs:
       - name: Install frontend build dependencies
         run: npm install --no-audit --no-fund
       - name: Build real Windows EXE with CI-only WebView2 CDP config
-        # Business source is the exact HEAD. Production tauri.conf.json is untouched.
+        # Same business source as production; UI audit hooks are Vite-gated.
+        # Production tauri.conf.json never enables WebView2 remote debugging.
+        env:
+          VITE_BANDO_NATIVE_AUDIT: "true"
         run: npm run build:windows -- --config src-tauri/tauri.ci-cdp.conf.json
       - name: Stage exact Windows binary and record SHA256
         shell: pwsh
