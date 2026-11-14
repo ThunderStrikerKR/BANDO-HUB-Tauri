@@ -36,6 +36,7 @@ import { receiptOf, correctReceipt } from "../../../../src/receipt.ts";
 import { billingSnapshot, applyReply } from "../../../../src/replies.ts";
 import { replyNeedsReview } from "../../../../src/factory-replies.ts";
 import { validateAutomaticMessageTemplates } from "../../../../src/automatic-message-templates.ts";
+import { validateProvisionalProductNotices } from "../../../../src/provisional-product-notices.ts";
 import { addressInfo, addressParts } from "../../../../src/parser.ts";
 import { companyClient, companyParty } from "../../../../src/order-types.ts";
 import { explicitSender } from "../../../../src/explicit-sender.ts";
@@ -3453,6 +3454,23 @@ shippingViewCase("old combination after tariff revision",shippingChanged);
 const shippingIndividual:any=copy(shippingViewState);
 shippingIndividual.products[0].shippingGroupId=undefined;
 shippingViewCase("assignment removed",shippingIndividual);
+
+// Staff provisional notice save validation; the real TS original is the oracle.
+function provisionalValidationCase(name:string,notices:Record<string,unknown>,valid=true){
+  const state:any=copy(baseState);
+  state.settings.provisionalProductNotices=notices;
+  add("provisional notice validation: "+name,"validate_provisional_notices",{
+    state
+  },()=>{validateProvisionalProductNotices(state);return {valid:true};});
+  cases[cases.length-1].expectedOk=valid;
+}
+provisionalValidationCase("valid Unicode notice",{"p1":"가상 상품 안내"});
+provisionalValidationCase("missing product id rejected",{"nonexistent":"안내"},false);
+provisionalValidationCase("blank notice rejected",{"p1":" \t "},false);
+provisionalValidationCase("non-string notice rejected",{"p1":12},false);
+provisionalValidationCase("2000 emoji allowed",{"p1":"😀".repeat(2000)});
+provisionalValidationCase("2001 emoji rejected",{"p1":"😀".repeat(2001)},false);
+provisionalValidationCase("empty mapping allowed",{});
 
 // Template editing is a save-time native decision, not only a preview rule.
 function templateValidationCase(name:string,edits:Record<string,unknown>,valid=true){
