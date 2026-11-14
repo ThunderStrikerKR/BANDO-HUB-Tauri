@@ -35,6 +35,7 @@ import { rawCorrectableIssue, rawCorrectionAllowed, correctWorkingRaw } from "..
 import { receiptOf, correctReceipt } from "../../../../src/receipt.ts";
 import { billingSnapshot, applyReply } from "../../../../src/replies.ts";
 import { replyNeedsReview } from "../../../../src/factory-replies.ts";
+import { validateAutomaticMessageTemplates } from "../../../../src/automatic-message-templates.ts";
 import { addressInfo, addressParts } from "../../../../src/parser.ts";
 import { companyClient, companyParty } from "../../../../src/order-types.ts";
 import { explicitSender } from "../../../../src/explicit-sender.ts";
@@ -3442,6 +3443,34 @@ shippingViewCase("old combination after tariff revision",shippingChanged);
 const shippingIndividual:any=copy(shippingViewState);
 shippingIndividual.products[0].shippingGroupId=undefined;
 shippingViewCase("assignment removed",shippingIndividual);
+
+// Template editing is a save-time native decision, not only a preview rule.
+function templateValidationCase(name:string,edits:Record<string,unknown>,valid=true){
+  add("message template validation: "+name,"validate_automatic_templates",{
+    edits,orderedKeys:Object.keys(edits)
+  },()=>{validateAutomaticMessageTemplates(edits as any);return {valid:true};});
+  cases[cases.length-1].expectedOk=valid;
+}
+templateValidationCase("custom valid recipient",{
+  recipientName:"정확한 받으실 분 성함을 알려주세요."});
+templateValidationCase("mandatory and optional variables",{
+  colorDefault:"{색상}으로 {상품명} 상품을 보내겠습니다.",
+  requestRecipient:"{번호}. {수취인}: {확인항목}"
+});
+templateValidationCase("unknown type",{"unsupportedTemplate":"테스트"},false);
+templateValidationCase("empty edited template",{recipientName:"   "},false);
+templateValidationCase("over length",{recipientName:"가".repeat(2001)},false);
+templateValidationCase("UTF16 emoji length",{recipientName:"😀".repeat(1001)},false);
+templateValidationCase("unknown variable",{addressMissing:"{수취인}님 {별명}"},false);
+templateValidationCase("missing mandatory variable",{addressMissing:"주소 확인"},false);
+templateValidationCase("broken brace",{addressMissing:"{수취인}님 {미완성"},false);
+templateValidationCase("nested braces",{addressMissing:"{{수취인}}님 주소 확인"},false);
+templateValidationCase("multiple invalid errors preserve input order",{
+  paymentItem:"{상품명} {수량}",addressMissing:"주소 확인"
+},false);
+templateValidationCase("valid numeric account placeholders",{
+  paymentAccount:"{은행명} {계좌번호} {예금주} 안내드립니다."
+});
 
 const runner=spawnSync(rustBinary||"cargo",rustBinary?[]:[
   "run","--quiet","--manifest-path",
