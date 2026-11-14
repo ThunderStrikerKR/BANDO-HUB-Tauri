@@ -15,6 +15,7 @@ import {
   recommendShipping,
   editableShippingRule,
   effectiveShippingRule,
+  emptyProductRule,
   combinationVersions,
   combinationCurrent,
   upgradeShipping,
@@ -3469,6 +3470,38 @@ shippingViewCase("individual product tariff",freightOwnRule);
 const freightDeletedGroup:any=copy(shippingViewState);
 freightDeletedGroup.shipping.groups[0].deletedAt=actionNow;
 shippingViewCase("deleted group falls back to product tariff",freightDeletedGroup);
+
+// Resetting a tariff must archive the exact old rate and not touch past orders.
+function freightResetCase(name:string,mode:"group"|"product"){
+  const original:any=copy(shippingViewState.shipping);
+  const versionId="freight-reset-"+mode;
+  const productId="p1",groupId=mode==="group"?"music":undefined;
+  if(mode==="product"){
+    original.productRules={p1:{...copy(shipping.groups[0].current),version:"prior-p1"}};
+    original.productHistory={p1:[]};
+  }
+  add("freight reset history: "+name,"apply_shipping_action",{
+    action:"start_new_rule",shipping:original,productId,groupId,
+    versionId,now:actionNow
+  },()=>{
+    const updated:any=copy(original);
+    const fresh=frozenDate(()=>deterministicIds([versionId],()=>emptyProductRule()));
+    if(groupId){
+      const group=updated.groups.find((g:any)=>g.id===groupId);
+      group.history.push(group.current);
+      group.current=fresh;
+    }else{
+      updated.productHistory??={};
+      updated.productHistory[productId]=[
+        ...(updated.productHistory[productId]??[]),updated.productRules[productId]
+      ];
+      updated.productRules[productId]=fresh;
+    }
+    return {shipping:updated};
+  });
+}
+freightResetCase("group preserves old current tariff","group");
+freightResetCase("product preserves old individual tariff","product");
 
 // Staff provisional notice save validation; the real TS original is the oracle.
 function provisionalValidationCase(name:string,notices:Record<string,unknown>,valid=true){
