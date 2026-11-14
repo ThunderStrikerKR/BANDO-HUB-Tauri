@@ -3406,6 +3406,43 @@ const blankCorrectionState:any=copy(correctionViewState);
 blankCorrectionState.workflow.changeRequests=[];
 correctionViewCase("no correction requests",blankCorrectionState);
 
+// Shipping manager read-only tariff projections must be bit-for-bit
+// equivalent to the two still-live TS helpers before they are retired.
+const shippingViewState:any=copy(baseState);
+shippingViewState.shipping=copy(shipping);
+shippingViewState.products[0].shippingGroupId="music";
+shippingViewState.shipping.groups[0].current.perItem=5200;
+shippingViewState.shipping.groups[0].current.maxBundle=4;
+shippingViewState.shipping.groups[0].current.maxConfirmed=false;
+shippingViewState.shipping.groups[0].current.fees={"1":null,"2":4000};
+shippingViewState.shipping.combinations=[
+  {id:"current",active:true,epoch:shippingViewState.shipping.epoch,
+    versions:{"group:music":"v1","assignment:p1":"music"},
+    at:actionNow,key:"FACTORY|p1@v1:2"},
+  {id:"expired-epoch",active:true,epoch:0,
+    versions:{"group:music":"v1"},at:actionNow,key:"FACTORY|p1@v1:2"},
+  {id:"unknown-product",active:true,epoch:shippingViewState.shipping.epoch,
+    versions:{"product:missing":"unregistered"},at:actionNow,key:"FACTORY|missing@v1:2"},
+  {id:"wrong-assignment",active:true,epoch:shippingViewState.shipping.epoch,
+    versions:{"assignment:p1":"other"},at:actionNow,key:"FACTORY|p1@v1:2"}
+];
+function shippingViewCase(name:string,state:any){
+  const shipping=state.shipping;
+  add("shipping manager: "+name,"shipping_manager_view",{
+    state,shipping
+  },()=>({editableRules:Object.fromEntries(shipping.groups.map((g:any)=>
+    [g.id,editableShippingRule(g.current)])),
+    currentCombinations:Object.fromEntries(shipping.combinations.map((c:any)=>
+    [c.id,combinationCurrent(c,state)]))}));
+}
+shippingViewCase("active group and per-item edit",shippingViewState);
+const shippingChanged:any=copy(shippingViewState);
+shippingChanged.shipping.groups[0].current.version="different-version";
+shippingViewCase("old combination after tariff revision",shippingChanged);
+const shippingIndividual:any=copy(shippingViewState);
+shippingIndividual.products[0].shippingGroupId=undefined;
+shippingViewCase("assignment removed",shippingIndividual);
+
 const runner=spawnSync(rustBinary||"cargo",rustBinary?[]:[
   "run","--quiet","--manifest-path",
   "tests/rust-migration/rules/Cargo.toml","--bin","json_rules"
