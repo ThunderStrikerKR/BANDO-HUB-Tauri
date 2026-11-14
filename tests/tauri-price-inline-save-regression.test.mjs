@@ -35,7 +35,8 @@ test("price-table draft stays visible until Save/Cancel and remains guarded on f
   const css = source("styles/table-density.css");
   assert.match(cell, /value=\{editing \? draft : value === null \? "" : value\.toLocaleString/);
   assert.match(cell, /data-price-pending=\{pending\}/);
-  assert.match(cell, /useEffect\(\(\) => \{ pendingRef\.current\?\.\(pending\); \}, \[pending\]\)/);
+  assert.match(cell, /if \(lastReportedPending\.current === pending\) return/);
+  assert.match(cell, /pendingRef\.current\?\.\(pending\)/);
   assert.match(manager, /hasChanges: \(\) => editDirty \|\| hasPendingPrices/);
   assert.match(manager, /const checkPriceDrafts = \(\) => \{/);
   assert.match(manager, /const togglePriceMode = \(\) => \{[\s\S]*?if \(!priceMode \|\| checkPriceDrafts\(\)\)/);
