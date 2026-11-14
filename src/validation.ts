@@ -35,9 +35,15 @@ export function orderIssues(o: Order): ValidationIssue[] {
       decision = o.issueResolutions?.[id],
       status =
         resolution ??
-        (decision?.evidence === evidence && decision.resolution === "PENDING_CUSTOMER"
-          ? "PENDING_CUSTOMER"
-          : "UNRESOLVED");
+        (kind === "QUANTITY_MISSING" &&
+        i?.quantityApproval?.quantity === 1 &&
+        i.quantity === 1 &&
+        i.quantityConfirmed === false &&
+        !!i.productId && !!i.variantId
+          ? "PROVISIONALLY_APPROVED"
+          : decision?.evidence === evidence && decision.resolution === "PENDING_CUSTOMER"
+            ? "PENDING_CUSTOMER"
+            : "UNRESOLVED");
     result.push({
       evidence,
       issueId: id,

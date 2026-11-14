@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { CorrectionPanel } from "./CorrectionPanel";
 import { ActualFreightField } from "./ActualFreightField";
 import { contactProblem } from "./contact";
@@ -14,12 +14,14 @@ import { won } from "./domain";
 
 import { internalModel } from "./matching";
 import { useOrderDesk, type OrderDeskProps } from "./orders/useOrderDesk";
-import { nativeBillingSnapshot, nativeClientChangeIssue, nativeConfirmProposedProduct, nativeRepriceEditedOrder, nativeReconcileWorkflow } from "./orders/native-rules";
+import { nativeApproveMissingQuantity, nativeBillingSnapshot, nativeClientChangeIssue, nativeConfirmProposedProduct, nativeRepriceEditedOrder, nativeReconcileWorkflow } from "./orders/native-rules";
 import { businessCoreCall } from "./tauri-bridge";
 import { addressParts } from "./parser";
 import { Field, clone } from "./ui";
 export function OrderDesk(props: OrderDeskProps) {
   const [changeRequest, setChangeRequest] = useState<string>();
+  const [approvingQuantity, setApprovingQuantity] = useState(false);
+  const quantityActionInFlight = useRef(false);
   const {
     highlight,
     linkController,
@@ -201,6 +203,53 @@ export function OrderDesk(props: OrderDeskProps) {
                   loading={!flowSummaryReady && !flowSummaryError}
                   error={!flowSummaryReady ? flowSummaryError : ""}
                   onSelect={selectIssue}
+                  approvingQuantity={approvingQuantity}
+                  canApproveOne={(b) => {
+                    if (exported || !b.recipientId || !b.itemId) return false;
+                    const item = draft.recipients.find((r) => r.id === b.recipientId)
+                      ?.items.find((i) => i.id === b.itemId);
+                    return !!item && !!item.productId && !!item.variantId &&
+                      item.quantityConfirmed === false &&
+                      item.match?.kind !== "QUANTITY" &&
+                      !item.issues.some((issue) => /여러|불명확/.test(issue));
+                  }}
+                  onApproveOne={(b) => {
+                    if (quantityActionInFlight.current || exported || !b.itemId || !b.recipientId)
+                      return;
+                    const row = draft.recipients.find((r) => r.id === b.recipientId);
+                    const item = row?.items.find((i) => i.id === b.itemId);
+                    if (!item || !item.productId || !item.variantId ||
+                        item.quantityConfirmed !== false || item.match?.kind === "QUANTITY" ||
+                        item.issues.some((issue) => /여러|불명확/.test(issue))) return;
+                    quantityActionInFlight.current = true;
+                    setApprovingQuantity(true);
+                    void run(async () => {
+                      try {
+                        const approved = await nativeApproveMissingQuantity(
+                          draft, b.recipientId, b.itemId!,
+                          state.settings.operatorName?.trim() || "직원",
+                        );
+                        if (!isCurrentOrderInput(draft, state))
+                          throw Error("주문 정보가 변경되었습니다. 수량 확인을 다시 진행하세요.");
+                        const source = approved.recipients.find((r) => r.id === b.recipientId)
+                          ?.items.find((i) => i.id === b.itemId);
+                        if (!source?.quantityApproval) throw Error("잠정 수량 승인 기록이 없습니다.");
+                        // Preserve the normal order edit's price-history and
+                        // freight invalidation, without running TS approval rules.
+                        recEdit(b.recipientId, (recipient) => {
+                          const target = recipient.items.find((i) => i.id === b.itemId);
+                          if (!target) return;
+                          target.quantity = source.quantity;
+                          target.quantityConfirmed = source.quantityConfirmed;
+                          target.quantityApproval = source.quantityApproval;
+                          target.manuallyConfirmed = source.manuallyConfirmed;
+                        });
+                      } finally {
+                        quantityActionInFlight.current = false;
+                        setApprovingQuantity(false);
+                      }
+                    });
+                  }}
                   onCancelApproval={(b) => {
                     if (b.itemId)
                       recEdit(

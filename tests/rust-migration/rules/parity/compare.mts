@@ -375,6 +375,40 @@ add("approve missing quantity explicit actor","apply_issue_action",{
   action:"approve_missing_quantity",order:approvalOrder,
   recipientId:"r1",itemId:"item1",actor:"검증직원",now:actionNow
 },()=>({order:frozenDate(()=>approveMissingQuantity(approvalOrder,"r1","item1","검증직원"))}));
+// The button must remove the blocking issue without pretending that the
+// customer's actual quantity was confirmed. Cancellation restores ACTION.
+const provisionalOrder:any=frozenDate(()=>
+  approveMissingQuantity(approvalOrder,"r1","item1","검증직원"));
+const provisionalIssue=orderIssues(provisionalOrder).find(i=>i.kind==="QUANTITY_MISSING");
+if(provisionalIssue?.severity!=="INFO" ||
+   provisionalIssue.resolution!=="PROVISIONALLY_APPROVED" ||
+   provisionalOrder.recipients[0].items[0].quantityConfirmed!==false)
+  throw Error("1개 잠정 처리 후 주문 수량 확인 상태가 정확하지 않습니다.");
+add("order issues after one-item provisional approval","order_issues",
+  {order:provisionalOrder},()=>({issues:orderIssues(provisionalOrder)}));
+const cancelledProvisional:any=copy(provisionalOrder);
+delete cancelledProvisional.recipients[0].items[0].quantityApproval;
+const cancelledIssue=orderIssues(cancelledProvisional).find(i=>i.kind==="QUANTITY_MISSING");
+if(cancelledIssue?.severity!=="ACTION" || cancelledIssue.resolution!=="UNRESOLVED")
+  throw Error("잠정 승인 취소 후 다시 수량 확인이 필요해야 합니다.");
+add("order issues after provisional approval cancellation","order_issues",
+  {order:cancelledProvisional},()=>({issues:orderIssues(cancelledProvisional)}));
+const staleProvisional:any=copy(provisionalOrder);
+staleProvisional.recipients[0].items[0].quantity=2;
+add("stale 1-item approval cannot clear changed quantity issue","order_issues",
+  {order:staleProvisional},()=>({issues:orderIssues(staleProvisional)}));
+const unregisteredProvisional:any=copy(provisionalOrder);
+unregisteredProvisional.recipients[0].items[0].productId="";
+add("unregistered product cannot inherit a provisional approval","order_issues",
+  {order:unregisteredProvisional},()=>({issues:orderIssues(unregisteredProvisional)}));
+const fullyConfirmed:any=copy(provisionalOrder);
+fullyConfirmed.recipients[0].items[0].quantityConfirmed=true;
+delete fullyConfirmed.recipients[0].items[0].quantityApproval;
+if(orderIssues(fullyConfirmed).some(i=>i.kind==="QUANTITY_MISSING"))
+  throw Error("직원 수량 확정 후 수량 미확정 오류가 남으면 안 됩니다.");
+add("quantity confirmed by employee removes provisional issue","order_issues",
+  {order:fullyConfirmed},()=>({issues:orderIssues(fullyConfirmed)}));
+
 const ambiguousApproval:any=copy(approvalOrder);
 ambiguousApproval.recipients[0].items[0].issues=["여러 모델 가능"];
 add("reject ambiguous quantity approval","apply_issue_action",{

@@ -26,5 +26,6 @@ test("issue descriptions and informational messages are static; explicit buttons
   assert.match(staff, /<div className="staff-fact-message">/);
   assert.doesNotMatch(staff, /클릭해 정정/);
   assert.match(staff, /<button onClick=\{\(\) => onSelect\(b\)\}>입력 위치로 이동<\/button>/);
-  assert.match(staff, /<button onClick=\{\(\) => onSelect\(b\)\}>수량 수정<\/button>/);
+  // A semantic button may also specify type="button" without changing the action.
+  assert.match(staff, /<button(?: type="button")? onClick=\{\(\) => onSelect\(b\)\}>수량 수정<\/button>/);
 });
