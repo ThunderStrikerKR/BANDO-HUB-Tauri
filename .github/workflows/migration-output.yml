@@ -49,6 +49,60 @@ jobs:
       - name: Compile actual Tauri Rust and SQLite tests on Windows
         run: cargo test --manifest-path src-tauri/Cargo.toml --lib
 
+  windows-p1p2-real-exe:
+    if: github.ref_name == 'migration/26-p1-p2-runtime-closure'
+    runs-on: windows-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+      - name: Install frontend build dependencies
+        run: npm install --no-audit --no-fund
+      - name: Build exact HEAD as native Windows Tauri EXE
+        run: npm run build:windows
+      - name: Stage exact Windows binary and record SHA256
+        shell: pwsh
+        run: |
+          $dir="src-tauri/target/release"
+          $original=Join-Path $dir "bando_hub_tauri.exe"
+          if(!(Test-Path $original)){throw "Native EXE was not built"}
+          Copy-Item $original (Join-Path $dir "bando_hub.exe")
+          Get-FileHash (Join-Path $dir "bando_hub.exe") -Algorithm SHA256
+      - name: Install WebView2 inspection client (not browser emulator)
+        run: npm install --no-save --no-package-lock --no-audit --no-fund playwright@1.55.1
+      - name: Enable loopback WebView2 inspection only for this disposable CI machine
+        shell: pwsh
+        run: |
+          $path="HKCU:\\Software\\Policies\\Microsoft\\Edge\\WebView2\\AdditionalBrowserArguments"
+          New-Item -Path $path -Force | Out-Null
+          New-ItemProperty -Path $path -Name "bando_hub.exe" -Value "--remote-debugging-port=19651 --remote-debugging-address=127.0.0.1" -PropertyType String -Force | Out-Null
+      - name: Boot real EXE, test isolated SQLite and native UI with actual Rust IPC
+        env:
+          BANDO_NATIVE_EXE: ${{ github.workspace }}\\src-tauri\\target\\release\\bando_hub.exe
+          BANDO_NATIVE_OUT: native-p1p2-evidence
+          BANDO_NATIVE_BIN_COMMIT: ${{ github.sha }}
+        run: node scripts/migration03-reception-native-ui.mjs
+      - name: Remove temporary WebView2 inspection policy
+        if: always()
+        shell: pwsh
+        run: |
+          $path="HKCU:\\Software\\Policies\\Microsoft\\Edge\\WebView2\\AdditionalBrowserArguments"
+          Remove-ItemProperty -Path $path -Name "bando_hub.exe" -ErrorAction SilentlyContinue
+      - name: Preserve real EXE screenshot, native IPC and SQLite diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: P1P2-real-Windows-Tauri-EXE-evidence
+          path: native-p1p2-evidence/
+          if-no-files-found: warn
+          retention-days: 7
+
   output-ts-rust-parity:
     runs-on: ubuntu-latest
     timeout-minutes: 25
