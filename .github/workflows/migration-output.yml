@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - migration/03-integration
+      - fix/product-price-explicit-save-preserve-draft
       - migration/05-factory-reply
       - integration/06-history-settlement
   workflow_dispatch:
