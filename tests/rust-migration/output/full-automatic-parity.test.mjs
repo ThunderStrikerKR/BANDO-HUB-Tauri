@@ -10,7 +10,7 @@ import { tsImport } from "tsx/esm/api";
 
 const { automaticMessage, paymentSignature, paymentWasCopied, withGreeting } =
   await tsImport("../../../src/automatic-message.ts",import.meta.url);
-const { groupOrder } =
+const { groupOrder, groupMessages } =
   await tsImport("../../../src/workflow.ts",import.meta.url);
 const { validProductUrl } =
   await tsImport("../../../src/domain.ts",import.meta.url);
@@ -159,6 +159,32 @@ test("full TS automatic message and copy signature match compiled Rust",()=>{
   assert.equal(mismatches.length,0,
     mismatches.length+" of "+scenarios.length+" full automatic cases differ");
 });
+test("Rust immutable workflow payment notices match the full original TS message",()=>{
+  // The editable automatic-message preview omits the greeting, but a workflow
+  // step-three notice must freeze the complete original payment text.
+  const noticeCases=scenarios.map(({name,payload})=>{
+    const {state,groupId}=payload;
+    let expected;
+    try{expected={ok:true,value:{payment:groupMessages(state,groupId).payment}};}
+    catch(error){expected={ok:false,error:error instanceof Error?error.message:String(error)};}
+    return {name,operation:"render_payment_notice",payload:{state,groupId},expected};
+  });
+  const run=spawnSync("cargo",["run","--quiet","--manifest-path",manifest,
+    "--bin","parity_runner"],{cwd:root,input:JSON.stringify(noticeCases.map(
+      ({operation,payload})=>({operation,payload})
+    )),encoding:"utf8",timeout:180000,maxBuffer:64*1024*1024});
+  if(run.error)throw run.error;
+  assert.equal(run.status,0,run.stderr);
+  const actual=JSON.parse(run.stdout);
+  assert.equal(actual.length,noticeCases.length);
+  const differences=noticeCases.flatMap((entry,i)=>{
+    try{assert.deepStrictEqual(actual[i],entry.expected);return [];}
+    catch{return [{scenario:entry.name,expected:entry.expected,rust:actual[i]}];}
+  });
+  if(differences.length)console.error(JSON.stringify(differences,null,2));
+  assert.equal(differences.length,0,"Rust workflow notice must match TS");
+});
+
 test("an already-copied payment uses the identical stored original TS signature",()=>{
   const state=base();
   state.workflow.events.push({id:"copy-1",groupId:gid,
