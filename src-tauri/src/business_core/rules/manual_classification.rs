@@ -49,10 +49,11 @@ fn manual_address_parts(value: &str) -> Value {
     if let Some(p)=province{result.insert("province".into(),json!(p));}
     fn bounded_capture(re:&str,value:&str)->Option<String> {
         let pattern=regex::Regex::new(re).ok()?;
-        pattern.captures_iter(value).find(|caps|
+        let capture = pattern.captures_iter(value).find(|caps|
             caps.get(1).is_some_and(|m|value[m.end()..].chars().next()
                 .is_none_or(char::is_whitespace))
-        ).and_then(|caps|caps.get(1).map(|m|m.as_str().to_owned()))
+        ).and_then(|caps|caps.get(1).map(|m|m.as_str().to_owned()));
+        capture
     }
     for (key,pattern) in [
         ("city",r"(?:^|\s)([가-힣]+(?:시|군))"),
