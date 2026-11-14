@@ -29,3 +29,36 @@ test("historical billing snapshot uses first edit metadata and native saved orig
   assert.match(read("tests/rust-migration/rules/order-save-parity.test.mjs"),
     /frozen history append preserves pre-existing snapshots/);
 });
+
+test("shipping manager reads editable tariff and current combination from Rust", () => {
+  const manager = read("src/ShippingManager.tsx");
+  const router = read("src-tauri/src/business_core/rules/mod.rs");
+  assert.match(manager, /"rules", "shipping_manager_view"/);
+  assert.match(manager, /currentView\?\.currentCombinations\[c\.id\]/);
+  assert.match(manager, /currentView\?\.editableRules\[g\.id\]/);
+  assert.doesNotMatch(manager, /\bcombinationCurrent\(/);
+  assert.doesNotMatch(manager, /\beditableShippingRule\(/);
+  assert.match(router, /"shipping_manager_view" => shipping::shipping_manager_view/);
+});
+test("factory alerts and corrections never show stale TS-calculated statuses", () => {
+  const notifications = read("src/FactoryNotifications.tsx");
+  const correction = read("src/CorrectionPanel.tsx");
+  assert.match(notifications, /"rules", "factory_reply_review_statuses"/);
+  assert.doesNotMatch(notifications, /\breplyNeedsReview\(/);
+  assert.match(notifications, /nativeReview\?\.state === state/);
+  assert.match(correction, /action: "correction_view", state, shipmentId: sid/);
+  assert.doesNotMatch(correction, /\bcorrectionMessage\(/);
+  assert.doesNotMatch(correction, /\bcorrectionStatus\(/);
+  assert.match(correction, /nativeView\?\.state === state/);
+});
+test("automatic message template validation is native before backup or SQLite patch", () => {
+  const editor = read("src/AutomaticMessageTemplateManager.tsx");
+  const native = read("src-tauri/src/business_core/rules/message_template_validation.rs");
+  const parity = read("tests/rust-migration/rules/parity/compare.mts");
+  assert.match(editor, /"rules", "validate_automatic_templates"/);
+  assert.doesNotMatch(editor, /\bvalidateAutomaticMessageTemplates\(/);
+  assert.ok(editor.indexOf('"validate_automatic_templates"') < editor.indexOf("window.bando.backup()"));
+  assert.ok(editor.indexOf("window.bando.backup()") < editor.indexOf("window.bando.patchSettings("));
+  assert.match(native, /text\.encode_utf16\(\)\.count\(\)>2000/);
+  assert.match(parity, /message template validation: /);
+});
