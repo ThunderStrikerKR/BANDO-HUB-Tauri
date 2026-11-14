@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - migration/03-integration
+      - test/quantity-one-automatic-message-flow
       - migration/05-factory-reply
       - integration/06-history-settlement
   workflow_dispatch:
