@@ -80,11 +80,14 @@ test("both freight editors display Close and disable Save when unchanged",()=>{
   }
 });
 
-test("prices require Enter to save and blur cannot persist silently",()=>{
+test("price input preserves uncommitted edits on blur; only Save or Enter commits",()=>{
   const s=src("PriceCell.tsx");
   assert.match(s,/if \(e.key === "Enter"\) \{\s*e.preventDefault\(\);\s*void save\(\);/);
+  assert.match(s,/onClick=\{\(\) => void save\(\)\}/);
+  assert.match(s,/onClick=\{cancel\}/);
+  assert.match(s,/onBlur=\{\(\) => \{[^}]*if \(saving\.current \|\| !editing\) return;[^}]*\}/);
+  assert.doesNotMatch(s,/onBlur=\{\(\) => \{[^}]*setDraft\(/);
   assert.doesNotMatch(s,/onBlur=\{\(\) => void save\(\)\}/);
-  assert.match(s,/onBlur=\{\(\) => \{[^}]+setDraft\(value/);
   assert.match(s,/if \(e.key === "Escape"\)/);
 });
 
