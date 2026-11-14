@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { confirmAction, promptText } from "./dialogs";
 import { money, won } from "./domain";
 import { businessCoreCall } from "./tauri-bridge";
+import { useNativeShippingRead } from "./useNativeShippingRead";
 import { internalModel } from "./matching";
 import { colorLabel, registeredProducts, sortProducts } from "./product-models";
 import { ProductFreightPanel } from "./ProductFreightPanel";
@@ -11,11 +12,7 @@ import { useAsyncTask } from "./shared/useAsyncTask";
 import { sameFreightEditor } from "./shared/meaningful-changes";
 import { requestEditorLeave, requestPageLeave, usePageLeaveGuard } from "./shared/page-leave";
 
-import {
-  combinationCurrent,
-  editableShippingRule,
-  initialShipping,
-} from "./shipping";
+import { initialShipping } from "./shipping";
 import type { ShippingRule, ShippingState, State } from "./types";
 import { HelpTooltip } from "./ui/HelpTooltip";
 import { Field, Modal } from "./ui";
@@ -34,7 +31,11 @@ export function ShippingManager({
 }) {
   const { busy, run: runSave } = useAsyncTask(onNotice);
   const [deleting, setDeleting] = useState("");
-  const shipping = state.shipping ?? initialShipping();
+  const shipping = useMemo(() => state.shipping ?? initialShipping(), [state.shipping]);
+  const effectiveState = useMemo(
+    () => state.shipping ? state : { ...state, shipping }, [state, shipping],
+  );
+  const freightRead = useNativeShippingRead(effectiveState);
   const [tab, setTab] = useState<"products" | "assign" | "rates" | "history">("products"),
     [query, setQuery] = useState(""),
     [filter, setFilter] = useState("all"),
@@ -278,7 +279,7 @@ export function ShippingManager({
         </article>
       </div>
       {tab === "products" && (
-        <ProductFreightPanel state={{ ...state, shipping }} onSave={onSave} onNotice={onNotice} />
+        <ProductFreightPanel state={effectiveState} onSave={onSave} onNotice={onNotice} />
       )}
       {tab === "assign" && (
         <section className="shipping-card shipping-assignment-list">
@@ -547,7 +548,11 @@ export function ShippingManager({
                       >이름 수정</Button>
                       <Button size="compact"
                         onClick={() => {
-                          const initial = editableShippingRule(g.current);
+                          const initial = freightRead.group(g.id)?.editableRule;
+                          if (!initial) {
+                            onNotice("운임 기준이 아직 조회되지 않았습니다.", "error");
+                            return;
+                          }
                           setInitialEditing(structuredClone(initial));
                           setEditing({ id: g.id, rule: initial });
                         }}
@@ -580,6 +585,9 @@ export function ShippingManager({
       {tab === "history" && (
         <section className="shipping-card shipping-rates">
           <h3>확인된 배송 조합</h3>
+          {!freightRead.ready && !freightRead.error &&
+            <p role="status">운임 기준을 확인하고 있습니다.</p>}
+          {freightRead.error && <p role="alert" className="form-error">{freightRead.error}</p>}
           <ManagementTable>
             <thead>
               <tr>
@@ -608,7 +616,9 @@ export function ShippingManager({
                     <td>{won(c.charge)}</td>
                     <td>{won(c.actual)}</td>
                     <td>
-                      {combinationCurrent(c, { ...state, shipping }) ? "현재 유효" : "과거 이력"}
+                      {freightRead.combination(c.id)
+                        ? freightRead.combination(c.id)!.current ? "현재 유효" : "과거 이력"
+                        : "운임 기준 조회 중"}
                     </td>
                     <td>
                       <button
