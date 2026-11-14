@@ -30,9 +30,9 @@ test("post-export correction register, copy and staff approval call Rust", () =>
   }
   assert.doesNotMatch(correction, /(?:requestCorrection|copiedCorrection|confirmCorrection)\(state,/);
   assert.match(correction, /action: "correction_view", state, shipmentId: sid/);
-  assert.match(correction, /await window\\.bando!\\.copy\\(message\\)/);
-  assert.match(correction, /message == null\\) throw Error/);
-  assert.doesNotMatch(correction, /correctionMessage\\(state, r\\.id\\)/);
+  assert.match(correction, /await window\.bando!\.copy\(message\)/);
+  assert.match(correction, /message == null\) throw Error/);
+  assert.doesNotMatch(correction, /correctionMessage\(state, r\.id\)/);
   assert.match(correction, /await onSave\(await nativeApplyCorrectionAction\(state, "copied_correction"/);
 });
 
