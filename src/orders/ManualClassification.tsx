@@ -1,5 +1,6 @@
 import { useRef, useState, type KeyboardEvent } from "react";
 import { ProductSearchDialog } from "../ProductSearchDialog";
+import { businessCoreCall } from "../tauri-bridge";
 import { deliveryRequirements } from "../delivery-requirements";
 import { usePendingChanges } from "../shared/pending-changes";
 import { confirmDiscardDraft } from "../shared/editor-flow";
@@ -8,7 +9,6 @@ import type { Order, Product, State } from "../types";
 import { orderIssues } from "../validation";
 import { ManualPrompt } from "./ManualPrompt";
 import {
-  applyManual,
   assignManualBlock,
   cellKey,
   emptyManualItem,
@@ -43,6 +43,8 @@ export function ManualClassification({
   onNotice: NoticeSink;
 }) {
   const [model, setModel] = useState(() => initialManual(order));
+  const latestInputs = useRef({ order, model });
+  latestInputs.current = { order, model };
   const initial = useRef(JSON.stringify(model));
   const [count, setCount] = useState(String(model.rows.length));
   const [active, setActive] = useState<Cell>(),
@@ -817,17 +819,26 @@ export function ManualClassification({
             <button
               className="primary"
               data-autofocus
+              disabled={applying.current}
               onClick={() => {
                 if (applying.current) return;
                 applying.current = true;
-                try {
-                  onApply(applyManual(order, model));
+                const submittedOrder = order, submittedModel = model;
+                void businessCoreCall<{ order: Order }>(
+                  "rules", "apply_manual_classification", {
+                    action: "apply_manual", order: submittedOrder, model: submittedModel,
+                  },
+                ).then(({ order: prepared }) => {
+                  if (latestInputs.current.order !== submittedOrder ||
+                      latestInputs.current.model !== submittedModel) {
+                    throw Error("수동 분류 내용이 변경되었습니다. 최신 내용을 확인하고 다시 적용하세요.");
+                  }
+                  onApply(prepared);
                   onClose();
-                } catch (e) {
-                  applying.current = false;
+                }).catch((e) => {
                   setCompletion(false);
-                  fail(String(e));
-                }
+                  fail(e instanceof Error ? e.message : String(e));
+                }).finally(() => { applying.current = false; });
               }}
             >
               피드백 없이 진행
