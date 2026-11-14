@@ -154,8 +154,9 @@ public static class BandoClientInput {
   WaitFor { Test-Path $baseline } 55 "disposable baseline SQLite"
   StopNative
   StartNative @("--bando-developer-test")
-  Check "Developer TEST database mode" (@(Nodes | Where-Object {
-    $_.name -match "BANDO HUB.*테스트" }).Count -gt 0) "BANDO HUB header must show TEST mode"
+  $testSqlite = Join-Path $env:APPDATA "com.bandostand.bandohub.tauri/developer-test/bando-hub-test.sqlite"
+  WaitFor { Test-Path -LiteralPath $testSqlite } 40 "isolated developer SQLite"
+  Check "Developer TEST database mode" (Test-Path -LiteralPath $testSqlite) "Must use developer-test/bando-hub-test.sqlite"
   Click "거래처 관리"
   WaitFor { $null -ne (FindNode "＋ 거래처 등록" "Button") } 30 "client management loaded"
   Capture "01-clients-list"
