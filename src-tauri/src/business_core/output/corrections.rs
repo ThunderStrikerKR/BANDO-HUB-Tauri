@@ -84,8 +84,9 @@ fn message(state:&Value,request:&Value)->Result<String,String> {
         }
     }
     if before.get("freightCode")!=after.get("freightCode") {
-        let code=|v:&Value|v.get("freightCode").and_then(Value::as_str).unwrap_or("010");
-        lines.push(format!("운임 방식: {} → {}",code(before),code(after)));
+        let before_code=before.get("freightCode").and_then(Value::as_str).unwrap_or("010");
+        let after_code=after.get("freightCode").and_then(Value::as_str).unwrap_or("010");
+        lines.push(format!("운임 방식: {} → {}",before_code,after_code));
     }
     Ok(lines.join("\n"))
 }
