@@ -359,8 +359,12 @@ pub(super) fn shipping_action(payload: &Value) -> Result<Value, String> {
             if let Some(group_id)=field(payload,"groupId").as_str()
                 .filter(|value|!value.is_empty()) {
                 let index=rows(field(&shipping,"groups")).iter()
-                    .position(|g|str_field(g,"id")==group_id &&
-                        !has_value(field(g,"deletedAt")))
+                    .position(|g|{
+                        let deleted=field(g,"deletedAt");
+                        str_field(g,"id")==group_id &&
+                            (deleted.is_null() || deleted.as_str()==Some("") ||
+                                deleted.as_bool()==Some(false))
+                    })
                     .ok_or("현재 운임 그룹을 찾을 수 없습니다.")?;
                 let previous=field(&shipping["groups"][index],"current").clone();
                 shipping["groups"][index]["history"].as_array_mut()
