@@ -1,4 +1,4 @@
-/** The React staff checklist reads preview_order.issues.
+/** The React staff checklist reads the Rust order_issues operation.
  * Compare that actual production projection with the original TS orderIssues
  * on identical draft inputs; never substitute an authored expected stub.
  */
@@ -77,7 +77,7 @@ add("no recipients in received raw",o=>{o.recipients=[];});
 
 test("real Rust order-preview staff issue projection equals original TS for every draft",()=>{
   const requests=scenarios.map(({payload})=>({
-    operation:"preview_order",payload,
+    operation:"order_issues",payload:{order:payload.draft},
   }));
   const run=spawnSync("cargo",["run","--quiet","--manifest-path",manifest,
     "--bin","json_rules"],{
