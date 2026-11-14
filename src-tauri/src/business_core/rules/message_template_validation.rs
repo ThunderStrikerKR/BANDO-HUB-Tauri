@@ -77,9 +77,48 @@ pub(super) fn validate(payload:&Value)->Result<Value,String>{
     Ok(json!({"valid":true}))
 }
 
+// Provisional, product-scoped notice validation matches the existing TS
+// settings validator. Unicode scalar count matches JS [...text].length.
+pub(super) fn validate_provisional(payload:&Value)->Result<Value,String>{
+    let state=req(payload,"state")?;
+    let notices=field(field(state,"settings"),"provisionalProductNotices");
+    if notices.is_null() {return Ok(json!({"valid":true}));}
+    let notices=notices.as_object()
+        .ok_or("상품별 잠정 안내문 형식이 올바르지 않습니다.")?;
+    if notices.len()>5000 {
+        return Err("잠정 상품 안내문 등록 한도를 초과했습니다.".into())
+    }
+    let ids=rows(field(state,"products")).iter()
+        .map(|p|field(p,"id").as_str().unwrap_or(""))
+        .collect::<HashSet<_>>();
+    for (id,value) in notices{
+        if !ids.contains(id.as_str()){
+            return Err("등록된 상품에만 안내문을 연결할 수 있습니다.".into())
+        }
+        let valid=value.as_str().is_some_and(|v|!v.trim().is_empty()&&v.chars().count()<=2000);
+        if !valid{
+            return Err("안내문은 1자 이상 2000자 이하로 입력하세요.".into())
+        }
+    }
+    Ok(json!({"valid":true}))
+}
+
 #[cfg(test)]
 mod tests{
     use super::*;
+    #[test] fn provisional_notices_check_registered_ids_and_unicode_scalars(){
+        let state=json!({"products":[{"id":"p1"}],
+            "settings":{"provisionalProductNotices":{"p1":"😀".repeat(2000)}}});
+        assert_eq!(validate_provisional(&json!({"state":state})).unwrap()["valid"],true);
+        let invalid=json!({"products":[{"id":"p1"}],
+            "settings":{"provisionalProductNotices":{"p2":"문의"}}});
+        assert!(validate_provisional(&json!({"state":invalid}))
+            .unwrap_err().contains("등록된 상품"));
+        let too_long=json!({"products":[{"id":"p1"}],
+            "settings":{"provisionalProductNotices":{"p1":"가".repeat(2001)}}});
+        assert!(validate_provisional(&json!({"state":too_long}))
+            .unwrap_err().contains("2000자"));
+    }
     #[test] fn validates_mandatory_vars_and_broken_braces(){
         assert_eq!(validate(&json!({"edits":{"addressMissing":"{수취인}님 주소 확인"}}))
             .unwrap()["valid"],true);

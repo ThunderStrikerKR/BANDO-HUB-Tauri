@@ -91,7 +91,7 @@ pub fn execute(operation: &str, payload: Value) -> Result<Value, String> {
         "apply_issue_action" => issues::issue_action(&payload),
         "apply_product_action" => product_confirmation::apply(&payload),
         "record_message_copy" => message_audit::record(&payload),
-        "factory_reply_review_statuses" | "analyze_factory_reply" | "preview_factory_reply" | "apply_factory_reply" =>
+        "factory_conflict_confirmation" | "factory_reply_review_statuses" | "analyze_factory_reply" | "preview_factory_reply" | "apply_factory_reply" =>
             factory_reply::execute(operation, &payload),
         "apply_reply_action" => reply_rules::apply(&payload),
         "client_change_issue" => client_change::check(&payload),
@@ -100,6 +100,7 @@ pub fn execute(operation: &str, payload: Value) -> Result<Value, String> {
         "apply_reception_action" => reception_operations::apply(&payload),
         "apply_manual_classification" => manual_classification::apply(&payload),
         "validate_automatic_templates" => message_template_validation::validate(&payload),
+        "validate_provisional_product_notices" => message_template_validation::validate_provisional(&payload),
         "create_catalog_item" => catalog_item::make(&payload),
         "remember_kakao_title_client" | "remembered_kakao_title_client" =>
             kakao_title::execute(operation, &payload),

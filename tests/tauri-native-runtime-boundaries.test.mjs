@@ -43,7 +43,8 @@ test("shipping manager reads editable tariff and current combination from Rust",
 test("factory alerts and corrections never show stale TS-calculated statuses", () => {
   const notifications = read("src/FactoryNotifications.tsx");
   const correction = read("src/CorrectionPanel.tsx");
-  assert.match(notifications, /"rules", "factory_reply_review_statuses"/);
+  assert.match(notifications, /"rules", "factory_reply_review_details"/);
+  assert.match(notifications, /statuses\?\.\[record\.id\]\?\.rows\[row\.row\] === false/);
   assert.doesNotMatch(notifications, /\breplyNeedsReview\(/);
   assert.match(notifications, /nativeReview\?\.state === state/);
   assert.match(correction, /action: "correction_view", state, shipmentId: sid/);

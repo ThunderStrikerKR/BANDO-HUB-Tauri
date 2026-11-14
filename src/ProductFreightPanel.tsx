@@ -3,7 +3,7 @@ import { ManagementSearch } from "./ui/ManagementSearch";
 import { EmptyState } from "./ui/PageHeading";
 import { ManagementTable } from "./ui/ManagementTable";
 import { ShippingFeeRanges } from "./ShippingFeeRanges";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { businessCoreCall } from "./tauri-bridge";
 import { confirmAction } from "./dialogs";
 import { registeredProducts, sortProducts } from "./product-models";
@@ -12,11 +12,6 @@ import { useAsyncTask } from "./shared/useAsyncTask";
 import { sameFreightEditor } from "./shared/meaningful-changes";
 import { requestEditorLeave, usePageLeaveGuard } from "./shared/page-leave";
 
-import {
-  editableShippingRule,
-  effectiveShippingRule,
-  emptyProductRule,
-} from "./shipping";
 import type { ShippingRule, State } from "./types";
 import { Field, Modal, MoneyInput, clone } from "./ui";
 export function ProductFreightPanel({
@@ -29,6 +24,29 @@ export function ProductFreightPanel({
   onNotice: NoticeSink;
 }) {
   const { busy, run: runSave } = useAsyncTask(onNotice);
+  const stateRef = useRef(state);
+  stateRef.current = state;
+  type ProductFreightView = {
+    group: { id: string; name: string } | null;
+    rule: ShippingRule | null;
+    editableRule: ShippingRule | null;
+  };
+  const [nativeView, setNativeView] = useState<{
+    state: State; views: Record<string, ProductFreightView>;
+  }>();
+  useEffect(() => {
+    let active = true;
+    void businessCoreCall<{ views: Record<string, ProductFreightView> }>(
+      "rules", "apply_shipping_action", { action: "product_freight_view", state },
+    ).then(({ views }) => {
+      if (active) setNativeView({ state, views });
+    }).catch((error) => {
+      if (active) onNotice("Rust 상품별 운임 조회 실패: " +
+        (error instanceof Error ? error.message : String(error)), "error");
+    });
+    return () => { active = false; };
+  }, [state, onNotice]);
+  const productViews = nativeView?.state === state ? nativeView.views : undefined;
   const [search, setSearch] = useState(""),
     [onlyMissing, setOnlyMissing] = useState(false),
     [selected, setSelected] = useState<string[]>([]),
@@ -50,7 +68,7 @@ export function ProductFreightPanel({
         .toLowerCase()
         .replace(/\s/g, "")
         .includes(search.toLowerCase().replace(/\s/g, "")) &&
-      (!onlyMissing || !effectiveShippingRule(state, p.id).rule),
+      (!onlyMissing || (productViews !== undefined && !productViews[p.id]?.rule)),
   );
   const save = async (next: State, message: string) =>
     (
@@ -61,12 +79,7 @@ export function ProductFreightPanel({
     ).ok;
   const writeRule = async (): Promise<boolean> => {
     if (!editing || !editingDirty) return true;
-    if (Object.entries(editing.rule.fees).some(([count, amount]) =>
-      typeof amount === "number" && editing.rule.maxBundle !== null &&
-      Number(count) > editing.rule.maxBundle)) {
-      onNotice("최대 묶음 수량을 초과하는 운임 구간을 삭제하거나 수량을 다시 설정하세요.", "error");
-      return false;
-    }
+    // Rust save_product_rule/save_group_rule exclusively validates bundle limits.
     try {
       const { shipping } = await businessCoreCall<{ shipping: NonNullable<State["shipping"]> }>(
         "rules", "apply_shipping_action", {
@@ -201,7 +214,9 @@ export function ProductFreightPanel({
             </thead>
             <tbody>
               {rows.map((p) => {
-                const { rule, group } = effectiveShippingRule(state, p.id);
+                const productView = productViews?.[p.id];
+                const rule = productView?.rule ?? null;
+                const group = productView?.group ?? null;
                 return (
                   <tr key={p.id}>
                     <td>
@@ -221,37 +236,49 @@ export function ProductFreightPanel({
                     <td className="shipping-product-name" title={p.name}>
                       <strong>{p.name}</strong>
                     </td>
-                    <td>{group ? group.name : "미소속"}</td>
-                    <td>{rule?.maxConfirmed && rule.maxBundle ? rule.maxBundle + "개" : "확인 필요"}</td>
+                    <td>{!productView ? "확인 중" : group ? group.name : "미소속"}</td>
+                    <td>{!productView ? "확인 중" : rule?.maxConfirmed && rule.maxBundle ? rule.maxBundle + "개" : "확인 필요"}</td>
                     <td>
-                      {rule && (typeof rule.perItem === "number" ||
+                      {!productView ? "확인 중" : rule && (typeof rule.perItem === "number" ||
                         Object.values(rule.fees).some((amount) => typeof amount === "number"))
                         ? "등록"
                         : "미등록"}
                     </td>
                     <td>
-                      {!rule?.maxConfirmed || !rule.maxBundle
+                      {!productView ? "확인 중" : !rule?.maxConfirmed || !rule.maxBundle
                         ? "확인 필요" : rule.maxBundle === 1 ? "개별 포장" : "합포장 가능"}
                     </td>
                     <td>{rule?.at ? new Date(rule.at).toLocaleDateString("ko-KR") : "-"}</td>
                     <td>
                       <button
-                        onClick={() => {
-                          // A missing rule has a generated version ID. Create it
-                          // once so an untouched editor is not falsely dirty.
-                          const initial = editableShippingRule(rule ?? emptyProductRule());
-                          setInitialRule(clone(initial));
-                          setEditing({
-                            productId: p.id,
-                            groupId: group?.id,
-                            name: group ? group.name + " / 공통 기준" : p.name,
-                            rule: initial,
-                          });
-                        }}
+                        disabled={!productView || busy}
+                        onClick={() => void (async () => {
+                          if (!productView) return;
+                          try {
+                            const initial = productView.editableRule ??
+                              (await businessCoreCall<{ rule: ShippingRule }>(
+                                "rules", "apply_shipping_action", {
+                                  action: "default_product_rule",
+                                  versionId: crypto.randomUUID(),
+                                  now: new Date().toISOString(),
+                                },
+                              )).rule;
+                            if (stateRef.current !== state) return;
+                            setInitialRule(clone(initial));
+                            setEditing({
+                              productId: p.id, groupId: group?.id,
+                              name: group ? group.name + " / 공통 기준" : p.name,
+                              rule: initial,
+                            });
+                          } catch (error) {
+                            onNotice("Rust 운임 편집 조회 실패: " +
+                              (error instanceof Error ? error.message : String(error)), "error");
+                          }
+                        })()}
                       >
                         {group ? "그룹 기준 편집" : "기본 운임 설정"}
                       </button>
-                      {rule && (
+                      {productView && rule && (
                         <button
                           onClick={async () => {
                             if (
@@ -260,23 +287,24 @@ export function ProductFreightPanel({
                               ))
                             )
                               return;
-                            const next = clone(state);
-                            if (group) {
-                              const g = next.shipping!.groups.find((g) => g.id === group.id)!;
-                              g.history.push(g.current);
-                              g.current = emptyProductRule();
-                            } else {
-                              next.shipping!.productHistory ??= {};
-                              next.shipping!.productHistory[p.id] = [
-                                ...(next.shipping!.productHistory[p.id] ?? []),
-                                rule,
-                              ];
-                              next.shipping!.productRules![p.id] = emptyProductRule();
+                            if (stateRef.current !== state) return;
+                            try {
+                              const { state: updated } = await businessCoreCall<{ state: State }>(
+                                "rules", "apply_shipping_action", {
+                                  action: "reset_product_freight_rule", state,
+                                  productId: p.id, versionId: crypto.randomUUID(),
+                                  now: new Date().toISOString(),
+                                },
+                              );
+                              if (stateRef.current !== state) return;
+                              await save(
+                                updated,
+                                "새 운임 기준을 시작했습니다. 확인된 운임을 다시 입력하세요.",
+                              );
+                            } catch (error) {
+                              onNotice("Rust 운임 기준 변경 실패: " +
+                                (error instanceof Error ? error.message : String(error)), "error");
                             }
-                            void save(
-                              next,
-                              "새 운임 기준을 시작했습니다. 확인된 운임을 다시 입력하세요.",
-                            );
                           }}
                         >
                           기준 변경
