@@ -8,6 +8,22 @@ import type { BillingSnapshot, Client, Order, Origin, Price, State } from "../ty
 
 /** The same billing snapshot as the legacy replies.ts oracle, including
  * frozen historical totals. This Rust result is never recomputed in TS. */
+/** Staff may explicitly assume one item only for a confirmed product whose
+ * quantity is missing. Rust validates eligibility and records actor/time;
+ * the caller must still apply this as an ordinary editable-order mutation. */
+export async function nativeApproveMissingQuantity(
+  order: Order, recipientId: string, itemId: string, actor: string,
+): Promise<Order> {
+  const { order: approved } = await businessCoreCall<{ order: Order }>(
+    "rules", "apply_issue_action", {
+      action: "approve_missing_quantity",
+      order, recipientId, itemId, actor,
+      now: new Date().toISOString(),
+    },
+  );
+  return approved;
+}
+
 export async function nativeBillingSnapshot(
   order: Order, state: State, reason: string,
 ): Promise<BillingSnapshot> {
