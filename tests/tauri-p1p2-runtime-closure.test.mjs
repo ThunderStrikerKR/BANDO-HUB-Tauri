@@ -11,7 +11,8 @@ test("all live factory review surfaces use the Rust resolver, never the TS revie
   assert.doesNotMatch(app, /replyNeedsReview/);
   assert.doesNotMatch(history, /replyNeedsReview/);
   assert.match(app, /"factory_reply_review_statuses"/);
-  assert.match(notifications, /"factory_reply_review_statuses"/);
+  assert.match(notifications, /"factory_reply_review_details"/);
+  assert.doesNotMatch(notifications, /resolves\?\.id === record\.id/);
   assert.match(history, /"factory_reply_review_details"/);
   assert.match(history, /"상태 확인 중"/);
   assert.match(history, /resolved === false && !row\.applied/);
@@ -32,6 +33,8 @@ test("registered item creation in independent and retail order editors is native
 test("product freight displays native effective and editable rules without TS status fallback", () => {
   const source = read("src/ProductFreightPanel.tsx");
   assert.match(source, /"product_freight_view"/);
+  assert.match(source, /action: "start_new_rule"/);
+  assert.doesNotMatch(source, /g\.history\.push\(g\.current\)/);
   assert.doesNotMatch(source, /\beffectiveShippingRule\(/);
   assert.doesNotMatch(source, /\beditableShippingRule\(/);
   assert.match(source, /nativeFreight\?\.state === state/);
@@ -51,6 +54,7 @@ test("Rust projections have source-TS differential fixtures, not just static wir
   const parity = read("tests/rust-migration/rules/parity/compare.mts");
   assert.match(parity, /"factory review detail: "\+name/);
   assert.match(parity, /"product freight view: "\+name/);
+  assert.match(parity, /"freight reset history: "\+name/);
   assert.match(parity, /"provisional notice validation: "\+name/);
   assert.match(parity, /\bvalidateProvisionalProductNotices\(state\)/);
   assert.match(parity, /\beffectiveShippingRule\(state,p\.id\)/);
