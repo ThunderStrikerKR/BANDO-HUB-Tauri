@@ -39,7 +39,7 @@ import { validateAutomaticMessageTemplates } from "../../../../src/automatic-mes
 import { addressInfo, addressParts } from "../../../../src/parser.ts";
 import { companyClient, companyParty } from "../../../../src/order-types.ts";
 import { explicitSender } from "../../../../src/explicit-sender.ts";
-import { applyManual, type ManualModel } from "../../../../src/orders/manual-classification.ts";
+import { applyManual, setManualValue, type ManualModel } from "../../../../src/orders/manual-classification.ts";
 import { rememberTitle, rememberedTitleClient } from "../../../../src/title-clients.ts";
 
 const root=resolve(dirname(fileURLToPath(import.meta.url)),"../../../..");
@@ -3324,6 +3324,19 @@ manualCase("confirmed reception blocks manual application",{
 manualCase("no assignments keeps manual rows",manualOrder,{
   ...manualModel,assignments:{},blocks:[]
 });
+
+// Differential parity of editable manual quantities against the TS original.
+for(const value of ["3", " 2 개 ", "한개", "세 세트", "x 5", "× 7",
+  "*8", "10cm", "수량 2개", "0", "", "1.5", "999999999999999999999"]) {
+  const cell={recipientId:"r1",itemId:"item1",field:"quantity"};
+  add("manual input quantity: "+JSON.stringify(value),
+    "apply_manual_classification", {action:"parse_manual_quantity",value},
+    ()=>{
+      const next=setManualValue(manualModel,cell,value,baseState as any,manualOrder as any);
+      const item=next.rows[0].items[0];
+      return {quantity:item.quantity,quantityConfirmed:item.quantityConfirmed};
+    });
+}
 
 // Native factory-review badges must use the same resolved-row semantics as
 // the original TS UI; unresolved errors must never display as completed.
