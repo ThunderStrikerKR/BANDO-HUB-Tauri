@@ -3,7 +3,6 @@ on:
   push:
     branches:
       - migration/03-integration
-      - fix/03-rust-retire-p0-billing-notice-client
       - migration/05-factory-reply
       - integration/06-history-settlement
   workflow_dispatch:
