@@ -47,6 +47,28 @@ fn current_combination(record:&Value,state:&Value,shipping:&Value)->bool {
     }
     true
 }
+// Source oracle: shipping.ts::effectiveShippingRule / editableShippingRule.
+// Pure read-only projection: existing/current and historical rates are unchanged.
+pub(super) fn product_freight_view(payload:&Value)->Result<Value,String>{
+    let state=super::req(payload,"state")?;
+    let shipping=field(state,"shipping");
+    let mut by_product=serde_json::Map::new();
+    for product in rows(field(state,"products")){
+        let id=str_field(product,"id");
+        let group_id=field(product,"shippingGroupId").as_str();
+        let group=rows(field(shipping,"groups")).iter().find(|candidate|
+            group_id==candidate.get("id").and_then(Value::as_str) &&
+            !has_value(field(candidate,"deletedAt")));
+        let rule=group.map(|g|field(g,"current"))
+            .unwrap_or_else(||field(field(shipping,"productRules"),id));
+        by_product.insert(id.into(),json!({
+            "rule":rule,
+            "group":group.cloned().unwrap_or(Value::Null),
+            "editableRule":if rule.is_null(){Value::Null}else{editable_rule(rule)}
+        }));
+    }
+    Ok(json!({"byProduct":by_product}))
+}
 pub(super) fn shipping_manager_view(payload:&Value)->Result<Value,String>{
     let state=super::req(payload,"state")?;
     let shipping=super::req(payload,"shipping")?;
