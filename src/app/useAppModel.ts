@@ -172,11 +172,15 @@ export function useAppModel() {
       const prepared = next.orders.find(
         (o) => o.id === draft?.id && o.receptionVersion === 1 && !o.confirmedAt,
       );
-      // Only Rust may strip temporary receptions and linked workflow entities
-      // before the single revision-checked native SQLite write.
+      // First freeze the historical invoice from the BEFORE state in Rust,
+      // then filter temporary reception previews in Rust. Neither call writes
+      // SQLite; exactly one revision-checked save follows both transitions.
+      const { state: billed } = await businessCoreCall<{ state: State }>(
+        "rules", "finalize_billing_history", { before: state!, state: next },
+      );
       const { state: persistent } = await businessCoreCall<{ state: State }>(
         "rules", "apply_reception_action", {
-          action: "persisted_reception_state", before: state!, state: next,
+          action: "persisted_reception_state", before: state!, state: billed,
         },
       );
       // serde_json may reorder object keys; compare semantic values rather than
