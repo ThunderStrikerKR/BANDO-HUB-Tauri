@@ -34,27 +34,30 @@ export function CorrectionPanel({
   const changed = !sameValue(after, ctx.recipient);
   const closeDraft = () => void confirmDiscardDraft("공장 전달 후 정정 요청", changed, onClose, busy);
   const requests = state.workflow!.changeRequests.filter((r) => r.shipmentId === sid);
-  const [nativeView, setNativeView] = useState<{
-    state: State;
-    requests: Record<string, { status: string; message: string | null }>;
+  // The authoritative status and exact factory copy text are Rust projections.
+  // Do not display or copy a stale response from a previous SQLite revision.
+  type CorrectionSummary = { id: string; status: string; text: string | null };
+  const [correctionsView, setCorrectionsView] = useState<{
+    source: State; shipmentId: string; records: CorrectionSummary[];
   }>();
+  const [correctionsError, setCorrectionsError] = useState("");
   useEffect(() => {
     let active = true;
-    void businessCoreCall<{ requests: { id: string; status: string; message: string | null }[] }>(
-      "rules", "apply_correction_action", {
-        action: "correction_view", state, shipmentId: sid,
-      },
-    ).then(({ requests }) => {
-      if (active) setNativeView({
-        state, requests: Object.fromEntries(requests.map((entry) => [entry.id, entry])),
-      });
+    setCorrectionsError("");
+    void businessCoreCall<{ records: CorrectionSummary[] }>(
+      "output", "render_correction_summaries", { state, shipmentId: sid },
+    ).then(({ records }) => {
+      if (active) setCorrectionsView({ source: state, shipmentId: sid, records });
     }).catch((error) => {
-      if (active) onNotice("Rust 정정 안내문 생성 실패: " +
-        (error instanceof Error ? error.message : String(error)), "error");
+      if (active) {
+        setCorrectionsView(undefined);
+        setCorrectionsError(error instanceof Error ? error.message : String(error));
+      }
     });
     return () => { active = false; };
-  }, [state, sid, onNotice]);
-  const view = nativeView?.state === state ? nativeView.requests : undefined;
+  }, [state, sid]);
+  const nativeRecords = correctionsView?.source === state && correctionsView.shipmentId === sid
+    ? correctionsView.records : undefined;
   const latestSelection = useRef({ state, search });
   latestSelection.current = { state, search };
   const setProduct = (p: Product) => {
@@ -183,9 +186,10 @@ export function CorrectionPanel({
             </button>
           </>
         )}
+        {correctionsError && <p role="alert" className="form-error">{correctionsError}</p>}
         {requests.map((r) => {
-          const status = view?.[r.id]?.status;
-          const message = view?.[r.id]?.message;
+          const native = nativeRecords?.find((entry) => entry.id === r.id);
+          const status = native?.status;
           return (
             <article className="correction-request" key={r.id}>
               <h3>
@@ -193,20 +197,21 @@ export function CorrectionPanel({
                   ? "공장 반영 직원 확인"
                   : status === "PENDING_FACTORY"
                     ? "공장 반영 대기"
-                    : status === "REGISTERED" ? "정정 요청 등록" : "상태 확인 중"}
+                    : status === undefined ? "정정 상태 조회 중" : "정정 요청 등록"}
               </h3>
               <small>
                 {r.at} / {r.actor}
               </small>
               {r.afterRecipient ? (
                 <>
-                  {message != null ? <pre>{message}</pre> : <p>정정 안내문 확인 중</p>}
+                  <pre>{native?.text ?? (correctionsError || "정정 문구 생성 중")}</pre>
                   <button
-                    disabled={busy || message == null || status === "CONFIRMED"}
+                    disabled={busy || !native?.text || status === "CONFIRMED"}
                     onClick={() =>
                       void run(async () => {
-                        if (message == null) throw Error("정정 안내문 확인이 완료되지 않았습니다.");
-                        await window.bando!.copy(message);
+                        if (!native?.text || correctionsView?.source !== state)
+                          throw Error("최신 공장 정정 문구를 불러오지 못했습니다.");
+                        await window.bando!.copy(native.text);
                         await onSave(await nativeApplyCorrectionAction(state, "copied_correction", { requestId: r.id }));
                         onNotice(
                           "정정 문구를 복사했습니다. 실제 공장 반영은 아직 대기 상태입니다.",

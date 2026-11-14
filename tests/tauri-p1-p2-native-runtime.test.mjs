@@ -9,7 +9,9 @@ test("factory history and notification both use native review and conflict proje
   const app = read("src/App.tsx");
   assert.match(app, /"rules", "factory_reply_review_statuses"/);
   assert.doesNotMatch(app, /replyNeedsReview\(/);
-  assert.match(app, /state\.factoryReplies\?\.length \?\? 0/);
+  // Historical replies are not equivalent to pending reviews during async load.
+  assert.doesNotMatch(app, /state\\.factoryReplies\\?\\.length \\?\\? 0/);
+  assert.match(app, /: 0/);
   const native = read("src/native-factory-conflict-review.ts");
   const rules = read("src-tauri/src/business_core/rules/factory_reply.rs");
   assert.match(history,/factory_reply_review_statuses/);

@@ -98,7 +98,7 @@ export function App() {
           notificationCount={
             nativeReviewCount?.state === state
               ? nativeReviewCount.count
-              : state.factoryReplies?.length ?? 0
+              : 0
           }
           page={tab}
           dock={model.dock}

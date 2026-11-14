@@ -43,7 +43,7 @@ import { validateAutomaticMessageTemplates } from "../../../../src/automatic-mes
 import { addressInfo, addressParts } from "../../../../src/parser.ts";
 import { companyClient, companyParty } from "../../../../src/order-types.ts";
 import { explicitSender } from "../../../../src/explicit-sender.ts";
-import { applyManual, type ManualModel } from "../../../../src/orders/manual-classification.ts";
+import { applyManual, setManualValue, type ManualModel } from "../../../../src/orders/manual-classification.ts";
 import { rememberTitle, rememberedTitleClient } from "../../../../src/title-clients.ts";
 
 const root=resolve(dirname(fileURLToPath(import.meta.url)),"../../../..");
@@ -3328,6 +3328,51 @@ manualCase("confirmed reception blocks manual application",{
 manualCase("no assignments keeps manual rows",manualOrder,{
   ...manualModel,assignments:{},blocks:[]
 });
+
+// Manual recipient edit: compare complete Rust model with the original TS reducer.
+for(const field of ["name","address","phone","mobile","note"]) {
+  const cell={recipientId:"r1",field};
+  for(const value of ["", "가상 값", "010-1234-5678"]) {
+    add("manual recipient: "+field+"="+JSON.stringify(value),
+      "apply_manual_classification", {
+        action:"set_manual_recipient_field",model:manualModel,cell,value
+      },()=>({model:setManualValue(manualModel,cell,value,baseState as any,manualOrder as any)}));
+  }
+}
+// Address parser ownership is part of manual cell semantics; compare entire
+// original state rather than comparing just the visible address text.
+for(const value of ["", "서울특별시 강남구 테헤란로 10 101호",
+  "경기도 수원시 팔달구 인계동 123", "부산 해운대구 센텀대로 5",
+  "전남 목포시 죽교동 산 20-2", "주소 확인 전"]) {
+  const cell={recipientId:"r1",field:"address"};
+  add("manual address parts: "+JSON.stringify(value),
+    "apply_manual_classification",{
+      action:"set_manual_recipient_field",model:manualModel,cell,value
+    },()=>({model:setManualValue(manualModel,cell,value,baseState as any,manualOrder as any)}));
+}
+
+for(const [name,cell] of [
+  ["invalid field",{recipientId:"r1",field:"unknown"}],
+  ["missing recipient",{recipientId:"missing",field:"name"}]
+]) {
+  add("manual recipient: "+name+" blocked","apply_manual_classification",{
+    action:"set_manual_recipient_field",model:manualModel,cell,value:"가상"
+  },()=>({model:setManualValue(manualModel,cell,"가상",baseState as any,manualOrder as any)}));
+  cases[cases.length-1].expectedOk=false;
+}
+
+// Differential parity of editable manual quantities against the TS original.
+for(const value of ["3", " 2 개 ", "한개", "세 세트", "x 5", "× 7",
+  "*8", "10cm", "수량 2개", "0", "", "1.5", "999999999999999999999"]) {
+  const cell={recipientId:"r1",itemId:"item1",field:"quantity"};
+  add("manual input quantity: "+JSON.stringify(value),
+    "apply_manual_classification", {action:"parse_manual_quantity",value},
+    ()=>{
+      const next=setManualValue(manualModel,cell,value,baseState as any,manualOrder as any);
+      const item=next.rows[0].items[0];
+      return {quantity:item.quantity,quantityConfirmed:item.quantityConfirmed};
+    });
+}
 
 // Native factory-review badges must use the same resolved-row semantics as
 // the original TS UI; unresolved errors must never display as completed.
