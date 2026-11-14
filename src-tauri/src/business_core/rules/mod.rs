@@ -65,6 +65,7 @@ pub fn execute(operation: &str, payload: Value) -> Result<Value, String> {
         },
         "reprice_order" => pricing::reprice_order(&payload),
         "should_refresh_pricing" => Ok(json!({"refresh": pricing::should_refresh(&payload)?})),
+        "shipping_manager_view" => shipping::shipping_manager_view(&payload),
         "apply_shipping_action" => shipping::shipping_action(&payload),
         "reconcile_workflow" => reconciliation::reconcile(&payload),
         "calculate_shipping" => shipping::recommend(
