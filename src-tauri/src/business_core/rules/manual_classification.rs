@@ -1,7 +1,7 @@
 //! Final manual classification, ported from src/orders/manual-classification.ts::applyManual.
 //! The grid keeps local UI draft state; this reducer exclusively owns the
 //! application of rows, evidence ownership and issue resolution updates.
-use serde_json::{json, Value};
+use serde_json::{json, Value, Map};
 use super::{field, has_value, req, required_str, rows, set, str_field};
 use std::collections::HashSet;
 
@@ -103,6 +103,151 @@ fn pending_quantity(model: &Value) -> bool {
         )
     )
 }
+fn valid_quantity_item(item:&Value)->bool{
+    let number=field(item,"quantity").as_i64();
+    number.is_some_and(|n|n>0 && n<=9_007_199_254_740_991)
+        && item.get("quantityConfirmed")!=Some(&Value::Bool(false))
+}
+fn synchronize(order:&mut Value)->Result<(),String>{
+    let previous=field(order,"issueResolutions").as_object()
+        .cloned().unwrap_or_default();
+    let mut next=previous.clone();
+    let current=super::issues::order_issues(order);
+    let now=order.get("updatedAt").cloned();
+    let mut present=std::collections::HashSet::new();
+    for issue in current {
+        let id=str_field(&issue,"issueId").to_owned();
+        if id.is_empty(){continue}
+        present.insert(id.clone());
+        let evidence=issue.get("evidence").filter(|value|!value.is_null())
+            .cloned().unwrap_or_else(||field(&issue,"title").clone());
+        let old=previous.get(&id);
+        let unchanged=old.is_some_and(|old|
+            old.get("resolution")==issue.get("resolution")&&
+            old.get("evidence")==Some(&evidence));
+        let mut decision=Map::new();
+        for key in ["resolution","resolutionSource"] {
+            if let Some(value)=issue.get(key) {
+                decision.insert(key.to_owned(),value.clone());
+            }
+        }
+        decision.insert("evidence".into(),evidence);
+        let updated_at=if unchanged {
+            old.and_then(|value|value.get("updatedAt")).cloned()
+        }else{
+            now.clone()
+        };
+        if let Some(value)=updated_at {
+            decision.insert("updatedAt".into(),value);
+        }
+        next.insert(id,Value::Object(decision));
+    }
+    for (id,old) in &previous {
+        if !present.contains(id) && [
+            "PENDING_CUSTOMER","UNRESOLVED","PROVISIONALLY_APPROVED","AUTO_APPLIED",
+        ].contains(&str_field(old,"resolution")) {
+            let mut updated=old.clone();
+            set(&mut updated,"resolution",json!("RESOLVED"))?;
+            set(&mut updated,"resolutionSource",json!("직원 수정 또는 현재 원문 반영"))?;
+            if let Some(ref now)=now {set(&mut updated,"updatedAt",now.clone())?;}
+            next.insert(id.clone(),updated);
+        }
+    }
+    set(order,"issueResolutions",Value::Object(next))
+}
+fn apply_final(payload:&Value)->Result<Value,String>{
+    let order=req(payload,"order")?;
+    let model=req(payload,"model")?;
+    if has_value(field(order,"confirmedAt")){
+        return Err("정식 주문은 수동 분류로 변경할 수 없습니다.".into());
+    }
+    let model_rows=req(model,"rows")?.as_array().ok_or("배송 행이 없습니다.")?;
+    if model_rows.is_empty(){return Err("배송 건수를 설정하세요.".into());}
+    for row in model_rows {
+        for item in rows(field(row,"items")){
+            if (!str_field(item,"productId").is_empty() || !str_field(item,"name").trim().is_empty())
+                && !valid_quantity_item(item) {
+                return Err("선택한 상품의 수량을 먼저 확정하세요.".into());
+            }
+        }
+    }
+    let mut next=order.clone();
+    set(&mut next,"recipients",json!(model_rows))?;
+    set(&mut next,"manualClassification",json!({
+        "blocks":field(model,"blocks"),"assignments":field(model,"assignments")
+    }))?;
+    let original=order.get("analysisRaw").filter(|value|!value.is_null())
+        .unwrap_or_else(||field(order,"raw"));
+    set(&mut next,"analysisRaw",original.clone())?;
+    set(&mut next,"analysisClientId",field(order,"clientId").clone())?;
+    set(&mut next,"pricesLocked",json!(false))?;
+    let order_has_type=order.get("orderType").is_some_and(|v|v.as_str().is_some_and(|s|!s.is_empty()));
+    let recipients=next.get_mut("recipients").and_then(Value::as_array_mut)
+        .ok_or("배송 행이 없습니다.")?;
+    for recipient in recipients.iter_mut(){
+        if order_has_type {
+            if recipient.get("dispatchOrigin").is_none_or(Value::is_null){
+                set(recipient,"dispatchOrigin",json!("FACTORY"))?;
+            }
+            let origin=field(recipient,"dispatchOrigin").clone();
+            if let Some(items)=recipient.get_mut("items").and_then(Value::as_array_mut){
+                for item in items {
+                    set(item,"origin",origin.clone())?;
+                }
+            }
+        }
+        recipient.as_object_mut().ok_or("배송 행 정보 오류")?
+            .remove("unassignedEvidence");
+        set(recipient,"sources",json!([]))?;
+        if let Some(items)=recipient.get_mut("items").and_then(Value::as_array_mut){
+            for item in items {
+                set(item,"sources",json!([]))?;
+            }
+        }
+    }
+    let blocks=rows(field(model,"blocks"));
+    let assignments=field(model,"assignments");
+    let assign_order=rows(field(payload,"assignmentOrder"));
+    let mut ids=assign_order.iter().filter_map(Value::as_str)
+        .map(str::to_owned).collect::<Vec<_>>();
+    // No silent reordering: the frontend passes Object.keys(assignments).
+    // A missing explicit order is invalid when assignment links exist.
+    if assignments.as_object().is_some_and(|map|map.len()!=ids.len()) {
+        return Err("수동 분류 원문 연결 순서가 일치하지 않습니다.".into());
+    }
+    let mut seen=std::collections::HashSet::new();
+    for id in ids.drain(..) {
+        if !seen.insert(id.clone()) {
+            return Err("중복된 수동 원문 연결입니다.".into());
+        }
+        let Some(assignment)=assignments.get(&id) else {
+            return Err("존재하지 않는 수동 원문 연결입니다.".into());
+        };
+        let Some(block)=blocks.iter().find(|b|str_field(b,"id")==id) else {continue};
+        let Some(recipient)=recipients.iter_mut().find(|r|
+            str_field(r,"id")==str_field(assignment,"recipientId")) else {continue};
+        let mut span=block.clone();
+        set(&mut span,"recipientId",field(recipient,"id").clone())?;
+        let item_id=str_field(assignment,"itemId");
+        set(&mut span,"targetId",if item_id.is_empty(){
+            field(recipient,"id").clone()
+        }else{json!(item_id)})?;
+        set(&mut span,"field",field(assignment,"field").clone())?;
+        if !item_id.is_empty(){
+            if let Some(item)=recipient.get_mut("items").and_then(Value::as_array_mut)
+                .and_then(|items|items.iter_mut().find(|item|str_field(item,"id")==item_id)){
+                item.get_mut("sources").and_then(Value::as_array_mut)
+                    .ok_or("상품 출처 정보 오류")?.push(span);
+            }
+        }else{
+            recipient.get_mut("sources").and_then(Value::as_array_mut)
+                .ok_or("수취인 출처 정보 오류")?.push(span);
+        }
+    }
+    synchronize(&mut next)?;
+    Ok(json!({"order":next}))
+}
+
 pub(super) fn apply(payload: &Value) -> Result<Value, String> {
     let action = required_str(payload, "action")?;
     if action == "set_manual_recipient_field" {
@@ -141,110 +286,7 @@ pub(super) fn apply(payload: &Value) -> Result<Value, String> {
     if action != "apply_manual" {
         return Err(format!("지원하지 않는 수동 분류 명령: {action}"));
     }
-    let order = req(payload, "order")?;
-    let model = req(payload, "model")?;
-    if has_value(field(order, "confirmedAt")) {
-        return Err("정식 주문은 수동 분류로 변경할 수 없습니다.".into());
-    }
-    if pending_quantity(model) {
-        return Err("선택한 상품의 수량을 먼저 확정하세요.".into());
-    }
-    if rows(field(model, "rows")).is_empty() {
-        return Err("배송 건수를 설정하세요.".into());
-    }
-    let mut next = order.clone();
-    set(&mut next, "recipients", req(model, "rows")?.clone())?;
-    set(&mut next, "manualClassification", json!({
-        "blocks": req(model, "blocks")?,
-        "assignments": req(model, "assignments")?,
-    }))?;
-    let raw = if !field(order, "analysisRaw").is_null() {
-        field(order, "analysisRaw")
-    } else { field(order, "raw") };
-    if let Some(v) = raw.as_str() {
-        set(&mut next, "analysisRaw", json!(v))?;
-    } else if !raw.is_null() {
-        set(&mut next, "analysisRaw", raw.clone())?;
-    }
-    if let Some(v) = order.get("clientId") {
-        set(&mut next, "analysisClientId", v.clone())?;
-    }
-    set(&mut next, "pricesLocked", json!(false))?;
-    let has_order_type = !field(order, "orderType").is_null() &&
-        !matches!(field(order, "orderType").as_str(), Some(""));
-    for row in next["recipients"].as_array_mut().ok_or("배송 목록 오류")? {
-        if has_order_type {
-            if field(row, "dispatchOrigin").is_null() {
-                set(row, "dispatchOrigin", json!("FACTORY"))?;
-            }
-            let origin = field(row, "dispatchOrigin").clone();
-            for item in row["items"].as_array_mut().ok_or("상품 목록 오류")? {
-                set(item, "origin", origin.clone())?;
-            }
-        }
-        row.as_object_mut().ok_or("수취인 데이터 오류")?.remove("unassignedEvidence");
-        set(row, "sources", json!([]))?;
-        for item in row["items"].as_array_mut().ok_or("상품 목록 오류")? {
-            set(item, "sources", json!([]))?;
-        }
-    }
-    let blocks = rows(field(model, "blocks"));
-    let assignments = field(model, "assignments").as_object()
-        .ok_or("원문 연결 정보 오류")?;
-    for (block_id, assignment) in assignments {
-        let Some(block) = blocks.iter().find(|b| str_field(b, "id") == block_id) else {continue};
-        let rid = str_field(assignment, "recipientId");
-        let Some(row) = next["recipients"].as_array_mut().ok_or("배송 목록 오류")?
-            .iter_mut().find(|r|str_field(r, "id") == rid) else {continue};
-        let mut span = block.clone();
-        let item_id = str_field(assignment, "itemId");
-        set(&mut span, "recipientId", json!(rid))?;
-        set(&mut span, "targetId", json!(if item_id.is_empty() {rid}else{item_id}))?;
-        set(&mut span, "field",field(assignment,"field").clone())?;
-        if item_id.is_empty() {
-            row["sources"].as_array_mut().ok_or("수취인 원문 연결 오류")?.push(span);
-        } else if let Some(item) = row["items"].as_array_mut().ok_or("상품 목록 오류")?
-            .iter_mut().find(|i| str_field(i, "id") == item_id) {
-            item["sources"].as_array_mut().ok_or("상품 원문 연결 오류")?.push(span);
-        }
-    }
-
-    let issues = super::issues::order_issues(&next);
-    let old = field(&next,"issueResolutions").as_object().cloned().unwrap_or_default();
-    let mut decisions = old.clone();
-    let present = issues.iter().map(|i|str_field(i,"issueId").to_string())
-        .collect::<HashSet<_>>();
-    let updated = field(&next,"updatedAt").clone();
-    for issue in &issues {
-        let id = str_field(issue, "issueId");
-        let old_entry = old.get(id);
-        let evidence = issue.get("evidence").filter(|v|!v.is_null())
-            .unwrap_or_else(||field(issue,"title"));
-        let current_resolution = field(issue,"resolution");
-        let date = if old_entry.is_some_and(|p|
-            field(p,"resolution")==current_resolution &&
-            field(p,"evidence")==evidence
-        ) { field(old_entry.unwrap(),"updatedAt").clone() } else {updated.clone()};
-        decisions.insert(id.into(),json!({
-            "resolution":current_resolution,
-            "resolutionSource":field(issue,"resolutionSource"),
-            "updatedAt":date,"evidence":evidence
-        }));
-    }
-    for (id,previous) in &old {
-        if !present.contains(id) &&
-            ["PENDING_CUSTOMER","UNRESOLVED","PROVISIONALLY_APPROVED","AUTO_APPLIED"]
-                .contains(&str_field(previous,"resolution")) {
-            let mut resolved = previous.clone();
-            set(&mut resolved,"resolution",json!("RESOLVED"))?;
-            set(&mut resolved,"resolutionSource",
-                json!("직원 수정 또는 현재 원문 반영"))?;
-            set(&mut resolved,"updatedAt",updated.clone())?;
-            decisions.insert(id.clone(),resolved);
-        }
-    }
-    set(&mut next,"issueResolutions",Value::Object(decisions))?;
-    Ok(json!({"order":next}))
+    apply_final(payload)
 }
 
 #[cfg(test)]
@@ -304,7 +346,8 @@ mod tests {
                     "quantity":2,"quantityConfirmed":true,"issues":[],
                     "sources":[{"old":"owner"}]}]}],
                 "blocks":[{"id":"0:3","start":0,"end":3,"text":"가상7","field":"product"}],
-                "assignments":{"0:3":{"recipientId":"r","itemId":"i","field":"product","value":"BD 709"}}}});
+                "assignments":{"0:3":{"recipientId":"r","itemId":"i","field":"product","value":"BD 709"}}},
+            "assignmentOrder":["0:3"]});
         let result=apply(&p).unwrap();
         assert_eq!(result["order"]["raw"],"가상");
         assert_eq!(result["order"]["recipients"][0]["items"][0]["origin"],"FACTORY");
