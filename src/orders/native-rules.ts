@@ -124,6 +124,14 @@ export async function nativeApplyWorkflowAction(
   // Audit IDs are preallocated on the caller side. Only IDs of actually
   // emitted records are used; never leave a partially changed SQLite state.
   const auditEventIds = Array.from({ length: 2048 }, () => crypto.randomUUID());
+  // The immutable notice must use the full Rust-rendered payment text,
+  // not the editable customer-message preview or a TypeScript formatter.
+  // Render from the same reconciled state passed to the Rust rules reducer.
+  const paymentMessage = action === "advance_group" && typeof args.groupId === "string"
+    ? (await businessCoreCall<{ payment: string }>("output", "render_payment_notice", {
+        state: prepared, groupId: args.groupId,
+      })).payment
+    : undefined;
   const payload = {
     state: prepared, action, now, actor,
     eventId: crypto.randomUUID(),
@@ -131,6 +139,7 @@ export async function nativeApplyWorkflowAction(
     newGroupId: crypto.randomUUID(),
     confirmationId: crypto.randomUUID(),
     noticeId: crypto.randomUUID(),
+    ...(paymentMessage === undefined ? {} : { paymentMessage }),
     ...args,
   };
   const result = await businessCoreCall<{ state: State }>(
