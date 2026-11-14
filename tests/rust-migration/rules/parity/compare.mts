@@ -34,6 +34,7 @@ import { confirmRetail, newRetailOrder } from "../../../../src/orders/retail.ts"
 import { rawCorrectableIssue, rawCorrectionAllowed, correctWorkingRaw } from "../../../../src/working-raw.ts";
 import { receiptOf, correctReceipt } from "../../../../src/receipt.ts";
 import { billingSnapshot, applyReply } from "../../../../src/replies.ts";
+import { replyNeedsReview } from "../../../../src/factory-replies.ts";
 import { addressInfo, addressParts } from "../../../../src/parser.ts";
 import { companyClient, companyParty } from "../../../../src/order-types.ts";
 import { explicitSender } from "../../../../src/explicit-sender.ts";
@@ -3322,6 +3323,43 @@ manualCase("confirmed reception blocks manual application",{
 manualCase("no assignments keeps manual rows",manualOrder,{
   ...manualModel,assignments:{},blocks:[]
 });
+
+// Native factory-review badges must use the same resolved-row semantics as
+// the original TS UI; unresolved errors must never display as completed.
+const openReply:any={
+  id:"reply-original",filename:"회신.xlsx",businessDate:"2026-11-13",
+  at:actionNow,status:"REVIEW",rows:[
+    {row:2,name:"가상",address:"서울",contacts:["01012345678"],
+      tracking:"001234567890",actual:3000,applied:false},
+    {row:3,name:"가상2",address:"서울",contacts:["01012345679"],
+      tracking:"001234567891",actual:3000,applied:true}
+  ]
+};
+function factoryReviewCase(name:string,replies:any[]){
+  const state:any={...copy(baseState),factoryReplies:replies};
+  add("factory review UI: "+name,"factory_reply_review_statuses",{state},
+    ()=>({reviews:replies.map(record=>({
+      id:record.id,needsReview:replyNeedsReview(state,record)
+    }))}));
+}
+factoryReviewCase("unresolved row remains review", [openReply]);
+factoryReviewCase("later successfully applied resolution closes review", [
+  openReply,{...copy(openReply),id:"reply-resolution",rows:[
+    {...copy(openReply.rows[0]),applied:true}
+  ],resolves:{id:"reply-original",row:2}}
+]);
+factoryReviewCase("unsuccessful resolution does not close review", [
+  openReply,{...copy(openReply),id:"reply-failed",rows:[
+    {...copy(openReply.rows[0]),applied:false}
+  ],resolves:{id:"reply-original",row:2}}
+]);
+factoryReviewCase("source file error remains review after applied row", [
+  {...copy(openReply),error:"원본 파일 문제",rows:[
+    {...copy(openReply.rows[0]),applied:true}]}
+]);
+factoryReviewCase("empty reply has no pending rows", [
+  {...copy(openReply),rows:[]}
+]);
 
 const runner=spawnSync(rustBinary||"cargo",rustBinary?[]:[
   "run","--quiet","--manifest-path",
