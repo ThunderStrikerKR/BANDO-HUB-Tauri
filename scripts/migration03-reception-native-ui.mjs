@@ -366,12 +366,35 @@ try{
     }
     throw error;
   }
-  await page.waitForFunction(()=>{
-    const el=document.querySelector(".source-document");
-    return el && el.querySelectorAll(".linked-token").length>=5 &&
-      document.querySelector(".review-pane")?.textContent?.includes("김가상") &&
-      document.querySelector(".review-pane")?.textContent?.includes("박가상");
-  },null,{timeout:50000});
+  try{
+    await page.waitForFunction(()=>{
+      const el=document.querySelector(".source-document");
+      return el && el.querySelectorAll(".linked-token").length>=5 &&
+        document.querySelector(".review-pane")?.textContent?.includes("김가상") &&
+        document.querySelector(".review-pane")?.textContent?.includes("박가상");
+    },null,{timeout:18000});
+  }catch(error){
+    const detail=await page.evaluate(async()=>({
+      calls:window.__bandoNativeCalls||[],
+      sourceText:document.querySelector(".source-document")?.textContent?.slice(0,1200),
+      linked:[...document.querySelectorAll(".source-document .linked-token")]
+        .map(e=>({text:e.textContent,key:e.getAttribute("data-link-key")})),
+      reviewText:document.querySelector(".review-pane")?.textContent?.slice(0,1600),
+      allReview:[...document.querySelectorAll(".review-pane")]
+        .map(e=>e.textContent?.slice(0,1400)),
+      alerts:[...document.querySelectorAll('[role="alert"],.source-error,.form-error')]
+        .map(e=>e.textContent?.slice(0,500)),
+      state:(()=>{const s=document.querySelector(".source-pane");return s?.textContent?.slice(0,900)})(),
+      snapshot:(()=>{const app=window.bando;return !!app})(),
+    }));
+    report.diagnostics.receptionAfterAnalysis=detail;
+    console.error("NATIVE_RECEPTION_ANALYSIS_DIAGNOSTIC",JSON.stringify(detail));
+    await persist();
+    try{await snap(page,"06-native-reception-analysis-diagnostic");}catch(e){
+      console.error("NATIVE_RECEPTION_ANALYSIS_SCREENSHOT",String(e));
+    }
+    throw error;
+  }
   const details=await page.evaluate(async()=>{
     const invoke=window.__bandoNativeCalls || [];
     const linked=[...document.querySelectorAll(".source-document .linked-token")]
