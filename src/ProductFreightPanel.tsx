@@ -84,12 +84,6 @@ export function ProductFreightPanel({
     ).ok;
   const writeRule = async (): Promise<boolean> => {
     if (!editing || !editingDirty) return true;
-    if (Object.entries(editing.rule.fees).some(([count, amount]) =>
-      typeof amount === "number" && editing.rule.maxBundle !== null &&
-      Number(count) > editing.rule.maxBundle)) {
-      onNotice("최대 묶음 수량을 초과하는 운임 구간을 삭제하거나 수량을 다시 설정하세요.", "error");
-      return false;
-    }
     try {
       const { shipping } = await businessCoreCall<{ shipping: NonNullable<State["shipping"]> }>(
         "rules", "apply_shipping_action", {
