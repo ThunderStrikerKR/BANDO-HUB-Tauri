@@ -24,3 +24,14 @@ test("manual quantity Rust implementation has executable original TS differentia
   assert.match(parity, /add\("manual input quantity: "/);
   assert.match(parity, /setManualValue\(manualModel,cell,value,baseState as any,manualOrder as any\)/);
 });
+
+test("manual identity/contact/note text editing is native-owned with TS parity", () => {
+  const source = read("src/orders/ManualClassification.tsx");
+  const core = read("src-tauri/src/business_core/rules/manual_classification.rs");
+  const parity = read("tests/rust-migration/rules/parity/compare.mts");
+  assert.match(source, /action: "set_manual_recipient_field", model, cell, value/);
+  assert.match(source, /manualTextRequest\.current\[key\] !== request/);
+  assert.match(core, /action == "set_manual_recipient_field"/);
+  assert.match(parity, /"manual recipient: "\+field/);
+  assert.match(parity, /setManualValue\(manualModel,cell,value,baseState as any,manualOrder as any\)/);
+});
