@@ -221,3 +221,163 @@ test("Rust optional greeting keeps the original TS behavior on edited copy texts
     ok:true,value:{text:includeGreeting?withGreeting(text):text},
   }))));
 });
+
+
+/** Real provisional-quantity flow: production Rust staff approval, not an
+ * authored quantityApproval fixture, then the same Rust output used by
+ * MessageWorkspace's copy buttons. This protects against a green isolated
+ * message parity test while the actual button->draft->copy chain is broken.
+ */
+const rulesManifest=fileURLToPath(new URL("../rules/Cargo.toml",import.meta.url));
+const { approveMissingQuantity, orderIssues } =
+  await tsImport("../../../src/validation.ts",import.meta.url);
+const { customerModel } =
+  await tsImport("../../../src/matching.ts",import.meta.url);
+
+function compiledRules(operations){
+  const r=spawnSync("cargo",["run","--quiet","--manifest-path",rulesManifest,
+    "--bin","json_rules"],{cwd:root,
+    input:operations.map(v=>JSON.stringify(v)).join("\n")+"\n",
+    encoding:"utf8",timeout:180000,maxBuffer:64*1024*1024});
+  if(r.error)throw r.error;
+  assert.equal(r.status,0,r.stderr);
+  const rows=r.stdout.trim().split(/\r?\n/).map(JSON.parse);
+  assert.equal(rows.length,operations.length);
+  return rows;
+}
+function compiledOutput(cases){
+  const r=spawnSync("cargo",["run","--quiet","--manifest-path",manifest,
+    "--bin","parity_runner"],{cwd:root,input:JSON.stringify(cases),
+    encoding:"utf8",timeout:180000,maxBuffer:64*1024*1024});
+  if(r.error)throw r.error;
+  assert.equal(r.status,0,r.stderr);
+  const rows=JSON.parse(r.stdout);
+  assert.equal(rows.length,cases.length);
+  return rows;
+}
+function copyRequest(state,includeLinks=false){
+  return {operation:"render_automatic_message",payload:{
+    state,groupId:gid,includeLinks,accountWire:state.settings.accounts.map(a=>({
+      id:a.id,json:JSON.stringify(a)
+    }))
+  }};
+}
+const approvalTime="2026-11-14T14:15:00.000Z";
+const actor="검증 담당";
+
+test("real Rust approve_missing_quantity flows to one exact copyable 1-item notice; cancellation and manual fix remove it",()=>{
+  const original=base();
+  const item=original.orders[0].recipients[0].items[0];
+  item.quantity=null;
+  item.quantityConfirmed=false;
+  const initial=compiledOutput([copyRequest(original)])[0];
+  assert.equal(initial.ok,true,JSON.stringify(initial));
+  assert.equal(initial.value.phase,"request",
+    "Missing quantity should require customer/staff action before provisional approval");
+  const reply=compiledRules([{operation:"apply_issue_action",payload:{
+    action:"approve_missing_quantity",order:original.orders[0],
+    recipientId:"r1",itemId:"i1",actor,now:approvalTime
+  }}])[0];
+  assert.equal(reply.ok,true,JSON.stringify(reply));
+  const approved=reply.value.order;
+  const recorded=approved.recipients[0].items[0];
+  assert.equal(recorded.quantity,1);
+  assert.equal(recorded.quantityConfirmed,false,
+    "Provisional quantity must not impersonate actual customer confirmation");
+  assert.deepStrictEqual(recorded.quantityApproval,{
+    actor,at:approvalTime,quantity:1,
+  });
+  assert.equal(recorded.manuallyConfirmed,true);
+  original.orders[0]=approved;
+  const approvedIssue=compiledRules([{operation:"order_issues",payload:{
+    order:approved
+  }}])[0];
+  assert.equal(approvedIssue.ok,true,JSON.stringify(approvedIssue));
+  const quantityIssue=approvedIssue.value.issues.find(i=>i.kind==="QUANTITY_MISSING");
+  assert.equal(quantityIssue?.resolution,"PROVISIONALLY_APPROVED");
+  assert.equal(quantityIssue?.severity,"INFO");
+  assert.deepStrictEqual(approvedIssue.value.issues,orderIssues(approved));
+  const live=compiledOutput([
+    copyRequest(original),copyRequest(original,true),
+    {operation:"render_payment_notice",payload:{state:original,groupId:gid}},
+  ]);
+  live.forEach(result=>assert.equal(result.ok,true,JSON.stringify(result)));
+  assert.equal(live[0].value.phase,"payment");
+  assert.equal(live[1].value.phase,"payment");
+  const note=\`김민수님 \${customerModel("BD 709")} 상품은 수량을 1개로 보내드리겠습니다.\`;
+  for(const result of live){
+    const message=result.value.text??result.value.payment;
+    assert.equal(message.split(note).length-1,1,
+      "One provisional approval must produce exactly one customer notice");
+  }
+  assert.deepStrictEqual(live[0].value.phase,automaticMessage(original,gid).phase);
+  assert.equal(live[0].value.text,automaticMessage(original,gid).text);
+  assert.equal(live[1].value.text,automaticMessage(original,gid,true).text);
+  assert.equal(live[2].value.payment,groupMessages(original,gid).payment);
+  assert.ok(live[0].value.text.indexOf(note)<live[0].value.text.indexOf("합계 :"),
+    "Quantity-one notice must appear before the payment total and account");
+  assert.doesNotMatch(live[0].value.text,/수량을 확인 부탁드립니다/);
+
+  const cancelled=structuredClone(original);
+  delete cancelled.orders[0].recipients[0].items[0].quantityApproval;
+  const modified=structuredClone(original);
+  modified.orders[0].recipients[0].items[0].quantity=2;
+  modified.orders[0].recipients[0].items[0].quantityConfirmed=true;
+  delete modified.orders[0].recipients[0].items[0].quantityApproval;
+  for(const [name,state,phase] of [
+    ["approval cancelled",cancelled,"request"],
+    ["actual quantity confirmed",modified,"payment"],
+  ]){
+    const actual=compiledOutput([copyRequest(state)])[0];
+    assert.equal(actual.ok,true,\`\${name}: \${JSON.stringify(actual)}\`);
+    assert.equal(actual.value.phase,phase,name);
+    assert.equal(actual.value.text,automaticMessage(state,gid).text,name);
+    assert.doesNotMatch(actual.value.text,/수량을 1개로 보내드리겠습니다/,
+      name+" must not retain a stale provisional promise");
+  }
+});
+
+test("provisional quantity notice respects custom template, other blockers and multi-recipient grouping",()=>{
+  const state=base();
+  const item=state.orders[0].recipients[0].items[0];
+  item.quantity=null;item.quantityConfirmed=false;
+  const reply=compiledRules([{operation:"apply_issue_action",payload:{
+    action:"approve_missing_quantity",order:state.orders[0],
+    recipientId:"r1",itemId:"i1",actor,now:approvalTime
+  }}])[0];
+  assert.equal(reply.ok,true,JSON.stringify(reply));
+  state.orders[0]=reply.value.order;
+  state.settings.automaticMessageTemplates={
+    quantityOne:"{수취인}님 {상품명} 1개 발송 예정으로 안내드립니다.",
+  };
+  const grouped=structuredClone(state.orders[0].recipients[0]);
+  grouped.id="r2";grouped.name="이가상";
+  grouped.items[0].id="i2";
+  grouped.items[0].quantity=3;
+  grouped.items[0].quantityConfirmed=true;
+  delete grouped.items[0].quantityApproval;
+  state.orders[0].recipients.push(grouped);
+  state.workflow.shipments.push({
+    ...structuredClone(state.workflow.shipments[0]),
+    id:"ship2",recipientId:"r2",charges:{FACTORY:4000},
+  });
+  const message=compiledOutput([copyRequest(state),copyRequest(state,true) ]);
+  const note=\`김민수님 \${customerModel("BD 709")} 1개 발송 예정으로 안내드립니다.\`;
+  for(let i=0;i<message.length;i++){
+    const output=message[i];
+    assert.equal(output.ok,true,JSON.stringify(output));
+    assert.equal(output.value.phase,"payment");
+    assert.equal(output.value.text.split(note).length-1,1);
+    assert.equal(output.value.text,automaticMessage(state,gid,i===1).text);
+    assert.doesNotMatch(output.value.text,/이가상님.*1개 발송 예정/);
+  }
+  // An unresolved address still selects the request phase. A provisional
+  // notice must not trick the user into a premature payment copy.
+  state.orders[0].recipients[1].name="";
+  const blocked=compiledOutput([copyRequest(state)])[0];
+  assert.equal(blocked.ok,true,JSON.stringify(blocked));
+  assert.equal(blocked.value.phase,"request");
+  assert.equal(blocked.value.text,automaticMessage(state,gid).text);
+  assert.doesNotMatch(blocked.value.text,/1개 발송 예정/,
+    "Payment-only note must not leak into the request phase");
+});
