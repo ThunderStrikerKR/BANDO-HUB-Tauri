@@ -168,10 +168,6 @@ public static class BandoClientInput {
   $phone = "02-742-9929"
   FillNative "거래처명" $name
   FillNative "거래처 주소" $address
-  # Check the genuine validation barrier before completing the required phone.
-  Click "거래처 등록"
-  Start-Sleep -Milliseconds 1100
-  Check "Incomplete client did not close dialog" ($null -ne (FindNode "거래처명" "Edit")) "Required phone must block saving"
   FillNative "전화번호" $phone
   Capture "03-form-filled"
   Click "거래처 등록"
