@@ -3,7 +3,7 @@ import { ManagementSearch } from "./ui/ManagementSearch";
 import { EmptyState } from "./ui/PageHeading";
 import { ManagementTable } from "./ui/ManagementTable";
 import { ShippingFeeRanges } from "./ShippingFeeRanges";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { businessCoreCall } from "./tauri-bridge";
 import { confirmAction } from "./dialogs";
 import { registeredProducts, sortProducts } from "./product-models";
@@ -12,12 +12,8 @@ import { useAsyncTask } from "./shared/useAsyncTask";
 import { sameFreightEditor } from "./shared/meaningful-changes";
 import { requestEditorLeave, usePageLeaveGuard } from "./shared/page-leave";
 
-import {
-  editableShippingRule,
-  effectiveShippingRule,
-  emptyProductRule,
-} from "./shipping";
-import type { ShippingRule, State } from "./types";
+import { emptyProductRule } from "./shipping";
+import type { ShippingRule, ShippingGroup, State } from "./types";
 import { Field, Modal, MoneyInput, clone } from "./ui";
 export function ProductFreightPanel({
   state,
@@ -40,7 +36,34 @@ export function ProductFreightPanel({
       name: string;
     }>();
   const [initialRule, setInitialRule] = useState<ShippingRule>();
-  const rows = sortProducts(
+  const [nativeFreight, setNativeFreight] = useState<{
+    state: State;
+    byProduct: Record<string, {
+      rule: ShippingRule | null;
+      group: ShippingGroup | null;
+      editableRule: ShippingRule | null;
+    }>;
+  }>();
+  const [nativeError, setNativeError] = useState("");
+  useEffect(() => {
+    let active = true;
+    setNativeError("");
+    void businessCoreCall<{
+      byProduct: Record<string, {
+        rule: ShippingRule | null;
+        group: ShippingGroup | null;
+        editableRule: ShippingRule | null;
+      }>;
+    }>("rules", "product_freight_view", { state }).then(({ byProduct }) => {
+      if (active) setNativeFreight({ state, byProduct });
+    }).catch(error => {
+      if (active) setNativeError("Rust 운임 조회 실패: " +
+        (error instanceof Error ? error.message : String(error)));
+    });
+    return () => { active = false; };
+  }, [state]);
+  const freightView = nativeFreight?.state === state ? nativeFreight.byProduct : undefined;
+  const rows = freightView ? sortProducts(
     registeredProducts(state.products).filter(
       (p) => p.catalog !== "DEMO" && !p.variants.some((v) => v.source === "DEMO"),
     ),
@@ -50,8 +73,8 @@ export function ProductFreightPanel({
         .toLowerCase()
         .replace(/\s/g, "")
         .includes(search.toLowerCase().replace(/\s/g, "")) &&
-      (!onlyMissing || !effectiveShippingRule(state, p.id).rule),
-  );
+      (!onlyMissing || !freightView[p.id]?.rule),
+  ) : [];
   const save = async (next: State, message: string) =>
     (
       await runSave(async () => {
@@ -61,12 +84,6 @@ export function ProductFreightPanel({
     ).ok;
   const writeRule = async (): Promise<boolean> => {
     if (!editing || !editingDirty) return true;
-    if (Object.entries(editing.rule.fees).some(([count, amount]) =>
-      typeof amount === "number" && editing.rule.maxBundle !== null &&
-      Number(count) > editing.rule.maxBundle)) {
-      onNotice("최대 묶음 수량을 초과하는 운임 구간을 삭제하거나 수량을 다시 설정하세요.", "error");
-      return false;
-    }
     try {
       const { shipping } = await businessCoreCall<{ shipping: NonNullable<State["shipping"]> }>(
         "rules", "apply_shipping_action", {
@@ -128,6 +145,7 @@ export function ProductFreightPanel({
   return (
     <>
       <section className="shipping-card shipping-product-list">
+        {!freightView && <p role="status">{nativeError || "Rust 운임 기준 확인 중"}</p>}
         <div className="shipping-tools management-search-toolbar">
           <ManagementSearch label="상품별 운임 검색"
             placeholder="모델명 / 상품명 검색"
@@ -201,7 +219,7 @@ export function ProductFreightPanel({
             </thead>
             <tbody>
               {rows.map((p) => {
-                const { rule, group } = effectiveShippingRule(state, p.id);
+                const { rule, group, editableRule } = freightView![p.id];
                 return (
                   <tr key={p.id}>
                     <td>
@@ -239,7 +257,7 @@ export function ProductFreightPanel({
                         onClick={() => {
                           // A missing rule has a generated version ID. Create it
                           // once so an untouched editor is not falsely dirty.
-                          const initial = editableShippingRule(rule ?? emptyProductRule());
+                          const initial = editableRule ? clone(editableRule) : emptyProductRule();
                           setInitialRule(clone(initial));
                           setEditing({
                             productId: p.id,
@@ -253,30 +271,26 @@ export function ProductFreightPanel({
                       </button>
                       {rule && (
                         <button
+                          disabled={busy}
                           onClick={async () => {
                             if (
                               !(await confirmAction(
                                 "이 상품의 새 운임 기준을 시작하고 이전 자동 추천을 중단할까요?",
                               ))
-                            )
-                              return;
-                            const next = clone(state);
-                            if (group) {
-                              const g = next.shipping!.groups.find((g) => g.id === group.id)!;
-                              g.history.push(g.current);
-                              g.current = emptyProductRule();
-                            } else {
-                              next.shipping!.productHistory ??= {};
-                              next.shipping!.productHistory[p.id] = [
-                                ...(next.shipping!.productHistory[p.id] ?? []),
-                                rule,
-                              ];
-                              next.shipping!.productRules![p.id] = emptyProductRule();
+                            ) return;
+                            try {
+                              const { shipping } = await businessCoreCall<{
+                                shipping: NonNullable<State["shipping"]>;
+                              }>("rules", "apply_shipping_action", {
+                                action: "start_new_rule", shipping: state.shipping,
+                                productId: p.id, groupId: group?.id,
+                                versionId: crypto.randomUUID(), now: new Date().toISOString(),
+                              });
+                              await save({ ...state, shipping },
+                                "새 운임 기준을 시작했습니다. 확인된 운임을 다시 입력하세요.");
+                            } catch (error) {
+                              onNotice(error instanceof Error ? error.message : String(error), "error");
                             }
-                            void save(
-                              next,
-                              "새 운임 기준을 시작했습니다. 확인된 운임을 다시 입력하세요.",
-                            );
                           }}
                         >
                           기준 변경

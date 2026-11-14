@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { confirmDiscardDraft } from "./shared/editor-flow";
 import { Modal } from "./ui";
-import { itemFromProduct } from "./domain";
+
 import { businessCoreCall } from "./tauri-bridge";
 import { productModelNames } from "./product-name-match";
 import { useNativeProductIds } from "./native-catalog-queries";
@@ -122,14 +122,9 @@ export function OrderItemEditor({
 
   const choose = (candidate: Product) => {
     if (locked || pricePending) return;
-    if (candidate.variants.length !== 1 || candidate.requiresOption) {
-      setSelectionError(candidate.requiresOption
-        ? "상품 구성이 미확정입니다. 등록된 독립 상품을 선택하세요."
-        : "가격 기록이 여러 개입니다. 상품 데이터를 확인하세요.");
-      return;
-    }
     setSelectionError("");
     if (candidate.id === item.productId &&
+        candidate.variants.length === 1 &&
         candidate.variants[0].id === item.variantId) {
       selectedPriceRequest.current++;
       setDraft(structuredClone(item));
@@ -137,22 +132,28 @@ export function OrderItemEditor({
     }
     const request = ++selectedPriceRequest.current;
     setPricePending(true);
-    void businessCoreCall<{ unitPrice: number | null }>(
-      "rules", "resolve_unit_price", {
-        product: candidate, variantId: candidate.variants[0].id, client,
+    const variant = candidate.variants.length === 1 ? candidate.variants[0] : undefined;
+    // Rust determines eligible independent variants, option status, identity,
+    // color, issues and unit quote together. TS must not reconstruct the item.
+    void businessCoreCall<{ item: Item }>(
+      "rules", "create_catalog_item", {
+        product: candidate, client, variantId: variant?.id,
+        color: variant?.color, quantity: item.quantity,
+        newItemId: crypto.randomUUID(),
       },
-    ).then(({ unitPrice }) => {
+    ).then(({ item: catalogItem }) => {
       if (request !== selectedPriceRequest.current) return;
-      const next = itemFromProduct(candidate, client,
-        candidate.variants[0].color, item.quantity,
-        candidate.variants[0].id, unitPrice);
+      if (!catalogItem.variantId) {
+        setSelectionError(catalogItem.issues[0] || "등록된 독립 상품을 선택하세요.");
+        return;
+      }
       setDraft({
-        ...next, id: item.id, raw: item.raw, sources: item.sources,
+        ...catalogItem, id: item.id, raw: item.raw, sources: item.sources,
         quantity: item.quantity, quantityConfirmed: item.quantityConfirmed,
       });
     }).catch((error) => {
       if (request === selectedPriceRequest.current)
-        setSelectionError("Rust 가격 조회 실패: " +
+        setSelectionError("Rust 상품 구성 실패: " +
           (error instanceof Error ? error.message : String(error)));
     }).finally(() => {
       if (request === selectedPriceRequest.current) setPricePending(false);

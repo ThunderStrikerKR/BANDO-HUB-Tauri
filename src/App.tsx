@@ -1,13 +1,14 @@
-import { replyNeedsReview } from "./factory-replies";
+import { businessCoreCall } from "./tauri-bridge";
 import { FactoryNotifications } from "./FactoryNotifications";
 import { FactoryReplyWatcher } from "./FactoryReplyWatcher";
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { AppHeader } from "./app/AppHeader";
 import { AppNotice } from "./app/AppNotice";
 import { StartupRecoveryPanel } from "./app/StartupRecoveryPanel";
 import { DailySettlement } from "./app/DailySettlement";
 import { OrderHistory } from "./app/OrderHistory";
 import { useAppModel } from "./app/useAppModel";
+import type { State } from "./types";
 import { HubShell } from "./HubShell";
 import { KakaoDockPicker } from "./KakaoDockPicker";
 import { HubWorkspace } from "./HubWorkspace";
@@ -43,6 +44,22 @@ export function App() {
   const [notifications, setNotifications] = useState(false);
   const model = useAppModel(),
     { state, draft, tab } = model;
+  const [nativeReviewCount, setNativeReviewCount] = useState<{ state: State; pending: number }>();
+  useEffect(() => {
+    if (!state) return;
+    let active = true;
+    void businessCoreCall<{ reviews: { id: string; needsReview: boolean }[] }>(
+      "rules", "factory_reply_review_statuses", { state },
+    ).then(({ reviews }) => {
+      if (active) setNativeReviewCount({
+        state, pending: reviews.filter((review) => review.needsReview).length,
+      });
+    }).catch((error) => {
+      if (active) model.setNotice("Rust 회신 알림 집계 실패: " +
+        (error instanceof Error ? error.message : String(error)), "error");
+    });
+    return () => { active = false; };
+  }, [state, model.setNotice]);
   if (!state || !draft) {
     if (model.startup.phase === "ERROR" || model.startup.phase === "RETRYING") {
       return (
@@ -76,9 +93,9 @@ export function App() {
         />
         <AppHeader
           onNotifications={() => setNotifications(true)}
-          notificationCount={
-            state.factoryReplies?.filter((r) => replyNeedsReview(state, r)).length ?? 0
-          }
+          notificationCount={nativeReviewCount?.state === state
+            ? nativeReviewCount.pending
+            : state.factoryReplies?.length ?? 0}
           page={tab}
           dock={model.dock}
           busy={model.dockBusy}

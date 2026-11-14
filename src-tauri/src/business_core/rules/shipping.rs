@@ -47,6 +47,33 @@ fn current_combination(record:&Value,state:&Value,shipping:&Value)->bool {
     }
     true
 }
+// Source oracle: shipping.ts::effectiveShippingRule / editableShippingRule.
+// Pure read-only projection: existing/current and historical rates are unchanged.
+pub(super) fn product_freight_view(payload:&Value)->Result<Value,String>{
+    let state=super::req(payload,"state")?;
+    let shipping=field(state,"shipping");
+    let mut by_product=serde_json::Map::new();
+    for product in rows(field(state,"products")){
+        let id=str_field(product,"id");
+        let group_id=field(product,"shippingGroupId").as_str();
+        let group=rows(field(shipping,"groups")).iter().find(|candidate|{
+            let deleted=field(candidate,"deletedAt");
+            group_id==candidate.get("id").and_then(Value::as_str) &&
+                (deleted.is_null() || deleted.as_str()==Some("") ||
+                    deleted.as_bool()==Some(false))
+        });
+        // TS uses nullish coalescing, so an incomplete group.current must
+        // still fall back to the independent product tariff.
+        let current=group.map(|g|field(g,"current")).filter(|v|!v.is_null());
+        let rule=current.unwrap_or_else(||field(field(shipping,"productRules"),id));
+        by_product.insert(id.into(),json!({
+            "rule":rule,
+            "group":group.cloned().unwrap_or(Value::Null),
+            "editableRule":if rule.is_null(){Value::Null}else{editable_rule(rule)}
+        }));
+    }
+    Ok(json!({"byProduct":by_product}))
+}
 pub(super) fn shipping_manager_view(payload:&Value)->Result<Value,String>{
     let state=super::req(payload,"state")?;
     let shipping=super::req(payload,"shipping")?;
@@ -314,6 +341,53 @@ pub(super) fn shipping_action(payload: &Value) -> Result<Value, String> {
                     shipping["groups"].as_array_mut().ok_or("운임 그룹 목록 누락")?
                         .push(group);
                 }
+            }
+            Ok(json!({"shipping":shipping}))
+        }
+        "start_new_rule" => {
+            // ProductFreightPanel "기준 변경": historical tariff is append-only.
+            // Creating an empty active rule must never retroactively alter orders.
+            let mut shipping=req(payload,"shipping")?.clone();
+            let version=required_str(payload,"versionId")?;
+            let at=required_str(payload,"now")?;
+            let fresh=json!({
+                "version":version,"at":at,
+                "fees":{"1":null,"2":null,"3":null,"4":null,"5":null,"6":null},
+                "maxBundle":null,"maxConfirmed":false,"perItem":null,
+                "notes":"상품의 최대 묶음 수량과 운임을 확인해 입력하세요."
+            });
+            if let Some(group_id)=field(payload,"groupId").as_str()
+                .filter(|value|!value.is_empty()) {
+                let index=rows(field(&shipping,"groups")).iter()
+                    .position(|g|{
+                        let deleted=field(g,"deletedAt");
+                        str_field(g,"id")==group_id &&
+                            (deleted.is_null() || deleted.as_str()==Some("") ||
+                                deleted.as_bool()==Some(false))
+                    })
+                    .ok_or("현재 운임 그룹을 찾을 수 없습니다.")?;
+                let previous=field(&shipping["groups"][index],"current").clone();
+                shipping["groups"][index]["history"].as_array_mut()
+                    .ok_or("그룹 운임 변경 이력을 확인하세요.")?.push(previous);
+                set(&mut shipping["groups"][index],"current",fresh)?;
+            } else {
+                let product_id=required_str(payload,"productId")?;
+                let previous=field(field(&shipping,"productRules"),product_id).clone();
+                if previous.is_null() {
+                    return Err("변경할 기존 상품 운임 기준이 없습니다.".into());
+                }
+                if !field(&shipping,"productHistory").is_object(){
+                    set(&mut shipping,"productHistory",json!({}))?;
+                }
+                if !field(&shipping["productHistory"],product_id).is_array(){
+                    set(&mut shipping["productHistory"],product_id,json!([]))?;
+                }
+                shipping["productHistory"][product_id].as_array_mut()
+                    .ok_or("상품 운임 변경 이력을 확인하세요.")?.push(previous);
+                if !field(&shipping,"productRules").is_object(){
+                    set(&mut shipping,"productRules",json!({}))?;
+                }
+                set(&mut shipping["productRules"],product_id,fresh)?;
             }
             Ok(json!({"shipping":shipping}))
         }

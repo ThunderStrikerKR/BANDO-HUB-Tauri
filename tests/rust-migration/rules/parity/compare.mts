@@ -14,6 +14,8 @@ import { resolvePrice, totals, parseOrder, repriceOrder, itemFromProduct } from 
 import {
   recommendShipping,
   editableShippingRule,
+  effectiveShippingRule,
+  emptyProductRule,
   combinationVersions,
   combinationCurrent,
   upgradeShipping,
@@ -36,6 +38,7 @@ import { receiptOf, correctReceipt } from "../../../../src/receipt.ts";
 import { billingSnapshot, applyReply } from "../../../../src/replies.ts";
 import { replyNeedsReview } from "../../../../src/factory-replies.ts";
 import { validateAutomaticMessageTemplates } from "../../../../src/automatic-message-templates.ts";
+import { validateProvisionalProductNotices } from "../../../../src/provisional-product-notices.ts";
 import { addressInfo, addressParts } from "../../../../src/parser.ts";
 import { companyClient, companyParty } from "../../../../src/order-types.ts";
 import { explicitSender } from "../../../../src/explicit-sender.ts";
@@ -3342,6 +3345,16 @@ function factoryReviewCase(name:string,replies:any[]){
     ()=>({reviews:replies.map(record=>({
       id:record.id,needsReview:replyNeedsReview(state,record)
     }))}));
+  add("factory review detail: "+name,"factory_reply_review_details",{state},
+    ()=>({reviews:replies.map(record=>({
+      id:record.id,needsReview:replyNeedsReview(state,record),
+      rows:record.rows.map((row:any)=>({
+        row:row.row,
+        resolved:state.factoryReplies.some((later:any)=>
+          later.resolves?.id===record.id && later.resolves.row===row.row &&
+          later.rows.some((result:any)=>result.applied))
+      }))
+    }))}));
 }
 factoryReviewCase("unresolved row remains review", [openReply]);
 factoryReviewCase("later successfully applied resolution closes review", [
@@ -3435,6 +3448,13 @@ function shippingViewCase(name:string,state:any){
     [g.id,editableShippingRule(g.current)])),
     currentCombinations:Object.fromEntries(shipping.combinations.map((c:any)=>
     [c.id,combinationCurrent(c,state)]))}));
+  add("product freight view: "+name,"product_freight_view",{state},()=>({
+    byProduct:Object.fromEntries(state.products.map((p:any)=>{
+      const {rule,group}=effectiveShippingRule(state,p.id);
+      return [p.id,{rule:rule??null,group:group??null,
+        editableRule:rule?editableShippingRule(rule):null}];
+    }))
+  }));
 }
 shippingViewCase("active group and per-item edit",shippingViewState);
 const shippingChanged:any=copy(shippingViewState);
@@ -3443,6 +3463,81 @@ shippingViewCase("old combination after tariff revision",shippingChanged);
 const shippingIndividual:any=copy(shippingViewState);
 shippingIndividual.products[0].shippingGroupId=undefined;
 shippingViewCase("assignment removed",shippingIndividual);
+const freightOwnRule:any=copy(shippingIndividual);
+freightOwnRule.shipping.productRules={p1:{...copy(shipping.groups[0].current),
+  perItem:4300,maxBundle:1,maxConfirmed:true}};
+shippingViewCase("individual product tariff",freightOwnRule);
+const freightDeletedGroup:any=copy(shippingViewState);
+freightDeletedGroup.shipping.groups[0].deletedAt=actionNow;
+shippingViewCase("deleted group falls back to product tariff",freightDeletedGroup);
+// An empty tombstone remains an active group in the original TS.
+const freightEmptyTombstone:any=copy(shippingViewState);
+freightEmptyTombstone.shipping.groups[0].deletedAt="";
+shippingViewCase("empty tombstone remains active",freightEmptyTombstone);
+
+// Optional/incomplete historical data: TS group?.current ?? product rule.
+const freightNullCurrent:any=copy(shippingViewState);
+freightNullCurrent.shipping.groups[0].current=null;
+freightNullCurrent.shipping.productRules={p1:{...copy(shipping.groups[0].current),
+  version:"product-fallback"}};
+add("product freight view: null group current falls back to individual",
+  "product_freight_view",{state:freightNullCurrent},()=>({
+    byProduct:Object.fromEntries(freightNullCurrent.products.map((p:any)=>{
+      const {rule,group}=effectiveShippingRule(freightNullCurrent,p.id);
+      return [p.id,{rule:rule??null,group:group??null,
+        editableRule:rule?editableShippingRule(rule):null}];
+    }))
+  }));
+
+
+// Resetting a tariff must archive the exact old rate and not touch past orders.
+function freightResetCase(name:string,mode:"group"|"product"){
+  const original:any=copy(shippingViewState.shipping);
+  const versionId="freight-reset-"+mode;
+  const productId="p1",groupId=mode==="group"?"music":undefined;
+  if(mode==="product"){
+    original.productRules={p1:{...copy(shipping.groups[0].current),version:"prior-p1"}};
+    original.productHistory={p1:[]};
+  }
+  add("freight reset history: "+name,"apply_shipping_action",{
+    action:"start_new_rule",shipping:original,productId,groupId,
+    versionId,now:actionNow
+  },()=>{
+    const updated:any=copy(original);
+    const fresh=frozenDate(()=>deterministicIds([versionId],()=>emptyProductRule()));
+    if(groupId){
+      const group=updated.groups.find((g:any)=>g.id===groupId);
+      group.history.push(group.current);
+      group.current=fresh;
+    }else{
+      updated.productHistory??={};
+      updated.productHistory[productId]=[
+        ...(updated.productHistory[productId]??[]),updated.productRules[productId]
+      ];
+      updated.productRules[productId]=fresh;
+    }
+    return {shipping:updated};
+  });
+}
+freightResetCase("group preserves old current tariff","group");
+freightResetCase("product preserves old individual tariff","product");
+
+// Staff provisional notice save validation; the real TS original is the oracle.
+function provisionalValidationCase(name:string,notices:Record<string,unknown>,valid=true){
+  const state:any=copy(baseState);
+  state.settings.provisionalProductNotices=notices;
+  add("provisional notice validation: "+name,"validate_provisional_notices",{
+    state
+  },()=>{validateProvisionalProductNotices(state);return {valid:true};});
+  cases[cases.length-1].expectedOk=valid;
+}
+provisionalValidationCase("valid Unicode notice",{"p1":"가상 상품 안내"});
+provisionalValidationCase("missing product id rejected",{"nonexistent":"안내"},false);
+provisionalValidationCase("blank notice rejected",{"p1":" \t "},false);
+provisionalValidationCase("non-string notice rejected",{"p1":12},false);
+provisionalValidationCase("2000 emoji allowed",{"p1":"😀".repeat(2000)});
+provisionalValidationCase("2001 emoji rejected",{"p1":"😀".repeat(2001)},false);
+provisionalValidationCase("empty mapping allowed",{});
 
 // Template editing is a save-time native decision, not only a preview rule.
 function templateValidationCase(name:string,edits:Record<string,unknown>,valid=true){

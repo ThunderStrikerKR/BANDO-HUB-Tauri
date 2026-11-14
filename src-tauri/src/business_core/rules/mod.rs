@@ -14,6 +14,7 @@ mod reception_operations;
 mod kakao_title;
 mod manual_classification;
 mod message_template_validation;
+mod provisional_notice_validation;
 mod catalog_item;
 mod retail_operations;
 mod raw_corrections;
@@ -68,6 +69,7 @@ pub fn execute(operation: &str, payload: Value) -> Result<Value, String> {
         "reprice_order" => pricing::reprice_order(&payload),
         "should_refresh_pricing" => Ok(json!({"refresh": pricing::should_refresh(&payload)?})),
         "shipping_manager_view" => shipping::shipping_manager_view(&payload),
+        "product_freight_view" => shipping::product_freight_view(&payload),
         "apply_shipping_action" => shipping::shipping_action(&payload),
         "reconcile_workflow" => reconciliation::reconcile(&payload),
         "calculate_shipping" => shipping::recommend(
@@ -91,7 +93,7 @@ pub fn execute(operation: &str, payload: Value) -> Result<Value, String> {
         "apply_issue_action" => issues::issue_action(&payload),
         "apply_product_action" => product_confirmation::apply(&payload),
         "record_message_copy" => message_audit::record(&payload),
-        "factory_reply_review_statuses" | "analyze_factory_reply" | "preview_factory_reply" | "apply_factory_reply" =>
+        "factory_reply_review_details" | "factory_reply_review_statuses" | "analyze_factory_reply" | "preview_factory_reply" | "apply_factory_reply" =>
             factory_reply::execute(operation, &payload),
         "apply_reply_action" => reply_rules::apply(&payload),
         "client_change_issue" => client_change::check(&payload),
@@ -100,6 +102,7 @@ pub fn execute(operation: &str, payload: Value) -> Result<Value, String> {
         "apply_reception_action" => reception_operations::apply(&payload),
         "apply_manual_classification" => manual_classification::apply(&payload),
         "validate_automatic_templates" => message_template_validation::validate(&payload),
+        "validate_provisional_notices" => provisional_notice_validation::validate(&payload),
         "create_catalog_item" => catalog_item::make(&payload),
         "remember_kakao_title_client" | "remembered_kakao_title_client" =>
             kakao_title::execute(operation, &payload),
