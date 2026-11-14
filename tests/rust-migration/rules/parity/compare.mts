@@ -3476,6 +3476,7 @@ templateValidationCase("valid numeric account placeholders",{
 // Compare the full constructed order item, including color, name, defaulted,
 // issue list, origin and price, against the original TS constructor.
 function catalogItemCase(name:string,p:any,c:any,quantity:any,vid?:string,color?:string){
+  p={defaultColor:"Black",code:"TEST",...p};
   const id="new-catalog-item-"+name.replace(/\s+/g,"-");
   const payload:any={product:p,client:c,newItemId:id,quantity};
   if(vid!==undefined)payload.variantId=vid;
