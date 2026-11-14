@@ -29,10 +29,9 @@ test("post-export correction register, copy and staff approval call Rust", () =>
     assert.ok(nativeCorrection.includes('"' + action + '"=>'), action + " Rust match arm");
   }
   assert.doesNotMatch(correction, /(?:requestCorrection|copiedCorrection|confirmCorrection)\(state,/);
-  assert.match(correction, /action: "correction_view", state, shipmentId: sid/);
-  assert.match(correction, /await window\.bando!\.copy\(message\)/);
-  assert.match(correction, /message == null\) throw Error/);
-  assert.doesNotMatch(correction, /correctionMessage\(state, r\.id\)/);
+  assert.match(correction, /await window\.bando!\.copy\(native\.text\)/);
+  assert.match(correction, /"output", "render_correction_summaries"/);
+  assert.doesNotMatch(correction, /correctionMessage\(state,/);
   assert.match(correction, /await onSave\(await nativeApplyCorrectionAction\(state, "copied_correction"/);
 });
 
@@ -86,4 +85,132 @@ test("working raw correction previews using Rust recognition and the Rust audit 
   assert.match(nativeRaw, /"correct_working_raw"=>/);
   assert.match(modal, /setPreview\(undefined\);\s*try \{/);
   assert.match(modal, /disabled=\{!preview \|\| busy\}/);
+});
+
+
+test("unconfirmed reception removal uses compiled Rust before atomic SQLite save", () => {
+  const app = source("src/app/useAppModel.ts");
+  const nativeReception = source("src-tauri/src/business_core/rules/reception_operations.rs");
+  assert.match(app, /"rules", "apply_reception_action"/);
+  assert.match(app, /action: "persisted_reception_state", before: state!, state: billed/);
+  assert.match(app, /if \(sameValue\(persistent, state\)\)/);
+  assert.match(app, /const committed = await window\.bando!\.save\(persistent\)/);
+  assert.doesNotMatch(app, /persistedReceptionState\(state!, next\)/);
+  assert.match(nativeReception, /"persisted_reception_state"=>/);
+});
+
+test("factory correction clipboard and display use fresh Rust projection without TypeScript fallback", () => {
+  const panel = source("src/CorrectionPanel.tsx");
+  const native = source("src-tauri/src/business_core/output/corrections.rs");
+  const dispatcher = source("src-tauri/src/business_core/output/mod.rs");
+  assert.match(panel, /"output", "render_correction_summaries"/);
+  assert.match(panel, /correctionsView\?\.source === state/);
+  assert.match(panel, /await window\.bando!\.copy\(native\.text\)/);
+  assert.doesNotMatch(panel, /(?:correctionMessage|correctionStatus)\(/);
+  assert.match(native, /fn message\(/);
+  assert.match(dispatcher, /"render_correction_summaries" => corrections::summaries/);
+});
+
+
+test("Kakao title-to-client decisions are Rust-owned in both UI entrypoints", () => {
+  const kakao = source("src/KakaoClients.tsx");
+  const reception = source("src/SourceDocument.tsx");
+  const adapter = source("src/native-title-clients.ts");
+  const native = source("src-tauri/src/business_core/catalog_clients/title_clients.rs");
+  assert.match(kakao, /await nativeRememberTitle\(/);
+  assert.doesNotMatch(kakao, /rememberTitle\(\s*state/);
+  assert.match(reception, /nativeRememberedTitleClient\(state, windows\)/);
+  assert.match(reception, /await nativeRememberedTitleClient\(state, chats\)/);
+  assert.doesNotMatch(reception, /rememberedTitleClient\(state,/);
+  assert.match(adapter, /"catalog_clients", "remember_title_client"/);
+  assert.match(adapter, /"catalog_clients", "remembered_title_client"/);
+  assert.match(native, /"remember_title_client"=>remember\(payload\)/);
+  assert.match(reception, /autoInput\.current\.state !== state/);
+});
+
+
+test("order edit history is frozen natively at commit without delaying controlled inputs", () => {
+  const app = source("src/app/useAppModel.ts");
+  const desk = source("src/orders/useOrderDesk.tsx");
+  const rust = source("src-tauri/src/business_core/rules/reply_rules.rs");
+  const dispatcher = source("src-tauri/src/business_core/rules/mod.rs");
+  assert.match(desk, /next\.pendingBillingSnapshot = \{/);
+  assert.match(desk, /at: new Date\(\)\.toISOString\(\), reason/);
+  assert.doesNotMatch(desk, /billingSnapshot\(previous, state, reason\)/);
+  assert.match(app, /"rules", "finalize_billing_history", \{ before: state!, state: next \}/);
+  assert.match(app, /state: billed/);
+  assert.match(rust, /pub\(super\) fn finalize_billing_history/);
+  assert.match(rust, /object\.remove\("pendingBillingSnapshot"\)/);
+  assert.match(rust, /let snapshot=billing\(previous,before,reason,at\)/);
+  assert.match(dispatcher, /"finalize_billing_history" => reply_rules::finalize_billing_history/);
+});
+
+
+test("manual classification final approved order is produced by native Rust, never TS applyManual", () => {
+  const manual = source("src/orders/ManualClassification.tsx");
+  const rust = source("src-tauri/src/business_core/rules/manual_classification.rs");
+  const dispatcher = source("src-tauri/src/business_core/rules/mod.rs");
+  assert.match(manual, /"rules", "apply_manual_classification"/);
+  assert.match(manual, /assignmentOrder: Object\.keys\(model\.assignments\)/);
+  assert.match(manual, /onApply\(finalized\)/);
+  assert.doesNotMatch(manual, /onApply\(applyManual\(/);
+  assert.match(rust, /fn synchronize\(order:&mut Value\)/);
+  assert.match(dispatcher, /"apply_manual_classification" => manual_classification::apply/);
+});
+
+
+test("factory notifications and history use only native review status and exact confirmation copy", () => {
+  const notice = source("src/FactoryNotifications.tsx");
+  const history = source("src/FactoryReplyHistory.tsx");
+  const adapter = source("src/useNativeFactoryReplyReview.ts");
+  const rust = source("src-tauri/src/business_core/output/factory_review.rs");
+  for (const component of [notice, history]) {
+    assert.match(component, /useNativeFactoryReplyReview\(state\)/);
+    assert.doesNotMatch(component, /replyNeedsReview\(/);
+    assert.doesNotMatch(component, /factoryConflictConfirmation\(/);
+  }
+  assert.match(adapter, /"output", "project_factory_reply_review"/);
+  assert.match(adapter, /resolved\?\.state === state/);
+  assert.match(rust, /fn requires_review\(/);
+  assert.match(rust, /fn confirm\(/);
+});
+
+
+test("freight managers read tariff rule and current status from native Rust", () => {
+  const group = source("src/ShippingManager.tsx");
+  const product = source("src/ProductFreightPanel.tsx");
+  const adapter = source("src/useNativeShippingRead.ts");
+  const rust = source("src-tauri/src/business_core/rules/shipping_read.rs");
+  for (const ui of [group, product]) {
+    assert.match(ui, /useNativeShippingRead\(/);
+    assert.doesNotMatch(ui, /combinationCurrent\(/);
+    assert.doesNotMatch(ui, /effectiveShippingRule\(/);
+    assert.doesNotMatch(ui, /editableShippingRule\(/);
+  }
+  assert.match(adapter, /"rules", "shipping_read"/);
+  assert.match(adapter, /snapshot\?\.state === state/);
+  assert.match(rust, /fn current_combo\(/);
+  assert.match(rust, /fn edit_rule\(/);
+});
+
+
+test("OCR, pasted and cleared reception drafts use Rust, never the old TS reducer", () => {
+  const component = source("src/SourceDocument.tsx");
+  const native = source("src-tauri/src/business_core/rules/reception_operations.rs");
+  assert.match(component, /action: "replace_reception", order: source/);
+  assert.match(component, /const next = await nativeReplaceReception\(order, raw\)/);
+  assert.match(component, /await nativeReplaceReception\(order, ""\)/);
+  assert.match(component, /latestReception\.current\.order !== order/);
+  assert.doesNotMatch(component, /(?:^|[^A-Za-z])replaceReception\(/m);
+  assert.match(native, /"replace_reception"=>/);
+});
+
+
+test("global factory alert badge is native and ignores stale reply projections", () => {
+  const app = source("src/App.tsx");
+  const hook = source("src/useNativeFactoryReplyReview.ts");
+  assert.match(app, /useNativeFactoryReplyReview\(state\)/);
+  assert.match(app, /factoryReview\.records\?\.filter\(\(record\) => record\.needsReview\)/);
+  assert.doesNotMatch(app, /replyNeedsReview\(state, r\)/);
+  assert.match(hook, /state && resolved\?\.state === state/);
 });

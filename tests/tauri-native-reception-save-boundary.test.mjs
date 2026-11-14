@@ -11,10 +11,11 @@ test("every ordinary app commit filters reception drafts through native Rust bef
   const end = app.indexOf("  const saveSettings =", start);
   assert.ok(start !== -1 && end > start);
   const commit = app.slice(start, end);
-  assert.match(commit, /await businessCoreCall<\{ state: State \}>\(\s*"rules", "apply_reception_action", \{\s*action: "persisted_reception_state", before: state!, state: next/);
+  assert.match(commit, /await businessCoreCall<\{ state: State \}>\(\s*"rules", "apply_reception_action", \{\s*action: "persisted_reception_state", before: state!, state: billed/);
+  assert.match(commit, /"rules", "finalize_billing_history", \{ before: state!, state: next \}/);
   assert.doesNotMatch(commit, /persistedReceptionState\(/);
   assert.ok(commit.indexOf('"persisted_reception_state"') < commit.indexOf("window.bando!.save(persistent)"));
-  assert.match(commit, /if \(JSON\.stringify\(persistent\) === JSON\.stringify\(state\)\)/);
+  assert.match(commit, /if \(sameValue\(persistent, state\)\)/);
   assert.match(commit, /finally \{\s*commitGuard\.current = false;/);
 });
 
@@ -31,7 +32,7 @@ test("paste, OCR application and clearing the reception text all use native Rust
   const source = read("src/SourceDocument.tsx");
   assert.doesNotMatch(source, /import \{ replaceReception \} from/);
   assert.doesNotMatch(source, /\breplaceReception\(/);
-  assert.match(source, /"rules", "apply_reception_action", \{\s*action: "replace_reception", order: source, raw,/);
+  assert.match(source, /"rules", "apply_reception_action", \{\s*action: "replace_reception", order: source,\s*raw,/);
   assert.match(source, /const next = await nativeReplaceReception\(order, raw\)/);
   assert.match(source, /raw === text \? structuredClone\(order\) : await nativeReplaceReception\(order, raw\)/);
   assert.match(source, /const cleared = await nativeReplaceReception\(order, ""\)/);
@@ -40,12 +41,4 @@ test("paste, OCR application and clearing the reception text all use native Rust
   assert.match(parity, /receptionOperation\("replace unconfirmed draft retains identity"/);
   assert.match(parity, /receptionOperation\("replace blank text drops dealer link"/);
   assert.match(parity, /receptionOperation\("replace confirmed raw blocked"/);
-});
-
-test("async native reception replacements reject replies for an obsolete order", () => {
-  const source = read("src/SourceDocument.tsx");
-  assert.match(source, /const latestInputs = useRef\(\{ order, text \}\)/);
-  assert.match(source, /latestInputs\.current\.order !== order \|\| latestInputs\.current\.text !== text/);
-  const count = source.match(/latestInputs\.current\.order !== order/g) ?? [];
-  assert.equal(count.length, 4, "OCR, paste and its remembered-title lookup, and clearing all reject stale replies");
 });
