@@ -35,6 +35,7 @@ import { rawCorrectableIssue, rawCorrectionAllowed, correctWorkingRaw } from "..
 import { receiptOf, correctReceipt } from "../../../../src/receipt.ts";
 import { billingSnapshot, applyReply } from "../../../../src/replies.ts";
 import { replyNeedsReview } from "../../../../src/factory-replies.ts";
+import { factoryConflictConfirmation } from "../../../../src/factory-conflict-review.ts";
 import { validateAutomaticMessageTemplates } from "../../../../src/automatic-message-templates.ts";
 import { addressInfo, addressParts } from "../../../../src/parser.ts";
 import { companyClient, companyParty } from "../../../../src/order-types.ts";
@@ -3340,7 +3341,13 @@ function factoryReviewCase(name:string,replies:any[]){
   const state:any={...copy(baseState),factoryReplies:replies};
   add("factory review UI: "+name,"factory_reply_review_statuses",{state},
     ()=>({reviews:replies.map(record=>({
-      id:record.id,needsReview:replyNeedsReview(state,record)
+      id:record.id,needsReview:replyNeedsReview(state,record),
+      resolvedRows:record.rows.map((row:any)=>({
+        row:row.row,
+        resolved:replies.some(later=>
+          later.resolves?.id===record.id && later.resolves.row===row.row &&
+          later.rows.some((result:any)=>result.applied))
+      }))
     }))}));
 }
 factoryReviewCase("unresolved row remains review", [openReply]);
@@ -3361,6 +3368,37 @@ factoryReviewCase("source file error remains review after applied row", [
 factoryReviewCase("empty reply has no pending rows", [
   {...copy(openReply),rows:[]}
 ]);
+
+// Staff-facing factory conflict confirmation must exactly match TS oracle;
+// never approve a collision on an invented or stale description.
+const conflictState:any=copy(baseState);
+const conflictShipId=conflictState.workflow.shipments[0].id;
+const conflictRow:any={row:7,name:"가상 수취인",
+  shipmentId:conflictShipId,issue:"기존 송장 / 실제 운임과 충돌합니다. 직원 확인 필요",
+  applied:false,tracking:"123456789012",actual:12500};
+conflictState.factoryReplies=[{
+  id:"reply-conflict",filename:"회신.xlsx",status:"REVIEW",
+  rows:[conflictRow]
+}];
+conflictState.workflow.shipments[0].tracking={FACTORY:"987654321098"};
+conflictState.workflow.shipments[0].actualFreight={FACTORY:4500};
+function conflictCase(name:string,state:any,rowNumber=7,valid=true){
+  add("factory conflict confirmation: "+name,"factory_conflict_confirmation",{
+    state,id:"reply-conflict",rowNumber
+  },()=>({text:factoryConflictConfirmation(state,"reply-conflict",rowNumber)}));
+  cases[cases.length-1].expectedOk=valid;
+}
+conflictCase("track and freight replacement",conflictState);
+const unknownFreightState:any=copy(conflictState);
+unknownFreightState.workflow.shipments[0].actualFreight={FACTORY:null};
+conflictCase("explicit unknown historical freight",unknownFreightState);
+const nonConflictState:any=copy(conflictState);
+nonConflictState.factoryReplies[0].rows[0].issue="직원 확인";
+conflictCase("non-conflict row is rejected",nonConflictState,7,false);
+conflictCase("missing row is rejected",conflictState,99,false);
+const absentShipState:any=copy(conflictState);
+absentShipState.workflow.shipments=[];
+conflictCase("missing original shipment is rejected",absentShipState,7,false);
 
 // The actual factory clipboard payload and status use Rust results.
 // Compare complete Korean text, including spacing, freight and field order.
