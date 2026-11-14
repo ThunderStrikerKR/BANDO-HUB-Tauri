@@ -3325,6 +3325,26 @@ manualCase("no assignments keeps manual rows",manualOrder,{
   ...manualModel,assignments:{},blocks:[]
 });
 
+// Manual recipient edit: compare complete Rust model with the original TS reducer.
+for(const field of ["name","phone","mobile","note"]) {
+  const cell={recipientId:"r1",field};
+  for(const value of ["", "가상 값", "010-1234-5678"]) {
+    add("manual recipient: "+field+"="+JSON.stringify(value),
+      "apply_manual_classification", {
+        action:"set_manual_recipient_field",model:manualModel,cell,value
+      },()=>({model:setManualValue(manualModel,cell,value,baseState as any,manualOrder as any)}));
+  }
+}
+for(const [name,cell] of [
+  ["invalid field",{recipientId:"r1",field:"unknown"}],
+  ["missing recipient",{recipientId:"missing",field:"name"}]
+]) {
+  add("manual recipient: "+name+" blocked","apply_manual_classification",{
+    action:"set_manual_recipient_field",model:manualModel,cell,value:"가상"
+  },()=>({model:setManualValue(manualModel,cell,"가상",baseState as any,manualOrder as any)}));
+  cases[cases.length-1].expectedOk=false;
+}
+
 // Differential parity of editable manual quantities against the TS original.
 for(const value of ["3", " 2 개 ", "한개", "세 세트", "x 5", "× 7",
   "*8", "10cm", "수량 2개", "0", "", "1.5", "999999999999999999999"]) {
