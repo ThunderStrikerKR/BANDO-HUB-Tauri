@@ -296,7 +296,11 @@ test("real Rust approve_missing_quantity flows to one exact copyable 1-item noti
   const quantityIssue=approvedIssue.value.issues.find(i=>i.kind==="QUANTITY_MISSING");
   assert.equal(quantityIssue?.resolution,"PROVISIONALLY_APPROVED");
   assert.equal(quantityIssue?.severity,"INFO");
-  assert.deepStrictEqual(approvedIssue.value.issues,orderIssues(approved));
+  // Rust JSON omits optional undefined fields; canonicalize the source
+  // TypeScript oracle the same way before comparing all persisted fields.
+  assert.deepStrictEqual(
+    approvedIssue.value.issues,JSON.parse(JSON.stringify(orderIssues(approved))),
+  );
   const live=compiledOutput([
     copyRequest(original),copyRequest(original,true),
     {operation:"render_payment_notice",payload:{state:original,groupId:gid}},
