@@ -204,3 +204,13 @@ test("OCR, pasted and cleared reception drafts use Rust, never the old TS reduce
   assert.doesNotMatch(component, /(?:^|[^A-Za-z])replaceReception\(/m);
   assert.match(native, /"replace_reception"=>/);
 });
+
+
+test("global factory alert badge is native and ignores stale reply projections", () => {
+  const app = source("src/App.tsx");
+  const hook = source("src/useNativeFactoryReplyReview.ts");
+  assert.match(app, /useNativeFactoryReplyReview\(state\)/);
+  assert.match(app, /factoryReview\.records\?\.filter\(\(record\) => record\.needsReview\)/);
+  assert.doesNotMatch(app, /replyNeedsReview\(state, r\)/);
+  assert.match(hook, /state && resolved\?\.state === state/);
+});
