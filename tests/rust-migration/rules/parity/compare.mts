@@ -3342,6 +3342,16 @@ function factoryReviewCase(name:string,replies:any[]){
     ()=>({reviews:replies.map(record=>({
       id:record.id,needsReview:replyNeedsReview(state,record)
     }))}));
+  add("factory review detail: "+name,"factory_reply_review_details",{state},
+    ()=>({reviews:replies.map(record=>({
+      id:record.id,needsReview:replyNeedsReview(state,record),
+      rows:record.rows.map((row:any)=>({
+        row:row.row,
+        resolved:state.factoryReplies.some((later:any)=>
+          later.resolves?.id===record.id && later.resolves.row===row.row &&
+          later.rows.some((result:any)=>result.applied))
+      }))
+    }))}));
 }
 factoryReviewCase("unresolved row remains review", [openReply]);
 factoryReviewCase("later successfully applied resolution closes review", [
