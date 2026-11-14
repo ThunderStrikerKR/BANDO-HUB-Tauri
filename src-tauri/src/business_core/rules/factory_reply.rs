@@ -297,28 +297,74 @@ fn apply(payload:&Value)->Result<Value,String>{
     let next=connect(state,reply,false,payload)?;
     Ok(json!({"next":next,"applied":field(&current,"applied"),"held":field(&current,"held")}))
 }
+// A resolved historical row requires a later successfully applied correction.
+fn resolved_row(state:&Value,record:&Value,row:&Value)->bool{
+    rows(state,"factoryReplies").iter().any(|later|
+        s(field(later,"resolves"),"id")==s(record,"id") &&
+        field(field(later,"resolves"),"row")==field(row,"row") &&
+        rows(later,"rows").iter().any(|r|field(r,"applied").as_bool()==Some(true)))
+}
+fn grouped_amount(value:&Value)->String {
+    let Some(n)=value.as_i64() else{return "미확인".into();};
+    let digits=n.to_string();
+    let mut result=String::new();
+    for (index,ch) in digits.chars().enumerate(){
+        if index>0 && (digits.len()-index)%3==0{result.push(',');}
+        result.push(ch);
+    }
+    format!("{result}원")
+}
+fn conflict_confirmation(payload:&Value)->Result<Value,String>{
+    let state=payload.get("state").ok_or("공장 회신 상태 누락")?;
+    let id=s(payload,"id");
+    let row_num=field(payload,"rowNumber").as_i64()
+        .ok_or("승인 가능한 회신 충돌 행을 찾지 못했습니다.")?;
+    let record=rows(state,"factoryReplies").iter().find(|r|s(r,"id")==id);
+    let row=record.and_then(|r|rows(r,"rows").iter().find(|row|
+        field(row,"row").as_i64()==Some(row_num)))
+        .ok_or("승인 가능한 회신 충돌 행을 찾지 못했습니다.")?;
+    if s(row,"shipmentId").is_empty()||!s(row,"issue").contains("충돌")||
+        field(row,"applied").as_bool()==Some(true) {
+        return Err("승인 가능한 회신 충돌 행을 찾지 못했습니다.".into())
+    }
+    let ship=rows(field(state,"workflow"),"shipments").iter()
+        .find(|ship|s(ship,"id")==s(row,"shipmentId"))
+        .ok_or("원본 배송 건을 찾지 못했습니다.")?;
+    let recipient=rows(state,"orders").iter()
+        .find(|order|s(order,"id")==s(ship,"orderId"))
+        .and_then(|o|rows(o,"recipients").iter()
+            .find(|r|s(r,"id")==s(ship,"recipientId")))
+        .ok_or("원본 배송 건을 찾지 못했습니다.")?;
+    let old=actual(ship,recipient);
+    let current=s(field(ship,"tracking"),"FACTORY");
+    let current=if current.is_empty(){"미등록"}else{current};
+    let message=format!("{}행 / {}\n기존: {} / 운임 {}\n회신: {} / 운임 {}\n이 한 행만 정정할까요? 기존 값과 원본 파일은 보존됩니다.",
+        row_num,s(row,"name"),current,grouped_amount(&old),
+        s(row,"tracking"),grouped_amount(field(row,"actual")));
+    Ok(json!({"text":message}))
+}
 // Historical review rows are resolved only by a later, successfully
 // applied correction. Source oracle: factory-replies.ts::replyNeedsReview.
 fn needs_review(state:&Value,record:&Value)->bool{
     if !s(record,"error").is_empty(){return true;}
-    rows(record,"rows").iter().any(|row|{
-        if field(row,"applied").as_bool()==Some(true){return false;}
-        !rows(state,"factoryReplies").iter().any(|later|
-            s(field(later,"resolves"),"id")==s(record,"id") &&
-            field(field(later,"resolves"),"row")==field(row,"row") &&
-            rows(later,"rows").iter().any(|r|field(r,"applied").as_bool()==Some(true)))
-    })
+    rows(record,"rows").iter().any(|row|
+        field(row,"applied").as_bool()!=Some(true) &&
+        !resolved_row(state,record,row))
 }
 fn review_list(payload:&Value)->Result<Value,String>{
     let state=payload.get("state").ok_or("공장 회신 상태 누락")?;
     let reviews=rows(state,"factoryReplies").iter().map(|record|json!({
-        "id":field(record,"id"),"needsReview":needs_review(state,record)
+        "id":field(record,"id"),"needsReview":needs_review(state,record),
+        "resolvedRows":rows(record,"rows").iter().map(|row|json!({
+            "row":field(row,"row"),"resolved":resolved_row(state,record,row)
+        })).collect::<Vec<_>>()
     })).collect::<Vec<_>>();
     Ok(json!({"reviews":reviews}))
 }
 pub(super) fn execute(operation:&str,payload:&Value)->Result<Value,String>{
     match operation {
         "factory_reply_review_statuses"=>review_list(payload),
+        "factory_conflict_confirmation"=>conflict_confirmation(payload),
         "analyze_factory_reply"=>analyze(payload),
         "preview_factory_reply"=>preview(
             payload.get("state").ok_or("공장 회신 상태 누락")?,
