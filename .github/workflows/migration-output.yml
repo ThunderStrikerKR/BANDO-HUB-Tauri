@@ -74,6 +74,8 @@ jobs:
         run: node --test tests/rust-migration/catalog-clients/title-clients-parity.test.mjs
       - name: Compare frozen historical billing at commit against TS reference
         run: node --test tests/rust-migration/rules/billing-commit-parity.test.mjs
+      - name: Compare final manually classified orders against original TypeScript
+        run: node --test tests/rust-migration/rules/manual-apply-parity.test.mjs
       - name: Compare existing TypeScript price and freight with staged Rust rules
         run: node --test tests/rust-migration/rules/parity.test.mjs
 
