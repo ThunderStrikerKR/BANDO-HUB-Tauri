@@ -88,13 +88,10 @@ export function FactoryNotifications({
                     )?.resolved === false && (
                       <button
                         onClick={async () => {
-                          if (
-                            !(await confirmAction(
-                              await nativeFactoryConflictConfirmation(state, record.id, row.row),
-                            ))
-                          )
-                            return;
                           try {
+                            if (!(await confirmAction(
+                              await nativeFactoryConflictConfirmation(state, record.id, row.row),
+                            ))) return;
                             if (!window.bando?.approveFactoryConflict) {
                               throw Error("공장 회신 충돌 승인 기능을 사용할 수 없습니다.");
                             }
