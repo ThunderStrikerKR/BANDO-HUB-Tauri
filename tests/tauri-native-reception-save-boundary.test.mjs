@@ -32,7 +32,7 @@ test("paste, OCR application and clearing the reception text all use native Rust
   const source = read("src/SourceDocument.tsx");
   assert.doesNotMatch(source, /import \{ replaceReception \} from/);
   assert.doesNotMatch(source, /\breplaceReception\(/);
-  assert.match(source, /"rules", "apply_reception_action", \{\s*action: "replace_reception", order: source, raw,/);
+  assert.match(source, /"rules", "apply_reception_action", \{\s*action: "replace_reception", order: source,\s*raw,/);
   assert.match(source, /const next = await nativeReplaceReception\(order, raw\)/);
   assert.match(source, /raw === text \? structuredClone\(order\) : await nativeReplaceReception\(order, raw\)/);
   assert.match(source, /const cleared = await nativeReplaceReception\(order, ""\)/);
