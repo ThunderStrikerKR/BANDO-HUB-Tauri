@@ -82,6 +82,28 @@ pub(super) fn save(payload: &Value) -> Result<Value,String> {
         return Err("공장 전달 완료 주문은 변경할 수 없습니다.".into());
     }
     let mut order = old.clone();
+    // Only the first editable change of an already locked, untransferred
+    // order can create a historical invoice snapshot. The timestamp/reason
+    // are transient UI intent, never a client-calculated monetary value.
+    if let Some(intent) = old.get("pendingBillingSnapshot").filter(|v|!v.is_null()) {
+        let at = required_str(intent,"at")?;
+        let reason = required_str(intent,"reason")?;
+        let previous = rows(field(state,"orders")).iter()
+            .find(|o|str_field(o,"id")==str_field(old,"id"))
+            .ok_or("과거 청구 이력을 작성할 기존 주문이 없습니다.")?;
+        let linked = rows(field(field(state,"workflow"),"shipments")).iter().any(|ship|
+            str_field(ship,"orderId")==str_field(previous,"id") &&
+            !flag(ship,"legacyArchived"));
+        if flag(previous,"pricesLocked") && !linked {
+            let snapshot = super::reply_rules::billing(previous,state,reason,at)?;
+            let mut history=rows(field(&order,"billingHistory")).to_vec();
+            history.push(snapshot);
+            set(&mut order,"billingHistory",json!(history))?;
+        }
+    }
+    // Do not persist the ephemeral marker as part of the historical order.
+    order.as_object_mut().ok_or("주문 데이터 형식 오류")?
+        .remove("pendingBillingSnapshot");
     set(&mut order,"clientSnapshot",client.clone())?;
     set(&mut order,"updatedAt",json!(now))?;
     let totals = pricing::totals(&order,client)?;
