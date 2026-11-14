@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - migration/03-integration
+      - migration/08-runtime-closure-26 # temporary validation branch
       - migration/05-factory-reply
       - integration/06-history-settlement
   workflow_dispatch:
@@ -67,6 +68,8 @@ jobs:
         run: node --test tests/rust-migration/output/automatic-request-parity.test.mjs
       - name: Compare full automatic messages and legacy payment copy signatures
         run: node --test tests/rust-migration/output/full-automatic-parity.test.mjs
+      - name: Compare customer-visible factory correction copies and event statuses with TypeScript
+        run: node --test tests/rust-migration/output/correction-parity.test.mjs
       - name: Compare existing TypeScript price and freight with staged Rust rules
         run: node --test tests/rust-migration/rules/parity.test.mjs
 
