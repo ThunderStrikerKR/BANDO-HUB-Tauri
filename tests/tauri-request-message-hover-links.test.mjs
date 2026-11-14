@@ -87,4 +87,29 @@ test("actual message preview passes its phase to the hover mapper, and hover eve
   assert.match(hub, /<LinkContext\.Provider value=\{linkController\}>/);
   assert.match(linked, /\(directEdit \? editing : true\)/);
   assert.match(linked, /강조 보기/);
+  assert.match(linked, /useState\(!text && !directEdit\)/);
+  assert.match(view, /key=\{order\.id \+ ":" \+ \(gid \?\? ""\)/);
+});
+
+test("real React request preview starts as hoverable linked text after async data, not a textarea", async () => {
+  const React = await import("react");
+  const { renderToStaticMarkup } = await import("react-dom/server");
+  const { LinkedText, LinkContext } = await tsImport("../src/LinkedText.tsx", import.meta.url);
+  const data = order(recipient("r1", "김민수", [["i1", "BD 709"]]));
+  const text = "1. 김민수님: 연락처, BD 709 수량";
+  const render = (value, active) => renderToStaticMarkup(
+    React.createElement(LinkContext.Provider, {
+      value: { active, recipientId: "r1", setActive: () => {} },
+    }, React.createElement(LinkedText, {
+      text: value, spans: requestMessageSpans(value, data),
+      label: "복사용 자동 메시지 본문",
+      directEdit: true, readOnly: false, onChange: () => {},
+    })),
+  );
+  const initiallyEmpty = render("", "");
+  assert.doesNotMatch(initiallyEmpty, /<textarea/);
+  const shown = render(text, "r1:phone");
+  assert.doesNotMatch(shown, /<textarea/);
+  assert.match(shown, /data-link-key="r1:phone"[^>]*linked-active/);
+  assert.match(shown, /data-link-key="i1:quantity"/);
 });
