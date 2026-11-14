@@ -4,7 +4,7 @@ import { categoryPath } from "./category-tree";
 import { catalogFromCategory, withCatalogRoots } from "./category-roots";
 import { BrandCombobox, ProductCategoryPicker } from "./ProductDetailComponents";
 import { SALE_STATES } from "./sale-status";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AliasManager } from "./AliasManager";
 import { ClassificationFilters, RegistrySettings } from "./Classification";
 import { confirmAction } from "./dialogs";
@@ -59,6 +59,7 @@ export function ProductManager({
     [pendingPriceIds, setPendingPriceIds] = useState<string[]>([]),
     [detailPriceMode, setDetailPriceMode] = useState(false),
     [categoryPicker, setCategoryPicker] = useState(false);
+  const priceWrites = useRef(0);
   const editDirty = !!edit && !!originalEdit && !sameProductEditor(edit, originalEdit);
   const hasPendingPrices = pendingPriceIds.length > 0;
   const markPricePending = useCallback((id: string, pending: boolean) => {
@@ -69,6 +70,10 @@ export function ProductManager({
     });
   }, []);
   const checkPriceDrafts = () => {
+    if (priceWrites.current > 0) {
+      onNotice("가격 저장이 완료된 뒤 다음 작업으로 이동할 수 있습니다.", "error");
+      return false;
+    }
     if (!hasPendingPrices) return true;
     onNotice("저장하지 않은 가격이 있습니다. 해당 가격 셀의 저장 또는 취소 버튼을 먼저 눌러주세요.", "error");
     return false;
@@ -156,7 +161,7 @@ export function ProductManager({
   usePageLeaveGuard({
     label: "상품",
     hasChanges: () => editDirty || hasPendingPrices,
-    busy: () => savingView,
+    busy: () => savingView || priceWrites.current > 0,
     save,
     discard: () => {
       setEdit(undefined);
@@ -351,8 +356,13 @@ export function ProductManager({
                                 value={v[tier]}
                                 label={`${p.name} ${variantLabel(v)} ${{ wholesale: "도매가", semi: "반도매가", retail: "소매가" }[tier]}`}
                                 onSave={async (n, expected) => {
-                                  const committed = await window.bando!.setPrice(p.id, v.id, tier, n, expected);
-                                  await onRefresh(committed);
+                                  priceWrites.current++;
+                                  try {
+                                    const committed = await window.bando!.setPrice(p.id, v.id, tier, n, expected);
+                                    await onRefresh(committed);
+                                  } finally {
+                                    priceWrites.current--;
+                                  }
                                 }}
                               />
                             </td>
