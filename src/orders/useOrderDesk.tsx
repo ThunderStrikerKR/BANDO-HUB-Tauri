@@ -16,7 +16,7 @@ import { useNativeOrderPreview } from "./useNativeOrderPreview";
 import { useNativeOrderIssues } from "./useNativeOrderIssues";
 import { applyRustReceptionAnalysis, assertRustReceptionAnalysis, receptionAnalysisAllowed } from "./rust-reception";
 import { registeredProducts, sortProducts } from "../product-models";
-import { billingSnapshot } from "../replies";
+
 import type { NoticeSink } from "../shared/notices";
 import type { Item, Order, Product, State } from "../types";
 import { clone } from "../ui";
@@ -379,13 +379,13 @@ export function useOrderDesk({
     }
     onChange((previous) => {
       const next = clone(previous);
-      if (previous.pricesLocked && !activeGroupId &&
-          !(state.workflow?.shipments.some((ship) =>
-            ship.orderId === previous.id && !ship.legacyArchived) ?? false))
-        next.billingHistory = [
-          ...(next.billingHistory ?? []),
-          billingSnapshot(previous, state, reason),
-        ];
+      // No TypeScript financial calculation during keystrokes.
+      // Preserve the first-edit timestamp and reason; the native commit
+      // boundary will atomically freeze old prices and history in Rust.
+      if (previous.pricesLocked && !next.pendingBillingSnapshot)
+        next.pendingBillingSnapshot = {
+          at: new Date().toISOString(), reason, activeGroupId: activeGroupId ?? null,
+        };
       next.pricesLocked = false;
       next.clientSnapshot = liveClient ? clone(liveClient) : next.clientSnapshot;
       next.notified = false;
