@@ -56,7 +56,7 @@ function Nodes {
       }
     } catch {}
   }
-  return ,$rows
+  return $rows
 }
 function FindNode([string]$label,[string]$kind) {
   return @(Nodes | Where-Object {
