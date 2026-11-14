@@ -5,6 +5,7 @@ import { ManagementTable } from "./ui/ManagementTable";
 import { ShippingFeeRanges } from "./ShippingFeeRanges";
 import { useState } from "react";
 import { businessCoreCall } from "./tauri-bridge";
+import { useNativeShippingRead } from "./useNativeShippingRead";
 import { confirmAction } from "./dialogs";
 import { registeredProducts, sortProducts } from "./product-models";
 import type { NoticeSink } from "./shared/notices";
@@ -12,11 +13,7 @@ import { useAsyncTask } from "./shared/useAsyncTask";
 import { sameFreightEditor } from "./shared/meaningful-changes";
 import { requestEditorLeave, usePageLeaveGuard } from "./shared/page-leave";
 
-import {
-  editableShippingRule,
-  effectiveShippingRule,
-  emptyProductRule,
-} from "./shipping";
+import { emptyProductRule } from "./shipping";
 import type { ShippingRule, State } from "./types";
 import { Field, Modal, MoneyInput, clone } from "./ui";
 export function ProductFreightPanel({
@@ -29,6 +26,7 @@ export function ProductFreightPanel({
   onNotice: NoticeSink;
 }) {
   const { busy, run: runSave } = useAsyncTask(onNotice);
+  const freightRead = useNativeShippingRead(state);
   const [search, setSearch] = useState(""),
     [onlyMissing, setOnlyMissing] = useState(false),
     [selected, setSelected] = useState<string[]>([]),
@@ -50,7 +48,7 @@ export function ProductFreightPanel({
         .toLowerCase()
         .replace(/\s/g, "")
         .includes(search.toLowerCase().replace(/\s/g, "")) &&
-      (!onlyMissing || !effectiveShippingRule(state, p.id).rule),
+      (!onlyMissing || (freightRead.ready && !freightRead.product(p.id)?.rule)),
   );
   const save = async (next: State, message: string) =>
     (
@@ -128,6 +126,9 @@ export function ProductFreightPanel({
   return (
     <>
       <section className="shipping-card shipping-product-list">
+        {!freightRead.ready && !freightRead.error &&
+          <p role="status">상품별 운임 기준을 조회하고 있습니다.</p>}
+        {freightRead.error && <p role="alert" className="form-error">{freightRead.error}</p>}
         <div className="shipping-tools management-search-toolbar">
           <ManagementSearch label="상품별 운임 검색"
             placeholder="모델명 / 상품명 검색"
@@ -201,7 +202,9 @@ export function ProductFreightPanel({
             </thead>
             <tbody>
               {rows.map((p) => {
-                const { rule, group } = effectiveShippingRule(state, p.id);
+                const { rule, group } = freightRead.product(p.id) ?? {
+                  rule: null, group: null,
+                };
                 return (
                   <tr key={p.id}>
                     <td>
@@ -236,10 +239,17 @@ export function ProductFreightPanel({
                     <td>{rule?.at ? new Date(rule.at).toLocaleDateString("ko-KR") : "-"}</td>
                     <td>
                       <button
+                        disabled={!freightRead.ready}
                         onClick={() => {
                           // A missing rule has a generated version ID. Create it
                           // once so an untouched editor is not falsely dirty.
-                          const initial = editableShippingRule(rule ?? emptyProductRule());
+                          const initial = freightRead.product(p.id)?.editableRule ?? (
+                            rule ? undefined : emptyProductRule()
+                          );
+                          if (!initial) {
+                            onNotice("운임 기준을 불러온 뒤 수정해 주세요.", "error");
+                            return;
+                          }
                           setInitialRule(clone(initial));
                           setEditing({
                             productId: p.id,
