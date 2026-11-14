@@ -67,8 +67,31 @@ try{
   assert.ok(ready,"Native Tauri did not initialize disposable CI baseline");
   await sleep(1700);
 }finally{
-  if(bootstrap.exitCode===null)bootstrap.kill();
-  await sleep(750);
+  if(bootstrap.exitCode===null){
+    // CI-audit WebView2 CDP flags are also baked into the bootstrap EXE.
+    // Kill the whole Windows process tree BEFORE its parent exits; merely
+    // killing the Tauri parent can leave an orphan WebView2 CDP port open.
+    try{
+      execFileSync("taskkill.exe",["/PID",String(bootstrap.pid),"/T","/F"],
+        {stdio:"pipe",timeout:12000});
+    }catch(error){
+      console.error("NATIVE_BOOTSTRAP_TREE_CLEANUP",String(error));
+      bootstrap.kill();
+    }
+  }
+  await sleep(1100);
+  // The CDP port must belong exclusively to the subsequent TEST workspace.
+  let busy=[];
+  for(let n=0;n<15;n++){
+    try{
+      busy=execFileSync("netstat.exe",["-ano"],
+        {encoding:"utf8",timeout:8000}).split(/\r?\n/)
+        .filter(line=>line.includes(":"+port)&&/LISTENING/i.test(line));
+    }catch{busy=[];}
+    if(!busy.length)break;
+    await sleep(250);
+  }
+  assert.equal(busy.length,0,"Bootstrap held the CI WebView2 CDP port");
 }
 console.log("NATIVE_CI_BASELINE_CREATED",baseline);
 
