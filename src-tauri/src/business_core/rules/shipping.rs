@@ -56,11 +56,16 @@ pub(super) fn product_freight_view(payload:&Value)->Result<Value,String>{
     for product in rows(field(state,"products")){
         let id=str_field(product,"id");
         let group_id=field(product,"shippingGroupId").as_str();
-        let group=rows(field(shipping,"groups")).iter().find(|candidate|
+        let group=rows(field(shipping,"groups")).iter().find(|candidate|{
+            let deleted=field(candidate,"deletedAt");
             group_id==candidate.get("id").and_then(Value::as_str) &&
-            !has_value(field(candidate,"deletedAt")));
-        let rule=group.map(|g|field(g,"current"))
-            .unwrap_or_else(||field(field(shipping,"productRules"),id));
+                (deleted.is_null() || deleted.as_str()==Some("") ||
+                    deleted.as_bool()==Some(false))
+        });
+        // TS uses nullish coalescing, so an incomplete group.current must
+        // still fall back to the independent product tariff.
+        let current=group.map(|g|field(g,"current")).filter(|v|!v.is_null());
+        let rule=current.unwrap_or_else(||field(field(shipping,"productRules"),id));
         by_product.insert(id.into(),json!({
             "rule":rule,
             "group":group.cloned().unwrap_or(Value::Null),
