@@ -385,3 +385,43 @@ test("provisional quantity notice respects custom template, other blockers and m
   assert.doesNotMatch(blocked.value.text,/1개 발송 예정/,
     "Payment-only note must not leak into the request phase");
 });
+
+test("actual React draft reconciliation retains provisional marker and allows the next staff stage",()=>{
+  const state=base();
+  const original=state.orders[0].recipients[0].items[0];
+  original.quantity=null;
+  original.quantityConfirmed=false;
+  const approved=compiledRules([{operation:"apply_issue_action",payload:{
+    action:"approve_missing_quantity",order:state.orders[0],
+    recipientId:"r1",itemId:"i1",actor,now:approvalTime
+  }}])[0];
+  assert.equal(approved.ok,true,JSON.stringify(approved));
+  // useNativeWorkflowReconcile sends the current saved State and new order
+  // draft separately, exactly like this production native operation.
+  const reconciled=compiledRules([{operation:"reconcile_workflow",payload:{
+    state,draft:approved.value.order,now:approvalTime,
+    eventIds:Array.from({length:256},(_,i)=>"quantity-audit-event-"+i),
+  }}])[0];
+  assert.equal(reconciled.ok,true,JSON.stringify(reconciled));
+  const preview=reconciled.value.state;
+  const shipment=preview.workflow.shipments.find(s=>s.recipientId==="r1");
+  const actual=preview.orders[0].recipients[0].items[0];
+  assert.equal(actual.quantity,1);
+  assert.equal(actual.quantityConfirmed,false);
+  assert.deepStrictEqual(actual.quantityApproval,{
+    quantity:1,actor,at:approvalTime,
+  });
+  // A changed line quantity invalidates the previous financial/shipment
+  // confirmation. That is deliberate; automatic copy stays in REQUEST until
+  // staff reconfirms the workflow's first two stages.
+  assert.ok(shipment.step<2);
+  const copy=compiledOutput([copyRequest(preview)])[0];
+  assert.equal(copy.ok,true,JSON.stringify(copy));
+  assert.equal(copy.value.phase,"request");
+  const evaluation=compiledRules([{operation:"evaluate_workflow",payload:{
+    state:preview,groupId:gid,
+  }}])[0];
+  assert.equal(evaluation.ok,true,JSON.stringify(evaluation));
+  assert.ok(!evaluation.value.issues.some(s=>s.includes("수량")),
+    "The approved one-item quantity must not block subsequent workflow stages");
+});
