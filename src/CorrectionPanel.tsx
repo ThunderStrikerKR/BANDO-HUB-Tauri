@@ -5,7 +5,7 @@ import { confirmDiscardDraft } from "./shared/editor-flow";
 
 import { nativeApplyCorrectionAction } from "./orders/native-rules";
 import { businessCoreCall } from "./tauri-bridge";
-import { itemFromProduct } from "./domain";
+import type { Item } from "./types";
 import { internalModel } from "./matching";
 import { ProductSearchDialog } from "./ProductSearchDialog";
 import type { NoticeSink } from "./shared/notices";
@@ -67,21 +67,21 @@ export function CorrectionPanel({
       // can be quoted; unconfigured products keep the original null price.
       const variantId = p.variants.length === 1 && !p.requiresOption
         ? p.variants[0].id : undefined;
-      const unitPrice = variantId
-        ? (await businessCoreCall<{ unitPrice: number | null }>(
-            "rules", "resolve_unit_price", { product: p, variantId, client },
-          )).unitPrice
-        : null;
+      const { item: catalogItem } = await businessCoreCall<{ item: Item }>(
+        "rules", "create_catalog_item", {
+          product: p, client, variantId,
+          quantity: null, newItemId: crypto.randomUUID(),
+        },
+      );
       if (latestSelection.current.state !== state ||
           latestSelection.current.search !== target) return;
       setAfter((recipient) => ({
         ...recipient,
         items: recipient.items.map((item) => item.id === target
           ? {
-              ...itemFromProduct(
-                p, client, undefined, item.quantity, variantId, unitPrice,
-              ),
+              ...catalogItem,
               id: item.id,
+              quantity: item.quantity,
               manuallyConfirmed: true,
               quantityConfirmed: true,
               issues: [],
