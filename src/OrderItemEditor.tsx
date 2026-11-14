@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { confirmDiscardDraft } from "./shared/editor-flow";
 import { Modal } from "./ui";
-import { itemFromProduct } from "./domain";
 import { businessCoreCall } from "./tauri-bridge";
 import { productModelNames } from "./product-name-match";
 import { useNativeProductIds } from "./native-catalog-queries";
@@ -137,22 +136,22 @@ export function OrderItemEditor({
     }
     const request = ++selectedPriceRequest.current;
     setPricePending(true);
-    void businessCoreCall<{ unitPrice: number | null }>(
-      "rules", "resolve_unit_price", {
-        product: candidate, variantId: candidate.variants[0].id, client,
-      },
-    ).then(({ unitPrice }) => {
+    // Rust constructs the authoritative item metadata AND quote atomically.
+    // An existing item keeps its identity, quantity and original evidence.
+    void businessCoreCall<{ item: Item }>("rules", "create_catalog_item", {
+      product: candidate, client, newItemId: item.id,
+      variantId: candidate.variants[0].id, color: candidate.variants[0].color,
+      quantity: item.quantity,
+    }).then(({ item: nativeItem }) => {
       if (request !== selectedPriceRequest.current) return;
-      const next = itemFromProduct(candidate, client,
-        candidate.variants[0].color, item.quantity,
-        candidate.variants[0].id, unitPrice);
+      if (!nativeItem.variantId) throw Error("등록된 독립 상품을 다시 선택하세요.");
       setDraft({
-        ...next, id: item.id, raw: item.raw, sources: item.sources,
+        ...nativeItem, id: item.id, raw: item.raw, sources: item.sources,
         quantity: item.quantity, quantityConfirmed: item.quantityConfirmed,
       });
     }).catch((error) => {
       if (request === selectedPriceRequest.current)
-        setSelectionError("Rust 가격 조회 실패: " +
+        setSelectionError("Rust 상품 구성 조회 실패: " +
           (error instanceof Error ? error.message : String(error)));
     }).finally(() => {
       if (request === selectedPriceRequest.current) setPricePending(false);
