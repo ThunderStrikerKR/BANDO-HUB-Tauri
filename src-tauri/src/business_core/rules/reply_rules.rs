@@ -4,7 +4,7 @@ use serde_json::{json,Value};
 use std::collections::HashSet;
 use super::{field,find_by_id,flag,has_value,req,required_str,rows,set,str_field};
 
-fn billing(order:&Value,state:&Value,reason:&str,now:&str)->Result<Value,String>{
+pub(super) fn billing(order:&Value,state:&Value,reason:&str,now:&str)->Result<Value,String>{
     let client=super::workflow::party(state,order)
         .or_else(||(str_field(order,"orderType")=="RETAIL")
             .then(||field(order,"clientSnapshot")).filter(|v|!v.is_null()))
