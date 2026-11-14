@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { confirmAction, askSaveChanges } from "../dialogs";
 import { orderClient } from "../domain";
 import { businessCoreCall } from "../tauri-bridge";
-import { newReception, persistedReceptionState } from "../orders/reception";
+import { newReception } from "../orders/reception";
 import { useHasPendingChanges } from "../shared/pending-changes";
 import { requestPageLeave } from "../shared/page-leave";
 import { useAsyncTask } from "../shared/useAsyncTask";
@@ -171,7 +171,13 @@ export function useAppModel() {
       const prepared = next.orders.find(
         (o) => o.id === draft?.id && o.receptionVersion === 1 && !o.confirmedAt,
       );
-      const persistent = persistedReceptionState(state!, next);
+      // Rust owns the authoritative draft/linked-workflow sanitization. A failed
+      // native validation must abort before the sole SQLite write below.
+      const { state: persistent } = await businessCoreCall<{ state: State }>(
+        "rules", "apply_reception_action", {
+          action: "persisted_reception_state", before: state!, state: next,
+        },
+      );
       if (JSON.stringify(persistent) === JSON.stringify(state)) {
         lastCommitted.current = state;
         if (prepared) setDraft(clone(prepared));
