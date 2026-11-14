@@ -44,6 +44,7 @@ export function ManualClassification({
 }) {
   const [model, setModel] = useState(() => initialManual(order));
   const manualQuantityRequest = useRef<Record<string, number>>({});
+  const manualQuantityPending = useRef<Set<string>>(new Set());
   const latestInputs = useRef({ order, model });
   latestInputs.current = { order, model };
   const initial = useRef(JSON.stringify(model));
@@ -169,6 +170,10 @@ export function ManualClassification({
   const finishQuantity = (): boolean => {
     const cell = pendingRef.current;
     if (!cell) return true;
+    if (manualQuantityPending.current.has(cellKey(cell))) {
+      fail("입력 중인 수량을 확인하고 있습니다. 다시 완료해 주세요.", cell);
+      return false;
+    }
     const item = model.rows
       .find((row) => row.id === cell.recipientId)
       ?.items.find((item) => item.id === cell.itemId);
@@ -487,6 +492,7 @@ export function ManualClassification({
           if (cell.field === "quantity") {
             const request = (manualQuantityRequest.current[key] ?? 0) + 1;
             manualQuantityRequest.current[key] = request;
+            manualQuantityPending.current.add(key);
             setQuantityText((old) => ({ ...old, [key]: value }));
             if (!pendingRef.current) beforeProduct.current = frame();
             setPending(cell);
@@ -498,6 +504,7 @@ export function ManualClassification({
             ).then(({ quantity }) => {
               if (manualQuantityRequest.current[key] !== request ||
                   latestInputs.current.order !== order) return;
+              manualQuantityPending.current.delete(key);
               setModel((current) => {
                 const next = structuredClone(current);
                 const item = next.rows.find((row) => row.id === cell.recipientId)
@@ -510,8 +517,10 @@ export function ManualClassification({
                 return next;
               });
             }).catch((e) => {
-              if (manualQuantityRequest.current[key] === request)
+              if (manualQuantityRequest.current[key] === request) {
+                manualQuantityPending.current.delete(key);
                 fail(e instanceof Error ? e.message : String(e), cell);
+              }
             });
             return;
           }
