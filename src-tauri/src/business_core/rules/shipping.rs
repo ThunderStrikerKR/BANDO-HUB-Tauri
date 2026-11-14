@@ -4,6 +4,63 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde_json::{json, Value};
 use super::{checked_sum, field, find_by_id, flag, has_value, rows, safe, str_field};
 
+// Read-only shipping-manager projections from editableShippingRule and
+// combinationCurrent. Active pricing never depends on historical tariff dates.
+fn editable_rule(rule:&Value)->Value {
+    let mut next=rule.clone();
+    let price=field(rule,"perItem");
+    if super::safe(price).is_some() {
+        if !field(&next,"fees").is_object() {next["fees"]=json!({});}
+        next["fees"]["1"]=price.clone();
+        next["perItem"]=Value::Null;
+        next["maxBundle"]=json!(1);
+        next["maxConfirmed"]=json!(true);
+    }
+    next
+}
+fn current_combination(record:&Value,state:&Value,shipping:&Value)->bool {
+    if !flag(record,"active")||field(record,"epoch")!=field(shipping,"epoch"){
+        return false;
+    }
+    let Some(versions)=field(record,"versions").as_object() else{return false};
+    for (key,version) in versions {
+        let expected=if let Some(group_id)=key.strip_prefix("group:"){
+            rows(field(shipping,"groups")).iter().any(|g|
+                str_field(g,"id")==group_id &&
+                field(field(g,"current"),"version")==version &&
+                !field(g,"current").is_null())
+        }else if let Some(pid)=key.strip_prefix("product:"){
+            let rule=field(field(shipping,"productRules"),pid);
+            let actual=if rule.is_null(){"unregistered"}else{str_field(rule,"version")};
+            actual==version.as_str().unwrap_or("") 
+        }else if let Some(pid)=key.strip_prefix("assignment:"){
+            let product=find_by_id(field(state,"products"),pid);
+            let group=product.map(|p|str_field(p,"shippingGroupId"))
+                .filter(|v|!v.is_empty()).unwrap_or("individual");
+            group==version.as_str().unwrap_or("")
+        }else{
+            rows(field(shipping,"groups")).iter().any(|g|
+                str_field(g,"id")==key &&
+                field(field(g,"current"),"version")==version)
+        };
+        if !expected{return false;}
+    }
+    true
+}
+pub(super) fn shipping_manager_view(payload:&Value)->Result<Value,String>{
+    let state=super::req(payload,"state")?;
+    let shipping=super::req(payload,"shipping")?;
+    let mut editable=serde_json::Map::new();
+    for group in rows(field(shipping,"groups")){
+        editable.insert(str_field(group,"id").into(),editable_rule(field(group,"current")));
+    }
+    let mut current=serde_json::Map::new();
+    for record in rows(field(shipping,"combinations")){
+        current.insert(str_field(record,"id").into(),
+            json!(current_combination(record,state,shipping)));
+    }
+    Ok(json!({"editableRules":editable,"currentCombinations":current}))
+}
 fn initial_shipping() -> Value {
     // The seed tariff values are from initialShipping(). Versions in the
     // persisted SQLite state always take precedence over these fallbacks.
