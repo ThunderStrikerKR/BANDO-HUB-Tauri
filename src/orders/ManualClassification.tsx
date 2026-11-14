@@ -6,9 +6,9 @@ import { confirmDiscardDraft } from "../shared/editor-flow";
 import type { NoticeSink } from "../shared/notices";
 import type { Order, Product, State } from "../types";
 import { orderIssues } from "../validation";
+import { businessCoreCall } from "../tauri-bridge";
 import { ManualPrompt } from "./ManualPrompt";
 import {
-  applyManual,
   assignManualBlock,
   cellKey,
   emptyManualItem,
@@ -817,11 +817,19 @@ export function ManualClassification({
             <button
               className="primary"
               data-autofocus
-              onClick={() => {
+              onClick={async () => {
                 if (applying.current) return;
                 applying.current = true;
                 try {
-                  onApply(applyManual(order, model));
+                  // Keep keystroke-scale grid editing local, but never accept
+                  // a TS-authored final order. Rust revalidates quantities,
+                  // source ownership and issue decision synchronization.
+                  const { order: finalized } = await businessCoreCall<{ order: Order }>(
+                    "rules", "apply_manual_classification", {
+                      order, model, assignmentOrder: Object.keys(model.assignments),
+                    },
+                  );
+                  onApply(finalized);
                   onClose();
                 } catch (e) {
                   applying.current = false;
