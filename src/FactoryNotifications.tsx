@@ -19,15 +19,15 @@ export function FactoryNotifications({
   const [error, setError] = useState("");
   const [nativeReview, setNativeReview] = useState<{
     state: State;
-    statuses: Record<string, boolean>;
+    statuses: Record<string, { needsReview: boolean; resolvedRows: { row: number; resolved: boolean }[] }>;
   }>();
   useEffect(() => {
     let active = true;
-    void businessCoreCall<{ reviews: { id: string; needsReview: boolean }[] }>(
+    void businessCoreCall<{ reviews: { id: string; needsReview: boolean; resolvedRows: { row: number; resolved: boolean }[] }[] }>(
       "rules", "factory_reply_review_statuses", { state },
     ).then(({ reviews }) => {
       if (active) setNativeReview({
-        state, statuses: Object.fromEntries(reviews.map((row) => [row.id, row.needsReview])),
+        state, statuses: Object.fromEntries(reviews.map((row) => [row.id, row])),
       });
     }).catch((cause) => {
       if (active) setError("Rust 회신 상태 확인 실패: " +
@@ -53,9 +53,9 @@ export function FactoryNotifications({
             <article key={record.id}>
               <h3>
                 {record.filename} / {" "}
-                {statuses?.[record.id] === false
+                {statuses?.[record.id]?.needsReview === false
                   ? "반영 완료"
-                  : statuses?.[record.id] === true
+                  : statuses?.[record.id]?.needsReview === true
                     ? record.status === "PARTIAL" ? "일부 반영" : "직원 확인 필요"
                     : "확인 중"}
               </h3>
@@ -83,9 +83,9 @@ export function FactoryNotifications({
                   {!row.applied &&
                     row.shipmentId &&
                     row.issue?.includes("충돌") &&
-                    !state.factoryReplies?.some(
-                      (r) => r.resolves?.id === record.id && r.resolves.row === row.row,
-                    ) && (
+                    statuses?.[record.id]?.resolvedRows.find(
+                      (r) => r.row === row.row,
+                    )?.resolved === false && (
                       <button
                         onClick={async () => {
                           if (
