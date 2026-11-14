@@ -12,7 +12,7 @@ import { ClientPicker, TierBadge } from "./ManagementUI";
 import { confirmAction } from "./dialogs";
 import { businessCoreCall } from "./tauri-bridge";
 import type { NoticeSink } from "./shared/notices";
-
+import { nativeRememberedTitleClient } from "./native-title-clients";
 import type { Client, DockWindow, OcrCapture, Order, State } from "./types";
 
 export function SourceDocument({
@@ -41,8 +41,6 @@ export function SourceDocument({
   onManual?: () => void;
   onSettings?: () => void;
 }) {
-  const latestInputs = useRef({ order, text });
-  latestInputs.current = { order, text };
   const [retail, setRetail] = useState(false);
   const [ocrResult, setOcrResult] = useState<OcrCapture | null>(null);
   const [ocrBusy, setOcrBusy] = useState(false);
@@ -53,6 +51,17 @@ export function SourceDocument({
     [busy, setBusy] = useState(false);
   const pending = useRef(false),
     alive = useRef(true);
+  const latestReception = useRef({ order, text });
+  latestReception.current = { order, text };
+  const nativeReplaceReception = async (source: Order, raw: string): Promise<Order> => {
+    const { order: next } = await businessCoreCall<{ order: Order }>(
+      "rules", "apply_reception_action", {
+        action: "replace_reception", order: source,
+        raw, now: new Date().toISOString(),
+      },
+    );
+    return next;
+  };
   const [windows, setWindows] = useState<DockWindow[]>([]);
   const [error, setError] = useState("");
   const [ocrFailure, setOcrFailure] = useState("");
@@ -71,23 +80,28 @@ export function SourceDocument({
   }, [text]);
   const formal = !!order.confirmedAt || state.orders.some((o) => o.id === order.id);
   const autoAttempt = useRef("");
+  const autoInput = useRef({ state, windows, text, orderId: order.id, dealerId: order.clientId });
+  autoInput.current = { state, windows, text, orderId: order.id, dealerId: order.clientId };
   useEffect(() => {
     if (!text.trim() || client || order.clientId || formal || busy) return;
-    let cancelled = false;
-    void businessCoreCall<{ clientId: string | null }>(
-      "rules", "remembered_kakao_title_client", { state, windows },
-    ).then(async ({ clientId: id }) => {
-      if (cancelled || !alive.current || !id) return;
-      const matched = state.clients.find((c) => c.id === id);
-      if (!matched) return;
-      const attempt = JSON.stringify([order.id, text, matched.id]);
-      if (autoAttempt.current === attempt) return;
-      autoAttempt.current = attempt;
-      await onDealer(matched);
-    }).catch((e) => {
-      if (!cancelled && alive.current) setError(String(e).replace(/^Error: /, ""));
-    });
-    return () => { cancelled = true; };
+    let active = true;
+    void nativeRememberedTitleClient(state, windows)
+      .then(async (id) => {
+        if (!active || !alive.current ||
+            autoInput.current.state !== state || autoInput.current.windows !== windows ||
+            autoInput.current.text !== text || autoInput.current.orderId !== order.id ||
+            autoInput.current.dealerId !== order.clientId) return;
+        const matched = state.clients.find((c) => c.id === id && !c.deletedAt && c.active !== false);
+        if (!matched) return;
+        const attempt = JSON.stringify([order.id, text, matched.id]);
+        if (autoAttempt.current === attempt) return;
+        autoAttempt.current = attempt;
+        await onDealer(matched);
+      })
+      .catch((e) => {
+        if (active && alive.current) setError(String(e).replace(/^Error: /, ""));
+      });
+    return () => { active = false; };
   }, [state, windows, text, client, order.clientId, order.id, formal, busy, onDealer]);
   useEffect(() => {
     if (!text.trim() || client || formal) return;
@@ -141,15 +155,6 @@ export function SourceDocument({
       }
     }
   };
-  const nativeReplaceReception = async (source: Order, raw: string): Promise<Order> => {
-    const { order: replaced } = await businessCoreCall<{ order: Order }>(
-      "rules", "apply_reception_action", {
-        action: "replace_reception", order: source, raw,
-        now: new Date().toISOString(),
-      },
-    );
-    return replaced;
-  };
   const applyOcr = async (edited: string, mode: "replace" | "append") => {
     if (formal || pending.current || !ocrResult) return;
     const cleaned = edited.trim();
@@ -169,7 +174,8 @@ export function SourceDocument({
     setBusy(true);
     try {
       const next = await nativeReplaceReception(order, raw);
-      if (!alive.current || latestInputs.current.order !== order || latestInputs.current.text !== text) return;
+      if (!alive.current || latestReception.current.order !== order ||
+          latestReception.current.text !== text) return;
       onText(raw);
       onOrder(next);
       setOcrResult(null);
@@ -203,19 +209,25 @@ export function SourceDocument({
       } catch {
         /* Title lookup is optional; manual selection remains available. */
       }
-      if (!alive.current || latestInputs.current.order !== order || latestInputs.current.text !== text) return;
+      if (!alive.current || latestReception.current.order !== order ||
+          latestReception.current.text !== text) return;
       setWindows(chats);
       if (!order.clientId) {
-        const { clientId: id } = await businessCoreCall<{ clientId: string | null }>(
-          "rules", "remembered_kakao_title_client", { state, windows: chats },
-        );
-        if (!alive.current || latestInputs.current.order !== order || latestInputs.current.text !== text) return;
-        const matched = state.clients.find((c) => c.id === id);
-        if (matched) {
-          next.clientId = matched.id;
-          next.clientSnapshot = structuredClone(matched);
+        // A failed optional title lookup must not discard a valid pasted order.
+        try {
+          const id = await nativeRememberedTitleClient(state, chats);
+          if (!alive.current) return;
+          const matched = state.clients.find((c) => c.id === id && !c.deletedAt && c.active !== false);
+          if (matched) {
+            next.clientId = matched.id;
+            next.clientSnapshot = structuredClone(matched);
+          }
+        } catch (error) {
+          onNotice("카카오톡 거래처 자동 연결을 확인하지 못했습니다. 거래처를 직접 선택해 주세요.", "error");
         }
       }
+      if (!alive.current || latestReception.current.order !== order ||
+          latestReception.current.text !== text) return;
       setError("");
       onText(raw);
       onOrder(next);
@@ -361,10 +373,10 @@ export function SourceDocument({
                 setBusy(true);
                 try {
                   const cleared = await nativeReplaceReception(order, "");
-                  if (!alive.current || latestInputs.current.order !== order || latestInputs.current.text !== text) return;
+                  if (!alive.current || latestReception.current.order !== order ||
+                      latestReception.current.text !== text) return;
                   onText("");
                   onOrder(cleared);
-                  setError("");
                 } catch (error) {
                   if (alive.current) setError(String(error).replace(/^Error: /, ""));
                 } finally {

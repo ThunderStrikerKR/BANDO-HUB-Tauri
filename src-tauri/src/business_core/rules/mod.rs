@@ -18,6 +18,7 @@ mod catalog_item;
 mod retail_operations;
 mod raw_corrections;
 mod reply_rules;
+mod shipping_read;
 mod client_change;
 mod factory_reply;
 mod legacy_migration;
@@ -69,6 +70,7 @@ pub fn execute(operation: &str, payload: Value) -> Result<Value, String> {
         "should_refresh_pricing" => Ok(json!({"refresh": pricing::should_refresh(&payload)?})),
         "shipping_manager_view" => shipping::shipping_manager_view(&payload),
         "apply_shipping_action" => shipping::shipping_action(&payload),
+        "shipping_read" => shipping_read::project(&payload),
         "reconcile_workflow" => reconciliation::reconcile(&payload),
         "calculate_shipping" => shipping::recommend(
             req(&payload, "order")?, req(&payload, "state")?,
@@ -94,6 +96,7 @@ pub fn execute(operation: &str, payload: Value) -> Result<Value, String> {
         "factory_conflict_confirmation" | "factory_reply_review_statuses" | "analyze_factory_reply" | "preview_factory_reply" | "apply_factory_reply" =>
             factory_reply::execute(operation, &payload),
         "apply_reply_action" => reply_rules::apply(&payload),
+        "finalize_billing_history" => reply_rules::finalize_billing_history(&payload),
         "client_change_issue" => client_change::check(&payload),
         "apply_raw_correction" => raw_corrections::apply(&payload),
         "apply_retail_action" => retail_operations::apply(&payload),
