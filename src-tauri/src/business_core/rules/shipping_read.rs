@@ -3,6 +3,10 @@
  //! Shipping calculations and history remain in rules::shipping; this is read-only.
 use serde_json::{json,Value};
 use super::{field,find_by_id,rows,str_field,flag,has_value};
+fn list<'a>(value:&'a Value,key:&str)->&'a [Value]{
+    rows(field(value,key))
+}
+
 
 fn edit_rule(rule:&Value)->Value {
     let mut edited=rule.clone();
@@ -24,7 +28,7 @@ fn current_combo(combination:&Value,state:&Value)->bool {
     for (key,version) in versions {
         let expected=version.as_str().unwrap_or("");
         if let Some(group_id)=key.strip_prefix("group:"){
-            let Some(group)=rows(shipping,"groups").iter().find(|g|
+            let Some(group)=list(shipping,"groups").iter().find(|g|
                 str_field(g,"id")==group_id) else{return false;};
             if str_field(field(group,"current"),"version")!=expected ||
                 !field(group,"current").is_object() {return false;}
@@ -39,7 +43,7 @@ fn current_combo(combination:&Value,state:&Value)->bool {
                 .unwrap_or("individual");
             if assigned!=expected{return false;}
         }else{
-            let group=rows(shipping,"groups").iter().find(|g|str_field(g,"id")==key);
+            let group=list(shipping,"groups").iter().find(|g|str_field(g,"id")==key);
             if group.and_then(|g|field(g,"current").get("version"))
                 .and_then(Value::as_str)!=Some(expected) {return false;}
         }
@@ -50,10 +54,10 @@ pub(super) fn project(payload:&Value)->Result<Value,String>{
     let state=payload.get("state").ok_or("운임 상태가 없습니다.")?;
     let shipping=field(state,"shipping");
     let mut effective=Vec::new();
-    for product in rows(state,"products"){
+    for product in list(state,"products"){
         let pid=str_field(product,"id");
         let group_id=str_field(product,"shippingGroupId");
-        let group=rows(shipping,"groups").iter().find(|g|
+        let group=list(shipping,"groups").iter().find(|g|
             str_field(g,"id")==group_id && !has_value(field(g,"deletedAt")));
         let rule=group.and_then(|g|g.get("current")).filter(|r|!r.is_null())
             .or_else(||field(shipping,"productRules").get(pid));
@@ -64,11 +68,11 @@ pub(super) fn project(payload:&Value)->Result<Value,String>{
             "editableRule":rule.filter(|v|v.is_object()).map(edit_rule)
         }));
     }
-    let groups=rows(shipping,"groups").iter().map(|group|
+    let groups=list(shipping,"groups").iter().map(|group|
         json!({"id":field(group,"id"),
             "editableRule":edit_rule(field(group,"current"))})
     ).collect::<Vec<_>>();
-    let combinations=rows(shipping,"combinations").iter().map(|combination|
+    let combinations=list(shipping,"combinations").iter().map(|combination|
         json!({"id":field(combination,"id"),
             "current":current_combo(combination,state)})
     ).collect::<Vec<_>>();
