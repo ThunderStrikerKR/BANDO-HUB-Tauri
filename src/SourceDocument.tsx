@@ -12,7 +12,7 @@ import { ClientPicker, TierBadge } from "./ManagementUI";
 import { confirmAction } from "./dialogs";
 import { replaceReception } from "./orders/reception";
 import type { NoticeSink } from "./shared/notices";
-import { rememberedTitleClient } from "./title-clients";
+import { nativeRememberedTitleClient } from "./native-title-clients";
 import type { Client, DockWindow, OcrCapture, Order, State } from "./types";
 
 export function SourceDocument({
@@ -69,19 +69,28 @@ export function SourceDocument({
   }, [text]);
   const formal = !!order.confirmedAt || state.orders.some((o) => o.id === order.id);
   const autoAttempt = useRef("");
+  const autoInput = useRef({ state, windows, text, orderId: order.id, dealerId: order.clientId });
+  autoInput.current = { state, windows, text, orderId: order.id, dealerId: order.clientId };
   useEffect(() => {
     if (!text.trim() || client || order.clientId || formal || busy) return;
-    const id = rememberedTitleClient(state, windows),
-      matched = state.clients.find((c) => c.id === id);
-    if (!matched) return;
-    const attempt = JSON.stringify([order.id, text, matched.id]);
-    if (autoAttempt.current === attempt) return;
-    autoAttempt.current = attempt;
-    void Promise.resolve()
-      .then(() => onDealer(matched))
+    let active = true;
+    void nativeRememberedTitleClient(state, windows)
+      .then(async (id) => {
+        if (!active || !alive.current ||
+            autoInput.current.state !== state || autoInput.current.windows !== windows ||
+            autoInput.current.text !== text || autoInput.current.orderId !== order.id ||
+            autoInput.current.dealerId !== order.clientId) return;
+        const matched = state.clients.find((c) => c.id === id && !c.deletedAt && c.active !== false);
+        if (!matched) return;
+        const attempt = JSON.stringify([order.id, text, matched.id]);
+        if (autoAttempt.current === attempt) return;
+        autoAttempt.current = attempt;
+        await onDealer(matched);
+      })
       .catch((e) => {
-        if (alive.current) setError(String(e).replace(/^Error: /, ""));
+        if (active && alive.current) setError(String(e).replace(/^Error: /, ""));
       });
+    return () => { active = false; };
   }, [state, windows, text, client, order.clientId, order.id, formal, busy, onDealer]);
   useEffect(() => {
     if (!text.trim() || client || formal) return;
@@ -181,11 +190,17 @@ export function SourceDocument({
       if (!alive.current) return;
       setWindows(chats);
       if (!order.clientId) {
-        const id = rememberedTitleClient(state, chats),
-          matched = state.clients.find((c) => c.id === id);
-        if (matched) {
-          next.clientId = matched.id;
-          next.clientSnapshot = structuredClone(matched);
+        // A failed optional title lookup must not discard a valid pasted order.
+        try {
+          const id = await nativeRememberedTitleClient(state, chats);
+          if (!alive.current) return;
+          const matched = state.clients.find((c) => c.id === id && !c.deletedAt && c.active !== false);
+          if (matched) {
+            next.clientId = matched.id;
+            next.clientSnapshot = structuredClone(matched);
+          }
+        } catch (error) {
+          onNotice("카카오톡 거래처 자동 연결을 확인하지 못했습니다. 거래처를 직접 선택해 주세요.", "error");
         }
       }
       setError("");
