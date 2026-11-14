@@ -14,6 +14,8 @@ import { resolvePrice, totals, parseOrder, repriceOrder, itemFromProduct } from 
 import {
   recommendShipping,
   editableShippingRule,
+  effectiveShippingRule,
+  emptyProductRule,
   combinationVersions,
   combinationCurrent,
   upgradeShipping,
@@ -3482,6 +3484,60 @@ shippingViewCase("old combination after tariff revision",shippingChanged);
 const shippingIndividual:any=copy(shippingViewState);
 shippingIndividual.products[0].shippingGroupId=undefined;
 shippingViewCase("assignment removed",shippingIndividual);
+
+// Product freight table/empty-editor/reset projections must use the exact
+// historical TS behavior, not merely Rust-internal expectations.
+function productFreightViewCase(name:string,state:any){
+  add("product freight view: "+name,"apply_shipping_action",{
+    action:"product_freight_view",state
+  },()=>({views:Object.fromEntries(state.products.map((p:any)=>{
+    const {group,rule}=effectiveShippingRule(state,p.id);
+    return [p.id,{group:group??null,rule:rule??null,
+      editableRule:rule?editableShippingRule(rule):null}];
+  }))}));
+}
+productFreightViewCase("group takes precedence",shippingViewState);
+productFreightViewCase("no assigned group",shippingIndividual);
+const missingFreightState:any=copy(shippingIndividual);
+missingFreightState.shipping.productRules={};
+productFreightViewCase("no registered rule",missingFreightState);
+const deletedFreightState:any=copy(shippingViewState);
+deletedFreightState.shipping.groups[0].deletedAt=now;
+deletedFreightState.shipping.productRules.p1={
+  version:"ind-1",fees:{"1":5000},perItem:null,
+  maxBundle:1,maxConfirmed:true,notes:"과거 개별 기준",at:now
+};
+productFreightViewCase("deleted group uses individual rule",deletedFreightState);
+const tariffVersion="freight-editor-test-version";
+add("product freight empty editor matches original TS","apply_shipping_action",{
+  action:"default_product_rule",versionId:tariffVersion,now:actionNow
+},()=>({rule:deterministicIds([tariffVersion],()=>
+  frozenDate(()=>emptyProductRule()))}));
+function resetProductFreightCase(name:string,state:any){
+  add("product freight reset: "+name,"apply_shipping_action",{
+    action:"reset_product_freight_rule",state,productId:"p1",
+    versionId:tariffVersion,now:actionNow
+  },()=>{
+    const next=copy(state);
+    const p=next.products.find((p:any)=>p.id==="p1");
+    const g=next.shipping.groups.find((g:any)=>g.id===p.shippingGroupId&&!g.deletedAt);
+    const create=()=>deterministicIds([tariffVersion],()=>frozenDate(()=>emptyProductRule()));
+    if(g){
+      g.history.push(g.current);
+      g.current=create();
+    }else{
+      next.shipping.productHistory??={};
+      next.shipping.productHistory.p1=[
+        ...(next.shipping.productHistory.p1??[]),
+        next.shipping.productRules.p1
+      ];
+      next.shipping.productRules.p1=create();
+    }
+    return {state:next};
+  });
+}
+resetProductFreightCase("group rate preserves history",shippingViewState);
+resetProductFreightCase("individual rate preserves history",deletedFreightState);
 
 // Template editing is a save-time native decision, not only a preview rule.
 function templateValidationCase(name:string,edits:Record<string,unknown>,valid=true){
