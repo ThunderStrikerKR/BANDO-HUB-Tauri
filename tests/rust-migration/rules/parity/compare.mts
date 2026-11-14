@@ -37,6 +37,7 @@ import { billingSnapshot, applyReply } from "../../../../src/replies.ts";
 import { addressInfo, addressParts } from "../../../../src/parser.ts";
 import { companyClient, companyParty } from "../../../../src/order-types.ts";
 import { explicitSender } from "../../../../src/explicit-sender.ts";
+import { applyManual, type ManualModel } from "../../../../src/orders/manual-classification.ts";
 import { rememberTitle, rememberedTitleClient } from "../../../../src/title-clients.ts";
 
 const root=resolve(dirname(fileURLToPath(import.meta.url)),"../../../..");
@@ -3273,6 +3274,54 @@ rememberedCase("ambiguous remembered mapping blocked",{
     kakaoTitleMappings:{"ab 가상":{...rememberedState.settings.kakaoTitleMappings["ab 가상"],
       ambiguous:true}}}
 },mappedWindows);
+
+// Manual grid application is tested against the unchanged TS oracle;
+// these cases cover assignment spans and preservation of old issue decisions.
+const manualOrder:any=copy(order);
+manualOrder.confirmedAt=undefined;
+manualOrder.pricesLocked=true;
+manualOrder.issueResolutions={
+  "issue:o1:r1:recipient:UNASSIGNED_EVIDENCE":{
+    resolution:"UNRESOLVED",resolutionSource:"가상 직원",updatedAt:now,evidence:"old"
+  }
+};
+const manualRows:any[]=copy(manualOrder.recipients);
+manualRows[0].sources=[{start:0,end:2,field:"name",targetId:"r1"}];
+manualRows[0].unassignedEvidence=[{start:0,end:2,kind:"product",text:"가상"}];
+manualRows[0].items[0].sources=[{start:2,end:4,field:"product",targetId:"item1"}];
+const manualModel:ManualModel={
+  rows:manualRows as any,
+  blocks:[
+    {id:"0:2",start:0,end:2,field:"name",targetId:"r1",text:"가상"} as any,
+    {id:"2:4",start:2,end:4,field:"product",targetId:"item1",text:"상품"} as any,
+  ],
+  assignments:{
+    "0:2":{recipientId:"r1",field:"name",value:"가상 수취인"},
+    "2:4":{recipientId:"r1",itemId:"item1",field:"product",value:"가상 상품"},
+  },
+};
+function manualCase(name:string,o:any,m:ManualModel,valid=true){
+  add("manual classification: "+name,"apply_manual_classification",{
+    action:"apply_manual",order:o,model:m,
+  },()=>({order:applyManual(o,m)}));
+  cases[cases.length-1].expectedOk=valid;
+}
+manualCase("final application rebuilds evidence and preserves source order",
+  manualOrder,manualModel);
+manualCase("missing quantity blocks application",manualOrder,{
+  ...manualModel,rows:manualModel.rows.map(r=>({...r,items:r.items.map(i=>({
+    ...i,quantity:null,quantityConfirmed:false
+  }))}))
+},false);
+manualCase("no shipment rows blocks application",manualOrder,{
+  ...manualModel,rows:[],
+},false);
+manualCase("confirmed reception blocks manual application",{
+  ...manualOrder,confirmedAt:now
+},manualModel,false);
+manualCase("no assignments keeps manual rows",manualOrder,{
+  ...manualModel,assignments:{},blocks:[]
+});
 
 const runner=spawnSync(rustBinary||"cargo",rustBinary?[]:[
   "run","--quiet","--manifest-path",
