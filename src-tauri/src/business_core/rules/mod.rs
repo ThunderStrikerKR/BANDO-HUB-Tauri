@@ -14,6 +14,7 @@ mod reception_operations;
 mod retail_operations;
 mod raw_corrections;
 mod reply_rules;
+mod manual_classification;
 mod client_change;
 mod factory_reply;
 mod legacy_migration;
@@ -94,6 +95,7 @@ pub fn execute(operation: &str, payload: Value) -> Result<Value, String> {
         "apply_raw_correction" => raw_corrections::apply(&payload),
         "apply_retail_action" => retail_operations::apply(&payload),
         "apply_reception_action" => reception_operations::apply(&payload),
+        "apply_manual_classification" => manual_classification::apply(&payload),
         "apply_correction_action" => correction_rules::apply(&payload),
         "apply_group_action" => group_operations::mutate(&payload),
         "delete_order" => order_mutations::delete_order(&payload),
