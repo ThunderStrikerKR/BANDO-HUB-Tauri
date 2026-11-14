@@ -7,6 +7,7 @@ mod automatic_request;
 mod automatic_full;
 mod settlement;
 mod corrections;
+mod factory_review;
 
 use serde_json::Value;
 
@@ -31,6 +32,7 @@ pub fn execute(operation: &str, payload: Value) -> Result<Value, String> {
         "render_automatic_message" => automatic_full::execute(&payload),
         "render_payment_notice" => automatic_full::payment_notice(&payload),
         "render_correction_summaries" => corrections::summaries(&payload),
+        "project_factory_reply_review" => factory_review::project(&payload),
         "decorate_automatic_copy" => automatic_full::decorate_copy(&payload),
         "payment_copy_status" => automatic_full::execute(&payload),
         "prepare_settlement" => settlement::prepare(
