@@ -5,6 +5,33 @@ use serde_json::{json, Value};
 use super::{field, has_value, req, required_str, rows, set, str_field};
 use std::collections::HashSet;
 
+// Exact single-cell quantity syntax from parser.ts::quantities and
+// manual-classification.ts::setManualValue. A draft can contain a partial
+// input, so invalid values yield null rather than an error.
+fn quantity_from_input(input: &str) -> Value {
+    let text = input.trim();
+    if text.is_empty() { return Value::Null; }
+    let integer = if !text.is_empty() && text.bytes().all(|b|b.is_ascii_digit()) {
+        text.parse::<i64>().ok()
+    } else {
+        let korean = [("하나",1),("둘",2),("셋",3),("다섯",5),
+            ("여섯",6),("일곱",7),("여덟",8),("아홉",9),
+            ("한",1),("두",2),("세",3),("네",4),("넷",4),("열",10),
+            ("일",1),("이",2),("삼",3),("사",4),("오",5),
+            ("육",6),("칠",7),("팔",8),("구",9),("십",10)];
+        let prefix = regex::Regex::new(r"(?i)^(\\d+|다섯|여섯|일곱|여덟|아홉|하나|둘|셋|넷|한|두|세|네|열|일|이|삼|사|오|육|칠|팔|구|십)\\s*(개|대|세트|ea|pcs)$").unwrap();
+        let multiplier = regex::Regex::new(r"^[x×*]\\s*(\\d+)$").unwrap();
+        if let Some(caps) = prefix.captures(text) {
+            let word = caps.get(1).unwrap().as_str();
+            word.parse::<i64>().ok().or_else(||korean.iter()
+                .find(|(spelling,_)|*spelling==word).map(|(_,count)|*count))
+        } else if let Some(caps) = multiplier.captures(text) {
+            caps.get(1).and_then(|m|m.as_str().parse::<i64>().ok())
+        } else { None }
+    };
+    integer.filter(|n|(1..=super::MAX_SAFE).contains(n))
+        .map_or(Value::Null, |n|json!(n))
+}
 fn valid_quantity(v: &Value) -> bool {
     v.as_i64().is_some_and(|q| (1..=super::MAX_SAFE).contains(&q))
 }
@@ -20,6 +47,12 @@ fn pending_quantity(model: &Value) -> bool {
 }
 pub(super) fn apply(payload: &Value) -> Result<Value, String> {
     let action = required_str(payload, "action")?;
+    if action == "parse_manual_quantity" {
+        let input = required_str(payload, "value")?;
+        let quantity = quantity_from_input(input);
+        return Ok(json!({"quantityConfirmed":!quantity.is_null(),
+            "quantity":quantity}));
+    }
     if action != "apply_manual" {
         return Err(format!("지원하지 않는 수동 분류 명령: {action}"));
     }
@@ -132,6 +165,16 @@ pub(super) fn apply(payload: &Value) -> Result<Value, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn parses_original_manual_quantity_tokens() {
+        for (input, expected) in [("3",json!(3)),(" 2 개 ",json!(2)),
+            ("세트",Value::Null),("한개",json!(1)),("세 세트",json!(3)),
+            ("× 7",json!(7)),("x 5",json!(5)),("10cm",Value::Null),
+            ("수량 2개",Value::Null),("0",Value::Null),("1.5",Value::Null),
+            ("",Value::Null)] {
+            assert_eq!(quantity_from_input(input),expected,"{input}");
+        }
+    }
     #[test]
     fn rejects_confirmed_and_missing_quantities() {
         let mut p=json!({"action":"apply_manual","order":{"id":"o","raw":"원문"},
