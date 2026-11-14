@@ -174,3 +174,21 @@ test("factory notifications and history use only native review status and exact 
   assert.match(rust, /fn requires_review\(/);
   assert.match(rust, /fn confirm\(/);
 });
+
+
+test("freight managers read tariff rule and current status from native Rust", () => {
+  const group = source("src/ShippingManager.tsx");
+  const product = source("src/ProductFreightPanel.tsx");
+  const adapter = source("src/useNativeShippingRead.ts");
+  const rust = source("src-tauri/src/business_core/rules/shipping_read.rs");
+  for (const ui of [group, product]) {
+    assert.match(ui, /useNativeShippingRead\(/);
+    assert.doesNotMatch(ui, /combinationCurrent\(/);
+    assert.doesNotMatch(ui, /effectiveShippingRule\(/);
+    assert.doesNotMatch(ui, /editableShippingRule\(/);
+  }
+  assert.match(adapter, /"rules", "shipping_read"/);
+  assert.match(adapter, /snapshot\?\.state === state/);
+  assert.match(rust, /fn current_combo\(/);
+  assert.match(rust, /fn edit_rule\(/);
+});
