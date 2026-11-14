@@ -13,6 +13,7 @@ import { businessCoreCall } from "../tauri-bridge";
 import { useNativeWorkflowReconcile } from "./useNativeWorkflowReconcile";
 import { useNativeWorkflowBoard } from "./useNativeWorkflowBoard";
 import { useNativeOrderPreview } from "./useNativeOrderPreview";
+import { useNativeOrderIssues } from "./useNativeOrderIssues";
 import { applyRustReceptionAnalysis, assertRustReceptionAnalysis, receptionAnalysisAllowed } from "./rust-reception";
 import { registeredProducts, sortProducts } from "../product-models";
 import { billingSnapshot } from "../replies";
@@ -108,7 +109,8 @@ export function useOrderDesk({
   const flowReady = nativeFlow.ready;
   const nativeBoard = useNativeWorkflowBoard(flowState);
   const nativeOrder = useNativeOrderPreview(flowState, draft, flowReady);
-  const flowSummaryReady = flowReady && nativeBoard.ready && nativeOrder.ready;
+  const nativeIssues = useNativeOrderIssues(draft);
+  const flowSummaryReady = flowReady && nativeBoard.ready && nativeOrder.ready && nativeIssues.ready;
   const flowGroups = (flowState.workflow?.groups ?? []).filter((g) =>
     groupShipments(flowState, g.id).some((s) => s.orderId === draft.id),
   );
@@ -433,7 +435,7 @@ export function useOrderDesk({
       ? []
       : flowGroups.length
         ? flowGroups.flatMap((g) => nativeBoard.byId[g.id]?.issues ?? [])
-        : nativeOrder.result?.issues ?? [];
+        : nativeIssues.issues;
   const staffBlocks: StaffBlock[] = allBlocks
     .filter((b, i, a) => a.findIndex((x) => x.issueId === b.issueId) === i)
     .map((b) => {
@@ -652,7 +654,7 @@ export function useOrderDesk({
     flowState,
     flowReady,
     flowSummaryReady,
-    flowSummaryError: nativeFlow.error || nativeBoard.error || nativeOrder.error,
+    flowSummaryError: nativeFlow.error || nativeBoard.error || nativeOrder.error || nativeIssues.error,
     orderPreview: nativeOrder.result,
     setProductSearch,
     edit,
