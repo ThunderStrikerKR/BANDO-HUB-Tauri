@@ -14,12 +14,10 @@ import { won } from "./domain";
 
 import { internalModel } from "./matching";
 import { useOrderDesk, type OrderDeskProps } from "./orders/useOrderDesk";
-import { nativeConfirmProposedProduct, nativeRepriceEditedOrder, nativeReconcileWorkflow } from "./orders/native-rules";
+import { nativeBillingSnapshot, nativeClientChangeIssue, nativeConfirmProposedProduct, nativeRepriceEditedOrder, nativeReconcileWorkflow } from "./orders/native-rules";
 import { businessCoreCall } from "./tauri-bridge";
 import { addressParts } from "./parser";
-import { billingSnapshot } from "./replies";
 import { Field, clone } from "./ui";
-import { clientChangeIssue } from "./workflow";
 export function OrderDesk(props: OrderDeskProps) {
   const [changeRequest, setChangeRequest] = useState<string>();
   const {
@@ -152,24 +150,29 @@ export function OrderDesk(props: OrderDeskProps) {
               onOrder={onChange}
               onDealer={async (c) => {
                 if (c.id === draft.clientId) return;
-                const issue = clientChangeIssue(state, draft, c.id);
+                const issue = await nativeClientChangeIssue(state, draft, c.id);
                 if (issue) throw Error(issue);
                 if (exported || draft.deletedAt)
                   throw Error("완료 / 삭제된 주문의 거래처는 변경할 수 없습니다.");
-                const next = await nativeRepriceEditedOrder(
-                  {
-                    ...clone(draft),
-                    clientId: c.id,
-                    clientSnapshot: clone(c),
-                    pricesLocked: false,
-                    notified: false,
-                    paid: false,
-                    postpaidApproved: false,
-                    status: "REVIEW",
-                  },
-                  c,
-                  state,
-                );
+                const [next, snapshot] = await Promise.all([
+                  nativeRepriceEditedOrder(
+                    {
+                      ...clone(draft),
+                      clientId: c.id,
+                      clientSnapshot: clone(c),
+                      pricesLocked: false,
+                      notified: false,
+                      paid: false,
+                      postpaidApproved: false,
+                      status: "REVIEW",
+                    },
+                    c,
+                    state,
+                  ),
+                  draft.pricesLocked
+                    ? nativeBillingSnapshot(draft, state, "거래처 변경")
+                    : Promise.resolve(undefined),
+                ]);
                 // Async native decisions must not apply to another selected
                 // draft or a newly received catalog / persisted revision.
                 if (!isCurrentOrderInput(draft, state))
@@ -177,7 +180,7 @@ export function OrderDesk(props: OrderDeskProps) {
                 if (draft.pricesLocked)
                   next.billingHistory = [
                     ...(next.billingHistory ?? []),
-                    billingSnapshot(draft, state, "거래처 변경"),
+                    snapshot!,
                   ];
                 next.updatedAt = new Date().toISOString();
                 if (saved) await onWorkflowSave(await nativeReconcileWorkflow(state, next));
