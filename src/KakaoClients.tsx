@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { NoticeSink } from "./shared/notices";
-import { rememberTitle, titleCandidates, titleKey } from "./title-clients";
+import { titleCandidates, titleKey } from "./title-clients";
+import { nativeRememberTitle } from "./native-title-clients";
 import type { DockWindow, Order, State, Client } from "./types";
 import { Modal } from "./ui";
 export function KakaoClients({
@@ -38,7 +39,7 @@ export function KakaoClients({
     try {
       if (chat)
         await onSave(
-          rememberTitle(
+          await nativeRememberTitle(
             state,
             windows,
             chat.handle,
