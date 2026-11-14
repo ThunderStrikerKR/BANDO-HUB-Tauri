@@ -121,15 +121,9 @@ export function OrderItemEditor({
 
   const choose = (candidate: Product) => {
     if (locked || pricePending) return;
-    if (candidate.variants.length !== 1 || candidate.requiresOption) {
-      setSelectionError(candidate.requiresOption
-        ? "상품 구성이 미확정입니다. 등록된 독립 상품을 선택하세요."
-        : "가격 기록이 여러 개입니다. 상품 데이터를 확인하세요.");
-      return;
-    }
     setSelectionError("");
-    if (candidate.id === item.productId &&
-        candidate.variants[0].id === item.variantId) {
+    if (candidate.id === item.productId && candidate.variants.length === 1 &&
+        !candidate.requiresOption && candidate.variants[0].id === item.variantId) {
       selectedPriceRequest.current++;
       setDraft(structuredClone(item));
       return;
@@ -140,11 +134,11 @@ export function OrderItemEditor({
     // An existing item keeps its identity, quantity and original evidence.
     void businessCoreCall<{ item: Item }>("rules", "create_catalog_item", {
       product: candidate, client, newItemId: item.id,
-      variantId: candidate.variants[0].id, color: candidate.variants[0].color,
+      variantId: candidate.variants[0]?.id, color: candidate.variants[0]?.color,
       quantity: item.quantity,
     }).then(({ item: nativeItem }) => {
       if (request !== selectedPriceRequest.current) return;
-      if (!nativeItem.variantId) throw Error("등록된 독립 상품을 다시 선택하세요.");
+      if (!nativeItem.variantId) throw Error(nativeItem.issues[0] ?? "등록된 독립 상품을 다시 선택하세요.");
       setDraft({
         ...nativeItem, id: item.id, raw: item.raw, sources: item.sources,
         quantity: item.quantity, quantityConfirmed: item.quantityConfirmed,
