@@ -157,3 +157,20 @@ test("manual classification final approved order is produced by native Rust, nev
   assert.match(rust, /fn synchronize\(order:&mut Value\)/);
   assert.match(dispatcher, /"apply_manual_classification" => manual_classification::apply/);
 });
+
+
+test("factory notifications and history use only native review status and exact confirmation copy", () => {
+  const notice = source("src/FactoryNotifications.tsx");
+  const history = source("src/FactoryReplyHistory.tsx");
+  const adapter = source("src/useNativeFactoryReplyReview.ts");
+  const rust = source("src-tauri/src/business_core/output/factory_review.rs");
+  for (const component of [notice, history]) {
+    assert.match(component, /useNativeFactoryReplyReview\(state\)/);
+    assert.doesNotMatch(component, /replyNeedsReview\(/);
+    assert.doesNotMatch(component, /factoryConflictConfirmation\(/);
+  }
+  assert.match(adapter, /"output", "project_factory_reply_review"/);
+  assert.match(adapter, /resolved\?\.state === state/);
+  assert.match(rust, /fn requires_review\(/);
+  assert.match(rust, /fn confirm\(/);
+});
