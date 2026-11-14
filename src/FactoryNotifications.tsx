@@ -1,5 +1,5 @@
-import { replyNeedsReview } from "./factory-replies";
-import { factoryConflictConfirmation } from "./factory-conflict-review";
+import { useNativeFactoryReplyReview } from "./useNativeFactoryReplyReview";
+
 import { confirmAction } from "./dialogs";
 import { useState } from "react";
 import type { State } from "./types";
@@ -17,11 +17,12 @@ export function FactoryNotifications({
   onRefresh: () => Promise<void>;
 }) {
   const [error, setError] = useState("");
+  const { records: reviewRecords, error: reviewError } = useNativeFactoryReplyReview(state);
   return (
     <Modal title="공장 회신 알림" onClose={onClose}>
-      <p role="alert" className="form-error">
-        {error}
-      </p>
+      {(error || reviewError) && <p role="alert" className="form-error">
+        {error || reviewError}
+      </p>}
       <div className="factory-notifications">
         {!state.factoryReplies?.length && (
           <p>공장 회신 내역이 없습니다. 공장 목록의 엑셀 작성 이력에서 회신 파일을 업로드하세요.</p>
@@ -33,11 +34,8 @@ export function FactoryNotifications({
             <article key={record.id}>
               <h3>
                 {record.filename} / {" "}
-                {!replyNeedsReview(state, record)
-                  ? "반영 완료"
-                  : record.status === "PARTIAL"
-                    ? "일부 반영"
-                    : "직원 확인 필요"}
+                {reviewRecords?.find((entry) => entry.id === record.id)?.notificationLabel ??
+                  (reviewError ? "회신 상태 조회 실패" : "회신 상태 조회 중")}
               </h3>
               <small>
                 {record.businessDate} / {new Date(record.at).toLocaleString("ko-KR")}
@@ -60,17 +58,15 @@ export function FactoryNotifications({
                       ? `${row.tracking} / 실제 운임 ${won(row.actual)}`
                       : row.issue || "직원 확인 필요"}
                   </p>
-                  {!row.applied &&
-                    row.shipmentId &&
-                    row.issue?.includes("충돌") &&
-                    !state.factoryReplies?.some(
-                      (r) => r.resolves?.id === record.id && r.resolves.row === row.row,
-                    ) && (
+                  {!!reviewRecords?.find((entry) => entry.id === record.id)
+                    ?.rows.find((entry) => entry.row === row.row)?.confirmation && (
                       <button
                         onClick={async () => {
                           if (
                             !(await confirmAction(
-                              factoryConflictConfirmation(state, record.id, row.row),
+                              reviewRecords?.find((entry) => entry.id === record.id)
+                                ?.rows.find((entry) => entry.row === row.row)?.confirmation ??
+                                "정정할 회신 행을 확인하세요.",
                             ))
                           )
                             return;
