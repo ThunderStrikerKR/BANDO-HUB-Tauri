@@ -13,6 +13,7 @@ mod correction_rules;
 mod reception_operations;
 mod kakao_title;
 mod manual_classification;
+mod message_template_validation;
 mod retail_operations;
 mod raw_corrections;
 mod reply_rules;
@@ -97,6 +98,7 @@ pub fn execute(operation: &str, payload: Value) -> Result<Value, String> {
         "apply_retail_action" => retail_operations::apply(&payload),
         "apply_reception_action" => reception_operations::apply(&payload),
         "apply_manual_classification" => manual_classification::apply(&payload),
+        "validate_automatic_templates" => message_template_validation::validate(&payload),
         "remember_kakao_title_client" | "remembered_kakao_title_client" =>
             kakao_title::execute(operation, &payload),
         "apply_correction_action" => correction_rules::apply(&payload),
