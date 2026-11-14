@@ -10,7 +10,7 @@
 import { spawnSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { resolvePrice, totals, parseOrder, repriceOrder } from "../../../../src/domain.ts";
+import { resolvePrice, totals, parseOrder, repriceOrder, itemFromProduct } from "../../../../src/domain.ts";
 import {
   recommendShipping,
   editableShippingRule,
@@ -3471,6 +3471,40 @@ templateValidationCase("multiple invalid errors preserve input order",{
 templateValidationCase("valid numeric account placeholders",{
   paymentAccount:"{은행명} {계좌번호} {예금주} 안내드립니다."
 });
+
+// The current React chosen-item path no longer calls TS itemFromProduct.
+// Compare the full constructed order item, including color, name, defaulted,
+// issue list, origin and price, against the original TS constructor.
+function catalogItemCase(name:string,p:any,c:any,quantity:any,vid?:string,color?:string){
+  const id="new-catalog-item-"+name.replace(/\s+/g,"-");
+  const payload:any={product:p,client:c,newItemId:id,quantity};
+  if(vid!==undefined)payload.variantId=vid;
+  if(color!==undefined)payload.color=color;
+  add("catalog item: "+name,"create_catalog_item",payload,
+    ()=>({item:deterministicIds([id],()=>itemFromProduct(p,c,color,quantity,vid))}));
+}
+catalogItemCase("single registered option",copy(product),copy(client),2,"v1");
+catalogItemCase("no option id uses default",copy(product),copy(client),null);
+catalogItemCase("explicit color preserves selected option",copy(product),copy(client),3,"v1","Black");
+catalogItemCase("unknown explicit variant",copy(product),copy(client),4,"absent");
+catalogItemCase("unresolved source configuration",{
+  ...copy(product),requiresOption:true
+},copy(client),null,"v1");
+catalogItemCase("two variants are not independently selectable",{
+  ...copy(product),variants:[...copy(product.variants),{...copy(product.variants[0]),id:"v2",color:"White"}]
+},copy(client),1,"v1");
+catalogItemCase("demo product label",{
+  ...copy(product),variants:[{...copy(product.variants[0]),source:"DEMO"}]
+},copy(client),1,"v1");
+catalogItemCase("missing default color warning",{
+  ...copy(product),colorStatus:"MISSING",defaultColor:"색상 미표기"
+},copy(client),1,"v1");
+catalogItemCase("special tier override",copy(product),{
+  ...copy(client),tier:"special",overrides:{"v1":18900}
+},5,"v1");
+catalogItemCase("catalog label and price absence",{
+  ...copy(product),catalog:"OFFICIAL",variants:[{...copy(product.variants[0]),wholesale:null}]
+},copy(client),1,"v1");
 
 const runner=spawnSync(rustBinary||"cargo",rustBinary?[]:[
   "run","--quiet","--manifest-path",
