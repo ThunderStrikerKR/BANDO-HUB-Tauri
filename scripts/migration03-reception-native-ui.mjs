@@ -198,6 +198,94 @@ try{
     };
   });
 
+  if (process.env.BANDO_P1P2_AUDIT === "true") {
+    // This branch builds the *exact HEAD binary* and tests these same Rust
+    // commands through its actual Windows WebView2 Tauri IPC, not fake JS.
+    await page.getByRole("button",{name:"운임 관리",exact:true}).click();
+    await page.locator(".shipping-product-list").waitFor({timeout:60000});
+    await page.waitForFunction(()=>
+      (window.__bandoNativeCalls||[]).some(call=>
+        call.command==="business_core_call"&&call.domain==="rules"&&
+        call.operation==="product_freight_view"),null,{timeout:60000});
+    await snap(page,"04-native-p1p2-product-freight");
+    const probes=await page.evaluate(async()=>{
+      const call=(operation,payload)=>window.__TAURI_INTERNALS__.invoke(
+        "business_core_call",{domain:"rules",operation,payload});
+      const before=await window.bando.load();
+      const product={
+        id:"p1-probe",name:"BD 709",origin:"FACTORY",defaultColor:"Black",
+        shippingGroupId:"probe-group",variants:[{
+          id:"v1",color:"Black",wholesale:30000,retail:40000,semi:35000
+        }]
+      };
+      const client={id:"dealer-probe",tier:"wholesale"};
+      const shipping={
+        epoch:1,groups:[{id:"probe-group",name:"가상 운임 그룹",history:[],
+          current:{version:"v1",at:"2026-11-15T00:00:00Z",
+            fees:{"1":null},perItem:3000,maxBundle:1,maxConfirmed:true,notes:"검수"} }],
+        productRules:{},combinations:[]
+      };
+      const state={
+        products:[product],shipping,
+        settings:{provisionalProductNotices:{"p1-probe":"가상 안내문"}},
+        factoryReplies:[
+          {id:"review-1",rows:[{row:5,applied:false}]},
+          {id:"review-resolution",resolves:{id:"review-1",row:5},
+            rows:[{row:5,applied:true}]}
+        ]
+      };
+      const item=await call("create_catalog_item",{
+        product,client,newItemId:"native-probe-item",variantId:"v1",
+        color:"Black",quantity:1});
+      if(item.item?.unitPrice!==30000||item.item?.variantId!=="v1"){
+        throw Error("Native catalog item creation is inconsistent");
+      }
+      const freight=await call("product_freight_view",{state});
+      if(freight.byProduct?.["p1-probe"]?.group?.id!=="probe-group"||
+        freight.byProduct?.["p1-probe"]?.editableRule?.fees?.["1"]!==3000){
+        throw Error("Native effective/editable freight projection is inconsistent");
+      }
+      const review=await call("factory_reply_review_details",{state});
+      const original=review.reviews.find(x=>x.id==="review-1");
+      if(original?.needsReview!==false||original?.rows?.[0]?.resolved!==true){
+        throw Error("Native factory row resolution failed");
+      }
+      const allowed=await call("validate_provisional_notices",{state});
+      if(allowed.valid!==true)throw Error("Native provisional notice validation failed");
+      let invalidRejected=false;
+      try {
+        await call("validate_provisional_notices",{state:{
+          ...state,settings:{provisionalProductNotices:{"missing-product":"안내"}}
+        }});
+      } catch {invalidRejected=true;}
+      if(!invalidRejected)throw Error("Native notice validator allowed unknown product");
+      const reset=await call("apply_shipping_action",{
+        action:"start_new_rule",shipping,groupId:"probe-group",productId:"p1-probe",
+        versionId:"v2",now:"2026-11-15T01:00:00Z"
+      });
+      if(reset.shipping?.groups?.[0]?.current?.version!=="v2"||
+        reset.shipping?.groups?.[0]?.history?.[0]?.version!=="v1"||
+        shipping.groups[0].current.version!=="v1"){
+        throw Error("Native freight change did not preserve previous tariff");
+      }
+      const after=await window.bando.load();
+      if(after.revision!==before.revision||
+        JSON.stringify(after.orders)!==JSON.stringify(before.orders)){
+        throw Error("Pure P1/P2 Rust probes changed persisted test orders");
+      }
+      return {itemPrice:item.item.unitPrice,
+        effectiveFee:freight.byProduct["p1-probe"].editableRule.fees["1"],
+        historicalTariff:reset.shipping.groups[0].history[0].version,
+        savedTariff:reset.shipping.groups[0].current.version,
+        resolvedFactoryRow:original.rows[0].resolved,
+        noticeValidated:allowed.valid,invalidNoticeRejected:invalidRejected,
+        databaseRevisionUnchanged:true};
+    });
+    record("real Windows EXE P1/P2 business rules, native IPC and SQLite preservation",probes);
+    await page.getByRole("button",{name:"접수",exact:true}).click();
+    await page.locator(".source-pane").waitFor({timeout:60000});
+  }
+
   const raw=[
     "김가상","010-1234-5678","경기도 의정부시 시민로 100",
     "709 2개","박가상","010-2345-6789",
