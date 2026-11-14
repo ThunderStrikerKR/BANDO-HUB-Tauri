@@ -92,7 +92,7 @@ test("unconfirmed reception removal uses compiled Rust before atomic SQLite save
   const app = source("src/app/useAppModel.ts");
   const nativeReception = source("src-tauri/src/business_core/rules/reception_operations.rs");
   assert.match(app, /"rules", "apply_reception_action"/);
-  assert.match(app, /action: "persisted_reception_state", before: state!, state: next/);
+  assert.match(app, /action: "persisted_reception_state", before: state!, state: billed/);
   assert.match(app, /if \(sameValue\(persistent, state\)\)/);
   assert.match(app, /const committed = await window\.bando!\.save\(persistent\)/);
   assert.doesNotMatch(app, /persistedReceptionState\(state!, next\)/);
@@ -126,4 +126,21 @@ test("Kakao title-to-client decisions are Rust-owned in both UI entrypoints", ()
   assert.match(adapter, /"catalog_clients", "remembered_title_client"/);
   assert.match(native, /"remember_title_client"=>remember\(payload\)/);
   assert.match(reception, /autoInput\.current\.state !== state/);
+});
+
+
+test("order edit history is frozen natively at commit without delaying controlled inputs", () => {
+  const app = source("src/app/useAppModel.ts");
+  const desk = source("src/orders/useOrderDesk.tsx");
+  const rust = source("src-tauri/src/business_core/rules/reply_rules.rs");
+  const dispatcher = source("src-tauri/src/business_core/rules/mod.rs");
+  assert.match(desk, /next\.pendingBillingSnapshot = \{/);
+  assert.match(desk, /at: new Date\(\)\.toISOString\(\), reason/);
+  assert.doesNotMatch(desk, /billingSnapshot\(previous, state, reason\)/);
+  assert.match(app, /"rules", "finalize_billing_history", \{ before: state!, state: next \}/);
+  assert.match(app, /state: billed/);
+  assert.match(rust, /pub\(super\) fn finalize_billing_history/);
+  assert.match(rust, /object\.remove\("pendingBillingSnapshot"\)/);
+  assert.match(rust, /let snapshot=billing\(previous,before,reason,at\)/);
+  assert.match(dispatcher, /"finalize_billing_history" => reply_rules::finalize_billing_history/);
 });
