@@ -47,7 +47,8 @@ function add(label, change = () => {}) {
   }
   cases.push({
     label, operation: "apply_manual_classification",
-    payload: { order, model, assignmentOrder: Object.keys(model.assignments) },
+    payload: { action: "apply_manual", order, model,
+      assignmentOrder: Object.keys(model.assignments) },
     expected,
   });
 }

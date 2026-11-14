@@ -922,6 +922,7 @@ export function ManualClassification({
                 void businessCoreCall<{ order: Order }>(
                   "rules", "apply_manual_classification", {
                     action: "apply_manual", order: submittedOrder, model: submittedModel,
+                    assignmentOrder: Object.keys(submittedModel.assignments),
                   },
                 ).then(({ order: prepared }) => {
                   if (latestInputs.current.order !== submittedOrder ||

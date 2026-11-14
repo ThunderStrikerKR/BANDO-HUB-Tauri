@@ -151,8 +151,8 @@ test("manual classification final approved order is produced by native Rust, nev
   const rust = source("src-tauri/src/business_core/rules/manual_classification.rs");
   const dispatcher = source("src-tauri/src/business_core/rules/mod.rs");
   assert.match(manual, /"rules", "apply_manual_classification"/);
-  assert.match(manual, /assignmentOrder: Object\.keys\(model\.assignments\)/);
-  assert.match(manual, /onApply\(finalized\)/);
+  assert.match(manual, /assignmentOrder: Object\.keys\(submittedModel\.assignments\)/);
+  assert.match(manual, /onApply\(prepared\)/);
   assert.doesNotMatch(manual, /onApply\(applyManual\(/);
   assert.match(rust, /fn synchronize\(order:&mut Value\)/);
   assert.match(dispatcher, /"apply_manual_classification" => manual_classification::apply/);
@@ -180,18 +180,21 @@ test("freight managers read tariff rule and current status from native Rust", ()
   const product = source("src/ProductFreightPanel.tsx");
   const adapter = source("src/useNativeShippingRead.ts");
   const rust = source("src-tauri/src/business_core/rules/shipping_read.rs");
+  const rules = source("src-tauri/src/business_core/rules/shipping.rs");
+  assert.match(group, /useNativeShippingRead\(effectiveState\)/);
+  assert.match(product, /action: "product_freight_view", state/);
+  assert.match(product, /action: "reset_product_freight_rule", state/);
   for (const ui of [group, product]) {
-    assert.match(ui, /useNativeShippingRead\(/);
-    assert.doesNotMatch(ui, /combinationCurrent\(/);
-    assert.doesNotMatch(ui, /effectiveShippingRule\(/);
-    assert.doesNotMatch(ui, /editableShippingRule\(/);
+    assert.doesNotMatch(ui, /\bcombinationCurrent\(/);
+    assert.doesNotMatch(ui, /\beffectiveShippingRule\(/);
+    assert.doesNotMatch(ui, /\beditableShippingRule\(/);
   }
   assert.match(adapter, /"rules", "shipping_read"/);
   assert.match(adapter, /snapshot\?\.state === state/);
   assert.match(rust, /fn current_combo\(/);
   assert.match(rust, /fn edit_rule\(/);
+  assert.match(rules, /"product_freight_view" =>/);
 });
-
 
 test("OCR, pasted and cleared reception drafts use Rust, never the old TS reducer", () => {
   const component = source("src/SourceDocument.tsx");
@@ -207,9 +210,11 @@ test("OCR, pasted and cleared reception drafts use Rust, never the old TS reduce
 
 test("global factory alert badge is native and ignores stale reply projections", () => {
   const app = source("src/App.tsx");
-  const hook = source("src/useNativeFactoryReplyReview.ts");
-  assert.match(app, /useNativeFactoryReplyReview\(state\)/);
-  assert.match(app, /factoryReview\.records\?\.filter\(\(record\) => record\.needsReview\)/);
+  const native = source("src-tauri/src/business_core/rules/factory_reply.rs");
+  assert.match(app, /"rules", "factory_reply_review_statuses"/);
+  assert.match(app, /nativeReviewCount\?\.state === state/);
+  assert.match(app, /reviews\.filter\(\(r\) => r\.needsReview\)\.length/);
   assert.doesNotMatch(app, /replyNeedsReview\(state, r\)/);
-  assert.match(hook, /state && resolved\?\.state === state/);
+  assert.doesNotMatch(app, /state\.factoryReplies\?\.length \?\? 0/);
+  assert.match(native, /fn review_list\(/);
 });
