@@ -43,6 +43,7 @@ export function ManualClassification({
   onNotice: NoticeSink;
 }) {
   const [model, setModel] = useState(() => initialManual(order));
+  const manualQuantityRequest = useRef<Record<string, number>>({});
   const latestInputs = useRef({ order, model });
   latestInputs.current = { order, model };
   const initial = useRef(JSON.stringify(model));
@@ -484,14 +485,34 @@ export function ManualClassification({
             return;
           }
           if (cell.field === "quantity") {
+            const request = (manualQuantityRequest.current[key] ?? 0) + 1;
+            manualQuantityRequest.current[key] = request;
             setQuantityText((old) => ({ ...old, [key]: value }));
-            const next = setManualValue(model, cell, value, state, order);
-            next.rows
-              .find((row) => row.id === cell.recipientId)!
-              .items.find((item) => item.id === cell.itemId)!.quantityConfirmed = false;
             if (!pendingRef.current) beforeProduct.current = frame();
-            setModel(next);
             setPending(cell);
+            // Incomplete typing is a valid draft; only Rust interprets the quantity.
+            void businessCoreCall<{ quantity: number | null; quantityConfirmed: boolean }>(
+              "rules", "apply_manual_classification", {
+                action: "parse_manual_quantity", value,
+              },
+            ).then(({ quantity }) => {
+              if (manualQuantityRequest.current[key] !== request ||
+                  latestInputs.current.order !== order) return;
+              setModel((current) => {
+                const next = structuredClone(current);
+                const item = next.rows.find((row) => row.id === cell.recipientId)
+                  ?.items.find((item) => item.id === cell.itemId);
+                if (!item) return current;
+                item.quantity = quantity;
+                item.quantityConfirmed = false;
+                delete item.quantityApproval;
+                item.issues = item.issues.filter((issue) => !issue.includes("수량"));
+                return next;
+              });
+            }).catch((e) => {
+              if (manualQuantityRequest.current[key] === request)
+                fail(e instanceof Error ? e.message : String(e), cell);
+            });
             return;
           }
           attempt(() => setModel(setManualValue(model, cell, value, state, order)), cell);
