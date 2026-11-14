@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { customerModel } from "./matching";
+import { requestMessageSpans } from "./request-message-links";
 import type { Order, SourceSpan } from "./types";
 export const LinkContext = createContext<{
   active: string;
@@ -31,7 +32,8 @@ export function Linked({ linkKey, children }: { linkKey: string; children: React
     </div>
   );
 }
-export function messageSpans(text: string, order: Order) {
+export function messageSpans(text: string, order: Order, phase: "request" | "payment" = "payment") {
+  if (phase === "request") return requestMessageSpans(text, order);
   const spans: SourceSpan[] = [];
   const add = (value: string, key: string, field: string, rid?: string) => {
     if (!value.trim()) return;
@@ -143,7 +145,10 @@ export function LinkedText({
   editingRequested?: boolean;
 }) {
   const c = useContext(LinkContext),
-    [editing, setEditing] = useState(!text);
+    // Rust-generated request text arrives asynchronously. If the initial
+    // empty placeholder opened a textarea, the later response would stay in
+    // edit mode and never render hoverable linked spans until blur.
+    [editing, setEditing] = useState(!text && !directEdit);
   const wrapper = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!c.active || editing) return;
@@ -209,7 +214,7 @@ export function LinkedText({
   return (
     <div ref={wrapper} className={"linked-text-editor" + (directEdit ? " direct-edit" : "")}>
       <div className="text-edit-tools">
-        {!readOnly && !directEdit && (
+        {!readOnly && (directEdit ? editing : true) && (
           <button
             className="text-button"
             onMouseDown={(e) => e.preventDefault()}

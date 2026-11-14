@@ -122,11 +122,12 @@ export function MessageWorkspace({
       </header>
       <div className="stage-message-preview">
         <LinkedText
+          key={order.id + ":" + (gid ?? "") + ":" + (request ? "request" : "payment")}
           readOnly={!request}
           directEdit={request}
           label="복사용 자동 메시지 본문"
           text={text}
-          spans={messageSpans(text, order)}
+          spans={messageSpans(text, order, request ? "request" : "payment")}
           onChange={(value) => {
             if (gid && request) {
               // Optional links belong to the copy preview, not the editable request draft.
