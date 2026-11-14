@@ -304,7 +304,7 @@ test("real Rust approve_missing_quantity flows to one exact copyable 1-item noti
   live.forEach(result=>assert.equal(result.ok,true,JSON.stringify(result)));
   assert.equal(live[0].value.phase,"payment");
   assert.equal(live[1].value.phase,"payment");
-  const note=\`김민수님 \${customerModel("BD 709")} 상품은 수량을 1개로 보내드리겠습니다.\`;
+  const note=`김민수님 ${customerModel("BD 709")} 상품은 수량을 1개로 보내드리겠습니다.`;
   for(const result of live){
     const message=result.value.text??result.value.payment;
     assert.equal(message.split(note).length-1,1,
@@ -329,7 +329,7 @@ test("real Rust approve_missing_quantity flows to one exact copyable 1-item noti
     ["actual quantity confirmed",modified,"payment"],
   ]){
     const actual=compiledOutput([copyRequest(state)])[0];
-    assert.equal(actual.ok,true,\`\${name}: \${JSON.stringify(actual)}\`);
+    assert.equal(actual.ok,true,`${name}: ${JSON.stringify(actual)}`);
     assert.equal(actual.value.phase,phase,name);
     assert.equal(actual.value.text,automaticMessage(state,gid).text,name);
     assert.doesNotMatch(actual.value.text,/수량을 1개로 보내드리겠습니다/,
@@ -362,7 +362,7 @@ test("provisional quantity notice respects custom template, other blockers and m
     id:"ship2",recipientId:"r2",charges:{FACTORY:4000},
   });
   const message=compiledOutput([copyRequest(state),copyRequest(state,true) ]);
-  const note=\`김민수님 \${customerModel("BD 709")} 1개 발송 예정으로 안내드립니다.\`;
+  const note=`김민수님 ${customerModel("BD 709")} 1개 발송 예정으로 안내드립니다.`;
   for(let i=0;i<message.length;i++){
     const output=message[i];
     assert.equal(output.ok,true,JSON.stringify(output));
