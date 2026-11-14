@@ -44,6 +44,7 @@ export function ManualClassification({
 }) {
   const [model, setModel] = useState(() => initialManual(order));
   const manualQuantityRequest = useRef<Record<string, number>>({});
+  const manualTextRequest = useRef<Record<string, number>>({});
   const manualQuantityPending = useRef<Set<string>>(new Set());
   const latestInputs = useRef({ order, model });
   latestInputs.current = { order, model };
@@ -460,7 +461,7 @@ export function ManualClassification({
         ? (entry[key] ?? manualValue(model, cell))
         : cell.field === "quantity"
           ? (quantityText[key] ?? manualValue(model, cell))
-          : manualValue(model, cell);
+          : (entry[key] ?? manualValue(model, cell));
     const input = (
       <input
         data-cell={key}
@@ -521,6 +522,39 @@ export function ManualClassification({
                 manualQuantityPending.current.delete(key);
                 fail(e instanceof Error ? e.message : String(e), cell);
               }
+            });
+            return;
+          }
+          if (["name", "phone", "mobile", "note"].includes(cell.field)) {
+            const request = (manualTextRequest.current[key] ?? 0) + 1;
+            manualTextRequest.current[key] = request;
+            setEntry((old) => ({ ...old, [key]: value }));
+            void businessCoreCall<{ model: ManualModel }>(
+              "rules", "apply_manual_classification", {
+                action: "set_manual_recipient_field", model, cell, value,
+              },
+            ).then(({ model: updated }) => {
+              if (manualTextRequest.current[key] !== request ||
+                  latestInputs.current.order !== order) return;
+              const changed = updated.rows.find((row) => row.id === cell.recipientId);
+              if (!changed) throw Error("배송 행을 선택하세요.");
+              setModel((current) => {
+                const next = structuredClone(current);
+                const row = next.rows.find((row) => row.id === cell.recipientId);
+                if (!row) return current;
+                const field = cell.field as "name" | "phone" | "mobile" | "note";
+                row[field] = changed[field];
+                row.confirmedFields = [...new Set([...(row.confirmedFields ?? []), field])];
+                return next;
+              });
+              setEntry((old) => {
+                const next = { ...old };
+                delete next[key];
+                return next;
+              });
+            }).catch((e) => {
+              if (manualTextRequest.current[key] === request)
+                fail(e instanceof Error ? e.message : String(e), cell);
             });
             return;
           }
