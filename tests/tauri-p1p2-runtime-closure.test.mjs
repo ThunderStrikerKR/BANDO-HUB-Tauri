@@ -27,6 +27,8 @@ test("registered item creation in independent and retail order editors is native
     assert.doesNotMatch(source, /\bitemFromProduct\(/);
   }
   assert.match(retail, /quantityConfirmed: false, unitPrice: null/);
+  assert.match(retail, /alive\.current = true;\s*return \(\) => \{ alive\.current = false; \}/);
+  assert.match(retail, /setOrder\(\(previous\) => \(\{/);
   assert.match(editor, /if \(!catalogItem\.variantId\)/);
 });
 
