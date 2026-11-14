@@ -10,7 +10,7 @@ import { KakaoClients } from "./KakaoClients";
 import { LinkedText } from "./LinkedText";
 import { ClientPicker, TierBadge } from "./ManagementUI";
 import { confirmAction } from "./dialogs";
-import { replaceReception } from "./orders/reception";
+import { businessCoreCall } from "./tauri-bridge";
 import type { NoticeSink } from "./shared/notices";
 import { rememberedTitleClient } from "./title-clients";
 import type { Client, DockWindow, OcrCapture, Order, State } from "./types";
@@ -135,6 +135,15 @@ export function SourceDocument({
       }
     }
   };
+  const nativeReplaceReception = async (source: Order, raw: string): Promise<Order> => {
+    const { order: replaced } = await businessCoreCall<{ order: Order }>(
+      "rules", "apply_reception_action", {
+        action: "replace_reception", order: source, raw,
+        now: new Date().toISOString(),
+      },
+    );
+    return replaced;
+  };
   const applyOcr = async (edited: string, mode: "replace" | "append") => {
     if (formal || pending.current || !ocrResult) return;
     const cleaned = edited.trim();
@@ -150,12 +159,22 @@ export function SourceDocument({
     if (mode === "replace" && text.trim() && raw !== text &&
       !(await confirmAction("기존 미확정 원문과 분석 결과를 OCR 내용으로 교체할까요?"))) return;
     if (formal) return;
-    const next = replaceReception(order, raw);
-    onText(raw);
-    onOrder(next);
-    setOcrResult(null);
-    setError("");
-    onNotice("검토한 OCR 문구를 발주 원문에 반영했습니다.", "success");
+    pending.current = true;
+    setBusy(true);
+    try {
+      const next = await nativeReplaceReception(order, raw);
+      if (!alive.current) return;
+      onText(raw);
+      onOrder(next);
+      setOcrResult(null);
+      setError("");
+      onNotice("검토한 OCR 문구를 발주 원문에 반영했습니다.", "success");
+    } catch (error) {
+      if (alive.current) setError(String(error).replace(/^Error: /, ""));
+    } finally {
+      pending.current = false;
+      if (alive.current) setBusy(false);
+    }
   };
   const paste = async (value?: string, orderType = order.orderType ?? "AGENCY") => {
     if (formal || pending.current) return;
@@ -170,7 +189,7 @@ export function SourceDocument({
         !(await confirmAction("현재 초안과 분석 결과를 새 원문으로 교체할까요?"))
       )
         return;
-      const next = raw === text ? structuredClone(order) : replaceReception(order, raw);
+      const next = raw === text ? structuredClone(order) : await nativeReplaceReception(order, raw);
       next.orderType = orderType;
       let chats: DockWindow[] = [];
       try {
@@ -327,9 +346,21 @@ export function SourceDocument({
             <button
               disabled={busy}
               onClick={async () => {
-                if (await confirmAction("현재 미확정 원문과 분석 결과를 비울까요?")) {
+                if (pending.current || busy) return;
+                if (!(await confirmAction("현재 미확정 원문과 분석 결과를 비울까요?"))) return;
+                pending.current = true;
+                setBusy(true);
+                try {
+                  const cleared = await nativeReplaceReception(order, "");
+                  if (!alive.current) return;
                   onText("");
-                  onOrder(replaceReception(order, ""));
+                  onOrder(cleared);
+                  setError("");
+                } catch (error) {
+                  if (alive.current) setError(String(error).replace(/^Error: /, ""));
+                } finally {
+                  pending.current = false;
+                  if (alive.current) setBusy(false);
                 }
               }}
             >
