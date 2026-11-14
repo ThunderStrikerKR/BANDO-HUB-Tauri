@@ -49,10 +49,96 @@ fn recipient_idx(state:&Value,si:usize)->Option<(usize,usize)>{
 fn linked_client<'a>(state:&'a Value,order:&'a Value)->Option<&'a Value>{
     super::workflow::party(state,order)
 }
+// The factory-facing correction message and its review state are authored
+// by Rust. UI requests this read-only view, never string-formats a copy.
+fn js_display(value:Option<&Value>)->String {
+    match value {
+        None=> "undefined".into(),
+        Some(Value::Null)=>"null".into(),
+        Some(Value::String(v))=>v.clone(),
+        Some(v)=>v.to_string()
+    }
+}
+fn internal_model(value:&str)->String {
+    let value=if let Some(after)=value.strip_prefix("[가상]"){
+        after.trim_start()
+    }else{value};
+    if value.len()>=2 && value.get(..2).is_some_and(|p|p.eq_ignore_ascii_case("BD")) &&
+        value[2..].chars().next().is_some_and(|ch|ch.is_whitespace()||ch.is_ascii_digit()){
+        value[2..].trim_start().into()
+    }else{value.into()}
+}
+fn message(state:&Value,request:&Value)->Result<String,String>{
+    let before=field(request,"beforeRecipient");
+    let after=field(request,"afterRecipient");
+    if before.is_null() || after.is_null(){
+        return Err("구조화된 정정 요청을 선택하세요.".into());
+    }
+    let mut lines=vec![
+        "기존 출고 건 정정 요청입니다.".to_string(),
+        format!("배송 ID: {}",str_field(request,"shipmentId")),
+        "새 출고 주문이 아닙니다.".to_string()
+    ];
+    for (field_name,title) in [("name","수취인"),("address","주소"),
+        ("mobile","휴대폰"),("phone","전화"),("note","요청사항")]{
+        if before.get(field_name)!=after.get(field_name){
+            lines.push(format!("{title}: {} → {}",
+                js_display(before.get(field_name)),js_display(after.get(field_name))));
+        }
+    }
+    if field(before,"items")!=field(after,"items"){
+        let display_items=|row:&Value|rows(field(row,"items")).iter()
+            .map(|item|format!("{} ({}) × {}",internal_model(str_field(item,"name")),
+                js_display(item.get("color")),js_display(item.get("quantity"))))
+            .collect::<Vec<_>>().join(" / ");
+        lines.push(format!("품목: {} → {}",display_items(before),display_items(after)));
+    }
+    let ship=rows(field(field(state,"workflow"),"shipments")).iter()
+        .find(|s|str_field(s,"id")==str_field(request,"shipmentId"));
+    for (origin,title) in [("FACTORY","공장"),("STORE","매장")]{
+        let ship_fee=ship.and_then(|s|s.get("charges")).and_then(|v|v.get(origin));
+        let old_fee=before.get("shippingCharges").and_then(|v|v.get(origin))
+            .filter(|v|!v.is_null()).or(ship_fee);
+        let new_fee=after.get("shippingCharges").and_then(|v|v.get(origin))
+            .filter(|v|!v.is_null()).or(old_fee);
+        if old_fee!=new_fee {
+            let display=|value:Option<&Value>| if value.is_none_or(Value::is_null) {
+                "미확정".into()
+            }else{js_display(value)};
+            lines.push(format!("{title} 운임: {} → {}원",
+                display(old_fee),display(new_fee)));
+        }
+    }
+    if before.get("freightCode")!=after.get("freightCode"){
+        let code=|v:Option<&Value>| if v.is_none_or(Value::is_null){
+            "010".into()
+        }else{js_display(v)};
+        lines.push(format!("운임 방식: {} → {}",
+            code(before.get("freightCode")),code(after.get("freightCode"))));
+    }
+    Ok(lines.join("\n"))
+}
+fn correction_view(payload:&Value)->Result<Value,String>{
+    let state=req(payload,"state")?;
+    let sid=required_str(payload,"shipmentId")?;
+    let requests=rows(field(field(state,"workflow"),"changeRequests")).iter()
+        .filter(|r|str_field(r,"shipmentId")==sid)
+        .map(|r|{
+            let text=if has_value(field(r,"afterRecipient"))&&
+                has_value(field(r,"beforeRecipient")){
+                Some(message(state,r)?)
+            }else{None};
+            Ok(json!({"id":field(r,"id"),"status":status(state,str_field(r,"id")),
+                "message":text}))
+        }).collect::<Result<Vec<Value>,String>>()?;
+    Ok(json!({"requests":requests}))
+}
+
 pub(super) fn apply(payload:&Value)->Result<Value,String>{
     let action=required_str(payload,"action")?;
     let mut state=req(payload,"state")?.clone();
     match action {
+        "correction_view"=>return correction_view(payload),
         "correction_status"=>{
             let request_id=required_str(payload,"requestId")?;
             return Ok(json!({"status":status(&state,request_id)}));
