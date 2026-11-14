@@ -46,6 +46,45 @@
   align-items: center;
   min-height: 28px;
 }
+/* Price edits keep the original column and row dimensions. A small
+   explicit Save/Cancel tray opens below the active price cell instead of
+   shrinking the amount input or pushing the product-name column aside. */
+.app-v03 .management-container .product-prices .price-cell {
+  min-width: 0;
+}
+.app-v03 .management-container .product-prices .price-cell > input[data-price-cell] {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+}
+.app-v03 .management-container .product-prices .price-cell:has(.price-cell-actions) {
+  z-index: 8;
+}
+.app-v03 .management-container .product-prices .price-cell-actions {
+  position: absolute;
+  top: calc(100% + 2px);
+  right: 0;
+  z-index: 9;
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--border-default, #505050);
+  border-radius: 5px;
+  background: var(--surface-raised, #292929);
+  box-shadow: 0 3px 12px #0007;
+}
+.app-v03 .management-container .product-prices .price-cell-actions button {
+  min-height: 26px;
+  height: 26px;
+  padding: 2px 7px;
+  font-size: 12px;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+.app-v03 .management-container .product-prices .price-cell.pending > input[data-price-cell] {
+  outline: 1px solid var(--accent, #b6c1dc);
+  outline-offset: -1px;
+}
 .app-v03 .management-container .product-prices .price-cell small {
   position: absolute;
   top: calc(100% + 2px);
@@ -66,6 +105,12 @@
 .app-v03 .management-container .product-prices .price-cell small:empty { display: none; }
 .app-v03 .management-container .product-prices .price-cell:focus-within small:not(:empty),
 .app-v03 .management-container .product-prices .price-cell.invalid small:not(:empty) {
+  opacity: 1;
+}
+.app-v03 .management-container .product-prices .price-cell:has(.price-cell-actions) small:not(:empty) {
+  top: calc(100% + 37px);
+}
+.app-v03 .management-container .product-prices .price-cell.pending small:not(:empty) {
   opacity: 1;
 }
 .app-v03 .management-container .product-prices .price-cell.invalid small {
