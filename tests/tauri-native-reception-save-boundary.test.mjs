@@ -27,3 +27,18 @@ test("native reducer has production Rust routing and executable original TS diff
   assert.match(parity, /persistedReceptionState\(input\.before as any,input\.state as any\)/);
   assert.match(parity, /receptionOperation\("no draft is unchanged"/);
 });
+
+test("paste, OCR application and clearing the reception text all use native Rust with no TS parser fallback", () => {
+  const source = read("src/SourceDocument.tsx");
+  assert.doesNotMatch(source, /import \{ replaceReception \} from/);
+  assert.doesNotMatch(source, /\breplaceReception\(/);
+  assert.match(source, /"rules", "apply_reception_action", \{\s*action: "replace_reception", order: source, raw,/);
+  assert.match(source, /const next = await nativeReplaceReception\(order, raw\)/);
+  assert.match(source, /raw === text \? structuredClone\(order\) : await nativeReplaceReception\(order, raw\)/);
+  assert.match(source, /const cleared = await nativeReplaceReception\(order, ""\)/);
+  assert.match(source, /pending\.current = true;\s*setBusy\(true\);\s*try \{\s*const cleared/);
+  const parity = read("tests/rust-migration/rules/parity/compare.mts");
+  assert.match(parity, /receptionOperation\("replace unconfirmed draft retains identity"/);
+  assert.match(parity, /receptionOperation\("replace blank text drops dealer link"/);
+  assert.match(parity, /receptionOperation\("replace confirmed raw blocked"/);
+});
