@@ -369,9 +369,13 @@ try{
   try{
     await page.waitForFunction(()=>{
       const el=document.querySelector(".source-document");
-      return el && el.querySelectorAll(".linked-token").length>=5 &&
-        document.querySelector(".review-pane")?.textContent?.includes("김가상") &&
-        document.querySelector(".review-pane")?.textContent?.includes("박가상");
+      const linked=[...(el?.querySelectorAll(".linked-token")??[])].map(e=>e.textContent||"");
+      const review=document.querySelector(".review-pane")?.textContent||"";
+      // The review panel intentionally displays only the SELECTED recipient,
+      // while source evidence spans preserve both shipment records.
+      return linked.length>=10 &&
+        ["김가상","박가상","709","GT-1"].every(text=>linked.some(x=>x.includes(text))) &&
+        review.includes("김가상");
     },null,{timeout:18000});
   }catch(error){
     const detail=await page.evaluate(async()=>({
@@ -413,6 +417,10 @@ try{
   assert.ok(details.clipped,"Native clipboard read must be used");
   assert.ok(details.linked.some(x=>x.text?.includes("709")));
   assert.ok(details.linked.some(x=>x.text?.includes("GT-1")));
+  assert.ok(details.linked.some(x=>x.text?.includes("김가상")));
+  assert.ok(details.linked.some(x=>x.text?.includes("박가상")));
+  assert.ok(details.reviewText.includes("김가상"),
+    "Selected first recipient should be visible on the review panel");
   assert.equal(details.orders,native.before.orders?.length??0,
     "Viewing an unconfirmed order must not write to SQLite");
   assert.ok(!details.invoke.some(x=>x.command==="state_save"),
