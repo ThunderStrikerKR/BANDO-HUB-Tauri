@@ -284,13 +284,17 @@ export function RetailOrderDialog({
               }
               const item: Item = {
                 ...catalogItem, quantityConfirmed: false, unitPrice: null,
-                origin: row.dispatchOrigin ?? "FACTORY",
               };
-              // Functional updates preserve recipient edits made while Rust was executing.
+              // Preserve the newest recipient and dispatch-origin edits while
+              // the native command was running; never append a stale shipment.
               setOrder((previous) => ({
                 ...previous,
                 recipients: previous.recipients.map((recipient, index) =>
-                  index === 0 ? { ...recipient, items: [...recipient.items, item] } : recipient),
+                  index === 0 ? {
+                    ...recipient, items: [...recipient.items, {
+                      ...item, origin: recipient.dispatchOrigin ?? "FACTORY",
+                    }],
+                  } : recipient),
               }));
               setSearch(false);
             }).catch((cause) => {
