@@ -41,3 +41,11 @@ test("paste, OCR application and clearing the reception text all use native Rust
   assert.match(parity, /receptionOperation\("replace blank text drops dealer link"/);
   assert.match(parity, /receptionOperation\("replace confirmed raw blocked"/);
 });
+
+test("async native reception replacements reject replies for an obsolete order", () => {
+  const source = read("src/SourceDocument.tsx");
+  assert.match(source, /const latestInputs = useRef\(\{ order, text \}\)/);
+  assert.match(source, /latestInputs\.current\.order !== order \|\| latestInputs\.current\.text !== text/);
+  const count = source.match(/latestInputs\.current\.order !== order/g) ?? [];
+  assert.equal(count.length, 3, "OCR, clipboard paste, and clearing must all reject stale replies");
+});
