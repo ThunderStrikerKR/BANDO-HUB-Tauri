@@ -89,6 +89,7 @@ pub fn execute(operation: &str, payload: Value) -> Result<Value, String> {
         "analyze_factory_reply" | "preview_factory_reply" | "apply_factory_reply" =>
             factory_reply::execute(operation, &payload),
         "apply_reply_action" => reply_rules::apply(&payload),
+        "finalize_billing_history" => reply_rules::finalize_billing_history(&payload),
         "client_change_issue" => client_change::check(&payload),
         "apply_raw_correction" => raw_corrections::apply(&payload),
         "apply_retail_action" => retail_operations::apply(&payload),
