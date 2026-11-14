@@ -391,13 +391,10 @@ pub(super) fn apply(payload:&Value)->Result<Value,String> {
                 let account=account_for(&state,group,&state["orders"][oi],&client)
                     .ok_or_else(||"등록된 계좌를 선택하세요.".to_string())?.clone();
                 let notice_id=required_str(payload,"noticeId")?;
-                // The notice is a financial audit snapshot. Render the exact
-                // original full payment text in Rust from this reconciled
-                // state; never trust a separately computed UI/TS string.
-                let rendered=super::super::output::execute("render_payment_notice",json!({
-                    "state":state,"groupId":id
-                }))?;
-                let payment_message=required_str(&rendered,"payment")?.to_owned();
+                // The Rust output engine renders this frozen text before
+                // invoking rules. Keep the pure rules crate independent of
+                // the output crate for isolated TS/Rust differential tests.
+                let payment_message=required_str(payload,"paymentMessage")?;
                 let mut amounts=serde_json::Map::new();
                 for si in &ships {
                     let id=str_field(&state["workflow"]["shipments"][*si],"id");
