@@ -16,7 +16,7 @@ import { useNativeOrderPreview } from "./useNativeOrderPreview";
 import { useNativeOrderIssues } from "./useNativeOrderIssues";
 import { applyRustReceptionAnalysis, assertRustReceptionAnalysis, receptionAnalysisAllowed } from "./rust-reception";
 import { registeredProducts, sortProducts } from "../product-models";
-import { billingSnapshot } from "../replies";
+
 import type { NoticeSink } from "../shared/notices";
 import type { Item, Order, Product, State } from "../types";
 import { clone } from "../ui";
@@ -379,13 +379,13 @@ export function useOrderDesk({
     }
     onChange((previous) => {
       const next = clone(previous);
+      // First edit captures only the timestamp and intent. The original
+      // frozen amount/client/recipient snapshot is produced by Rust save_order
+      // from the authoritative persisted order in the same save transaction.
       if (previous.pricesLocked && !activeGroupId &&
           !(state.workflow?.shipments.some((ship) =>
             ship.orderId === previous.id && !ship.legacyArchived) ?? false))
-        next.billingHistory = [
-          ...(next.billingHistory ?? []),
-          billingSnapshot(previous, state, reason),
-        ];
+        next.pendingBillingSnapshot = { at: new Date().toISOString(), reason };
       next.pricesLocked = false;
       next.clientSnapshot = liveClient ? clone(liveClient) : next.clientSnapshot;
       next.notified = false;
