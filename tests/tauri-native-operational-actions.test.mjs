@@ -29,7 +29,9 @@ test("post-export correction register, copy and staff approval call Rust", () =>
     assert.ok(nativeCorrection.includes('"' + action + '"=>'), action + " Rust match arm");
   }
   assert.doesNotMatch(correction, /(?:requestCorrection|copiedCorrection|confirmCorrection)\(state,/);
-  assert.match(correction, /await window\.bando!\.copy\(correctionMessage\(state, r\.id\)\)/);
+  assert.match(correction, /await window\.bando!\.copy\(native\.text\)/);
+  assert.match(correction, /"output", "render_correction_summaries"/);
+  assert.doesNotMatch(correction, /correctionMessage\(state,/);
   assert.match(correction, /await onSave\(await nativeApplyCorrectionAction\(state, "copied_correction"/);
 });
 
@@ -83,4 +85,28 @@ test("working raw correction previews using Rust recognition and the Rust audit 
   assert.match(nativeRaw, /"correct_working_raw"=>/);
   assert.match(modal, /setPreview\(undefined\);\s*try \{/);
   assert.match(modal, /disabled=\{!preview \|\| busy\}/);
+});
+
+
+test("unconfirmed reception removal uses compiled Rust before atomic SQLite save", () => {
+  const app = source("src/app/useAppModel.ts");
+  const nativeReception = source("src-tauri/src/business_core/rules/reception_operations.rs");
+  assert.match(app, /"rules", "apply_reception_action"/);
+  assert.match(app, /action: "persisted_reception_state", before: state!, state: next/);
+  assert.match(app, /if \(sameValue\(persistent, state\)\)/);
+  assert.match(app, /const committed = await window\.bando!\.save\(persistent\)/);
+  assert.doesNotMatch(app, /persistedReceptionState\(state!, next\)/);
+  assert.match(nativeReception, /"persisted_reception_state"=>/);
+});
+
+test("factory correction clipboard and display use fresh Rust projection without TypeScript fallback", () => {
+  const panel = source("src/CorrectionPanel.tsx");
+  const native = source("src-tauri/src/business_core/output/corrections.rs");
+  const dispatcher = source("src-tauri/src/business_core/output/mod.rs");
+  assert.match(panel, /"output", "render_correction_summaries"/);
+  assert.match(panel, /correctionsView\?\.source === state/);
+  assert.match(panel, /await window\.bando!\.copy\(native\.text\)/);
+  assert.doesNotMatch(panel, /(?:correctionMessage|correctionStatus)\(/);
+  assert.match(native, /fn message\(/);
+  assert.match(dispatcher, /"render_correction_summaries" => corrections::summaries/);
 });
