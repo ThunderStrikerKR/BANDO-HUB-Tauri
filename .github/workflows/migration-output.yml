@@ -67,8 +67,9 @@ jobs:
           workspaces: src-tauri -> target
       - name: Install frontend build dependencies
         run: npm install --no-audit --no-fund
-      - name: Build exact HEAD as native Windows Tauri EXE
-        run: npm run build:windows
+      - name: Build real Windows EXE with CI-only WebView2 CDP config
+        # Business source is the exact HEAD. Production tauri.conf.json is untouched.
+        run: npm run build:windows -- --config src-tauri/tauri.ci-cdp.conf.json
       - name: Stage exact Windows binary and record SHA256
         shell: pwsh
         run: |
@@ -79,8 +80,8 @@ jobs:
           Get-FileHash (Join-Path $dir "bando_hub.exe") -Algorithm SHA256
       - name: Install WebView2 inspection client (not browser emulator)
         run: npm install --no-save --no-package-lock --no-audit --no-fund playwright@1.55.1
-      # WebView2 CDP is enabled inside the test script after its synthetic
-      # SQLite bootstrap exits. Never assign the inspection port to bootstrap.
+      # CI-only Tauri config passes browser args directly to WebView2.
+      # Wry's default options bypass environment/registry CDP overrides.
       - name: Boot real EXE, test isolated SQLite and native UI with actual Rust IPC
         env:
           BANDO_NATIVE_EXE: ${{ github.workspace }}\\src-tauri\\target\\release\\bando_hub.exe

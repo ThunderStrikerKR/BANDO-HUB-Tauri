@@ -1,4 +1,6 @@
 // Actual Windows Tauri EXE + real WebView2 + real Rust IPC, no mocked commands.
+// CI audit binary uses the same source with a temporary Tauri window CDP flag.
+// Production tauri.conf.json contains no remote-debugging argument.
 import assert from "node:assert/strict";
 import { spawn, execFileSync } from "node:child_process";
 import { promises as fs } from "node:fs";
@@ -70,17 +72,6 @@ try{
 }
 console.log("NATIVE_CI_BASELINE_CREATED",baseline);
 
-// Only the developer TEST process may own the WebView2 CDP port.
-// Bootstrap's WebView2 child may survive app.kill() briefly.
-const policyKey="HKCU\\Software\\Policies\\Microsoft\\Edge\\WebView2\\AdditionalBrowserArguments";
-const policyNames=[basename(exe),"com.bandostand.bandohub.tauri"];
-for(const name of policyNames){
-  execFileSync("reg.exe",["add",policyKey,"/v",name,"/t","REG_SZ",
-    "/d","--remote-debugging-port="+port+" --remote-debugging-address=127.0.0.1","/f"],
-    {stdio:"pipe",timeout:10000});
-}
-console.log("NATIVE_CDP_POLICY_APPLIED",JSON.stringify({policyNames,port}));
-
 const report={
   type:"real-Windows-Tauri-WebView2-IPC",
   automationCommit:process.env.GITHUB_SHA || "",
@@ -97,8 +88,6 @@ const app=spawn(exe,["--bando-developer-test"],{
   cwd:dirname(exe),windowsHide:false,stdio:["ignore","pipe","pipe"],
   env:{
     ...process.env,
-    WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS:
-      "--remote-debugging-port="+port+" --remote-debugging-address=127.0.0.1",
     WEBVIEW2_USER_DATA_FOLDER:join(root,"webview2"),
   },
 });
@@ -418,9 +407,4 @@ try{
   await persist();
   await browser?.close().catch(()=>{});
   if(app.exitCode===null)app.kill();
-  for(const name of policyNames){
-    try{execFileSync("reg.exe",["delete",policyKey,"/v",name,"/f"],
-      {stdio:"pipe",timeout:10000});}
-    catch(e){console.error("NATIVE_CDP_POLICY_CLEANUP_FAILED",name,String(e));}
-  }
 }

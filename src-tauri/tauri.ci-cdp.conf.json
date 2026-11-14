@@ -1,0 +1,17 @@
+{
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "반도허브 BANDO HUB v0.0.4",
+        "width": 1520,
+        "height": 1000,
+        "minWidth": 1024,
+        "minHeight": 700,
+        "backgroundColor": "#101010",
+        "decorations": false,
+        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --remote-debugging-port=19651 --remote-debugging-address=127.0.0.1"
+      }
+    ]
+  }
+}
