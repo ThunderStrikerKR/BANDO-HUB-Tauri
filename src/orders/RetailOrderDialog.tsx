@@ -2,14 +2,14 @@ import { useEffect, useRef, useState } from "react";
 import { sameValue } from "../shared/draft";
 import { confirmDiscardDraft } from "../shared/editor-flow";
 import { Modal, Field, MoneyInput } from "../ui";
-import { itemFromProduct } from "../domain";
+import { businessCoreCall } from "../tauri-bridge";
 import { companyClient, companySenderMissing } from "../order-types";
 import { deliveryRequirements } from "../delivery-requirements";
 import { contactProblem } from "../contact";
 import { ProductSearchDialog } from "../ProductSearchDialog";
 import { newRetailOrder } from "./retail";
 import { nativeConfirmRetail } from "./native-rules";
-import type { State } from "../types";
+import type { Item, State } from "../types";
 export function RetailOrderDialog({
   state,
   onSave,
@@ -264,12 +264,34 @@ export function RetailOrderDialog({
           state={state}
           onClose={() => setSearch(false)}
           onChoose={(p) => {
-            const item = itemFromProduct(p, companyClient(state.settings), p.variants[0].color, 1);
-            item.quantityConfirmed = false;
-            item.unitPrice = null;
-            item.origin = row.dispatchOrigin ?? "FACTORY";
-            change({ items: [...row.items, item] });
-            setSearch(false);
+            if (busy) return;
+            setBusy(true);
+            setError("");
+            void businessCoreCall<{ item: Item }>(
+              "rules", "create_catalog_item", {
+                product: p, client: companyClient(state.settings),
+                color: p.variants[0]?.color, variantId: p.variants[0]?.id,
+                quantity: 1, newItemId: crypto.randomUUID(),
+              },
+            ).then(({ item }) => {
+              if (!item.variantId) throw Error("등록된 독립 상품을 다시 선택하세요.");
+              // Retail prices are entered/confirmed explicitly, never inferred here.
+              setOrder((previous) => {
+                const currentRow = previous.recipients[0];
+                if (!currentRow) return previous;
+                const draftItem = {
+                  ...item, quantityConfirmed: false, unitPrice: null,
+                  origin: currentRow.dispatchOrigin ?? "FACTORY",
+                };
+                return { ...previous, recipients: [{
+                  ...currentRow, items: [...currentRow.items, draftItem],
+                }] };
+              });
+              setSearch(false);
+            }).catch((error) => {
+              setError("Rust 상품 구성 조회 실패: " +
+                (error instanceof Error ? error.message : String(error)));
+            }).finally(() => setBusy(false));
           }}
         />
       )}

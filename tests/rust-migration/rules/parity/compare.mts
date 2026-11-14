@@ -14,6 +14,8 @@ import { resolvePrice, totals, parseOrder, repriceOrder, itemFromProduct } from 
 import {
   recommendShipping,
   editableShippingRule,
+  effectiveShippingRule,
+  emptyProductRule,
   combinationVersions,
   combinationCurrent,
   upgradeShipping,
@@ -35,6 +37,8 @@ import { rawCorrectableIssue, rawCorrectionAllowed, correctWorkingRaw } from "..
 import { receiptOf, correctReceipt } from "../../../../src/receipt.ts";
 import { billingSnapshot, applyReply } from "../../../../src/replies.ts";
 import { replyNeedsReview } from "../../../../src/factory-replies.ts";
+import { factoryConflictConfirmation } from "../../../../src/factory-conflict-review.ts";
+import { validateProvisionalProductNotices } from "../../../../src/provisional-product-notices.ts";
 import { validateAutomaticMessageTemplates } from "../../../../src/automatic-message-templates.ts";
 import { addressInfo, addressParts } from "../../../../src/parser.ts";
 import { companyClient, companyParty } from "../../../../src/order-types.ts";
@@ -3340,7 +3344,13 @@ function factoryReviewCase(name:string,replies:any[]){
   const state:any={...copy(baseState),factoryReplies:replies};
   add("factory review UI: "+name,"factory_reply_review_statuses",{state},
     ()=>({reviews:replies.map(record=>({
-      id:record.id,needsReview:replyNeedsReview(state,record)
+      id:record.id,needsReview:replyNeedsReview(state,record),
+      resolvedRows:record.rows.map((row:any)=>({
+        row:row.row,
+        resolved:replies.some(later=>
+          later.resolves?.id===record.id && later.resolves.row===row.row &&
+          later.rows.some((result:any)=>result.applied))
+      }))
     }))}));
 }
 factoryReviewCase("unresolved row remains review", [openReply]);
@@ -3361,6 +3371,37 @@ factoryReviewCase("source file error remains review after applied row", [
 factoryReviewCase("empty reply has no pending rows", [
   {...copy(openReply),rows:[]}
 ]);
+
+// Staff-facing factory conflict confirmation must exactly match TS oracle;
+// never approve a collision on an invented or stale description.
+const conflictState:any=copy(baseState);
+const conflictShipId=conflictState.workflow.shipments[0].id;
+const conflictRow:any={row:7,name:"가상 수취인",
+  shipmentId:conflictShipId,issue:"기존 송장 / 실제 운임과 충돌합니다. 직원 확인 필요",
+  applied:false,tracking:"123456789012",actual:12500};
+conflictState.factoryReplies=[{
+  id:"reply-conflict",filename:"회신.xlsx",status:"REVIEW",
+  rows:[conflictRow]
+}];
+conflictState.workflow.shipments[0].tracking={FACTORY:"987654321098"};
+conflictState.workflow.shipments[0].actualFreight={FACTORY:4500};
+function conflictCase(name:string,state:any,rowNumber=7,valid=true){
+  add("factory conflict confirmation: "+name,"factory_conflict_confirmation",{
+    state,id:"reply-conflict",rowNumber
+  },()=>({text:factoryConflictConfirmation(state,"reply-conflict",rowNumber)}));
+  cases[cases.length-1].expectedOk=valid;
+}
+conflictCase("track and freight replacement",conflictState);
+const unknownFreightState:any=copy(conflictState);
+unknownFreightState.workflow.shipments[0].actualFreight={FACTORY:null};
+conflictCase("explicit unknown historical freight",unknownFreightState);
+const nonConflictState:any=copy(conflictState);
+nonConflictState.factoryReplies[0].rows[0].issue="직원 확인";
+conflictCase("non-conflict row is rejected",nonConflictState,7,false);
+conflictCase("missing row is rejected",conflictState,99,false);
+const absentShipState:any=copy(conflictState);
+absentShipState.workflow.shipments=[];
+conflictCase("missing original shipment is rejected",absentShipState,7,false);
 
 // The actual factory clipboard payload and status use Rust results.
 // Compare complete Korean text, including spacing, freight and field order.
@@ -3444,6 +3485,60 @@ const shippingIndividual:any=copy(shippingViewState);
 shippingIndividual.products[0].shippingGroupId=undefined;
 shippingViewCase("assignment removed",shippingIndividual);
 
+// Product freight table/empty-editor/reset projections must use the exact
+// historical TS behavior, not merely Rust-internal expectations.
+function productFreightViewCase(name:string,state:any){
+  add("product freight view: "+name,"apply_shipping_action",{
+    action:"product_freight_view",state
+  },()=>({views:Object.fromEntries(state.products.map((p:any)=>{
+    const {group,rule}=effectiveShippingRule(state,p.id);
+    return [p.id,{group:group??null,rule:rule??null,
+      editableRule:rule?editableShippingRule(rule):null}];
+  }))}));
+}
+productFreightViewCase("group takes precedence",shippingViewState);
+productFreightViewCase("no assigned group",shippingIndividual);
+const missingFreightState:any=copy(shippingIndividual);
+missingFreightState.shipping.productRules={};
+productFreightViewCase("no registered rule",missingFreightState);
+const deletedFreightState:any=copy(shippingViewState);
+deletedFreightState.shipping.groups[0].deletedAt=now;
+deletedFreightState.shipping.productRules.p1={
+  version:"ind-1",fees:{"1":5000},perItem:null,
+  maxBundle:1,maxConfirmed:true,notes:"과거 개별 기준",at:now
+};
+productFreightViewCase("deleted group uses individual rule",deletedFreightState);
+const tariffVersion="freight-editor-test-version";
+add("product freight empty editor matches original TS","apply_shipping_action",{
+  action:"default_product_rule",versionId:tariffVersion,now:actionNow
+},()=>({rule:deterministicIds([tariffVersion],()=>
+  frozenDate(()=>emptyProductRule()))}));
+function resetProductFreightCase(name:string,state:any){
+  add("product freight reset: "+name,"apply_shipping_action",{
+    action:"reset_product_freight_rule",state,productId:"p1",
+    versionId:tariffVersion,now:actionNow
+  },()=>{
+    const next=copy(state);
+    const p=next.products.find((p:any)=>p.id==="p1");
+    const g=next.shipping.groups.find((g:any)=>g.id===p.shippingGroupId&&!g.deletedAt);
+    const create=()=>deterministicIds([tariffVersion],()=>frozenDate(()=>emptyProductRule()));
+    if(g){
+      g.history.push(g.current);
+      g.current=create();
+    }else{
+      next.shipping.productHistory??={};
+      next.shipping.productHistory.p1=[
+        ...(next.shipping.productHistory.p1??[]),
+        next.shipping.productRules.p1
+      ];
+      next.shipping.productRules.p1=create();
+    }
+    return {state:next};
+  });
+}
+resetProductFreightCase("group rate preserves history",shippingViewState);
+resetProductFreightCase("individual rate preserves history",deletedFreightState);
+
 // Template editing is a save-time native decision, not only a preview rule.
 function templateValidationCase(name:string,edits:Record<string,unknown>,valid=true){
   add("message template validation: "+name,"validate_automatic_templates",{
@@ -3506,6 +3601,26 @@ catalogItemCase("special tier override",copy(product),{
 catalogItemCase("catalog label and price absence",{
   ...copy(product),catalog:"OFFICIAL",variants:[{...copy(product.variants[0]),wholesale:null}]
 },copy(client),1,"v1");
+
+// The live product-specific provisional notice editor now calls the native
+// validator. Compare the actual original TS eligibility on every fixture.
+function productNoticeCase(name:string,notices:Record<string,unknown>,valid=true){
+  const state:any=copy(baseState);
+  state.settings.provisionalProductNotices=notices;
+  add("provisional notice validation: "+name,
+    "validate_provisional_product_notices",{state},
+    ()=>{validateProvisionalProductNotices(state);return {valid:true};});
+  cases[cases.length-1].expectedOk=valid;
+}
+productNoticeCase("registered one",{"p1":"직원 잠정 안내"});
+productNoticeCase("empty settings",{});
+productNoticeCase("2000 Unicode code points",{"p1":"😀".repeat(2000)});
+productNoticeCase("unknown product rejected",{"unknown":"주의"},false);
+productNoticeCase("whitespace only rejected",{"p1":"　 \n"},false);
+productNoticeCase("over 2000 Unicode code points rejected",{"p1":"😀".repeat(2001)},false);
+productNoticeCase("nonstring rejected",{"p1":5},false);
+productNoticeCase("5001 notices rejected",Object.fromEntries(
+  Array.from({length:5001},(_,i)=>["p"+i,"주의"])),false);
 
 const runner=spawnSync(rustBinary||"cargo",rustBinary?[]:[
   "run","--quiet","--manifest-path",

@@ -658,6 +658,84 @@ pub(super) fn shipping_action(payload: &Value) -> Result<Value, String> {
             }
             Ok(json!({"shipping":shipping}))
         }
+        // Pure read-side projection used by the live product-freight editor.
+        // Group assignment wins over individual rates; deleted groups never apply.
+        "product_freight_view" => {
+            let state=req(payload,"state")?;
+            let shipping=field(state,"shipping");
+            let mut views=serde_json::Map::new();
+            for product in rows(field(state,"products")){
+                let pid=str_field(product,"id");
+                if pid.is_empty(){continue;}
+                let group_id=str_field(product,"shippingGroupId");
+                let group=rows(field(shipping,"groups")).iter()
+                    .find(|g|str_field(g,"id")==group_id &&
+                        field(g,"deletedAt").is_null());
+                let rate=if let Some(group)=group {
+                    field(group,"current")
+                } else {field(field(shipping,"productRules"),pid)};
+                let editable=if rate.is_null(){Value::Null}else{editable_rule(rate)};
+                views.insert(pid.into(),json!({
+                    "group":group.cloned().unwrap_or(Value::Null),
+                    "rule":rate,"editableRule":editable
+                }));
+            }
+            Ok(json!({"views":views}))
+        }
+        // Same input and output shape as TypeScript emptyProductRule; caller
+        // supplies the version and timestamp explicitly to avoid hidden clocks.
+        "default_product_rule" => {
+            let version=required_str(payload,"versionId")?;
+            let now=required_str(payload,"now")?;
+            Ok(json!({"rule":{
+                "version":version,"at":now,
+                "fees":{"1":null,"2":null,"3":null,"4":null,"5":null,"6":null},
+                "maxBundle":null,"maxConfirmed":false,"perItem":null,
+                "notes":"상품의 최대 묶음 수량과 운임을 확인해 입력하세요."
+            }}))
+        }
+        "reset_product_freight_rule" => {
+            let mut state=req(payload,"state")?.clone();
+            let pid=required_str(payload,"productId")?;
+            let version=required_str(payload,"versionId")?;
+            let now=required_str(payload,"now")?;
+            let product=find_by_id(field(&state,"products"),pid)
+                .ok_or("등록된 상품을 확인하세요.")?;
+            let group_id=str_field(product,"shippingGroupId").to_string();
+            let group_index=rows(field(field(&state,"shipping"),"groups")).iter()
+                .position(|g|str_field(g,"id")==group_id &&
+                    field(g,"deletedAt").is_null());
+            let default=json!({
+                "version":version,"at":now,
+                "fees":{"1":null,"2":null,"3":null,"4":null,"5":null,"6":null},
+                "maxBundle":null,"maxConfirmed":false,"perItem":null,
+                "notes":"상품의 최대 묶음 수량과 운임을 확인해 입력하세요."
+            });
+            if let Some(index)=group_index{
+                let group=&mut state["shipping"]["groups"][index];
+                let old=field(group,"current").clone();
+                if !field(group,"history").is_array(){set(group,"history",json!([]))?;}
+                group["history"].as_array_mut().ok_or("운임 이력 오류")?
+                    .push(old);
+                set(group,"current",default)?;
+            } else {
+                let shipping=&mut state["shipping"];
+                if !field(shipping,"productHistory").is_object() {
+                    set(shipping,"productHistory",json!({}))?;
+                }
+                if !field(shipping,"productRules").is_object() {
+                    set(shipping,"productRules",json!({}))?;
+                }
+                let old=field(field(shipping,"productRules"),pid).clone();
+                if !field(&shipping["productHistory"],pid).is_array(){
+                    set(&mut shipping["productHistory"],pid,json!([]))?;
+                }
+                shipping["productHistory"][pid].as_array_mut()
+                    .ok_or("상품 운임 이력 오류")?.push(old);
+                set(&mut shipping["productRules"],pid,default)?;
+            }
+            Ok(json!({"state":state}))
+        }
         "editable_rule" => {
             let mut rule=req(payload,"rule")?.clone();
             if let Some(per_item)=safe(field(&rule,"perItem")) {
@@ -712,5 +790,44 @@ pub(super) fn shipping_action(payload: &Value) -> Result<Value, String> {
             Ok(json!({"current":current}))
         }
         _=>Err(format!("지원하지 않는 운임 action: {action}"))
+    }
+}
+
+#[cfg(test)]
+mod p1_product_freight_tests {
+    use super::*;
+    #[test]
+    fn group_reset_keeps_historical_rate_and_unrelated_orders() {
+        let state=json!({
+            "products":[{"id":"p1","shippingGroupId":"g1"},{"id":"p2"}],
+            "orders":[{"id":"old-paid","shippingFee":3800,"paid":true}],
+            "shipping":{"epoch":2,"groups":[{"id":"g1","name":"가상 그룹",
+                "current":{"version":"original","fees":{"1":3800},
+                    "maxBundle":1,"maxConfirmed":true,"perItem":null,"notes":""},
+                "history":[]}],"productRules":{},"productHistory":{},
+                "combinations":[]}
+        });
+        let original=state["orders"].clone();
+        let r=shipping_action(&json!({"action":"reset_product_freight_rule",
+            "state":state,"productId":"p1",
+            "versionId":"new","now":"2026-11-15T00:00:00Z"})).unwrap();
+        assert_eq!(r["state"]["orders"],original);
+        assert_eq!(r["state"]["shipping"]["groups"][0]["history"][0]["version"],"original");
+        assert_eq!(r["state"]["shipping"]["groups"][0]["current"]["version"],"new");
+        assert_eq!(r["state"]["shipping"]["groups"][0]["current"]["fees"]["1"],Value::Null);
+    }
+    #[test]
+    fn individual_rate_reset_keeps_previous_rule(){
+        let state=json!({
+            "products":[{"id":"p1"}],
+            "shipping":{"groups":[],"productHistory":{},
+                "productRules":{"p1":{"version":"old","fees":{"1":6000},
+                    "maxBundle":1,"maxConfirmed":true,"perItem":null,"notes":""}}}
+        });
+        let r=shipping_action(&json!({"action":"reset_product_freight_rule",
+            "state":state,"productId":"p1",
+            "versionId":"new","now":"2026-11-15T00:00:00Z"})).unwrap();
+        assert_eq!(r["state"]["shipping"]["productHistory"]["p1"][0]["version"],"old");
+        assert_eq!(r["state"]["shipping"]["productRules"]["p1"]["version"],"new");
     }
 }

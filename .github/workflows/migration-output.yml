@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - migration/03-integration
+      - migration/27-p1-p2-readside
       - migration/05-factory-reply
       - integration/06-history-settlement
   workflow_dispatch:

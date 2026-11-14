@@ -1,6 +1,7 @@
 import { confirmAction } from "./dialogs";
-import { factoryConflictConfirmation } from "./factory-conflict-review";
-import { replyNeedsReview } from "./factory-replies";
+import { nativeFactoryConflictConfirmation } from "./native-factory-conflict-review";
+import { businessCoreCall } from "./tauri-bridge";
+import { useEffect, useState } from "react";
 import { useAsyncTask } from "./shared/useAsyncTask";
 import type { NoticeSink } from "./shared/notices";
 import type { State } from "./types";
@@ -17,11 +18,33 @@ export function FactoryReplyHistory({
   onNotice: NoticeSink;
 }) {
   const { busy, run } = useAsyncTask(onNotice);
+  const [nativeReview, setNativeReview] = useState<{
+    state: State;
+    statuses: Record<string, {
+      needsReview: boolean; resolvedRows: {row: number; resolved: boolean}[];
+    }>;
+  }>();
+  useEffect(() => {
+    let active = true;
+    void businessCoreCall<{ reviews: {
+      id: string; needsReview: boolean; resolvedRows: {row: number; resolved: boolean}[];
+    }[] }>("rules", "factory_reply_review_statuses", { state })
+      .then(({ reviews }) => {
+        if (active) setNativeReview({
+          state, statuses: Object.fromEntries(reviews.map(r => [r.id, r])),
+        });
+      }).catch(e => {
+        if (active) onNotice("Rust 공장 회신 이력 조회 실패: " +
+          (e instanceof Error ? e.message : String(e)), "error");
+      });
+    return () => { active = false; };
+  }, [state, onNotice]);
+  const statuses = nativeReview?.state === state ? nativeReview.statuses : undefined;
   const records = (state.factoryReplies ?? [])
     .filter((r) => (r.filename + " " + r.businessDate).includes(query))
     .slice().reverse();
   const correct = (id: string, row: number) => void run(async () => {
-    if (!(await confirmAction(factoryConflictConfirmation(state, id, row)))) return;
+    if (!(await confirmAction(await nativeFactoryConflictConfirmation(state, id, row)))) return;
     if (!window.bando?.approveFactoryConflict) {
       throw Error("공장 회신 충돌 승인 기능을 사용할 수 없습니다.");
     }
@@ -60,7 +83,7 @@ export function FactoryReplyHistory({
                     </button>
                   )}
                 </td>
-                <td>{replyNeedsReview(state, r) ? "직원 확인 필요" : "반영 완료"}</td>
+                <td>{statuses?.[r.id]?.needsReview === true ? "직원 확인 필요" : statuses?.[r.id]?.needsReview === false ? "반영 완료" : "확인 중"}</td>
                 <td>
                   {[...new Set(r.rows.map((row) => row.orderId).filter(Boolean))].map((id) => (
                     <button type="button" key={id} onClick={() => onOpen(id!)}>
@@ -73,15 +96,15 @@ export function FactoryReplyHistory({
                   <details>
                     <summary>회신 행 {r.rows.length}건 보기</summary>
                     {r.rows.map((row) => {
-                      const resolved = state.factoryReplies?.some((later) =>
-                        later.resolves?.id === r.id && later.resolves.row === row.row &&
-                        later.rows.some((result) => result.applied));
+                      const resolved = statuses?.[r.id]?.resolvedRows.find(
+                        (entry) => entry.row === row.row,
+                      )?.resolved;
                       return (
                         <div className="factory-reply-history-row" key={row.row}>
                           <strong>{row.row}행 / {row.name}</strong>
                           <span>{row.tracking || "운송장 미입력"} / {row.actual === null ? "실제 운임 미확인" : row.actual.toLocaleString("ko-KR") + "원"}</span>
-                          <span>{resolved ? "직원 정정 완료" : row.applied ? "반영 완료" : row.issue || "검토 필요"}</span>
-                          {!resolved && !row.applied && row.shipmentId && row.issue?.includes("충돌") && (
+                          <span>{resolved == null ? "확인 중" : resolved ? "직원 정정 완료" : row.applied ? "반영 완료" : row.issue || "검토 필요"}</span>
+                          {resolved === false && !row.applied && row.shipmentId && row.issue?.includes("충돌") && (
                             <button type="button" disabled={busy} onClick={() => correct(r.id, row.row)}>
                               충돌 값 확인 후 정정
                             </button>
