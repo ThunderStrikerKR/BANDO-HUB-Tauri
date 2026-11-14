@@ -1,7 +1,7 @@
-import { replyNeedsReview } from "./factory-replies";
+import { businessCoreCall } from "./tauri-bridge";
 import { factoryConflictConfirmation } from "./factory-conflict-review";
 import { confirmAction } from "./dialogs";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { State } from "./types";
 import { Modal } from "./ui";
 import { won } from "./domain";
@@ -17,6 +17,26 @@ export function FactoryNotifications({
   onRefresh: () => Promise<void>;
 }) {
   const [error, setError] = useState("");
+  const [nativeReview, setNativeReview] = useState<{
+    state: State;
+    statuses: Record<string, boolean>;
+  }>();
+  useEffect(() => {
+    let active = true;
+    void businessCoreCall<{ reviews: { id: string; needsReview: boolean }[] }>(
+      "rules", "factory_reply_review_statuses", { state },
+    ).then(({ reviews }) => {
+      if (active) setNativeReview({
+        state, statuses: Object.fromEntries(reviews.map((row) => [row.id, row.needsReview])),
+      });
+    }).catch((cause) => {
+      if (active) setError("Rust 회신 상태 확인 실패: " +
+        (cause instanceof Error ? cause.message : String(cause)));
+    });
+    return () => { active = false; };
+  }, [state]);
+  // Never display an obsolete revision's review result as 'completed'.
+  const statuses = nativeReview?.state === state ? nativeReview.statuses : undefined;
   return (
     <Modal title="공장 회신 알림" onClose={onClose}>
       <p role="alert" className="form-error">
@@ -33,11 +53,11 @@ export function FactoryNotifications({
             <article key={record.id}>
               <h3>
                 {record.filename} / {" "}
-                {!replyNeedsReview(state, record)
+                {statuses?.[record.id] === false
                   ? "반영 완료"
-                  : record.status === "PARTIAL"
-                    ? "일부 반영"
-                    : "직원 확인 필요"}
+                  : statuses?.[record.id] === true
+                    ? record.status === "PARTIAL" ? "일부 반영" : "직원 확인 필요"
+                    : "확인 중"}
               </h3>
               <small>
                 {record.businessDate} / {new Date(record.at).toLocaleString("ko-KR")}
