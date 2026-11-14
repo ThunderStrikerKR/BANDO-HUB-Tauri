@@ -6,6 +6,10 @@ const read = p => readFileSync(new URL("../" + p, import.meta.url), "utf8");
 test("factory history and notification both use native review and conflict projection", () => {
   const history = read("src/FactoryReplyHistory.tsx");
   const notices = read("src/FactoryNotifications.tsx");
+  const app = read("src/App.tsx");
+  assert.match(app, /"rules", "factory_reply_review_statuses"/);
+  assert.doesNotMatch(app, /replyNeedsReview\(/);
+  assert.match(app, /state\.factoryReplies\?\.length \?\? 0/);
   const native = read("src/native-factory-conflict-review.ts");
   const rules = read("src-tauri/src/business_core/rules/factory_reply.rs");
   assert.match(history,/factory_reply_review_statuses/);
