@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-const read = (path) => readFileSync(new URL("../../" + path, import.meta.url), "utf8");
+const read = (path) => readFileSync(new URL("../" + path, import.meta.url), "utf8");
 
 // The real React commit must invoke the audited Rust reducer before the only
 // SQLite write; a TS oracle in tests is not a production fallback.
