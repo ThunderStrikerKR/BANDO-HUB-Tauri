@@ -400,6 +400,23 @@ mod tests {
             "businessDate":"2026-11-13","at":"2026-11-13T10:00:00Z",
             "actor":"직원"})
     }
+    #[test] fn collision_preview_is_read_only_and_recovers_exact_old_values(){
+        let mut state=fixture();
+        state["workflow"]["shipments"][0]["tracking"]=json!({"FACTORY":"1234567890"});
+        state["workflow"]["shipments"][0]["actualFreight"]=json!({"FACTORY":4900});
+        state["factoryReplies"]=json!([{"id":"f1","rows":[{
+            "row":2,"name":"김수취","shipmentId":"s1","tracking":"9999999999",
+            "actual":8500,"issue":"기존 송장 / 실제 운임과 충돌합니다. 직원 확인 필요",
+            "applied":false}]}]);
+        let frozen=state.clone();
+        let preview=conflict_confirmation(&json!({
+            "state":state,"id":"f1","rowNumber":2})).unwrap();
+        assert_eq!(preview["text"],"2행 / 김수취\\n기존: 1234567890 / 운임 4,900원\\n회신: 9999999999 / 운임 8,500원\\n이 한 행만 정정할까요? 기존 값과 원본 파일은 보존됩니다.");
+        assert_eq!(frozen["workflow"]["shipments"][0]["actualFreight"]["FACTORY"],4900);
+        let denied=conflict_confirmation(&json!({
+            "state":frozen,"id":"f1","rowNumber":99}));
+        assert!(denied.is_err());
+    }
     #[test] fn valid_reply_matches_and_audits(){
         let s=fixture();
         let preview=analyze(&input(s.clone(),"001234567890","4,000")).unwrap();
