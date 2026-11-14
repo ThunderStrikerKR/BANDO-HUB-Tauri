@@ -38,6 +38,9 @@ test("price-table draft stays visible until Save/Cancel and remains guarded on f
   assert.match(cell, /if \(lastReportedPending\.current === pending\) return/);
   assert.match(cell, /pendingRef\.current\?\.\(pending\)/);
   assert.match(manager, /hasChanges: \(\) => editDirty \|\| hasPendingPrices/);
+  assert.match(manager, /busy: \(\) => savingView \|\| priceWrites\.current > 0/);
+  assert.match(manager, /priceWrites\.current\+\+/);
+  assert.match(manager, /finally \{\s*priceWrites\.current--/);
   assert.match(manager, /const checkPriceDrafts = \(\) => \{/);
   assert.match(manager, /const togglePriceMode = \(\) => \{[\s\S]*?if \(!priceMode \|\| checkPriceDrafts\(\)\)/);
   assert.match(manager, /onChange=\{\(value\) => \{ if \(checkPriceDrafts\(\)\) setSearch\(value\); \}\}/);
