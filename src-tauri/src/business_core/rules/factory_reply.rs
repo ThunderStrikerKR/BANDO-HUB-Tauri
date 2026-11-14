@@ -411,7 +411,7 @@ mod tests {
         let frozen=state.clone();
         let preview=conflict_confirmation(&json!({
             "state":state,"id":"f1","rowNumber":2})).unwrap();
-        assert_eq!(preview["text"],"2행 / 김수취\\n기존: 1234567890 / 운임 4,900원\\n회신: 9999999999 / 운임 8,500원\\n이 한 행만 정정할까요? 기존 값과 원본 파일은 보존됩니다.");
+        assert_eq!(preview["text"],"2행 / 김수취\n기존: 1234567890 / 운임 4,900원\n회신: 9999999999 / 운임 8,500원\n이 한 행만 정정할까요? 기존 값과 원본 파일은 보존됩니다.");
         assert_eq!(frozen["workflow"]["shipments"][0]["actualFreight"]["FACTORY"],4900);
         let denied=conflict_confirmation(&json!({
             "state":frozen,"id":"f1","rowNumber":99}));
