@@ -10,7 +10,7 @@ import { KakaoClients } from "./KakaoClients";
 import { LinkedText } from "./LinkedText";
 import { ClientPicker, TierBadge } from "./ManagementUI";
 import { confirmAction } from "./dialogs";
-import { replaceReception } from "./orders/reception";
+import { businessCoreCall } from "./tauri-bridge";
 import type { NoticeSink } from "./shared/notices";
 import { nativeRememberedTitleClient } from "./native-title-clients";
 import type { Client, DockWindow, OcrCapture, Order, State } from "./types";
@@ -51,6 +51,17 @@ export function SourceDocument({
     [busy, setBusy] = useState(false);
   const pending = useRef(false),
     alive = useRef(true);
+  const latestReception = useRef({ order, text });
+  latestReception.current = { order, text };
+  const nativeReplaceReception = async (source: Order, raw: string): Promise<Order> => {
+    const { order: next } = await businessCoreCall<{ order: Order }>(
+      "rules", "apply_reception_action", {
+        action: "replace_reception", order: source,
+        raw, now: new Date().toISOString(),
+      },
+    );
+    return next;
+  };
   const [windows, setWindows] = useState<DockWindow[]>([]);
   const [error, setError] = useState("");
   const [ocrFailure, setOcrFailure] = useState("");
@@ -159,12 +170,23 @@ export function SourceDocument({
     if (mode === "replace" && text.trim() && raw !== text &&
       !(await confirmAction("기존 미확정 원문과 분석 결과를 OCR 내용으로 교체할까요?"))) return;
     if (formal) return;
-    const next = replaceReception(order, raw);
-    onText(raw);
-    onOrder(next);
-    setOcrResult(null);
-    setError("");
-    onNotice("검토한 OCR 문구를 발주 원문에 반영했습니다.", "success");
+    pending.current = true;
+    setBusy(true);
+    try {
+      const next = await nativeReplaceReception(order, raw);
+      if (!alive.current || latestReception.current.order !== order ||
+          latestReception.current.text !== text) return;
+      onText(raw);
+      onOrder(next);
+      setOcrResult(null);
+      setError("");
+      onNotice("검토한 OCR 문구를 발주 원문에 반영했습니다.", "success");
+    } catch (error) {
+      if (alive.current) setError(String(error).replace(/^Error: /, ""));
+    } finally {
+      pending.current = false;
+      if (alive.current) setBusy(false);
+    }
   };
   const paste = async (value?: string, orderType = order.orderType ?? "AGENCY") => {
     if (formal || pending.current) return;
@@ -179,7 +201,7 @@ export function SourceDocument({
         !(await confirmAction("현재 초안과 분석 결과를 새 원문으로 교체할까요?"))
       )
         return;
-      const next = raw === text ? structuredClone(order) : replaceReception(order, raw);
+      const next = raw === text ? structuredClone(order) : await nativeReplaceReception(order, raw);
       next.orderType = orderType;
       let chats: DockWindow[] = [];
       try {
@@ -187,7 +209,8 @@ export function SourceDocument({
       } catch {
         /* Title lookup is optional; manual selection remains available. */
       }
-      if (!alive.current) return;
+      if (!alive.current || latestReception.current.order !== order ||
+          latestReception.current.text !== text) return;
       setWindows(chats);
       if (!order.clientId) {
         // A failed optional title lookup must not discard a valid pasted order.
@@ -203,6 +226,8 @@ export function SourceDocument({
           onNotice("카카오톡 거래처 자동 연결을 확인하지 못했습니다. 거래처를 직접 선택해 주세요.", "error");
         }
       }
+      if (!alive.current || latestReception.current.order !== order ||
+          latestReception.current.text !== text) return;
       setError("");
       onText(raw);
       onOrder(next);
