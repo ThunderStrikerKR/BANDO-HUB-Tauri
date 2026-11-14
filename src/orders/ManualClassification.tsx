@@ -539,18 +539,45 @@ export function ManualClassification({
     );
     if (cell.field !== "quantity") return input;
     const increment = (delta: number) => {
-      if (!allowed(cell)) return;
+      if (!allowed(cell) || manualQuantityPending.current.has(key)) return;
       checkpoint();
       const value = Math.max(1, Number(manualValue(model, cell) || 0) + delta);
-      const next = setManualValue(model, cell, String(value), state, order);
-      next.rows
-        .find((r) => r.id === cell.recipientId)!
-        .items.find((i) => i.id === cell.itemId)!.quantityConfirmed = true;
-      setModel(next);
-      setQuantityText((old) => ({ ...old, [key]: String(value) }));
-      setPending(undefined);
-      setError(undefined);
-      requestAnimationFrame(() => focus(cell));
+      const request = (manualQuantityRequest.current[key] ?? 0) + 1;
+      manualQuantityRequest.current[key] = request;
+      manualQuantityPending.current.add(key);
+      void businessCoreCall<{ quantity: number | null; quantityConfirmed: boolean }>(
+        "rules", "apply_manual_classification", {
+          action: "parse_manual_quantity", value: String(value),
+        },
+      ).then(({ quantity, quantityConfirmed }) => {
+        if (manualQuantityRequest.current[key] !== request ||
+            latestInputs.current.order !== order) return;
+        manualQuantityPending.current.delete(key);
+        if (!quantityConfirmed || quantity == null) {
+          fail("수량을 1 이상의 정수로 입력하세요.", cell);
+          return;
+        }
+        setModel((current) => {
+          const next = structuredClone(current);
+          const item = next.rows.find((r) => r.id === cell.recipientId)
+            ?.items.find((i) => i.id === cell.itemId);
+          if (!item) return current;
+          item.quantity = quantity;
+          item.quantityConfirmed = true;
+          delete item.quantityApproval;
+          item.issues = item.issues.filter((issue) => !issue.includes("수량"));
+          return next;
+        });
+        setQuantityText((old) => ({ ...old, [key]: String(quantity) }));
+        setPending(undefined);
+        setError(undefined);
+        requestAnimationFrame(() => focus(cell));
+      }).catch((e) => {
+        if (manualQuantityRequest.current[key] === request) {
+          manualQuantityPending.current.delete(key);
+          fail(e instanceof Error ? e.message : String(e), cell);
+        }
+      });
     };
     return (
       <div className="manual-quantity-cell">
