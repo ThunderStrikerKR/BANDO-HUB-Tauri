@@ -209,10 +209,18 @@ pub(super) fn project_order(payload: &Value) -> Result<Value, String> {
     }).collect::<Vec<_>>();
     let has_vat = recipients.iter().any(|row| vat_applies(order, row));
     let has_excluded = recipients.iter().any(|row| !vat_applies(order, row));
+    // OrderDesk previously used TS hubMessages(...).validation to show
+    // staff blockers. Reuse the authoritative Rust order_issues projection
+    // with the current draft overlay, not a second UI computation.
+    let current_order = payload.get("draft")
+        .filter(|draft| str_field(draft,"id")==order_id)
+        .unwrap_or(order);
+    let issues=super::issues::order_issues(current_order);
     Ok(json!({
         "orderId": order_id,
         "shipmentCount": ships.len(),
         "lineAmounts": line_amounts,
+        "issues": issues,
         "total": sum_field(&amounts, "total"),
         "vatLabel": if has_vat && has_excluded { "부가세 포함/별도" }
             else if has_vat { "부가세 포함" } else { "부가세 별도" }
