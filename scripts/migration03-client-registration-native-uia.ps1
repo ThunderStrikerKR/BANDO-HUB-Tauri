@@ -116,8 +116,8 @@ function WaitFor([scriptblock]$predicate,[int]$seconds,[string]$label) {
   } while ((Get-Date) -lt $end)
   throw "Timed out: $label"
 }
-function StartNative([string[]]$args) {
-  $script:proc = Start-Process -FilePath $Exe -ArgumentList $args -WorkingDirectory (Split-Path $Exe) -PassThru
+function StartNative([string[]]$launchArguments) {
+  $script:proc = Start-Process -FilePath $Exe -ArgumentList $launchArguments -WorkingDirectory (Split-Path $Exe) -PassThru
   WaitFor { $script:proc.Refresh(); $script:proc.MainWindowHandle -ne [IntPtr]::Zero } 45 "Tauri window"
   [BandoClientInput]::ShowWindow($script:proc.MainWindowHandle,3) | Out-Null
   [BandoClientInput]::SetForegroundWindow($script:proc.MainWindowHandle) | Out-Null
