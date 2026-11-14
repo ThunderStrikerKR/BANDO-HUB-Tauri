@@ -1,5 +1,5 @@
 import { businessCoreCall } from "./tauri-bridge";
-import { factoryConflictConfirmation } from "./factory-conflict-review";
+import { nativeFactoryConflictConfirmation } from "./native-factory-conflict-review";
 import { confirmAction } from "./dialogs";
 import { useEffect, useState } from "react";
 import type { State } from "./types";
@@ -90,7 +90,7 @@ export function FactoryNotifications({
                         onClick={async () => {
                           if (
                             !(await confirmAction(
-                              factoryConflictConfirmation(state, record.id, row.row),
+                              await nativeFactoryConflictConfirmation(state, record.id, row.row),
                             ))
                           )
                             return;
