@@ -144,3 +144,16 @@ test("order edit history is frozen natively at commit without delaying controlle
   assert.match(rust, /let snapshot=billing\(previous,before,reason,at\)/);
   assert.match(dispatcher, /"finalize_billing_history" => reply_rules::finalize_billing_history/);
 });
+
+
+test("manual classification final approved order is produced by native Rust, never TS applyManual", () => {
+  const manual = source("src/orders/ManualClassification.tsx");
+  const rust = source("src-tauri/src/business_core/rules/manual_classification.rs");
+  const dispatcher = source("src-tauri/src/business_core/rules/mod.rs");
+  assert.match(manual, /"rules", "apply_manual_classification"/);
+  assert.match(manual, /assignmentOrder: Object\.keys\(model\.assignments\)/);
+  assert.match(manual, /onApply\(finalized\)/);
+  assert.doesNotMatch(manual, /onApply\(applyManual\(/);
+  assert.match(rust, /fn synchronize\(order:&mut Value\)/);
+  assert.match(dispatcher, /"apply_manual_classification" => manual_classification::apply/);
+});
