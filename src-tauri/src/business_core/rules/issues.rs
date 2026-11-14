@@ -134,7 +134,15 @@ fn emit(result:&mut Vec<Value>,order:&Value,info:Info<'_>){
     let evidence=js_evidence(evidence);
     let decision=field(order,"issueResolutions").get(&id);
     let status=resolution.unwrap_or_else(||{
-        if decision.is_some_and(|d|
+        let approved=kind=="QUANTITY_MISSING"&&item.is_some_and(|i|{
+            field(field(i,"quantityApproval"),"quantity").as_i64()==Some(1)&&
+            field(i,"quantity").as_i64()==Some(1)&&
+            field(i,"quantityConfirmed").as_bool()==Some(false)&&
+            !str_field(i,"productId").is_empty()&&
+            !str_field(i,"variantId").is_empty()
+        });
+        if approved{"PROVISIONALLY_APPROVED"}
+        else if decision.is_some_and(|d|
              str_field(d,"evidence")==evidence.as_deref().unwrap_or("")
              && str_field(d,"resolution")=="PENDING_CUSTOMER") {
             "PENDING_CUSTOMER"
