@@ -15,9 +15,23 @@ fn evidence_value(value:&Value)->String {
             // keys, which changes JSON.stringify evidence and staff
             // decision fingerprints.
             let mut keys=map.keys().cloned().collect::<Vec<String>>();
-            if map.contains_key("kind"){
+            // Exact original parser.ts/item.match insertion order:
+            // kind -> term -> productIds -> aliasId. This string is a
+            // persisted employee-decision fingerprint, not cosmetic JSON.
+            if map.contains_key("kind") && map.contains_key("term") {
+                let expected=["kind","term","productIds","aliasId"];
+                keys.retain(|key|!expected.contains(&key.as_str()));
+                for key in expected.iter().rev(){
+                    if map.contains_key(*key){keys.insert(0,(*key).to_owned());}
+                }
+            } else if map.contains_key("kind"){
                 keys.retain(|key|key.as_str()!="kind");
                 keys.insert(0,"kind".to_string());
+            } else if map.len()==3 && ["field","value","label"].iter()
+                .all(|key|map.contains_key(*key)) {
+                // Original candidate objects received through the React
+                // input may have value before label, unlike sorted maps.
+                keys=vec!["field".into(),"value".into(),"label".into()];
             }
             format!("{{{}}}",keys.iter().map(|key|format!("{}:{}",
                 json!(key),evidence_value(&map[key]))).collect::<Vec<_>>().join(","))

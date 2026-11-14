@@ -1,17 +1,22 @@
 import type { StaffBlock } from "./hub-messages";
 export function StaffChecks({
   blocks,
+  loading = false,
+  error = "",
   onSelect,
   onCancelApproval,
   onCandidate,
 }: {
   blocks: StaffBlock[];
+  loading?: boolean;
+  error?: string;
   onSelect: (block: StaffBlock) => void;
   onCancelApproval?: (b: StaffBlock) => void;
   onCandidate?: (b: StaffBlock, value: string) => void;
 }) {
-  const actions = blocks.filter((b) => b.severity !== "INFO"),
-    facts = blocks.filter((b) => b.severity === "INFO"),
+  const visible = loading || error ? [] : blocks;
+  const actions = visible.filter((b) => b.severity !== "INFO"),
+    facts = visible.filter((b) => b.severity === "INFO"),
     inherited = facts.filter(
       (b) =>
         b.kind === "APPLIED" && b.resolutionSource === "코어" && b.title === "공통 상품 자동 적용",
@@ -26,7 +31,11 @@ export function StaffChecks({
         </small>
       </h3>
       <div className="staff-check-scroll">
-        {!actions.length && <p className="staff-empty">필수 확인 사항 없음</p>}
+        {loading
+          ? <p className="staff-empty">확인 항목을 계산하고 있습니다.</p>
+          : error
+            ? <p className="form-error" role="alert">Rust 확인 항목 조회 실패: {error}</p>
+            : !actions.length && <p className="staff-empty">필수 확인 사항 없음</p>}
         {actions.map((b, n) => (
           <article
             className={

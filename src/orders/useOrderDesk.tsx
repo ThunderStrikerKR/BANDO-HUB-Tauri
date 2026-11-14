@@ -9,11 +9,11 @@ import {
   unassignedClient,
 } from "../domain";
 import type { StaffBlock } from "../hub-messages";
-import { hubMessages } from "../hub-messages";
 import { businessCoreCall } from "../tauri-bridge";
 import { useNativeWorkflowReconcile } from "./useNativeWorkflowReconcile";
 import { useNativeWorkflowBoard } from "./useNativeWorkflowBoard";
 import { useNativeOrderPreview } from "./useNativeOrderPreview";
+import { useNativeOrderIssues } from "./useNativeOrderIssues";
 import { applyRustReceptionAnalysis, assertRustReceptionAnalysis, receptionAnalysisAllowed } from "./rust-reception";
 import { registeredProducts, sortProducts } from "../product-models";
 import { billingSnapshot } from "../replies";
@@ -22,7 +22,7 @@ import type { Item, Order, Product, State } from "../types";
 import { clone } from "../ui";
 import { pendingIssue } from "../validation";
 import { shouldRefreshUncommittedOrderPricing } from "./passive-pricing";
-import { groupMessages, groupShipments } from "../workflow";
+import { groupShipments } from "../workflow";
 type SaveMode = "save" | "notify" | "pay" | "queue" | "wait";
 export type OrderDeskProps = {
   onRawEditDirty?: (dirty: boolean) => void;
@@ -93,7 +93,6 @@ export function useOrderDesk({
   const place = (content: ReactNode, node?: HTMLElement | null) =>
     portalTargets ? (node ? createPortal(content, node) : null) : content;
   const [source, setSource] = useState(draft.analysisRaw ?? draft.raw),
-    [links] = useState({ payment: false, options: false }),
     [selected, setSelected] = useState<string[]>([]);
   const client = orderClient(draft, state),
     liveClient = state.clients.find((c) => c.id === draft.clientId && !c.deletedAt) ?? client,
@@ -110,7 +109,8 @@ export function useOrderDesk({
   const flowReady = nativeFlow.ready;
   const nativeBoard = useNativeWorkflowBoard(flowState);
   const nativeOrder = useNativeOrderPreview(flowState, draft, flowReady);
-  const flowSummaryReady = flowReady && nativeBoard.ready && nativeOrder.ready;
+  const nativeIssues = useNativeOrderIssues(draft);
+  const flowSummaryReady = flowReady && nativeBoard.ready && nativeOrder.ready && nativeIssues.ready;
   const flowGroups = (flowState.workflow?.groups ?? []).filter((g) =>
     groupShipments(flowState, g.id).some((s) => s.orderId === draft.id),
   );
@@ -127,9 +127,6 @@ export function useOrderDesk({
     ? nativeBoard.byId[activeGroupId]?.shipments.find((entry) => entry.shipmentId === activeShipment.id)
     : undefined;
 
-  const generated = activeGroupId
-    ? groupMessages(flowState, activeGroupId, links)
-    : hubMessages(draft, state, undefined, links);
   const persisted = persistedOrders ?? state.orders;
   const saved = persisted.some((o) => o.id === draft.id),
     // Saved orders retain historical prices even when their preview state
@@ -437,8 +434,8 @@ export function useOrderDesk({
     !draft.raw.trim() && !draft.recipients.length
       ? []
       : flowGroups.length
-        ? flowGroups.flatMap((g) => groupMessages(flowState, g.id).validation)
-        : generated.validation;
+        ? flowGroups.flatMap((g) => nativeBoard.byId[g.id]?.issues ?? [])
+        : nativeIssues.issues;
   const staffBlocks: StaffBlock[] = allBlocks
     .filter((b, i, a) => a.findIndex((x) => x.issueId === b.issueId) === i)
     .map((b) => {
@@ -603,7 +600,7 @@ export function useOrderDesk({
             id: item.id, raw: item.raw, sources: item.sources,
             quantityConfirmed: item.quantityConfirmed,
           };
-          Object.assign(item, itemFromProduct(p, pricingClient, undefined, item.quantity), old, {
+          Object.assign(item, itemFromProduct(p, pricingClient, undefined, item.quantity, variantId, unitPrice), old, {
             manuallyConfirmed: true, unitPrice,
           });
           item.match = { kind: "NAME", term: p.name, productIds: [p.id] };
@@ -616,7 +613,7 @@ export function useOrderDesk({
         });
       } else {
         recEdit(rid, (r) => r.items.push({
-          ...itemFromProduct(p, pricingClient, undefined, null),
+          ...itemFromProduct(p, pricingClient, undefined, null, variantId, unitPrice),
           unitPrice, quantityConfirmed: false,
         }));
       }
@@ -657,7 +654,7 @@ export function useOrderDesk({
     flowState,
     flowReady,
     flowSummaryReady,
-    flowSummaryError: nativeFlow.error || nativeBoard.error || nativeOrder.error,
+    flowSummaryError: nativeFlow.error || nativeBoard.error || nativeOrder.error || nativeIssues.error,
     orderPreview: nativeOrder.result,
     setProductSearch,
     edit,

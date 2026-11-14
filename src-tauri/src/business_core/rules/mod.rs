@@ -14,6 +14,7 @@ mod reception_operations;
 mod retail_operations;
 mod raw_corrections;
 mod reply_rules;
+mod client_change;
 mod factory_reply;
 mod legacy_migration;
 mod shipping;
@@ -88,6 +89,7 @@ pub fn execute(operation: &str, payload: Value) -> Result<Value, String> {
         "analyze_factory_reply" | "preview_factory_reply" | "apply_factory_reply" =>
             factory_reply::execute(operation, &payload),
         "apply_reply_action" => reply_rules::apply(&payload),
+        "client_change_issue" => client_change::check(&payload),
         "apply_raw_correction" => raw_corrections::apply(&payload),
         "apply_retail_action" => retail_operations::apply(&payload),
         "apply_reception_action" => reception_operations::apply(&payload),

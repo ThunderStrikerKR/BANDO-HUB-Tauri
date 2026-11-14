@@ -391,6 +391,9 @@ pub(super) fn apply(payload:&Value)->Result<Value,String> {
                 let account=account_for(&state,group,&state["orders"][oi],&client)
                     .ok_or_else(||"등록된 계좌를 선택하세요.".to_string())?.clone();
                 let notice_id=required_str(payload,"noticeId")?;
+                // The Rust output engine renders this frozen text before
+                // invoking rules. Keep the pure rules crate independent of
+                // the output crate for isolated TS/Rust differential tests.
                 let payment_message=required_str(payload,"paymentMessage")?;
                 let mut amounts=serde_json::Map::new();
                 for si in &ships {

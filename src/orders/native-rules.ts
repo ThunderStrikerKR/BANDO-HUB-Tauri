@@ -3,9 +3,33 @@
  * These functions never write SQLite or silently modify the supplied order.
  */
 import { businessCoreCall } from "../tauri-bridge";
-import { groupMessages } from "../workflow";
 import { assertRustReceptionAnalysis, type RustReceptionAnalysis } from "./rust-reception";
-import type { Client, Order, Origin, Price, State } from "../types";
+import type { BillingSnapshot, Client, Order, Origin, Price, State } from "../types";
+
+/** The same billing snapshot as the legacy replies.ts oracle, including
+ * frozen historical totals. This Rust result is never recomputed in TS. */
+export async function nativeBillingSnapshot(
+  order: Order, state: State, reason: string,
+): Promise<BillingSnapshot> {
+  const { snapshot } = await businessCoreCall<{ snapshot: BillingSnapshot }>(
+    "rules", "apply_reply_action", {
+      action: "billing_snapshot", order, state, reason,
+      now: new Date().toISOString(),
+    },
+  );
+  return snapshot;
+}
+
+/** A change of dealer may invalidate already-issued or paid shipments.
+ * Delegate this decision to Rust before re-pricing the selected draft. */
+export async function nativeClientChangeIssue(
+  state: State, order: Order, dealerId: string,
+): Promise<string | undefined> {
+  const { issue } = await businessCoreCall<{ issue: string | null }>(
+    "rules", "client_change_issue", { state, order, dealerId },
+  );
+  return issue ?? undefined;
+}
 
 export async function nativeRepriceEditedOrder(
   order: Order,
@@ -100,12 +124,19 @@ export async function nativeApplyWorkflowAction(
   // Audit IDs are preallocated on the caller side. Only IDs of actually
   // emitted records are used; never leave a partially changed SQLite state.
   const auditEventIds = Array.from({ length: 2048 }, () => crypto.randomUUID());
-  // Payment copy text is UI-owned but its notice record is a native Rust
-  // workflow decision. Build it from the reconciled state that Rust will use.
-  const paymentMessage =
-    action === "advance_group" && typeof args.groupId === "string"
-      ? groupMessages(prepared, args.groupId).payment
-      : undefined;
+  // The immutable notice must use the full Rust-rendered payment text,
+  // not the editable customer-message preview or a TypeScript formatter.
+  // Render from the same reconciled state passed to the Rust rules reducer.
+  const nextStep = action === "advance_group" && typeof args.groupId === "string"
+    ? (await businessCoreCall<{ nextStep: number }>("rules", "evaluate_workflow", {
+        state: prepared, groupId: args.groupId,
+      })).nextStep
+    : undefined;
+  const paymentMessage = nextStep === 3 && typeof args.groupId === "string"
+    ? (await businessCoreCall<{ payment: string }>("output", "render_payment_notice", {
+        state: prepared, groupId: args.groupId,
+      })).payment
+    : undefined;
   const payload = {
     state: prepared, action, now, actor,
     eventId: crypto.randomUUID(),
@@ -113,7 +144,7 @@ export async function nativeApplyWorkflowAction(
     newGroupId: crypto.randomUUID(),
     confirmationId: crypto.randomUUID(),
     noticeId: crypto.randomUUID(),
-    ...(paymentMessage !== undefined ? { paymentMessage } : {}),
+    ...(paymentMessage === undefined ? {} : { paymentMessage }),
     ...args,
   };
   const result = await businessCoreCall<{ state: State }>(

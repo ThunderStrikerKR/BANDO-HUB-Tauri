@@ -85,6 +85,8 @@ jobs:
         run: node --test tests/rust-migration/rules/order-save-parity.test.mjs
       - name: Compare native group shipping rates with original TypeScript
         run: node --test tests/rust-migration/rules/shipping-rate-parity.test.mjs
+      - name: Compare live native staff review with original TypeScript order issues
+        run: node --test tests/rust-migration/rules/preview-issues-parity.test.mjs
 
   rules-comprehensive-parity:
     runs-on: ubuntu-latest

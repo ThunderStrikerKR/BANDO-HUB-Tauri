@@ -1,9 +1,10 @@
 import { validDeliveryAddress } from "./delivery-requirements";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { sameValue } from "./shared/draft";
 import { confirmDiscardDraft } from "./shared/editor-flow";
 import { correctionMessage, correctionStatus } from "./corrections";
 import { nativeApplyCorrectionAction } from "./orders/native-rules";
+import { businessCoreCall } from "./tauri-bridge";
 import { itemFromProduct } from "./domain";
 import { internalModel } from "./matching";
 import { ProductSearchDialog } from "./ProductSearchDialog";
@@ -33,24 +34,42 @@ export function CorrectionPanel({
   const changed = !sameValue(after, ctx.recipient);
   const closeDraft = () => void confirmDiscardDraft("공장 전달 후 정정 요청", changed, onClose, busy);
   const requests = state.workflow!.changeRequests.filter((r) => r.shipmentId === sid);
+  const latestSelection = useRef({ state, search });
+  latestSelection.current = { state, search };
   const setProduct = (p: Product) => {
-    const c = ctx.client;
-    setAfter((r) => ({
-      ...r,
-      items: r.items.map((i) =>
-        i.id === search
+    const target = search;
+    if (!target || busy) return;
+    const client = ctx.client;
+    void run(async () => {
+      // The old itemFromProduct helper must not calculate a TS quote before
+      // its unitPrice is overwritten. Only a registered independent variant
+      // can be quoted; unconfigured products keep the original null price.
+      const variantId = p.variants.length === 1 && !p.requiresOption
+        ? p.variants[0].id : undefined;
+      const unitPrice = variantId
+        ? (await businessCoreCall<{ unitPrice: number | null }>(
+            "rules", "resolve_unit_price", { product: p, variantId, client },
+          )).unitPrice
+        : null;
+      if (latestSelection.current.state !== state ||
+          latestSelection.current.search !== target) return;
+      setAfter((recipient) => ({
+        ...recipient,
+        items: recipient.items.map((item) => item.id === target
           ? {
-              ...itemFromProduct(p, c, undefined, i.quantity),
-              id: i.id,
+              ...itemFromProduct(
+                p, client, undefined, item.quantity, variantId, unitPrice,
+              ),
+              id: item.id,
               manuallyConfirmed: true,
               quantityConfirmed: true,
               issues: [],
-              sources: i.sources,
+              sources: item.sources,
             }
-          : i,
-      ),
-    }));
-    setSearch(undefined);
+          : item),
+      }));
+      setSearch(undefined);
+    });
   };
   return (
     <>

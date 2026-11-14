@@ -20,7 +20,7 @@ import {
   deleteShippingGroup,
   changeShippingBasis,
 } from "../../../../src/shipping.ts";
-import { shipmentTotals, validateWorkflow, reconcileWorkflow, deleteOrder, workflowIssues, stageIssues, applyOrderRawEdit, migrateWorkflow, advanceGroup, undoGroup, setShipmentFreight, processGroup, confirmGroupPayment, recordPayment, restoreShipment, markStoreSent, recordChangeRequest, setGroupAccount, detachShipment, regroupShipment, completeDelivery, groupContext, groupStep } from "../../../../src/workflow.ts";
+import { shipmentTotals, validateWorkflow, reconcileWorkflow, clientChangeIssue, deleteOrder, workflowIssues, stageIssues, applyOrderRawEdit, migrateWorkflow, advanceGroup, undoGroup, setShipmentFreight, processGroup, confirmGroupPayment, recordPayment, restoreShipment, markStoreSent, recordChangeRequest, setGroupAccount, detachShipment, regroupShipment, completeDelivery, groupContext, groupStep } from "../../../../src/workflow.ts";
 import { recordActualFreight } from "../../../../src/actual-freight.ts";
 import { dispatchState } from "../../../../src/factory-replies.ts";
 import { shouldRefreshUncommittedOrderPricing } from "../../../../src/orders/passive-pricing.ts";
@@ -118,6 +118,52 @@ for(const tier of ["retail","semi","wholesale","special"] as const) {
   add("tier "+tier,"resolve_unit_price",{product,variantId:"v1",client:c},
     ()=>({unitPrice:resolvePrice(product as any,"v1",c)}));
 }
+/** Dealer-change protection is a live, save-affecting decision in the UI.
+ * Compare the original TS guard with the production Rust read-only contract.
+ */
+function dealerChangeCase(name:string,mutate:(state:any)=>void=()=>{},dealerId="dealer-2"){
+  const state:any=copy(baseState);
+  mutate(state);
+  add("dealer change: "+name,"client_change_issue",{
+    state,order:state.orders[0],dealerId
+  },()=>({issue:clientChangeIssue(state,state.orders[0],dealerId)??null}));
+  cases[cases.length-1].expectedOk=true;
+}
+dealerChangeCase("unchanged dealer",()=>{},"dealer-1");
+dealerChangeCase("new dealer without frozen commitments");
+dealerChangeCase("legacy order without workflow",s=>{delete s.workflow;});
+dealerChangeCase("cancelled queue is not a transfer",s=>{
+  s.workflow.queue.push({shipmentId:"shipment:o1:r1",status:"CANCELLED"});
+});
+dealerChangeCase("queued shipment prevents dealer change",s=>{
+  s.workflow.queue.push({shipmentId:"shipment:o1:r1",status:"QUEUED"});
+});
+dealerChangeCase("exported queue prevents dealer change",s=>{
+  s.workflow.queue.push({shipmentId:"shipment:o1:r1",status:"EXPORTED"});
+});
+dealerChangeCase("actual transfer prevents dealer change",s=>{
+  s.workflow.shipments[0].transferred=true;
+});
+dealerChangeCase("fourth workflow stage prevents dealer change",s=>{
+  s.workflow.shipments[0].step=4;
+});
+dealerChangeCase("historical delivery prevents dealer change",s=>{
+  s.workflow.shipments[0].delivery={at:"2026-11-13"};
+});
+dealerChangeCase("payment allocation prevents dealer change",s=>{
+  s.workflow.payments.push({allocations:[{shipmentId:"shipment:o1:r1",amount:3000}]});
+});
+dealerChangeCase("unrelated payment must not block",s=>{
+  s.workflow.payments.push({allocations:[{shipmentId:"not-this-shipment",amount:3000}]});
+});
+dealerChangeCase("prior owner group not connected to shipment",s=>{
+  s.workflow.groups[0].id="another-group";
+  s.workflow.queue.push({shipmentId:"shipment:o1:r1",status:"QUEUED"});
+});
+dealerChangeCase("same dealer can retain paid shipment",s=>{
+  s.workflow.shipments[0].step=4;
+},"dealer-1");
+
 const shippingState=copy(baseState);
 add("factory tariff","calculate_shipping",{order,state:shippingState},
   ()=>recommendShipping(order as any,shippingState as any));
