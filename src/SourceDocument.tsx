@@ -12,7 +12,7 @@ import { ClientPicker, TierBadge } from "./ManagementUI";
 import { confirmAction } from "./dialogs";
 import { businessCoreCall } from "./tauri-bridge";
 import type { NoticeSink } from "./shared/notices";
-import { rememberedTitleClient } from "./title-clients";
+
 import type { Client, DockWindow, OcrCapture, Order, State } from "./types";
 
 export function SourceDocument({
@@ -73,17 +73,21 @@ export function SourceDocument({
   const autoAttempt = useRef("");
   useEffect(() => {
     if (!text.trim() || client || order.clientId || formal || busy) return;
-    const id = rememberedTitleClient(state, windows),
-      matched = state.clients.find((c) => c.id === id);
-    if (!matched) return;
-    const attempt = JSON.stringify([order.id, text, matched.id]);
-    if (autoAttempt.current === attempt) return;
-    autoAttempt.current = attempt;
-    void Promise.resolve()
-      .then(() => onDealer(matched))
-      .catch((e) => {
-        if (alive.current) setError(String(e).replace(/^Error: /, ""));
-      });
+    let cancelled = false;
+    void businessCoreCall<{ clientId: string | null }>(
+      "rules", "remembered_kakao_title_client", { state, windows },
+    ).then(async ({ clientId: id }) => {
+      if (cancelled || !alive.current || !id) return;
+      const matched = state.clients.find((c) => c.id === id);
+      if (!matched) return;
+      const attempt = JSON.stringify([order.id, text, matched.id]);
+      if (autoAttempt.current === attempt) return;
+      autoAttempt.current = attempt;
+      await onDealer(matched);
+    }).catch((e) => {
+      if (!cancelled && alive.current) setError(String(e).replace(/^Error: /, ""));
+    });
+    return () => { cancelled = true; };
   }, [state, windows, text, client, order.clientId, order.id, formal, busy, onDealer]);
   useEffect(() => {
     if (!text.trim() || client || formal) return;
@@ -202,8 +206,11 @@ export function SourceDocument({
       if (!alive.current || latestInputs.current.order !== order || latestInputs.current.text !== text) return;
       setWindows(chats);
       if (!order.clientId) {
-        const id = rememberedTitleClient(state, chats),
-          matched = state.clients.find((c) => c.id === id);
+        const { clientId: id } = await businessCoreCall<{ clientId: string | null }>(
+          "rules", "remembered_kakao_title_client", { state, windows: chats },
+        );
+        if (!alive.current || latestInputs.current.order !== order || latestInputs.current.text !== text) return;
+        const matched = state.clients.find((c) => c.id === id);
         if (matched) {
           next.clientId = matched.id;
           next.clientSnapshot = structuredClone(matched);
