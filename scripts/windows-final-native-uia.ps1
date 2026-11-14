@@ -317,23 +317,41 @@ finally:
   }
   Start-Sleep -Milliseconds 520
   Capture "reopened" "설정-재진입-실제화면"
-  $operator=@(Elements | Where-Object {
+  $nodes=Elements
+  $operator=@($nodes | Where-Object {
     $_.name -eq "작업자 이름" -and $_.control -match "Edit" -and
     !$_.offscreen -and $_.w -gt 75 -and $_.h -gt 10
   }) | Select-Object -First 1
-  if($null -eq $operator){throw "Saved operator field not visibly accessible after settings screen re-entry"}
-  # First try the semantic API, then native mouse/keyboard reading of the
-  # same measured HTML input, never a JS/React or database substitution.
+  $nameLabel=@($nodes | Where-Object {
+    $_.name -eq "작업자 이름" -and $_.control -match "Text" -and
+    !$_.offscreen -and $_.w -gt 0 -and $_.h -gt 0
+  }) | Select-Object -First 1
+  if($null -eq $operator -and $null -eq $nameLabel){
+    throw "Saved operator field and its visible label are both missing after settings re-entry"
+  }
   $shown=$null
   $accessMethod="UIA ValuePattern"
-  try {
-    $pattern=$operator.el.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern)
-    $shown=$pattern.Current.Value
-  } catch {
-    $accessMethod="Native mouse click and keyboard Ctrl+A / Ctrl+C"
+  if($null -ne $operator){
+    try {
+      $pattern=$operator.el.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern)
+      $shown=$pattern.Current.Value
+    } catch {}
+  }
+  if($shown -ne "CI-Windows-UIA-검수"){
+    # When WebView2 omits Edit semantics, point relative to the visible
+    # accessibility Text label (x + 100, bottom + 25) into the actual input.
+    # Never inject a DOM value or re-read the saved DB as a UI substitute.
+    $accessMethod="Native label-relative mouse and clipboard read"
+    if($null -ne $operator){
+      $x=[int]($operator.x+[Math]::Min(110,$operator.w/2))
+      $y=[int]($operator.y+$operator.h/2)
+    } else {
+      $x=[int]($nameLabel.x+100)
+      $y=[int]($nameLabel.y+$nameLabel.h+25)
+    }
+    $report.reopenClick=@{method=$accessMethod;x=$x;y=$y;label=($null -ne $nameLabel)}
+    Store
     [BandoAuditNative]::SetForegroundWindow($proc.MainWindowHandle)|Out-Null
-    $x=[int]($operator.x+[Math]::Min(110,$operator.w/2))
-    $y=[int]($operator.y+$operator.h/2)
     [BandoAuditNative]::SetCursorPos($x,$y)|Out-Null
     [BandoAuditNative]::mouse_event(0x0002,0,0,0,[UIntPtr]::Zero)
     Start-Sleep -Milliseconds 90
@@ -341,7 +359,7 @@ finally:
     Start-Sleep -Milliseconds 200
     [System.Windows.Forms.Clipboard]::Clear()
     [System.Windows.Forms.SendKeys]::SendWait("^a")
-    Start-Sleep -Milliseconds 140
+    Start-Sleep -Milliseconds 120
     [System.Windows.Forms.SendKeys]::SendWait("^c")
     Start-Sleep -Milliseconds 270
     $shown=[System.Windows.Forms.Clipboard]::GetText()
