@@ -41,6 +41,13 @@ pub(super) fn finalize_billing_history(payload:&Value)->Result<Value,String>{
         let Some(marker)=marker.filter(|v|!v.is_null()) else {continue};
         let Some(previous)=previous_orders.iter()
             .find(|old|str_field(old,"id")==str_field(order,"id")) else {continue};
+        // Never allow a stale React draft to overwrite an already frozen
+        // historical invoice, even if the first-edit marker survives a save.
+        let frozen=rows(field(previous,"billingHistory"));
+        let incoming=rows(field(order,"billingHistory"));
+        if incoming.len()<frozen.len() || !incoming.iter().zip(frozen).all(|(a,b)|a==b){
+            return Err("과거 청구 이력이 변경되었습니다. 최신 주문을 다시 불러오세요.".into());
+        }
         if !flag(previous,"pricesLocked") ||
             marker.get("activeGroupId").and_then(Value::as_str)
                 .is_some_and(|value|!value.is_empty()) ||
