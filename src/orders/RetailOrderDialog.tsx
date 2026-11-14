@@ -33,7 +33,10 @@ export function RetailOrderDialog({
   const initial = useRef(structuredClone(order));
   const addingProduct = useRef(false);
   const alive = useRef(true);
-  useEffect(() => () => { alive.current = false; }, []);
+  useEffect(() => {
+    alive.current = true;
+    return () => { alive.current = false; };
+  }, []);
   const closeDraft = () => void confirmDiscardDraft("직접 입력 주문", !sameValue(order, initial.current), onClose, busy);
   useEffect(() => onDraft?.(order), [order, onDraft]);
   const row = order.recipients[0],
