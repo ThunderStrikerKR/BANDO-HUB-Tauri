@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - fix/03-client-registration-native-audit
+      - migration/03-integration
     paths:
       - scripts/migration03-client-registration-native-uia.ps1
       - .github/workflows/migration-client-registration-native.yml
