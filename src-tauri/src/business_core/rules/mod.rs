@@ -14,6 +14,7 @@ mod reception_operations;
 mod kakao_title;
 mod manual_classification;
 mod message_template_validation;
+mod provisional_notice_validation;
 mod catalog_item;
 mod retail_operations;
 mod raw_corrections;
@@ -100,6 +101,7 @@ pub fn execute(operation: &str, payload: Value) -> Result<Value, String> {
         "apply_reception_action" => reception_operations::apply(&payload),
         "apply_manual_classification" => manual_classification::apply(&payload),
         "validate_automatic_templates" => message_template_validation::validate(&payload),
+        "validate_provisional_notices" => provisional_notice_validation::validate(&payload),
         "create_catalog_item" => catalog_item::make(&payload),
         "remember_kakao_title_client" | "remembered_kakao_title_client" =>
             kakao_title::execute(operation, &payload),
