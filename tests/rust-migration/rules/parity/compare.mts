@@ -36,6 +36,7 @@ import { receiptOf, correctReceipt } from "../../../../src/receipt.ts";
 import { billingSnapshot, applyReply } from "../../../../src/replies.ts";
 import { replyNeedsReview } from "../../../../src/factory-replies.ts";
 import { factoryConflictConfirmation } from "../../../../src/factory-conflict-review.ts";
+import { validateProvisionalProductNotices } from "../../../../src/provisional-product-notices.ts";
 import { validateAutomaticMessageTemplates } from "../../../../src/automatic-message-templates.ts";
 import { addressInfo, addressParts } from "../../../../src/parser.ts";
 import { companyClient, companyParty } from "../../../../src/order-types.ts";
@@ -3544,6 +3545,26 @@ catalogItemCase("special tier override",copy(product),{
 catalogItemCase("catalog label and price absence",{
   ...copy(product),catalog:"OFFICIAL",variants:[{...copy(product.variants[0]),wholesale:null}]
 },copy(client),1,"v1");
+
+// The live product-specific provisional notice editor now calls the native
+// validator. Compare the actual original TS eligibility on every fixture.
+function productNoticeCase(name:string,notices:Record<string,unknown>,valid=true){
+  const state:any=copy(baseState);
+  state.settings.provisionalProductNotices=notices;
+  add("provisional notice validation: "+name,
+    "validate_provisional_product_notices",{state},
+    ()=>{validateProvisionalProductNotices(state);return {valid:true};});
+  cases[cases.length-1].expectedOk=valid;
+}
+productNoticeCase("registered one",{"p1":"직원 잠정 안내"});
+productNoticeCase("empty settings",{});
+productNoticeCase("2000 Unicode code points",{"p1":"😀".repeat(2000)});
+productNoticeCase("unknown product rejected",{"unknown":"주의"},false);
+productNoticeCase("whitespace only rejected",{"p1":"　 \n"},false);
+productNoticeCase("over 2000 Unicode code points rejected",{"p1":"😀".repeat(2001)},false);
+productNoticeCase("nonstring rejected",{"p1":5},false);
+productNoticeCase("5001 notices rejected",Object.fromEntries(
+  Array.from({length:5001},(_,i)=>["p"+i,"주의"])),false);
 
 const runner=spawnSync(rustBinary||"cargo",rustBinary?[]:[
   "run","--quiet","--manifest-path",
