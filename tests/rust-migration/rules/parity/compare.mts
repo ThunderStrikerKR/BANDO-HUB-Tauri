@@ -25,7 +25,7 @@ import { recordActualFreight } from "../../../../src/actual-freight.ts";
 import { dispatchState } from "../../../../src/factory-replies.ts";
 import { shouldRefreshUncommittedOrderPricing } from "../../../../src/orders/passive-pricing.ts";
 import { deleteGroup, restoreGroup } from "../../../../src/group-trash.ts";
-import { correctionStatus, requestCorrection, copiedCorrection, confirmCorrection, markFactoryDelivered, markCollected, reopenUnsentExport } from "../../../../src/corrections.ts";
+import { correctionStatus, correctionMessage, requestCorrection, copiedCorrection, confirmCorrection, markFactoryDelivered, markCollected, reopenUnsentExport } from "../../../../src/corrections.ts";
 import { recordCopy } from "../../../../src/message-model.ts";
 import { paymentSignature } from "../../../../src/automatic-message.ts";
 import { orderIssues, approveMissingQuantity, pendingIssue } from "../../../../src/validation.ts";
@@ -3360,6 +3360,51 @@ factoryReviewCase("source file error remains review after applied row", [
 factoryReviewCase("empty reply has no pending rows", [
   {...copy(openReply),rows:[]}
 ]);
+
+// The actual factory clipboard payload and status use Rust results.
+// Compare complete Korean text, including spacing, freight and field order.
+const correctionViewState:any=copy(baseState);
+const correctionShipId=correctionViewState.workflow.shipments[0].id;
+const originalCorrectionRecipient:any=copy(correctionViewState.orders[0].recipients[0]);
+const editedCorrectionRecipient:any=copy(originalCorrectionRecipient);
+editedCorrectionRecipient.name="변경된 수취인";
+editedCorrectionRecipient.mobile="010-0000-0000";
+editedCorrectionRecipient.note="교문 앞 수령";
+editedCorrectionRecipient.items[0].quantity=3;
+editedCorrectionRecipient.shippingCharges={FACTORY:4500,STORE:2500};
+editedCorrectionRecipient.freightCode="020";
+const correctionViewRequest:any={
+  id:"correction-message-1",shipmentId:correctionShipId,
+  orderId:correctionViewState.orders[0].id,
+  beforeRecipient:originalCorrectionRecipient,
+  afterRecipient:editedCorrectionRecipient,
+  at:actionNow,actor:"가상 직원",text:"배송 정보 정정 요청"
+};
+correctionViewState.workflow.changeRequests=[correctionViewRequest];
+function correctionViewCase(name:string,state:any){
+  add("factory correction copy: "+name,"apply_correction_action",{
+    action:"correction_view",state,shipmentId:correctionShipId
+  },()=>({requests:state.workflow.changeRequests
+    .filter((r:any)=>r.shipmentId===correctionShipId)
+    .map((r:any)=>({id:r.id,status:correctionStatus(state,r.id),
+      message:r.afterRecipient&&r.beforeRecipient?correctionMessage(state,r.id):null}))}));
+}
+correctionViewCase("complete changed fields",correctionViewState);
+const pendingCorrectionState:any=copy(correctionViewState);
+pendingCorrectionState.workflow.events.push({
+  id:"correction-status-test",at:actionNow,actor:"가상 직원",
+  action:"정정 요청 상태",shipmentIds:[correctionShipId],
+  before:correctionViewRequest.id,after:"PENDING_FACTORY"
+});
+correctionViewCase("pending factory status",pendingCorrectionState);
+const legacyCorrectionState:any=copy(correctionViewState);
+legacyCorrectionState.workflow.changeRequests=[{
+  id:"legacy-correction-test",shipmentId:correctionShipId,text:"구 버전 정정 안내"
+}];
+correctionViewCase("legacy request without structured details",legacyCorrectionState);
+const blankCorrectionState:any=copy(correctionViewState);
+blankCorrectionState.workflow.changeRequests=[];
+correctionViewCase("no correction requests",blankCorrectionState);
 
 const runner=spawnSync(rustBinary||"cargo",rustBinary?[]:[
   "run","--quiet","--manifest-path",
