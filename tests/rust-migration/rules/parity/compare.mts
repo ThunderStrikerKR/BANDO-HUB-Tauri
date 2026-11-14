@@ -14,6 +14,7 @@ import { resolvePrice, totals, parseOrder, repriceOrder, itemFromProduct } from 
 import {
   recommendShipping,
   editableShippingRule,
+  effectiveShippingRule,
   combinationVersions,
   combinationCurrent,
   upgradeShipping,
@@ -3446,6 +3447,13 @@ function shippingViewCase(name:string,state:any){
     [g.id,editableShippingRule(g.current)])),
     currentCombinations:Object.fromEntries(shipping.combinations.map((c:any)=>
     [c.id,combinationCurrent(c,state)]))}));
+  add("product freight view: "+name,"product_freight_view",{state},()=>({
+    byProduct:Object.fromEntries(state.products.map((p:any)=>{
+      const {rule,group}=effectiveShippingRule(state,p.id);
+      return [p.id,{rule:rule??null,group:group??null,
+        editableRule:rule?editableShippingRule(rule):null}];
+    }))
+  }));
 }
 shippingViewCase("active group and per-item edit",shippingViewState);
 const shippingChanged:any=copy(shippingViewState);
@@ -3454,6 +3462,13 @@ shippingViewCase("old combination after tariff revision",shippingChanged);
 const shippingIndividual:any=copy(shippingViewState);
 shippingIndividual.products[0].shippingGroupId=undefined;
 shippingViewCase("assignment removed",shippingIndividual);
+const freightOwnRule:any=copy(shippingIndividual);
+freightOwnRule.shipping.productRules={p1:{...copy(shipping.groups[0].current),
+  perItem:4300,maxBundle:1,maxConfirmed:true}};
+shippingViewCase("individual product tariff",freightOwnRule);
+const freightDeletedGroup:any=copy(shippingViewState);
+freightDeletedGroup.shipping.groups[0].deletedAt=actionNow;
+shippingViewCase("deleted group falls back to product tariff",freightDeletedGroup);
 
 // Staff provisional notice save validation; the real TS original is the oracle.
 function provisionalValidationCase(name:string,notices:Record<string,unknown>,valid=true){
