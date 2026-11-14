@@ -2,6 +2,8 @@
 //! XLSX byte parsing and React editor drafts remain UI concerns. A validated
 //! state transition is returned to the existing revision-checked SQLite saver.
 use serde_json::{json, Value};
+#[path = "catalog_clients/title_clients.rs"]
+mod title_clients;
 #[path = "catalog_clients/client_preview.rs"]
 mod client_preview;
 #[path = "catalog_clients/registration.rs"]
@@ -289,6 +291,7 @@ pub fn execute(operation: &str, payload: Value) -> Result<Value, String> {
     if operation == "official_links" { return queries::execute(operation, &payload); }
     let state = payload.get("state").ok_or("현재 상태가 없습니다.")?;
     match operation {
+        "remembered_title_client" | "remember_title_client" => title_clients::execute(operation,&payload),
         "preview_client_rows" => client_preview::preview(&payload),
         "upsert_product_from_editor" => editor::execute(&payload),
         "save_alias" | "alias_problems" | "alias_problems_one" => aliases::execute(operation,&payload),
