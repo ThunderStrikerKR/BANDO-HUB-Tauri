@@ -2,7 +2,6 @@
 //! employee confirmation copy. Oracles: src/factory-replies.ts and
 //! src/factory-conflict-review.ts. Read-only, never approves a conflict.
 use serde_json::{json,Value};
-use super::super::rules;
 
 fn field<'a>(v:&'a Value,key:&str)->&'a Value {
     v.get(key).unwrap_or(&Value::Null)
