@@ -192,3 +192,15 @@ test("freight managers read tariff rule and current status from native Rust", ()
   assert.match(rust, /fn current_combo\(/);
   assert.match(rust, /fn edit_rule\(/);
 });
+
+
+test("OCR, pasted and cleared reception drafts use Rust, never the old TS reducer", () => {
+  const component = source("src/SourceDocument.tsx");
+  const native = source("src-tauri/src/business_core/rules/reception_operations.rs");
+  assert.match(component, /action: "replace_reception", order: source/);
+  assert.match(component, /const next = await nativeReplaceReception\(order, raw\)/);
+  assert.match(component, /await nativeReplaceReception\(order, ""\)/);
+  assert.match(component, /latestReception\.current\.order !== order/);
+  assert.doesNotMatch(component, /(?:^|[^A-Za-z])replaceReception\(/m);
+  assert.match(native, /"replace_reception"=>/);
+});
