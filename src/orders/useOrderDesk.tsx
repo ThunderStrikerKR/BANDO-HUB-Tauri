@@ -603,7 +603,7 @@ export function useOrderDesk({
             id: item.id, raw: item.raw, sources: item.sources,
             quantityConfirmed: item.quantityConfirmed,
           };
-          Object.assign(item, itemFromProduct(p, pricingClient, undefined, item.quantity), old, {
+          Object.assign(item, itemFromProduct(p, pricingClient, undefined, item.quantity, variantId, unitPrice), old, {
             manuallyConfirmed: true, unitPrice,
           });
           item.match = { kind: "NAME", term: p.name, productIds: [p.id] };
@@ -616,7 +616,7 @@ export function useOrderDesk({
         });
       } else {
         recEdit(rid, (r) => r.items.push({
-          ...itemFromProduct(p, pricingClient, undefined, null),
+          ...itemFromProduct(p, pricingClient, undefined, null, variantId, unitPrice),
           unitPrice, quantityConfirmed: false,
         }));
       }
