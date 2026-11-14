@@ -277,30 +277,26 @@ export function ProductFreightPanel({
                       </button>
                       {rule && (
                         <button
+                          disabled={busy}
                           onClick={async () => {
                             if (
                               !(await confirmAction(
                                 "이 상품의 새 운임 기준을 시작하고 이전 자동 추천을 중단할까요?",
                               ))
-                            )
-                              return;
-                            const next = clone(state);
-                            if (group) {
-                              const g = next.shipping!.groups.find((g) => g.id === group.id)!;
-                              g.history.push(g.current);
-                              g.current = emptyProductRule();
-                            } else {
-                              next.shipping!.productHistory ??= {};
-                              next.shipping!.productHistory[p.id] = [
-                                ...(next.shipping!.productHistory[p.id] ?? []),
-                                rule,
-                              ];
-                              next.shipping!.productRules![p.id] = emptyProductRule();
+                            ) return;
+                            try {
+                              const { shipping } = await businessCoreCall<{
+                                shipping: NonNullable<State["shipping"]>;
+                              }>("rules", "apply_shipping_action", {
+                                action: "start_new_rule", shipping: state.shipping,
+                                productId: p.id, groupId: group?.id,
+                                versionId: crypto.randomUUID(), now: new Date().toISOString(),
+                              });
+                              await save({ ...state, shipping },
+                                "새 운임 기준을 시작했습니다. 확인된 운임을 다시 입력하세요.");
+                            } catch (error) {
+                              onNotice(error instanceof Error ? error.message : String(error), "error");
                             }
-                            void save(
-                              next,
-                              "새 운임 기준을 시작했습니다. 확인된 운임을 다시 입력하세요.",
-                            );
                           }}
                         >
                           기준 변경
