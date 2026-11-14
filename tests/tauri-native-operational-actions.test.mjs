@@ -110,3 +110,20 @@ test("factory correction clipboard and display use fresh Rust projection without
   assert.match(native, /fn message\(/);
   assert.match(dispatcher, /"render_correction_summaries" => corrections::summaries/);
 });
+
+
+test("Kakao title-to-client decisions are Rust-owned in both UI entrypoints", () => {
+  const kakao = source("src/KakaoClients.tsx");
+  const reception = source("src/SourceDocument.tsx");
+  const adapter = source("src/native-title-clients.ts");
+  const native = source("src-tauri/src/business_core/catalog_clients/title_clients.rs");
+  assert.match(kakao, /await nativeRememberTitle\(/);
+  assert.doesNotMatch(kakao, /rememberTitle\(\s*state/);
+  assert.match(reception, /nativeRememberedTitleClient\(state, windows\)/);
+  assert.match(reception, /await nativeRememberedTitleClient\(state, chats\)/);
+  assert.doesNotMatch(reception, /rememberedTitleClient\(state,/);
+  assert.match(adapter, /"catalog_clients", "remember_title_client"/);
+  assert.match(adapter, /"catalog_clients", "remembered_title_client"/);
+  assert.match(native, /"remember_title_client"=>remember\(payload\)/);
+  assert.match(reception, /autoInput\.current\.state !== state/);
+});
