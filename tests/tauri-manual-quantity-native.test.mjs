@@ -32,6 +32,9 @@ test("manual identity/contact/note text editing is native-owned with TS parity",
   assert.match(source, /action: "set_manual_recipient_field", model, cell, value/);
   assert.match(source, /manualTextRequest\.current\[key\] !== request/);
   assert.match(core, /action == "set_manual_recipient_field"/);
+  assert.match(core, /fn manual_address_parts\(value: &str\) -> Value/);
+  assert.match(source, /row\.addressParts = changed\.addressParts/);
+  assert.match(parity, /"manual address parts: "/);
   assert.match(parity, /"manual recipient: "\+field/);
   assert.match(parity, /setManualValue\(manualModel,cell,value,baseState as any,manualOrder as any\)/);
 });
