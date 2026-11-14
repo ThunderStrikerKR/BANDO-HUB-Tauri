@@ -194,7 +194,8 @@ test("factory workbook blocks a legacy multi-configuration item instead of selec
 });
 test("Order editor chooses a complete standalone product rather than a variant dropdown", () => {
   const source = read("src/OrderItemEditor.tsx");
-  assert.match(source, /itemFromProduct\(candidate, client/);
+  assert.match(source, /"rules", "create_catalog_item"/);
+  assert.doesNotMatch(source, /itemFromProduct\(/);
   assert.doesNotMatch(source, /label="옵션"|p\?\.variants\.map/);
 });
 test("Factory export uses the frozen complete product name without a second color label",()=>{
