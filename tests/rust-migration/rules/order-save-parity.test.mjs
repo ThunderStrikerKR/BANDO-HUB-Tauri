@@ -14,6 +14,7 @@ const seed=JSON.parse(readFileSync(new URL(
   "../../../src-tauri/resources/state-seed.json",import.meta.url),"utf8"));
 const { totals, reviewIssues, canQueue }=await tsImport("../../../src/domain.ts",import.meta.url);
 const { blankOrder }=await tsImport("../../../src/seed.ts",import.meta.url);
+const { billingSnapshot }=await tsImport("../../../src/replies.ts",import.meta.url);
 const at="2026-11-13T01:05:12.000Z";
 const baseClient={
   id:"synthetic-dealer",name:"가상 거래처",displayName:"가상 거래처",
@@ -50,6 +51,20 @@ function oracle(payload){
   if(!c)throw Error("거래처를 선택하세요.");
   if(draft.status==="EXPORTED")throw Error("공장 전달 완료 주문은 변경할 수 없습니다.");
   const o=structuredClone(draft),next=structuredClone(state);
+  // The original TS billingSnapshot is the oracle for the Rust save-time
+  // transition. The UI records the first-edit time, not a TS monetary value.
+  if(o.pendingBillingSnapshot){
+    const original=state.orders.find(x=>x.id===o.id);
+    if(!original)throw Error("과거 청구 이력을 작성할 기존 주문이 없습니다.");
+    const linked=state.workflow?.shipments.some(x=>
+      x.orderId===original.id && !x.legacyArchived);
+    if(original.pricesLocked&&!linked){
+      const historical=billingSnapshot(original,state,o.pendingBillingSnapshot.reason);
+      historical.at=o.pendingBillingSnapshot.at;
+      o.billingHistory=[...(o.billingHistory??[]),historical];
+    }
+  }
+  delete o.pendingBillingSnapshot;
   o.clientSnapshot=structuredClone(c);
   o.updatedAt=now;
   o.vatAmount=totals(o,c).vat;
@@ -124,6 +139,48 @@ add("unconfirmed first reception cannot be stored",x=>{
   delete x.order.confirmedAt;
 });
 add("invalid contact blocked",x=>{x.order.recipients[0].mobile="010123";},"notify");
+add("locked past invoice is frozen before first draft edit",x=>{
+  const old=structuredClone(x.order);
+  old.pricesLocked=true;old.status="APPROVED";
+  old.notified=true;old.paid=true;
+  old.clientSnapshot=structuredClone(x.client);
+  x.state.orders=[old];
+  x.order.pricesLocked=false;
+  x.order.status="REVIEW";
+  x.order.recipients[0].items[0].quantity=3;
+  x.order.pendingBillingSnapshot={at:"2026-11-13T00:59:00.000Z",
+    reason:"수취인 / 배송 정보 수정"};
+});
+add("frozen history append preserves pre-existing snapshots",x=>{
+  const old=structuredClone(x.order);
+  old.pricesLocked=true;
+  old.billingHistory=[{at:"2026-11-12T02:00:00.000Z",
+    reason:"가상 이력",recipients:[],shippingFee:3000,vatAmount:0,
+    applyVat:false,total:3000,status:"REVIEW",paid:false,notified:false,
+    postpaidApproved:false,client:structuredClone(x.client)}];
+  x.state.orders=[old];
+  x.order.pricesLocked=false;
+  x.order.billingHistory=structuredClone(old.billingHistory);
+  x.order.pendingBillingSnapshot={at:"2026-11-13T00:59:00.000Z",reason:"주문 정보 수정"};
+});
+add("no duplicate snapshot when previous order was not price-locked",x=>{
+  x.state.orders=[structuredClone(x.order)];
+  x.order.pendingBillingSnapshot={at:"2026-11-13T00:59:00.000Z",reason:"주문 정보 수정"};
+});
+add("linked shipment disallows new standalone billing snapshot",x=>{
+  const old=structuredClone(x.order);old.pricesLocked=true;
+  x.state.orders=[old];
+  x.state.workflow.shipments.push({
+    id:"synthetic-linked-shipment",orderId:x.order.id,recipientId:"synthetic-recipient",
+    sourceId:"test",groupId:"g",step:1,transferred:false
+  });
+  x.order.pricesLocked=false;
+  x.order.pendingBillingSnapshot={at:"2026-11-13T00:59:00.000Z",reason:"주문 정보 수정"};
+});
+add("missing original order refuses to invent historical invoice",x=>{
+  x.order.pendingBillingSnapshot={at:"2026-11-13T00:59:00.000Z",reason:"주문 정보 수정"};
+});
+
 const requests=scenarios.map(({input})=>({
   domain:"rules",operation:"save_order",payload:input,
 }));
