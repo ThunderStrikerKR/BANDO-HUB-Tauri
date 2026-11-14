@@ -3309,6 +3309,8 @@ const manualModel:ManualModel={
 function manualCase(name:string,o:any,m:ManualModel,valid=true){
   add("manual classification: "+name,"apply_manual_classification",{
     action:"apply_manual",order:o,model:m,
+    // JS source-assignment object iteration order is part of the native contract.
+    assignmentOrder:Object.keys(m.assignments),
   },()=>({order:applyManual(o,m)}));
   cases[cases.length-1].expectedOk=valid;
 }
