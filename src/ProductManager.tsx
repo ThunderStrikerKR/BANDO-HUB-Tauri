@@ -4,7 +4,7 @@ import { categoryPath } from "./category-tree";
 import { catalogFromCategory, withCatalogRoots } from "./category-roots";
 import { BrandCombobox, ProductCategoryPicker } from "./ProductDetailComponents";
 import { SALE_STATES } from "./sale-status";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AliasManager } from "./AliasManager";
 import { ClassificationFilters, RegistrySettings } from "./Classification";
 import { confirmAction } from "./dialogs";
@@ -55,9 +55,29 @@ export function ProductManager({
     [adding, setAdding] = useState(false),
     [excelOpen, setExcelOpen] = useState(false),
     [priceMode, setPriceMode] = useState(false),
+    [priceResetEpoch, setPriceResetEpoch] = useState(0),
+    [pendingPriceIds, setPendingPriceIds] = useState<string[]>([]),
     [detailPriceMode, setDetailPriceMode] = useState(false),
     [categoryPicker, setCategoryPicker] = useState(false);
+  const priceWrites = useRef(0);
   const editDirty = !!edit && !!originalEdit && !sameProductEditor(edit, originalEdit);
+  const hasPendingPrices = pendingPriceIds.length > 0;
+  const markPricePending = useCallback((id: string, pending: boolean) => {
+    setPendingPriceIds((previous) => {
+      const has = previous.includes(id);
+      if (has === pending) return previous;
+      return pending ? [...previous, id] : previous.filter((value) => value !== id);
+    });
+  }, []);
+  const checkPriceDrafts = () => {
+    if (priceWrites.current > 0) {
+      onNotice("가격 저장이 완료된 뒤 다음 작업으로 이동할 수 있습니다.", "error");
+      return false;
+    }
+    if (!hasPendingPrices) return true;
+    onNotice("저장하지 않은 가격이 있습니다. 해당 가격 셀의 저장 또는 취소 버튼을 먼저 눌러주세요.", "error");
+    return false;
+  };
   const [localImage, setLocalImage] = useState<{ id: string; data: string }>();
   useEffect(() => {
     setLocalImage(undefined);
@@ -120,6 +140,8 @@ export function ProductManager({
     setOriginalEdit(clone(fresh));
   };
   const save = async (): Promise<boolean> => {
+    // A product-detail save cannot commit edits staged in unrelated table cells.
+    if (!checkPriceDrafts()) return false;
     if (!edit) return true;
     const result = await runSave(async () => {
       // The native reducer owns normalization, legacy modelKey semantics,
@@ -138,10 +160,19 @@ export function ProductManager({
   };
   usePageLeaveGuard({
     label: "상품",
-    hasChanges: () => editDirty,
-    busy: () => savingView,
+    hasChanges: () => editDirty || hasPendingPrices,
+    busy: () => savingView || priceWrites.current > 0,
     save,
-    discard: () => { setEdit(undefined); setOriginalEdit(undefined); setCategoryPicker(false); },
+    discard: () => {
+      setEdit(undefined);
+      setOriginalEdit(undefined);
+      setCategoryPicker(false);
+      // Explicitly discard pending price-table edits only after the shared
+      // page-leave confirmation, never just because input focus moved.
+      setPriceMode(false);
+      setPendingPriceIds([]);
+      setPriceResetEpoch((old) => old + 1);
+    },
   });
   const closeDetail = async () => {
     if (!edit || savingView) return;
@@ -166,10 +197,14 @@ export function ProductManager({
     setSearch("");
   };
   const openDetail = (p: Product) => {
+    if (!checkPriceDrafts()) return;
     setDetailPriceMode(false);
     setCategoryPicker(false);
     setEdit(clone(p));
     setOriginalEdit(clone(p));
+  };
+  const togglePriceMode = () => {
+    if (!priceMode || checkPriceDrafts()) setPriceMode(!priceMode);
   };
   const remove = async (p: Product) => {
     if (
@@ -223,7 +258,7 @@ export function ProductManager({
                     title="상품 가격 수정"
                     purpose="등록된 상품의 도매가, 반도매가, 소매가를 확인하거나 변경하는 기능입니다."
                     when="판매 가격이 달라졌거나 잘못 등록한 가격을 고칠 때 사용합니다."
-                    steps={["가격 수정 모드 켜기를 누릅니다.", "변경할 가격을 입력합니다.", "Enter를 눌러 해당 가격을 저장합니다.", "수정을 마치면 가격 수정 모드 종료를 누릅니다."]}
+                    steps={["가격 수정 모드를 켭니다.", "원하는 가격을 입력합니다.", "Enter 또는 가격 셀의 저장 버튼으로 저장합니다.", "다른 칸을 클릭해도 미저장 값은 유지되며, 취소 버튼 또는 Esc로 되돌릴 수 있습니다.", "저장 또는 취소를 마치면 가격 수정 모드를 종료합니다."]}
                     result="저장한 가격이 상품 가격표에 반영됩니다."
                     caution="수정 모드를 켜기 전에는 가격을 바꿀 수 없습니다. 가격이 비어 있으면 등록되지 않은 상태입니다."
                   />
@@ -233,7 +268,7 @@ export function ProductManager({
                       <button
                         aria-pressed={priceMode}
                         className={priceMode ? "primary" : ""}
-                        onClick={() => setPriceMode(!priceMode)}
+                        onClick={togglePriceMode}
                       >
                         {priceMode ? "가격 수정 모드 종료" : "가격 수정 모드 켜기"}
                       </button>
@@ -263,7 +298,7 @@ export function ProductManager({
             <section className="card product-prices">
               <div className="management-search-toolbar">
                 <ManagementSearch label="상품 검색" placeholder="모델명 또는 상품명 검색"
-                  value={search} onChange={setSearch}/>
+                  value={search} onChange={(value) => { if (checkPriceDrafts()) setSearch(value); }}/>
               </div>
               <div className="manager-filters">
                 <ClassificationFilters
@@ -271,6 +306,7 @@ export function ProductManager({
                   category={category}
                   brand={brand}
                   onChange={(nextCategory, nextBrand) => {
+                    if (!checkPriceDrafts()) return;
                     setCategory(nextCategory);
                     setBrand(nextBrand);
                   }}
@@ -279,7 +315,7 @@ export function ProductManager({
                   <input
                     type="checkbox"
                     checked={missing}
-                    onChange={(e) => setMissing(e.target.checked)}
+                    onChange={(e) => { if (checkPriceDrafts()) setMissing(e.target.checked); }}
                   />{" "}
                   가격 미등록만
                 </label>
@@ -314,12 +350,19 @@ export function ProductManager({
                           {(["wholesale", "semi", "retail"] as const).map((tier) => (
                             <td key={tier}>
                               <PriceCell
+                                key={v.id + ":" + tier + ":" + priceResetEpoch}
                                 enabled={priceMode}
+                                onPendingChange={(pending) => markPricePending(v.id + ":" + tier, pending)}
                                 value={v[tier]}
                                 label={`${p.name} ${variantLabel(v)} ${{ wholesale: "도매가", semi: "반도매가", retail: "소매가" }[tier]}`}
                                 onSave={async (n, expected) => {
-                                  const committed = await window.bando!.setPrice(p.id, v.id, tier, n, expected);
-                                  await onRefresh(committed);
+                                  priceWrites.current++;
+                                  try {
+                                    const committed = await window.bando!.setPrice(p.id, v.id, tier, n, expected);
+                                    await onRefresh(committed);
+                                  } finally {
+                                    priceWrites.current--;
+                                  }
                                 }}
                               />
                             </td>

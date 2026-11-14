@@ -46,6 +46,38 @@
   align-items: center;
   min-height: 28px;
 }
+/* Only the price row being edited becomes taller, so Save/Cancel never
+   block a neighboring price input. Product-name column width is unchanged. */
+.app-v03 .management-container .product-prices .price-cell {
+  min-width: 0;
+}
+.app-v03 .management-container .product-prices .price-cell > input[data-price-cell] {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+}
+.app-v03 .management-container .product-prices .price-cell:has(.price-cell-actions) {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
+}
+.app-v03 .management-container .product-prices .price-cell-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+}
+.app-v03 .management-container .product-prices .price-cell-actions button {
+  min-height: 26px;
+  height: 26px;
+  padding: 2px 7px;
+  font-size: 12px;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+.app-v03 .management-container .product-prices .price-cell.pending > input[data-price-cell] {
+  outline: 1px solid var(--accent, #b6c1dc);
+  outline-offset: -1px;
+}
 .app-v03 .management-container .product-prices .price-cell small {
   position: absolute;
   top: calc(100% + 2px);
@@ -66,6 +98,9 @@
 .app-v03 .management-container .product-prices .price-cell small:empty { display: none; }
 .app-v03 .management-container .product-prices .price-cell:focus-within small:not(:empty),
 .app-v03 .management-container .product-prices .price-cell.invalid small:not(:empty) {
+  opacity: 1;
+}
+.app-v03 .management-container .product-prices .price-cell.pending small:not(:empty) {
   opacity: 1;
 }
 .app-v03 .management-container .product-prices .price-cell.invalid small {
