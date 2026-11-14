@@ -159,22 +159,21 @@ test("manual classification final approved order is produced by native Rust, nev
 });
 
 
-test("factory notifications and history use only native review status and exact confirmation copy", () => {
+test("factory notifications and history use native review status and exact confirmation copy", () => {
   const notice = source("src/FactoryNotifications.tsx");
   const history = source("src/FactoryReplyHistory.tsx");
-  const adapter = source("src/useNativeFactoryReplyReview.ts");
-  const rust = source("src-tauri/src/business_core/output/factory_review.rs");
+  const adapter = source("src/native-factory-conflict-review.ts");
+  const rust = source("src-tauri/src/business_core/rules/factory_reply.rs");
   for (const component of [notice, history]) {
-    assert.match(component, /useNativeFactoryReplyReview\(state\)/);
-    assert.doesNotMatch(component, /replyNeedsReview\(/);
-    assert.doesNotMatch(component, /factoryConflictConfirmation\(/);
+    assert.match(component, /"rules", "factory_reply_review_statuses"/);
+    assert.match(component, /nativeFactoryConflictConfirmation\(/);
+    assert.doesNotMatch(component, /\breplyNeedsReview\(/);
+    assert.doesNotMatch(component, /(?<!native)factoryConflictConfirmation\(/);
   }
-  assert.match(adapter, /"output", "project_factory_reply_review"/);
-  assert.match(adapter, /resolved\?\.state === state/);
-  assert.match(rust, /fn requires_review\(/);
-  assert.match(rust, /fn confirm\(/);
+  assert.match(adapter, /"rules", "factory_conflict_confirmation"/);
+  assert.match(rust, /fn resolved_row\(/);
+  assert.match(rust, /fn conflict_confirmation\(/);
 });
-
 
 test("freight managers read tariff rule and current status from native Rust", () => {
   const group = source("src/ShippingManager.tsx");
