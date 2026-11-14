@@ -1,0 +1,52 @@
+name: Native Windows client registration audit (real Tauri EXE)
+on:
+  push:
+    branches:
+      - fix/03-client-registration-native-audit
+      - migration/03-integration
+    paths:
+      - scripts/migration03-client-registration-native-uia.ps1
+      - .github/workflows/migration-client-registration-native.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  real-client-registration:
+    name: Real Windows keyboard input, Rust upsert and SQLite reload
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Refuse to test an EXE from a different source tree
+        shell: bash
+        run: |
+          git diff --exit-code 3eca217fe2a045e25c6caf0cbedb0bdd234a9afb HEAD -- src src-tauri
+      - name: Fetch exact integrated, green-verified native EXE
+        uses: actions/download-artifact@v4
+        with:
+          name: TSBH-migration03-preview-NOT-FINAL
+          path: native-release
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 43460648913
+      - name: Extract real Windows Tauri EXE
+        shell: pwsh
+        run: |
+          Expand-Archive -LiteralPath "native-release/BANDO-HUB-migration03-preview.zip" -DestinationPath "native-release/unpacked" -Force
+          if (!(Test-Path "native-release/unpacked/bando_hub.exe")) { throw "Native EXE not found" }
+      - name: Test real form input, validation, native Rust save and SQLite persistence
+        shell: pwsh
+        env:
+          BANDO_BINARY_COMMIT: 3eca217fe2a045e25c6caf0cbedb0bdd234a9afb
+        run: |
+          pwsh -NoProfile -Sta -ExecutionPolicy Bypass -File scripts/migration03-client-registration-native-uia.ps1 -Exe (Resolve-Path "native-release/unpacked/bando_hub.exe") -OutDir "client-registration-evidence"
+      - name: Always upload native UI screenshots and structured report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: TSBH-client-registration-native-evidence
+          path: client-registration-evidence/
+          if-no-files-found: warn
+          retention-days: 7
