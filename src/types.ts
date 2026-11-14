@@ -279,6 +279,9 @@ export interface Order {
   replies?: ReplyRecord[];
   messageEdits?: { payment?: string; options?: string };
   billingHistory?: BillingSnapshot[];
+  /** UI-only edit provenance, consumed and removed by Rust before SQLite save.
+   * Never persists; Rust derives the frozen billing values from pre-edit state. */
+  pendingBillingSnapshot?: { at: string; reason: string; activeGroupId: string | null };
   shippingVersion?: string;
 }
 export interface BillingSnapshot {
