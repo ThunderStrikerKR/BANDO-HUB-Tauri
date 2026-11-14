@@ -15,6 +15,7 @@ mod retail_operations;
 mod raw_corrections;
 mod reply_rules;
 mod manual_classification;
+mod shipping_read;
 mod client_change;
 mod factory_reply;
 mod legacy_migration;
@@ -65,6 +66,7 @@ pub fn execute(operation: &str, payload: Value) -> Result<Value, String> {
         "reprice_order" => pricing::reprice_order(&payload),
         "should_refresh_pricing" => Ok(json!({"refresh": pricing::should_refresh(&payload)?})),
         "apply_shipping_action" => shipping::shipping_action(&payload),
+        "shipping_read" => shipping_read::project(&payload),
         "reconcile_workflow" => reconciliation::reconcile(&payload),
         "calculate_shipping" => shipping::recommend(
             req(&payload, "order")?, req(&payload, "state")?,
