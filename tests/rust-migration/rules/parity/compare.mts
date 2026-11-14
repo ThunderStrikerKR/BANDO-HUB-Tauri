@@ -37,6 +37,7 @@ import { billingSnapshot, applyReply } from "../../../../src/replies.ts";
 import { addressInfo, addressParts } from "../../../../src/parser.ts";
 import { companyClient, companyParty } from "../../../../src/order-types.ts";
 import { explicitSender } from "../../../../src/explicit-sender.ts";
+import { rememberTitle, rememberedTitleClient } from "../../../../src/title-clients.ts";
 
 const root=resolve(dirname(fileURLToPath(import.meta.url)),"../../../..");
 const now="2026-11-13T09:00:00+09:00";
@@ -3222,6 +3223,57 @@ function outcome(run:()=>unknown) {
   catch(error) {return {ok:false,error:error instanceof Error?error.message:String(error)};}
 }
 const rustBinary=process.env.TSBH_RULES_BIN;
+// KakaoTalk title-client association uses the exact original TS oracle.
+// Preserve NFKC title normalization, duplicate window guards and active clients.
+const mappedWindows:any[]=[
+  {kind:"CHAT",handle:"w1",title:"  ＡＢ  가상  "},
+];
+const mappedState:any=copy(baseState);
+mappedState.clients=[{...copy(client),id:"dealer-1",active:true}];
+mappedState.settings.kakaoTitleMappings={};
+add("kakao title: remember normalized chat","remember_kakao_title_client",{
+  state:mappedState,windows:mappedWindows,handle:"w1",clientId:"dealer-1",
+  actor:"가상 직원",now:actionNow
+},()=>({state:frozenDate(()=>rememberTitle(mappedState,mappedWindows as any,
+  "w1","dealer-1","가상 직원"))}));
+const twinWindows:any[]=[
+  ...mappedWindows,{kind:"CHAT",handle:"w2",title:"ab 가상"}
+];
+add("kakao title: duplicate normalized titles mark ambiguous","remember_kakao_title_client",{
+  state:mappedState,windows:twinWindows,handle:"w1",clientId:"dealer-1",
+  actor:"가상 직원",now:actionNow
+},()=>({state:frozenDate(()=>rememberTitle(mappedState,twinWindows as any,
+  "w1","dealer-1","가상 직원"))}));
+for(const [name,handle,clientId] of [
+  ["unknown window","absent","dealer-1"],
+  ["unknown dealer","w1","no-client"],
+]){
+  add("kakao title: "+name+" rejected","remember_kakao_title_client",{
+    state:mappedState,windows:mappedWindows,handle,clientId,
+    actor:"가상 직원",now:actionNow
+  },()=>({state:rememberTitle(mappedState,mappedWindows as any,handle,clientId,"가상 직원")}));
+  cases[cases.length-1].expectedOk=false;
+}
+const rememberedState:any=copy(mappedState);
+rememberedState.settings.kakaoTitleMappings={
+  "ab 가상":{clientId:"dealer-1",actor:"가상 직원",updatedAt:actionNow,ambiguous:false}
+};
+function rememberedCase(name:string,state:any,windows:any[]) {
+  add("kakao title lookup: "+name,"remembered_kakao_title_client",{
+    state,windows
+  },()=>({clientId:rememberedTitleClient(state,windows as any)??null}));
+}
+rememberedCase("NFKC match",rememberedState,mappedWindows);
+rememberedCase("two chat windows are not selected",rememberedState,twinWindows);
+rememberedCase("inactive dealer blocked",{
+  ...rememberedState,clients:[{...copy(client),active:false}]
+},mappedWindows);
+rememberedCase("ambiguous remembered mapping blocked",{
+  ...rememberedState,settings:{...rememberedState.settings,
+    kakaoTitleMappings:{"ab 가상":{...rememberedState.settings.kakaoTitleMappings["ab 가상"],
+      ambiguous:true}}}
+},mappedWindows);
+
 const runner=spawnSync(rustBinary||"cargo",rustBinary?[]:[
   "run","--quiet","--manifest-path",
   "tests/rust-migration/rules/Cargo.toml","--bin","json_rules"
